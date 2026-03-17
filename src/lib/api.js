@@ -1,6 +1,6 @@
 import { getBusinessId, getToken } from './storage';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://api.yoursfriend.com';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 async function request(path, options = {}) {
   const token = getToken();
@@ -12,6 +12,10 @@ async function request(path, options = {}) {
 
   if (token) headers.Authorization = `Bearer ${token}`;
   if (businessId) headers['x-business-id'] = businessId;
+
+  if (headers['Content-Type'] === '') {
+    delete headers['Content-Type'];
+  }
 
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
@@ -70,8 +74,34 @@ export const api = {
     return request(`/api/reports/low-stock${suffix}`);
   },
   inventorySummary: () => request('/api/reports/inventory-summary'),
-  listCustomers: () => request('/api/customers'),
-  createCustomer: (data) => request('/api/customers', { method: 'POST', body: JSON.stringify(data) }),
-  listSuppliers: () => request('/api/suppliers'),
-  createSupplier: (data) => request('/api/suppliers', { method: 'POST', body: JSON.stringify(data) }),
+  listParties: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const suffix = query ? `?${query}` : '';
+    return request(`/api/parties${suffix}`);
+  },
+  createParty: (data) => request('/api/parties', { method: 'POST', body: JSON.stringify(data) }),
+  getParty: (id) => request(`/api/parties/${id}`),
+  updateParty: (id, data) => request(`/api/parties/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteParty: (id) => request(`/api/parties/${id}`, { method: 'DELETE' }),
+  listOrderAttributes: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const suffix = query ? `?${query}` : '';
+    return request(`/api/order-attributes${suffix}`);
+  },
+  createOrderAttribute: (data) => request('/api/order-attributes', { method: 'POST', body: JSON.stringify(data) }),
+  getOrderAttribute: (id) => request(`/api/order-attributes/${id}`),
+  updateOrderAttribute: (id, data) => request(`/api/order-attributes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteOrderAttribute: (id) => request(`/api/order-attributes/${id}`, { method: 'DELETE' }),
+  uploadAttachment: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request('/api/uploads/attachment', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        // Let the browser set the boundary for multipart/form-data
+        'Content-Type': '',
+      },
+    });
+  },
 };

@@ -5,12 +5,13 @@ const navItems = [
   { to: '/app', key: 'nav.dashboard' },
   { to: '/app/products', key: 'nav.products' },
   { to: '/app/inventory', key: 'nav.inventory' },
-  { to: '/app/suppliers', key: 'nav.suppliers' },
+  { to: '/app/parties', key: 'nav.parties' },
   { to: '/app/purchases', key: 'nav.purchases' },
   { to: '/app/sales', key: 'nav.sales' },
   { to: '/app/services', key: 'nav.services' },
   { to: '/app/ledger', key: 'nav.ledger' },
   { to: '/app/analytics', key: 'nav.analytics' },
+  { to: '/app/order-attributes', key: 'nav.orderAttributes' },
 ];
 
 export default function Sidebar() {

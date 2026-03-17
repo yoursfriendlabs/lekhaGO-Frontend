@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
-import Pagination from '../components/Pagination';
 import { useI18n } from '../lib/i18n.jsx';
+import { Download, Printer } from 'lucide-react';
 
 function toDateValue(value) {
   if (!value) return null;
@@ -17,42 +17,37 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
 }
 
-function buildMonthRange(monthValue) {
-  if (!monthValue) return { from: '', to: '' };
-  const [year, month] = monthValue.split('-').map(Number);
-  if (!year || !month) return { from: '', to: '' };
-  const from = new Date(year, month - 1, 1);
-  const to = new Date(year, month, 0);
-  return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
-  };
+function buildRange(period) {
+  const now = new Date();
+  if (period === 'month') {
+    return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
+  }
+  if (period === 'year') {
+    return { from: new Date(now.getFullYear(), 0, 1), to: now };
+  }
+  return { from: null, to: null };
 }
 
 export default function Ledger() {
   const { t } = useI18n();
   const [sales, setSales] = useState([]);
   const [purchases, setPurchases] = useState([]);
+  const [parties, setParties] = useState([]);
   const [status, setStatus] = useState('');
-  const [filters, setFilters] = useState({
-    type: 'all',
-    status: 'all',
-    fromDate: '',
-    toDate: '',
-    month: '',
-    search: '',
-    minAmount: '',
-    maxAmount: '',
-  });
-  const [openingBalance, setOpeningBalance] = useState('0');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [selectedPartyId, setSelectedPartyId] = useState('all');
+  const [period, setPeriod] = useState('month');
+  const [pdfWithItem, setPdfWithItem] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.listSales({ limit: 200 }), api.listPurchases({ limit: 200 })])
-      .then(([salesData, purchaseData]) => {
+    Promise.all([
+      api.listSales({ limit: 200 }),
+      api.listPurchases({ limit: 200 }),
+      api.listParties(),
+    ])
+      .then(([salesData, purchaseData, partyData]) => {
         setSales(salesData || []);
         setPurchases(purchaseData || []);
+        setParties(partyData || []);
       })
       .catch((err) => setStatus(err.message));
   }, []);
@@ -71,6 +66,7 @@ export default function Ledger() {
         date: sale.saleDate,
         status: sale.status || 'paid',
         party: sale.Customer?.name || sale.customerName || sale.customerId || t('sales.walkIn'),
+        partyId: sale.customerId || sale.Customer?.id || null,
         grandTotal,
         cashAmount: totalReceived,
         dueAmount,
@@ -89,6 +85,7 @@ export default function Ledger() {
         date: purchase.purchaseDate,
         status: purchase.status || 'received',
         party: purchase.Supplier?.name || purchase.supplierName || purchase.supplierId || '—',
+        partyId: purchase.supplierId || purchase.Supplier?.id || null,
         grandTotal,
         cashAmount: totalPaid,
         dueAmount,
@@ -97,278 +94,171 @@ export default function Ledger() {
     return [...normalizedSales, ...normalizedPurchases];
   }, [sales, purchases, t]);
 
-  const filteredTransactions = useMemo(() => {
-    const fromDate = toDateValue(filters.fromDate);
-    const toDate = toDateValue(filters.toDate);
-    const minAmount = filters.minAmount ? Number(filters.minAmount) : null;
-    const maxAmount = filters.maxAmount ? Number(filters.maxAmount) : null;
-    const search = filters.search.trim().toLowerCase();
+  const { from, to } = useMemo(() => buildRange(period), [period]);
 
+  const filteredTransactions = useMemo(() => {
     return transactions
-      .filter((tx) => (filters.type === 'all' ? true : tx.type === filters.type))
-      .filter((tx) => (filters.status === 'all' ? true : tx.status === filters.status))
+      .filter((tx) => (selectedPartyId === 'all' ? true : tx.partyId === selectedPartyId))
       .filter((tx) => {
-        if (!fromDate && !toDate) return true;
+        if (!from && !to) return true;
         const txDate = toDateValue(tx.date);
         if (!txDate) return false;
-        if (fromDate && txDate < fromDate) return false;
-        if (toDate) {
-          const dayEnd = new Date(toDate);
+        if (from && txDate < from) return false;
+        if (to) {
+          const dayEnd = new Date(to);
           dayEnd.setHours(23, 59, 59, 999);
           if (txDate > dayEnd) return false;
         }
         return true;
       })
-      .filter((tx) => (minAmount === null ? true : tx.grandTotal >= minAmount))
-      .filter((tx) => (maxAmount === null ? true : tx.grandTotal <= maxAmount))
-      .filter((tx) => {
-        if (!search) return true;
-        return (
-          tx.invoiceNo.toLowerCase().includes(search) ||
-          tx.party.toLowerCase().includes(search)
-        );
-      })
-      .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-  }, [filters, transactions]);
+      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+  }, [transactions, selectedPartyId, from, to]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filters]);
-
-  const totals = useMemo(() => {
-    return filteredTransactions.reduce(
-      (acc, tx) => {
-        if (tx.type === 'sale') {
-          acc.salesTotal += tx.grandTotal;
-          acc.receivedTotal += tx.cashAmount;
-          acc.salesDue += tx.dueAmount;
-        } else {
-          acc.purchasesTotal += tx.grandTotal;
-          acc.paidTotal += tx.cashAmount;
-          acc.purchaseDue += tx.dueAmount;
-        }
-        return acc;
-      },
-      { salesTotal: 0, purchasesTotal: 0, receivedTotal: 0, paidTotal: 0, salesDue: 0, purchaseDue: 0 }
-    );
+  const summary = useMemo(() => {
+    let totalDebit = 0;
+    let totalCredit = 0;
+    filteredTransactions.forEach((tx) => {
+      if (tx.type === 'purchase') {
+        totalDebit += tx.grandTotal;
+      } else {
+        totalCredit += tx.grandTotal;
+      }
+    });
+    const netBalance = totalCredit - totalDebit;
+    return { totalDebit, totalCredit, netBalance, entries: filteredTransactions.length };
   }, [filteredTransactions]);
 
-  const opening = Number(openingBalance || 0);
-  const closing = opening + totals.receivedTotal - totals.paidTotal;
-
-  const totalRows = filteredTransactions.length;
-  const pagedRows = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredTransactions.slice(start, start + pageSize);
-  }, [filteredTransactions, page, pageSize]);
-
-  const handleFilterChange = (event) => {
-    const { name, value } = event.target;
-    setFilters((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleMonthChange = (event) => {
-    const value = event.target.value;
-    const range = buildMonthRange(value);
-    setFilters((prev) => ({ ...prev, month: value, fromDate: range.from, toDate: range.to }));
-  };
+  const statementRows = useMemo(() => {
+    let runningBalance = 0;
+    return filteredTransactions.map((tx) => {
+      const debit = tx.type === 'purchase' ? tx.grandTotal : 0;
+      const credit = tx.type === 'sale' ? tx.grandTotal : 0;
+      runningBalance += credit - debit;
+      return {
+        ...tx,
+        debit,
+        credit,
+        runningBalance,
+        label: tx.type === 'sale'
+          ? `${t('ledger.salesInvoice')} ${tx.invoiceNo}`
+          : `${t('ledger.purchaseInvoice')} ${tx.invoiceNo}`,
+      };
+    });
+  }, [filteredTransactions, t]);
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title={t('ledger.title')}
-        subtitle={t('ledger.subtitle')}
+        title={t('ledger.statementTitle')}
+        subtitle={t('ledger.statementSubtitle')}
+        action={(
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary" type="button">
+              <Printer size={16} /> {t('ledger.printPdf')}
+            </button>
+            <button className="btn-primary" type="button">
+              <Download size={16} /> {t('ledger.downloadExcel')}
+            </button>
+          </div>
+        )}
       />
       {status ? <Notice title={status} tone="error" /> : null}
+
       <div className="card space-y-5">
-        <div className="grid gap-4 md:grid-cols-3">
-          <div>
-            <label className="label">{t('ledger.month')}</label>
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            className="input min-w-[200px]"
+            value={selectedPartyId}
+            onChange={(event) => setSelectedPartyId(event.target.value)}
+          >
+            <option value="all">{t('ledger.allParties')}</option>
+            {parties.map((party) => (
+              <option key={party.id} value={party.id}>{party.name}</option>
+            ))}
+          </select>
+          <select
+            className="input min-w-[160px]"
+            value={period}
+            onChange={(event) => setPeriod(event.target.value)}
+          >
+            <option value="month">{t('ledger.thisMonth')}</option>
+            <option value="year">{t('ledger.thisYear')}</option>
+            <option value="all">{t('ledger.allTime')}</option>
+          </select>
+          <label className="flex items-center gap-2 text-sm text-slate-600">
             <input
-              className="input mt-1"
-              type="month"
-              name="month"
-              value={filters.month}
-              onChange={handleMonthChange}
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300"
+              checked={pdfWithItem}
+              onChange={(event) => setPdfWithItem(event.target.checked)}
             />
-          </div>
-          <div>
-            <label className="label">{t('ledger.from')}</label>
-            <input
-              className="input mt-1"
-              type="date"
-              name="fromDate"
-              value={filters.fromDate}
-              onChange={handleFilterChange}
-            />
-          </div>
-          <div>
-            <label className="label">{t('ledger.to')}</label>
-            <input
-              className="input mt-1"
-              type="date"
-              name="toDate"
-              value={filters.toDate}
-              onChange={handleFilterChange}
-            />
-          </div>
-          <div>
-            <label className="label">{t('ledger.type')}</label>
-            <select className="input mt-1" name="type" value={filters.type} onChange={handleFilterChange}>
-              <option value="all">{t('ledger.all')}</option>
-              <option value="sale">{t('ledger.sales')}</option>
-              <option value="purchase">{t('ledger.purchases')}</option>
-            </select>
-          </div>
-          <div>
-            <label className="label">{t('ledger.status')}</label>
-            <select className="input mt-1" name="status" value={filters.status} onChange={handleFilterChange}>
-              <option value="all">{t('ledger.all')}</option>
-              <option value="paid">{t('sales.paid')}</option>
-              <option value="unpaid">{t('sales.due')}</option>
-              <option value="received">{t('purchases.received')}</option>
-              <option value="ordered">{t('purchases.ordered')}</option>
-            </select>
-          </div>
-          <div>
-            <label className="label">{t('ledger.search')}</label>
-            <input
-              className="input mt-1"
-              name="search"
-              value={filters.search}
-              onChange={handleFilterChange}
-              placeholder={t('ledger.search')}
-            />
-          </div>
-          <div>
-            <label className="label">{t('ledger.minAmount')}</label>
-            <input
-              className="input mt-1"
-              type="number"
-              step="0.01"
-              name="minAmount"
-              value={filters.minAmount}
-              onChange={handleFilterChange}
-            />
-          </div>
-          <div>
-            <label className="label">{t('ledger.maxAmount')}</label>
-            <input
-              className="input mt-1"
-              type="number"
-              step="0.01"
-              name="maxAmount"
-              value={filters.maxAmount}
-              onChange={handleFilterChange}
-            />
-          </div>
-          <div>
-            <label className="label">{t('ledger.openingBalance')}</label>
-            <input
-              className="input mt-1"
-              type="number"
-              step="0.01"
-              value={openingBalance}
-              onChange={(event) => setOpeningBalance(event.target.value)}
-            />
-          </div>
+            {t('ledger.pdfWithItem')}
+          </label>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm text-slate-600 dark:border-slate-800/60 dark:bg-slate-900/60 dark:text-slate-300">
-            <p className="text-xs uppercase text-slate-400">{t('dashboard.cashOverview')}</p>
-            <p className="mt-2">
-              {t('ledger.totalReceived')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.receivedTotal.toFixed(2) })}
-            </p>
-            <p>
-              {t('ledger.totalPaid')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.paidTotal.toFixed(2) })}
-            </p>
-            <p className="mt-2 font-semibold">
-              {t('ledger.closingBalance')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: closing.toFixed(2) })}
+
+        <div className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4">
+            <p className="text-xs uppercase text-slate-400">{t('ledger.netBalance')}</p>
+            <p className="mt-2 text-lg font-semibold text-emerald-600">
+              {t('currency.formatted', { symbol: t('currency.symbol'), amount: summary.netBalance.toFixed(2) })}
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm text-slate-600 dark:border-slate-800/60 dark:bg-slate-900/60 dark:text-slate-300">
-            <p className="text-xs uppercase text-slate-400">{t('ledger.sales')}</p>
-            <p className="mt-2">
-              {t('ledger.totalSales')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.salesTotal.toFixed(2) })}
-            </p>
-            <p>
-              {t('ledger.salesDue')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.salesDue.toFixed(2) })}
+          <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4">
+            <p className="text-xs uppercase text-slate-400">{t('ledger.totalDebit')}</p>
+            <p className="mt-2 text-lg font-semibold">
+              {t('currency.formatted', { symbol: t('currency.symbol'), amount: summary.totalDebit.toFixed(2) })}
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm text-slate-600 dark:border-slate-800/60 dark:bg-slate-900/60 dark:text-slate-300">
-            <p className="text-xs uppercase text-slate-400">{t('ledger.purchases')}</p>
-            <p className="mt-2">
-              {t('ledger.totalPurchases')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.purchasesTotal.toFixed(2) })}
+          <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4">
+            <p className="text-xs uppercase text-slate-400">{t('ledger.totalCredit')}</p>
+            <p className="mt-2 text-lg font-semibold">
+              {t('currency.formatted', { symbol: t('currency.symbol'), amount: summary.totalCredit.toFixed(2) })}
             </p>
-            <p>
-              {t('ledger.purchaseDue')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.purchaseDue.toFixed(2) })}
-            </p>
+          </div>
+          <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4">
+            <p className="text-xs uppercase text-slate-400">{t('ledger.totalEntries')}</p>
+            <p className="mt-2 text-lg font-semibold">{summary.entries}</p>
           </div>
         </div>
       </div>
+
       <div className="card">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('ledger.title')}</h3>
-          <span className="text-xs text-slate-500">
-            {filters.fromDate || filters.toDate
-              ? `${filters.fromDate || t('ledger.all')} → ${filters.toDate || t('ledger.all')}`
-              : t('ledger.all')}
-          </span>
-        </div>
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm text-slate-600 dark:text-slate-300">
+          <table className="w-full text-sm text-slate-600">
             <thead className="text-xs uppercase text-slate-400">
               <tr>
                 <th className="py-2 text-left">{t('common.date')}</th>
-                <th className="py-2 text-left">{t('ledger.type')}</th>
-                <th className="py-2 text-left">{t('common.invoice')}</th>
-                <th className="py-2 text-left">{t('ledger.party')}</th>
-                <th className="py-2 text-right">{t('common.total')}</th>
-                <th className="py-2 text-right">{t('ledger.totalReceived')}</th>
-                <th className="py-2 text-right">{t('ledger.salesDue')}</th>
-                <th className="py-2 text-left">{t('common.status')}</th>
+                <th className="py-2 text-left">{t('ledger.transaction')}</th>
+                <th className="py-2 text-right">{t('ledger.debit')}</th>
+                <th className="py-2 text-right">{t('ledger.credit')}</th>
+                <th className="py-2 text-right">{t('ledger.runningBalance')}</th>
               </tr>
             </thead>
             <tbody>
-              {pagedRows.length === 0 ? (
+              {statementRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-3 text-slate-500">
-                    {t('ledger.noTransactions')}
-                  </td>
+                  <td colSpan={5} className="py-3 text-slate-500">{t('ledger.noTransactions')}</td>
                 </tr>
               ) : (
-                pagedRows.map((tx) => (
-                  <tr key={`${tx.type}-${tx.id}`} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                    <td className="py-2">{formatDate(tx.date)}</td>
-                    <td className="py-2 capitalize">{tx.type === 'sale' ? t('ledger.sales') : t('ledger.purchases')}</td>
-                    <td className="py-2">{tx.invoiceNo}</td>
-                    <td className="py-2">{tx.party}</td>
+                statementRows.map((row) => (
+                  <tr key={`${row.type}-${row.id}`} className="border-t border-slate-200/70">
+                    <td className="py-2">{formatDate(row.date)}</td>
+                    <td className="py-2">{row.label}</td>
                     <td className="py-2 text-right">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: tx.grandTotal.toFixed(2) })}
+                      {row.debit > 0 ? t('currency.formatted', { symbol: t('currency.symbol'), amount: row.debit.toFixed(2) }) : '--'}
                     </td>
                     <td className="py-2 text-right">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: tx.cashAmount.toFixed(2) })}
+                      {row.credit > 0 ? t('currency.formatted', { symbol: t('currency.symbol'), amount: row.credit.toFixed(2) }) : '--'}
                     </td>
-                    <td className="py-2 text-right text-rose-600 dark:text-rose-300">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: tx.dueAmount.toFixed(2) })}
+                    <td className={`py-2 text-right ${row.runningBalance < 0 ? 'text-rose-500' : 'text-emerald-600'}`}>
+                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: row.runningBalance.toFixed(2) })}
                     </td>
-                    <td className="py-2 capitalize">{tx.status}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={totalRows}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
-        />
       </div>
     </div>
   );

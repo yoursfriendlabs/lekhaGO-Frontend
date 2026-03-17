@@ -7,6 +7,8 @@ import { useAuth } from '../lib/auth';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import Pagination from '../components/Pagination';
 import { useI18n } from '../lib/i18n.jsx';
+import FileUpload from '../components/FileUpload';
+import DynamicAttributes from '../components/DynamicAttributes';
 
 const emptyItem = {
   productId: '',
@@ -20,19 +22,22 @@ const emptyItem = {
 
 export default function Sales() {
   const { t } = useI18n();
-  const { businessId } = useAuth();
+  const { businessId, user } = useAuth();
   const [products, setProducts] = useState([]);
   const [batchesByProduct, setBatchesByProduct] = useState({});
   const [customers, setCustomers] = useState([]);
+  const [customerQuery, setCustomerQuery] = useState('');
   const [salesList, setSalesList] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [header, setHeader] = useState({
     customerId: '',
     invoiceNo: '',
-    saleDate: '',
+    saleDate: new Date().toISOString().slice(0, 10),
     status: 'paid',
     notes: '',
     amountReceived: '0',
+    attachment: '',
+    attributes: {},
   });
   const [items, setItems] = useState([{ ...emptyItem }]);
   const [status, setStatus] = useState({ type: 'info', message: '' });
@@ -45,8 +50,19 @@ export default function Sales() {
 
   useEffect(() => {
     api.listProducts().then(setProducts).catch(() => null);
-    api.listCustomers().then(setCustomers).catch(() => null);
   }, []);
+
+  useEffect(() => {
+    if (customerQuery.length > 1) {
+      api.listParties({ type: 'customer', q: customerQuery })
+        .then(setCustomers)
+        .catch(() => null);
+    } else {
+      api.listParties({ type: 'customer' })
+        .then(setCustomers)
+        .catch(() => null);
+    }
+  }, [customerQuery]);
 
   useEffect(() => {
     if (!businessId) return;
@@ -192,7 +208,16 @@ export default function Sales() {
   }, [page, pageSize, salesList]);
 
   const resetForm = () => {
-    setHeader({ customerId: '', invoiceNo: '', saleDate: '', status: 'paid', notes: '', amountReceived: '0' });
+    setHeader({
+      customerId: '',
+      invoiceNo: '',
+      saleDate: new Date().toISOString().slice(0, 10),
+      status: 'paid',
+      notes: '',
+      amountReceived: '0',
+      attachment: '',
+      attributes: {},
+    });
     setItems([{ ...emptyItem }]);
     setDeletedItemIds([]);
     setEditingId(null);
@@ -218,6 +243,8 @@ export default function Sales() {
         status: sale.status || 'paid',
         notes: sale.notes || '',
         amountReceived: String(sale.amountReceived ?? 0),
+        attachment: sale.attachment || '',
+        attributes: sale.attributes || {},
       });
       const mappedItems = saleItems.map((item) => ({
         id: item.id,
@@ -329,7 +356,13 @@ export default function Sales() {
             </div>
             <div>
               <label className="label">{t('sales.saleDate')}</label>
-              <input className="input mt-1" type="date" name="saleDate" value={header.saleDate} onChange={handleHeaderChange} required />
+              <input
+                type="date"
+                className="input mt-1"
+                name="saleDate"
+                value={header.saleDate}
+                onChange={handleHeaderChange}
+              />
             </div>
             <div>
               <label className="label">{t('sales.status')}</label>
@@ -349,10 +382,33 @@ export default function Sales() {
                 onChange={handleHeaderChange}
               />
             </div>
-            <div className="md:col-span-2">
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FileUpload
+              label={t('sales.attachment')}
+              initialUrl={header.attachment}
+              onUpload={(url) => setHeader((prev) => ({ ...prev, attachment: url }))}
+            />
+            <div className="md:col-span-1">
               <label className="label">{t('sales.notes')}</label>
-              <input className="input mt-1" name="notes" value={header.notes} onChange={handleHeaderChange} />
+              <textarea
+                className="input mt-1 h-20 resize-none"
+                name="notes"
+                value={header.notes}
+                onChange={handleHeaderChange}
+                placeholder={t('sales.notesPlaceholder')}
+              />
             </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <h3 className="mb-4 text-sm font-medium text-slate-700">
+              {t('services.orderInformation') || 'Order Information'}
+            </h3>
+            <DynamicAttributes
+              entityType="sale"
+              attributes={header.attributes}
+              onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))}
+            />
           </div>
           <div className="flex items-center justify-between">
             <h4 className="font-semibold text-slate-800 dark:text-slate-100">{t('sales.items')}</h4>

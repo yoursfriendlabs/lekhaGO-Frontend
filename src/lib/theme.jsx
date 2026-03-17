@@ -4,20 +4,14 @@ const ThemeContext = createContext(null);
 const STORAGE_KEY = 'mms_theme';
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return stored;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  const theme = 'light';
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'dark') root.classList.add('dark');
-    else root.classList.remove('dark');
-    localStorage.setItem(STORAGE_KEY, theme);
-  }, [theme]);
+    root.classList.remove('dark');
+  }, []);
 
-  const value = useMemo(() => ({ theme, setTheme }), [theme]);
+  const value = useMemo(() => ({ theme, setTheme: () => {} }), []);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

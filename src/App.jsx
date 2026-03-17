@@ -12,9 +12,10 @@ import Inventory from './pages/Inventory';
 import Purchases from './pages/Purchases';
 import Sales from './pages/Sales';
 import Services from './pages/Services';
-import Suppliers from './pages/Suppliers';
+import Parties from './pages/Parties';
 import Ledger from './pages/Ledger';
 import Analytics from './pages/Analytics';
+import OrderAttributes from './pages/OrderAttributes';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Landing from './pages/Landing';
@@ -53,9 +54,10 @@ function AppShell() {
               <Route path="purchases" element={<Purchases />} />
               <Route path="sales" element={<Sales />} />
               <Route path="services" element={<Services />} />
-              <Route path="suppliers" element={<Suppliers />} />
+              <Route path="parties" element={<Parties />} />
               <Route path="ledger" element={<Ledger />} />
               <Route path="analytics" element={<Analytics />} />
+              <Route path="order-attributes" element={<OrderAttributes />} />
               <Route path="invoice/:type/:id" element={<Invoice />} />
               <Route path="*" element={<Navigate to="/app" replace />} />
             </Routes>

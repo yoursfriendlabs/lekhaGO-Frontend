@@ -47,7 +47,7 @@ export default function Purchases() {
     supplierId: '',
     supplierName: '',
     invoiceNo: '',
-    purchaseDate: '',
+    purchaseDate: new Date().toISOString().slice(0, 10),
     status: 'received',
     notes: '',
     amountReceived: '0',
@@ -65,7 +65,7 @@ export default function Purchases() {
 
   useEffect(() => {
     api.listProducts().then(setProducts).catch(() => null);
-    api.listSuppliers().then(setSuppliers).catch(() => null);
+    api.listParties({ type: 'supplier' }).then(setSuppliers).catch(() => null);
   }, []);
 
   useEffect(() => {
@@ -248,7 +248,7 @@ export default function Purchases() {
       supplierId: '',
       supplierName: '',
       invoiceNo: '',
-      purchaseDate: '',
+      purchaseDate: new Date().toISOString().slice(0, 10),
       status: 'received',
       notes: '',
       amountReceived: '0',
@@ -428,7 +428,13 @@ export default function Purchases() {
             </div>
             <div>
               <label className="label">{t('purchases.purchaseDate')}</label>
-              <input className="input mt-1" type="date" name="purchaseDate" value={header.purchaseDate} onChange={handleHeaderChange} required />
+              <input
+                type="date"
+                className="input mt-1"
+                name="purchaseDate"
+                value={header.purchaseDate}
+                onChange={handleHeaderChange}
+              />
             </div>
             <div>
               <label className="label">{t('purchases.status')}</label>

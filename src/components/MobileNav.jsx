@@ -1,17 +1,18 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Package, Boxes, Truck, ShoppingCart, UserCheck, Briefcase, FileText, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Package, Boxes, Users, ShoppingCart, UserCheck, Briefcase, FileText, BarChart3, Settings2 } from 'lucide-react';
 import { useI18n } from '../lib/i18n.jsx';
 
 const navItems = [
   { to: '/app', key: 'nav.home', icon: LayoutDashboard },
   { to: '/app/products', key: 'nav.items', icon: Package },
   { to: '/app/inventory', key: 'nav.stocks', icon: Boxes },
-  { to: '/app/suppliers', key: 'nav.suppliers', icon: Truck },
+  { to: '/app/parties', key: 'nav.parties', icon: Users },
   { to: '/app/purchases', key: 'nav.buy', icon: ShoppingCart },
   { to: '/app/sales', key: 'nav.sell', icon: UserCheck },
   { to: '/app/services', key: 'nav.service', icon: Briefcase },
   { to: '/app/ledger', key: 'nav.ledger', icon: FileText },
   { to: '/app/analytics', key: 'nav.stats', icon: BarChart3 },
+  { to: '/app/order-attributes', key: 'nav.orderAttributes', icon: Settings2 },
 ];
 
 export default function MobileNav() {

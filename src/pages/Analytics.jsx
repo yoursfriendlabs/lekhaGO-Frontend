@@ -64,8 +64,8 @@ export default function Analytics() {
   const [filters, setFilters] = useState({
     type: 'all',
     status: 'all',
-    fromDate: '',
-    toDate: '',
+    fromDate: new Date().toISOString().slice(0, 10),
+    toDate: new Date().toISOString().slice(0, 10),
     search: '',
   });
   const [page, setPage] = useState(1);
@@ -200,8 +200,8 @@ export default function Analytics() {
           <div>
             <label className="label">From</label>
             <input
-              className="input mt-1"
               type="date"
+              className="input mt-1"
               name="fromDate"
               value={filters.fromDate}
               onChange={handleFilterChange}
@@ -210,8 +210,8 @@ export default function Analytics() {
           <div>
             <label className="label">To</label>
             <input
-              className="input mt-1"
               type="date"
+              className="input mt-1"
               name="toDate"
               value={filters.toDate}
               onChange={handleFilterChange}

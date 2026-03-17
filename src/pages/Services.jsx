@@ -4,6 +4,8 @@ import Notice from '../components/Notice';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
+import FileUpload from '../components/FileUpload';
+import DynamicAttributes from '../components/DynamicAttributes';
 
 const emptyItem = {
   itemType: 'labor',
@@ -17,30 +19,38 @@ const emptyItem = {
 
 export default function Services() {
   const { t } = useI18n();
-  const { businessId } = useAuth();
+  const { businessId, user } = useAuth();
   const [products, setProducts] = useState([]);
   const [batchesByProduct, setBatchesByProduct] = useState({});
-  const [customers, setCustomers] = useState([]);
-  const [customerQuery, setCustomerQuery] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '' });
-  const [customerNameTouched, setCustomerNameTouched] = useState(false);
+  const [parties, setParties] = useState([]);
+  const [partyQuery, setPartyQuery] = useState('');
+  const [selectedParty, setSelectedParty] = useState(null);
+  const [newParty, setNewParty] = useState({ name: '', phone: '' });
+  const [partyNameTouched, setPartyNameTouched] = useState(false);
   const [serviceList, setServiceList] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [header, setHeader] = useState({
-    customerId: '',
+    partyId: '',
     vehicleId: '',
     orderNo: '',
     status: 'open',
     notes: '',
+    deliveryDate: new Date().toISOString().slice(0, 10),
+    attachment: '',
+    attributes: {},
   });
   const [items, setItems] = useState([{ ...emptyItem }]);
   const [status, setStatus] = useState({ type: 'info', message: '' });
 
   useEffect(() => {
     api.listProducts().then(setProducts).catch(() => null);
-    api.listCustomers().then(setCustomers).catch(() => null);
   }, []);
+
+  useEffect(() => {
+    api.listParties({ q: partyQuery })
+      .then(setParties)
+      .catch(() => null);
+  }, [partyQuery]);
 
   useEffect(() => {
     if (!businessId) return;
@@ -79,13 +89,13 @@ export default function Services() {
   };
 
   useEffect(() => {
-    if (customerNameTouched) return;
-    if (customerQuery) {
-      setNewCustomer((prev) => ({ ...prev, name: customerQuery }));
+    if (partyNameTouched) return;
+    if (partyQuery) {
+      setNewParty((prev) => ({ ...prev, name: partyQuery }));
     } else {
-      setNewCustomer((prev) => ({ ...prev, name: '' }));
+      setNewParty((prev) => ({ ...prev, name: '' }));
     }
-  }, [customerQuery, customerNameTouched]);
+  }, [partyQuery, partyNameTouched]);
 
   const handleItemChange = (index, field, value) => {
     setItems((prev) =>
@@ -115,7 +125,7 @@ export default function Services() {
       setStatus({ type: 'error', message: t('errors.businessIdRequired') });
       return;
     }
-    if (!header.customerId) {
+    if (!header.partyId) {
       setStatus({ type: 'error', message: t('errors.customerRequired') });
       return;
     }
@@ -136,76 +146,86 @@ export default function Services() {
         })),
       });
       setStatus({ type: 'success', message: t('services.messages.created') });
-      setHeader({ customerId: '', vehicleId: '', orderNo: '', status: 'open', notes: '' });
+      setHeader({
+        partyId: '',
+        vehicleId: '',
+        orderNo: '',
+        status: 'open',
+        notes: '',
+        deliveryDate: new Date().toISOString().slice(0, 10),
+        attachment: '',
+        attributes: {},
+      });
       setItems([{ ...emptyItem }]);
-      setCustomerQuery('');
-      setSelectedCustomer(null);
-      setNewCustomer({ name: '', phone: '' });
-      setCustomerNameTouched(false);
+      setPartyQuery('');
+      setSelectedParty(null);
+      setNewParty({ name: '', phone: '' });
+      setPartyNameTouched(false);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     }
   };
 
-  const filteredCustomers = useMemo(() => {
-    const query = customerQuery.trim().toLowerCase();
+  const filteredParties = useMemo(() => {
+    const query = partyQuery.trim().toLowerCase();
     if (!query) return [];
-    return customers
-      .filter((customer) => {
+    return parties
+      .filter((party) => {
         return (
-          String(customer.name || '').toLowerCase().includes(query) ||
-          String(customer.phone || '').toLowerCase().includes(query)
+          String(party.name || '').toLowerCase().includes(query) ||
+          String(party.phone || '').toLowerCase().includes(query)
         );
       })
       .slice(0, 6);
-  }, [customerQuery, customers]);
+  }, [partyQuery, parties]);
 
-  const showSuggestions = customerQuery.trim().length > 0 && !selectedCustomer;
+  const showSuggestions = partyQuery.trim().length > 0 && !selectedParty;
 
-  const selectCustomer = (customer) => {
-    setSelectedCustomer(customer);
-    setHeader((prev) => ({ ...prev, customerId: customer.id }));
-    setCustomerQuery(`${customer.name}${customer.phone ? ` (${customer.phone})` : ''}`);
-    setNewCustomer({ name: '', phone: '' });
-    setCustomerNameTouched(false);
+  const selectParty = (party) => {
+    setSelectedParty(party);
+    setHeader((prev) => ({ ...prev, partyId: party.id }));
+    setPartyQuery(`${party.name}${party.phone ? ` (${party.phone})` : ''}`);
+    setNewParty({ name: '', phone: '' });
+    setPartyNameTouched(false);
   };
 
-  const clearCustomer = () => {
-    setSelectedCustomer(null);
-    setHeader((prev) => ({ ...prev, customerId: '' }));
-    setCustomerQuery('');
-    setNewCustomer({ name: '', phone: '' });
-    setCustomerNameTouched(false);
+  const clearParty = () => {
+    setSelectedParty(null);
+    setHeader((prev) => ({ ...prev, partyId: '' }));
+    setPartyQuery('');
+    setNewParty({ name: '', phone: '' });
+    setPartyNameTouched(false);
   };
 
-  const handleCustomerSearch = (event) => {
+  const handlePartySearch = (event) => {
     const value = event.target.value;
-    setCustomerQuery(value);
-    if (selectedCustomer) {
-      setSelectedCustomer(null);
-      setHeader((prev) => ({ ...prev, customerId: '' }));
+    setPartyQuery(value);
+    if (selectedParty) {
+      setSelectedParty(null);
+      setHeader((prev) => ({ ...prev, partyId: '' }));
     }
   };
 
-  const handleNewCustomerChange = (event) => {
+  const handleNewPartyChange = (event) => {
     const { name, value } = event.target;
-    setNewCustomer((prev) => ({ ...prev, [name]: value }));
-    if (name === 'name') setCustomerNameTouched(true);
+    setNewParty((prev) => ({ ...prev, [name]: value }));
+    if (name === 'name') setPartyNameTouched(true);
   };
 
-  const handleCreateCustomer = async () => {
-    if (!newCustomer.name.trim()) {
-      setStatus({ type: 'error', message: 'Enter a name to add a payee.' });
+  const handleCreateParty = async () => {
+    if (!newParty.name.trim()) {
+      setStatus({ type: 'error', message: 'Enter a name to add a party.' });
       return;
     }
     try {
-      const customer = await api.createCustomer({
-        name: newCustomer.name.trim(),
-        phone: newCustomer.phone.trim(),
+      const party = await api.createParty({
+        name: newParty.name.trim(),
+        phone: newParty.phone.trim(),
+        type: 'customer',
       });
-      setCustomers((prev) => [customer, ...prev]);
-      selectCustomer(customer);
-      setStatus({ type: 'success', message: 'Payee added.' });
+      setParties((prev) => [party, ...prev]);
+      selectParty(party);
+      setStatus({ type: 'success', message: 'Party added.' });
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     }
@@ -228,29 +248,29 @@ export default function Services() {
                 <input
                   className="input flex-1"
                   placeholder={t('services.customerSearch')}
-                  value={customerQuery}
-                  onChange={handleCustomerSearch}
+                  value={partyQuery}
+                  onChange={handlePartySearch}
                 />
-                {selectedCustomer ? (
-                  <button className="btn-ghost" type="button" onClick={clearCustomer}>
+                {selectedParty ? (
+                  <button className="btn-ghost" type="button" onClick={clearParty}>
                     {t('common.change')}
                   </button>
                 ) : null}
               </div>
               {showSuggestions ? (
                 <div className="mt-3 grid gap-2">
-                  {filteredCustomers.length === 0 ? (
+                  {filteredParties.length === 0 ? (
                     <p className="text-xs text-slate-500">{t('services.noCustomerMatch')}</p>
                   ) : (
-                    filteredCustomers.map((customer) => (
+                    filteredParties.map((party) => (
                       <button
-                        key={customer.id}
+                        key={party.id}
                         type="button"
                         className="rounded-xl border border-slate-200/70 bg-white/90 px-3 py-2 text-left text-sm text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-200 dark:hover:border-emerald-800/60 dark:hover:bg-emerald-900/20"
-                        onClick={() => selectCustomer(customer)}
+                        onClick={() => selectParty(party)}
                       >
-                          <div className="font-semibold">{customer.name}</div>
-                          <div className="text-xs text-slate-500">{customer.phone || t('suppliers.phoneNA')}</div>
+                          <div className="font-semibold">{party.name}</div>
+                          <div className="text-xs text-slate-500">{party.phone || t('suppliers.phoneNA')}</div>
                         </button>
                     ))
                   )}
@@ -263,18 +283,18 @@ export default function Services() {
                     className="input"
                     name="name"
                     placeholder={t('services.addCustomer')}
-                    value={newCustomer.name}
-                    onChange={handleNewCustomerChange}
+                    value={newParty.name}
+                    onChange={handleNewPartyChange}
                   />
                   <input
                     className="input"
                     name="phone"
                     placeholder={t('services.phoneOptional')}
-                    value={newCustomer.phone}
-                    onChange={handleNewCustomerChange}
+                    value={newParty.phone}
+                    onChange={handleNewPartyChange}
                   />
                 </div>
-                <button className="btn-secondary mt-2" type="button" onClick={handleCreateCustomer}>
+                <button className="btn-secondary mt-2" type="button" onClick={handleCreateParty}>
                   {t('services.addSelect')}
                 </button>
               </div>
@@ -297,9 +317,44 @@ export default function Services() {
               <option value="closed">{t('services.closed')}</option>
             </select>
           </div>
+          <div>
+            <label className="label">{t('services.deliveryDate')}</label>
+            <input
+              type="date"
+              className="input mt-1"
+              name="deliveryDate"
+              value={header.deliveryDate}
+              onChange={handleHeaderChange}
+            />
+          </div>
           <div className="md:col-span-2">
+            <FileUpload
+              label={t('services.attachment')}
+              initialUrl={header.attachment}
+              onUpload={(url) => setHeader((prev) => ({ ...prev, attachment: url }))}
+            />
+          </div>
+          <div className="md:col-span-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+              <h3 className="mb-4 text-sm font-medium text-slate-700">
+                {t('services.orderInformation') || 'Order Information'}
+              </h3>
+              <DynamicAttributes
+                entityType="service"
+                attributes={header.attributes}
+                onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))}
+              />
+            </div>
+          </div>
+          <div className="md:col-span-3">
             <label className="label">{t('services.notes')}</label>
-            <input className="input mt-1" name="notes" value={header.notes} onChange={handleHeaderChange} />
+            <textarea
+              className="input mt-1 h-20 resize-none"
+              name="notes"
+              value={header.notes}
+              onChange={handleHeaderChange}
+              placeholder={t('services.notesPlaceholder')}
+            />
           </div>
         </div>
         <div className="space-y-4">
