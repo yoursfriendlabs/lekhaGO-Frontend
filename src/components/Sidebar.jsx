@@ -28,7 +28,7 @@ export default function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
-            className={({ isActive }) =>
+            className={({  isActive }) =>
               `rounded-xl px-3 py-2 text-sm font-semibold transition ${
                 isActive
                   ? 'bg-emerald-300 text-slate-950 dark:bg-ocean'

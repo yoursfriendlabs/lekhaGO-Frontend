@@ -95,7 +95,7 @@ export default function SearchableSelect({
               <Search size={13} className="shrink-0 text-slate-400" />
               <input
                 ref={searchRef}
-                className="flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-slate-400"
+                className="flex-1 bg-transparent text-sm focus:border-0 focus:outline-0 focus:ring-0 border-0 text-ink outline-none ring-0 placeholder:text-slate-400"
                 placeholder="Search…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}

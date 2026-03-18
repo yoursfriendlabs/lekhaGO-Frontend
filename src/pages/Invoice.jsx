@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api, API_BASE } from '../lib/api';
+import { api } from '../lib/api';
 import { useBusinessSettings } from '../lib/businessSettings';
+import InvoiceHeader from '../components/InvoiceHeader';
 import Notice from '../components/Notice';
 
-function formatDate(dateStr) {
-  if (!dateStr) return '-';
+function fmt(dateStr) {
+  if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function money(val) {
+  return `Rs ${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default function Invoice() {
@@ -18,9 +23,7 @@ export default function Invoice() {
 
   useEffect(() => {
     const loader = type === 'sales' ? api.getSale : api.getPurchase;
-    loader(id)
-      .then(setRecord)
-      .catch((err) => setStatus(err.message));
+    loader(id).then(setRecord).catch((err) => setStatus(err.message));
   }, [type, id]);
 
   const handlePrint = () => {
@@ -38,9 +41,9 @@ export default function Invoice() {
   };
 
   const isSale = type === 'sales';
-  const label = isSale ? 'Sale' : 'Purchase';
   const dateValue = isSale ? record?.saleDate : record?.purchaseDate;
   const items = record?.PurchaseItems || record?.SaleItems || [];
+
   const totalReceived = isSale
     ? Number(record?.amountReceived ?? (record?.status === 'paid' ? record?.grandTotal : 0) ?? 0)
     : 0;
@@ -48,155 +51,146 @@ export default function Invoice() {
     ? Number(record?.amountReceived ?? (record?.status === 'received' ? record?.grandTotal : 0) ?? 0)
     : 0;
   const dueAmount = Number(
-    record?.dueAmount ??
-      Math.max(Number(record?.grandTotal || 0) - (isSale ? totalReceived : totalPaid), 0)
+    record?.dueAmount ?? Math.max(Number(record?.grandTotal || 0) - (isSale ? totalReceived : totalPaid), 0)
   );
 
-  const logoSrc = biz.logoUrl
-    ? biz.logoUrl.startsWith('http') ? biz.logoUrl : `${API_BASE}${biz.logoUrl}`
-    : null;
+  const isPaidOrReceived = record?.status === 'paid' || record?.status === 'received';
+  const statusColor = isPaidOrReceived
+    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
+
+  const partyName = isSale
+    ? record?.partyName || record?.customerName || record?.Customer?.name || 'Walk-in Customer'
+    : record?.partyName || record?.supplierName || record?.Party?.name || '—';
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-3xl space-y-4">
+      {/* Toolbar — hidden on print */}
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Link className="btn-ghost" to={type === 'sales' ? '/app/sales' : '/app/purchases'}>
+        <Link className="btn-ghost" to={isSale ? '/app/sales' : '/app/purchases'}>
           ← Back
         </Link>
         <button className="btn-primary" type="button" onClick={handlePrint}>
           Download PDF
         </button>
       </div>
+
       {status ? <Notice title={status} tone="error" /> : null}
+
       {record ? (
-        <div ref={printRef} className="print-area card space-y-6 print:shadow-none print:border-none">
-          {/* Header */}
-          <div className="flex items-start justify-between border-b border-slate-200/70 pb-6 dark:border-slate-800/70">
-            {/* Company info */}
-            <div className="flex items-start gap-4">
-              {logoSrc && (
-                <img
-                  src={logoSrc}
-                  alt="Logo"
-                  className="h-14 w-14 rounded-xl object-contain border border-slate-200 bg-white p-0.5"
-                />
-              )}
-              <div>
-                <h1 className="font-serif text-2xl text-slate-900 dark:text-white">
-                  {biz.companyName || 'ManageMyShop'}
-                </h1>
-                {biz.address && (
-                  <p className="mt-0.5 text-xs text-slate-500 whitespace-pre-wrap">{biz.address}</p>
-                )}
-                {(biz.phone || biz.email) && (
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    {[biz.phone, biz.email].filter(Boolean).join(' · ')}
-                  </p>
-                )}
-                {biz.panVat && (
-                  <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
-                    PAN/VAT: {biz.panVat}
-                  </p>
-                )}
-              </div>
-            </div>
-            {/* Invoice meta */}
-            <div className="text-right shrink-0">
-              <p className="text-xs uppercase text-slate-400">{label} Invoice</p>
-              <p className="font-bold text-slate-900 dark:text-white">#{record.invoiceNo || record.id.slice(0, 8)}</p>
-              <p className="mt-1 text-xs text-slate-500">{formatDate(dateValue)}</p>
-              <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
-                record.status === 'paid' || record.status === 'received'
-                  ? 'bg-emerald-100 text-emerald-700'
-                  : 'bg-amber-100 text-amber-700'
-              }`}>{record.status}</span>
-            </div>
+        <div ref={printRef} className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950">
+          {/* ── Header ── */}
+          <div className="px-8 pt-0">
+            <InvoiceHeader
+              biz={biz}
+              invoiceType={isSale ? 'Sales Invoice' : 'Purchase Invoice'}
+              invoiceNo={record.invoiceNo || record.id.slice(0, 8)}
+              date={fmt(dateValue)}
+              status={record.status}
+              statusColor={statusColor}
+            />
           </div>
 
-          {/* Customer / Supplier + Notes */}
-          <div className="grid gap-4 text-sm sm:grid-cols-2">
+          {/* ── Bill To / From + Notes ── */}
+          <div className="grid gap-6 px-8 py-6 sm:grid-cols-2 bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-200/70 dark:border-slate-800/70">
             <div>
-              <p className="text-xs uppercase text-slate-400">{isSale ? 'Customer' : 'Supplier'}</p>
-              <p className="font-semibold text-slate-800 dark:text-slate-200">
-                {isSale
-                  ? record.partyName || record.customerName || record.Customer?.name || 'Walk-in'
-                  : record.partyName || record.supplierName || record.Party?.name || '—'}
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {isSale ? 'Bill To' : 'Supplier'}
               </p>
+              <p className="font-semibold text-slate-800 dark:text-slate-200">{partyName}</p>
+              {record.partyPhone && <p className="mt-0.5 text-sm text-slate-500">{record.partyPhone}</p>}
             </div>
             {record.notes && (
               <div>
-                <p className="text-xs uppercase text-slate-400">Notes</p>
-                <p className="whitespace-pre-wrap text-slate-600 dark:text-slate-300">{record.notes}</p>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Notes</p>
+                <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-400">{record.notes}</p>
               </div>
             )}
           </div>
 
-          {/* Line items */}
-          <div>
-            <p className="mb-2 text-xs uppercase text-slate-400">Line Items</p>
-            <div className="overflow-x-auto rounded-xl border border-slate-200/70 dark:border-slate-800/70">
-              <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-                <thead className="bg-slate-50 dark:bg-slate-900/40 text-xs uppercase text-slate-400">
+          {/* ── Line Items ── */}
+          <div className="px-8 py-6">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-slate-200/70 dark:border-slate-700/70">
+                  <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Product</th>
+                  <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Qty</th>
+                  <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Unit Price</th>
+                  <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Tax</th>
+                  <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                {items.length === 0 ? (
                   <tr>
-                    <th className="py-2 px-4 text-left">Product</th>
-                    <th className="py-2 px-4 text-right">Qty</th>
-                    <th className="py-2 px-4 text-right">Unit Price</th>
-                    <th className="py-2 px-4 text-right">Tax %</th>
-                    <th className="py-2 px-4 text-right">Total</th>
+                    <td colSpan={5} className="py-4 text-slate-400">No line items.</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {items.length === 0 ? (
-                    <tr><td colSpan={5} className="py-3 px-4 text-slate-500">No line items.</td></tr>
-                  ) : (
-                    items.map((item) => (
-                      <tr key={item.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                        <td className="py-2.5 px-4">{item.Product?.name || item.description || '—'}</td>
-                        <td className="py-2.5 px-4 text-right">{Number(item.quantity || 0).toFixed(2)}</td>
-                        <td className="py-2.5 px-4 text-right">Rs {Number(item.unitPrice || 0).toFixed(2)}</td>
-                        <td className="py-2.5 px-4 text-right">{Number(item.taxRate || 0).toFixed(2)}%</td>
-                        <td className="py-2.5 px-4 text-right font-semibold">Rs {Number(item.lineTotal || 0).toFixed(2)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                ) : (
+                  items.map((item, idx) => (
+                    <tr key={item.id || idx}>
+                      <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                        {item.Product?.name || item.description || '—'}
+                        {item.Product?.companyName && (
+                          <span className="ml-2 text-xs text-slate-400">{item.Product.companyName}</span>
+                        )}
+                      </td>
+                      <td className="py-3 text-right text-slate-600 dark:text-slate-400">
+                        {Number(item.quantity || 0).toFixed(2)}
+                      </td>
+                      <td className="py-3 text-right text-slate-600 dark:text-slate-400">
+                        {money(item.unitPrice)}
+                      </td>
+                      <td className="py-3 text-right text-slate-500">
+                        {Number(item.taxRate || 0) > 0 ? `${Number(item.taxRate).toFixed(1)}%` : '—'}
+                      </td>
+                      <td className="py-3 text-right font-semibold text-slate-800 dark:text-slate-200">
+                        {money(item.lineTotal)}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
 
-          {/* Totals */}
-          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-5 dark:border-slate-800/60 dark:bg-slate-900/40">
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                <span>Subtotal</span>
-                <span>Rs {Number(record.subTotal || 0).toFixed(2)}</span>
+          {/* ── Totals ── */}
+          <div className="border-t border-slate-200/70 dark:border-slate-800/70 px-8 py-6">
+            <div className="ml-auto max-w-xs space-y-2 text-sm">
+              {Number(record.subTotal || 0) > 0 && (
+                <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                  <span>Subtotal</span>
+                  <span>{money(record.subTotal)}</span>
+                </div>
+              )}
+              {Number(record.taxTotal || 0) > 0 && (
+                <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                  <span>Tax</span>
+                  <span>{money(record.taxTotal)}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-slate-200/70 pt-3 font-bold text-slate-900 dark:border-slate-700 dark:text-white">
+                <span className="text-base">Grand Total</span>
+                <span className="text-lg">{money(record.grandTotal)}</span>
               </div>
-              <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                <span>Tax</span>
-                <span>Rs {Number(record.taxTotal || 0).toFixed(2)}</span>
-              </div>
-              <div className="flex items-center justify-between border-t border-slate-200/70 pt-2 font-bold text-slate-900 dark:border-slate-700/60 dark:text-white">
-                <span>Grand Total</span>
-                <span className="text-lg">Rs {Number(record.grandTotal || 0).toFixed(2)}</span>
-              </div>
-              <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400">
+              <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
                 <span>{isSale ? 'Amount Received' : 'Amount Paid'}</span>
-                <span className="font-semibold">
-                  Rs {isSale ? totalReceived.toFixed(2) : totalPaid.toFixed(2)}
-                </span>
+                <span className="font-semibold">{money(isSale ? totalReceived : totalPaid)}</span>
               </div>
               {dueAmount > 0 && (
-                <div className="flex items-center justify-between rounded-xl bg-rose-50 px-3 py-2 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">
+                <div className="flex justify-between rounded-xl bg-rose-50 px-4 py-2.5 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">
                   <span className="font-semibold">Due Amount</span>
-                  <span className="font-bold">Rs {dueAmount.toFixed(2)}</span>
+                  <span className="font-bold">{money(dueAmount)}</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="border-t border-slate-200/70 pt-4 text-center text-xs text-slate-400 dark:border-slate-800/70">
-            <p>Thank you for your business!</p>
-            <p className="mt-1">Printed on {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+          {/* ── Footer ── */}
+          <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-8 py-4 dark:border-slate-800/70 dark:bg-slate-900/30">
+            <p className="text-xs text-slate-400">Thank you for your business!</p>
+            <p className="text-xs text-slate-400">
+              Printed {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+            </p>
           </div>
         </div>
       ) : null}

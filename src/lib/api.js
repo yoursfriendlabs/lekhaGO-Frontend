@@ -1,6 +1,6 @@
 import { getBusinessId, getToken } from './storage';
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://api.yoursfriend.com';
 
 async function request(path, options = {}) {
   const token = getToken();
@@ -97,6 +97,8 @@ export const api = {
   getOrderAttribute: (id) => request(`/api/order-attributes/${id}`),
   updateOrderAttribute: (id, data) => request(`/api/order-attributes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteOrderAttribute: (id) => request(`/api/order-attributes/${id}`, { method: 'DELETE' }),
+  getBusinessSettings: () => request('/api/business-settings'),
+  updateBusinessSettings: (data) => request('/api/business-settings', { method: 'PUT', body: JSON.stringify(data) }),
   uploadAttachment: (file) => {
     const formData = new FormData();
     formData.append('file', file);

@@ -32,6 +32,10 @@ export default function OrderAttributes() {
     loadAttributes();
   }, []);
 
+  useEffect(() => {
+    form.key = form.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+  }, [form.name])
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     let finalValue = value;
@@ -121,17 +125,18 @@ export default function OrderAttributes() {
                 />
               </div>
 
-              <div>
-                <label className="label">{t('orderAttributes.key')}</label>
-                <input
-                  required
-                  name="key"
-                  className="input mt-1"
-                  value={form.key}
-                  onChange={handleChange}
-                  placeholder="e.g. chest_size"
-                />
-              </div>
+              {/*<div>*/}
+              {/*  <label className="label">{t('orderAttributes.key')}</label>*/}
+              {/*  <input*/}
+              {/*    required*/}
+              {/*    disabled*/}
+              {/*    name="key"*/}
+              {/*    className="input mt-1"*/}
+              {/*    value={form.key}*/}
+              {/*    onChange={handleChange}*/}
+              {/*    placeholder="e.g. chest_size"*/}
+              {/*  />*/}
+              {/*</div>*/}
 
               <div>
                 <label className="label">{t('orderAttributes.type')}</label>
@@ -189,7 +194,6 @@ export default function OrderAttributes() {
               <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
                 <tr>
                   <th className="px-6 py-4">{t('orderAttributes.name')}</th>
-                  <th className="px-6 py-4">{t('orderAttributes.key')}</th>
                   <th className="px-6 py-4">{t('orderAttributes.type')}</th>
                   <th className="px-6 py-4">{t('orderAttributes.entityType')}</th>
                   <th className="px-6 py-4"></th>
@@ -199,7 +203,6 @@ export default function OrderAttributes() {
                 {attributes.map((attr) => (
                   <tr key={attr.id} className="hover:bg-slate-50/50">
                     <td className="px-6 py-4 font-medium text-slate-900">{attr.name}</td>
-                    <td className="px-6 py-4 text-slate-500"><code>{attr.key}</code></td>
                     <td className="px-6 py-4">
                       <span className="rounded-lg bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600">
                         {t(`orderAttributes.types.${attr.type}`)}

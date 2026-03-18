@@ -3,6 +3,7 @@ import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
 import SearchableSelect from '../components/SearchableSelect';
+import InvoiceHeader from '../components/InvoiceHeader';
 import { api, API_BASE } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
@@ -26,7 +27,7 @@ const emptyItem = {
 
 const emptyHeader = {
   partyId: '',
-  orderNo: '',
+  orderNo: new Date().getHours() * 100 + new Date().getMinutes(),
   status: 'open',
   notes: '',
   deliveryDate: new Date().toISOString().slice(0, 10),
@@ -265,6 +266,7 @@ export default function Services() {
       prev.map((item, idx) => {
         if (idx !== index) return item;
         const next = { ...item };
+
         if (!next.unitType) next.unitType = 'primary';
         if (next.unitType === 'secondary') {
           const explicit = Number(product.secondarySalePrice || 0);
@@ -312,7 +314,7 @@ export default function Services() {
   const removeItem = (index) => setItems((prev) => prev.filter((_, i) => i !== index));
 
   // ── Item draft helpers ──
-  const handleDraftChange = (field, value) => {
+  const handleDraftChange = (field, value, actualUnit) => {
     // unitType change needs to re-price from product immediately
     if (field === 'unitType') {
       const product = getProductById(itemDraft.productId);
@@ -332,6 +334,7 @@ export default function Services() {
             next.unitPrice = String(product.salePrice);
           }
         }
+        next.actualUnit = actualUnit
         next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
         return next;
       });
@@ -371,6 +374,7 @@ export default function Services() {
   };
 
   const confirmItem = () => {
+    console.log(itemDraft)
     const draft = {
       ...itemDraft,
       lineTotal: (Number(itemDraft.quantity || 0) * Number(itemDraft.unitPrice || 0)).toFixed(2),
@@ -681,8 +685,24 @@ export default function Services() {
       {/* ── Orders Table ── */}
       <div className="card">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('services.recentOrders')}</h3>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col items-start gap-2">
+            <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('services.recentOrders')}</h3>
+            <div className="flex gap-2">
+              <button onClick={() => setStatusFilter('all')} className={statusFilter === 'all' ? "bg-blue-50 border  border-blue-500 text-blue-500 px-2 rounded" : "border rounded px-2 border-gray-300"}>
+                All
+              </button>
+              <button onClick={() => setStatusFilter('open')} className={statusFilter === 'open' ? "bg-blue-50 border px-2 border-blue-500 text-blue-500 rounded" : "border rounded px-2 border-gray-300"}>
+                Open
+              </button>
+              <button onClick={() => setStatusFilter('in_progress')} className={statusFilter === 'in_progress' ? "bg-yellow-50 border px-2 border-yellow-500 text-yellow-500 rounded" : "border rounded px-2 border-gray-300"}>
+                In Progress
+              </button>
+              <button onClick={() => setStatusFilter('closed')} className={statusFilter === 'closed' ? "bg-green-50 border px-2 border-green-500 text-green-500 rounded" : "border rounded px-2 border-gray-300"}>
+                Closed
+              </button>
+            </div>
+          </div>
+          <div className="flex  items-center gap-2">
             <SearchableSelect
               className="min-w-[180px]"
               options={[
@@ -693,16 +713,6 @@ export default function Services() {
               onChange={setPartyFilterId}
               placeholder={t('services.filterByParty')}
             />
-            <select
-              className="input max-w-[150px]"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="all">{t('sales.allStatuses')}</option>
-              <option value="open">{t('services.open')}</option>
-              <option value="in_progress">{t('services.inProgress')}</option>
-              <option value="closed">{t('services.closed')}</option>
-            </select>
           </div>
         </div>
 
@@ -1085,10 +1095,10 @@ export default function Services() {
                             <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${
                               item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
                             }`}>
-                              {item.itemType === 'labor' ? 'Labor' : 'Part'}
+                              {item.itemType === 'labor' ? 'Service' : 'Product'}
                             </span>
                             <span className="flex-1 min-w-0 truncate text-slate-700 dark:text-slate-300">{displayName}</span>
-                            <span className="shrink-0 text-xs text-slate-400">{item.quantity} × {money(item.unitPrice)}</span>
+                            <span className="shrink-0 text-xs text-slate-400">{item.quantity} {item.actualUnit} × {money(item.unitPrice)}</span>
                             <span className="shrink-0 font-semibold text-slate-800 dark:text-slate-200">{money(item.lineTotal)}</span>
                             <button
                               type="button"
@@ -1126,8 +1136,8 @@ export default function Services() {
                             value={itemDraft.itemType}
                             onChange={(e) => handleDraftChange('itemType', e.target.value)}
                           >
-                            <option value="labor">{t('services.labor')}</option>
-                            <option value="part">{t('services.part')}</option>
+                            <option value="labor">{'Service'}</option>
+                            <option value="part">{'Product'}</option>
                           </select>
                         </div>
                         <div>
@@ -1165,14 +1175,14 @@ export default function Services() {
                               <div className="mt-1 flex gap-2">
                                 <button
                                   type="button"
-                                  onClick={() => handleDraftChange('unitType', 'primary')}
+                                  onClick={() => handleDraftChange('unitType', 'primary', prod.primaryUnit)}
                                   className={itemDraft.unitType === 'primary' ? 'btn-primary flex-1 text-sm' : 'btn-ghost flex-1 text-sm'}
                                 >
                                   {prod.primaryUnit || t('products.primaryUnit')}
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleDraftChange('unitType', 'secondary')}
+                                  onClick={() => handleDraftChange('unitType', 'secondary', prod.secondaryUnit)}
                                   className={itemDraft.unitType === 'secondary' ? 'btn-primary flex-1 text-sm' : 'btn-ghost flex-1 text-sm'}
                                 >
                                   {prod.secondaryUnit} <span className="opacity-60 text-xs ml-1">({t('products.secondaryUnit')})</span>
@@ -1180,7 +1190,7 @@ export default function Services() {
                               </div>
                               {prod.conversionRate > 0 && (
                                 <p className="mt-1 text-xs text-slate-500">
-                                  1 {prod.secondaryUnit} = {prod.conversionRate} {prod.primaryUnit}
+                                  1 {prod.primaryUnit} = {prod.conversionRate} {prod.secondaryUnit}
                                 </p>
                               )}
                             </div>
@@ -1333,145 +1343,144 @@ export default function Services() {
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
               </div>
             ) : (
-              <div ref={invoicePrintRef} className="print-area card space-y-6 print:shadow-none print:border-none print:rounded-none">
-                {/* ── Invoice header ── */}
-                <div className="flex items-start justify-between border-b border-slate-200/70 pb-6 dark:border-slate-800/70">
-                  {/* Left: logo + company info */}
-                  <div className="flex items-start gap-4">
-                    {bizSettings.logoUrl && (
-                      <img
-                        src={bizSettings.logoUrl.startsWith('http') ? bizSettings.logoUrl : `${API_BASE}${bizSettings.logoUrl}`}
-                        alt="Logo"
-                        className="h-14 w-14 rounded-xl object-contain border border-slate-200 bg-white p-0.5"
-                      />
+              <div ref={invoicePrintRef} className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950">
+                {/* ── Header ── */}
+                <div className="px-8 pt-0">
+                  <InvoiceHeader
+                    biz={bizSettings}
+                    invoiceType="Service Invoice"
+                    invoiceNo={invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)}
+                    date={invoiceOrder.deliveryDate ? new Date(invoiceOrder.deliveryDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : null}
+                    status={invoiceOrder.status}
+                    statusColor={
+                      invoiceOrder.status === 'closed'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                        : invoiceOrder.status === 'in_progress'
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                    }
+                  />
+                </div>
+
+                {/* ── Customer + Notes + Attributes ── */}
+                <div className="border-b border-slate-200/70 bg-slate-50/60 px-8 py-5 dark:border-slate-800/70 dark:bg-slate-900/30">
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div>
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Bill To</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200">{invoiceOrder.Party.name || '—'}</p>
+                      {invoiceOrder.Party?.phone && <p className="mt-0.5 text-sm text-slate-500">{invoiceOrder.Party?.phone}</p>}
+                    </div>
+                    {invoiceOrder.notes && (
+                      <div>
+                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Notes</p>
+                        <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-400">{invoiceOrder.notes}</p>
+                      </div>
                     )}
-                    <div>
-                      <h1 className="font-serif text-2xl text-slate-900 dark:text-white">
-                        {bizSettings.companyName || user?.name || 'ManageMyShop'}
-                      </h1>
-                      {bizSettings.address && (
-                        <p className="mt-0.5 text-xs text-slate-500 whitespace-pre-wrap">{bizSettings.address}</p>
-                      )}
-                      {(bizSettings.phone || bizSettings.email) && (
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {[bizSettings.phone, bizSettings.email].filter(Boolean).join(' · ')}
-                        </p>
-                      )}
-                      {bizSettings.panVat && (
-                        <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
-                          PAN/VAT: {bizSettings.panVat}
-                        </p>
-                      )}
-                    </div>
                   </div>
-                  {/* Right: order info */}
-                  <div className="text-right shrink-0">
-                    <p className="text-xs uppercase text-slate-400">Service Invoice</p>
-                    <p className="font-bold text-slate-900 dark:text-white">#{invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {invoiceOrder.deliveryDate ? new Date(invoiceOrder.deliveryDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}
-                    </p>
-                    <div className="mt-1"><StatusBadge status={invoiceOrder.status} /></div>
-                  </div>
-                </div>
-                <div className="grid gap-4 text-sm sm:grid-cols-2">
-                  <div>
-                    <p className="text-xs uppercase text-slate-400">Customer</p>
-                    <p className="font-semibold text-slate-800 dark:text-slate-200">{invoiceOrder.partyName || '—'}</p>
-                    {invoiceOrder.partyPhone ? <p className="text-slate-500">{invoiceOrder.partyPhone}</p> : null}
-                  </div>
-                  {invoiceOrder.notes ? (
-                    <div>
-                      <p className="text-xs uppercase text-slate-400">Notes</p>
-                      <p className="whitespace-pre-wrap text-slate-600 dark:text-slate-300">{invoiceOrder.notes}</p>
-                    </div>
-                  ) : null}
-                </div>
-                {invoiceOrder.attributes && Object.keys(invoiceOrder.attributes).length > 0 && (
-                  <div>
-                    <p className="mb-2 text-xs uppercase text-slate-400">Order Details</p>
-                    <div className="flex flex-wrap gap-x-6 gap-y-1.5">
+                  {invoiceOrder.attributes && Object.keys(invoiceOrder.attributes).length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5">
                       {Object.entries(invoiceOrder.attributes).map(([key, val]) => {
                         const def = attributeDefs.find((d) => d.key === key);
-                        const label = def?.name || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                        const attrLabel = def?.name || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
                         return (
                           <div key={key} className="text-sm">
-                            <span className="text-slate-500">{label}: </span>
-                            <span className="font-medium text-slate-800 dark:text-slate-200">{String(val || '—')}</span>
+                            <span className="text-slate-400">{attrLabel}: </span>
+                            <span className="font-medium text-slate-700 dark:text-slate-300">{String(val || '—')}</span>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
-                )}
-                <div>
-                  <p className="mb-2 text-xs uppercase text-slate-400">Line Items</p>
-                  <div className="overflow-x-auto rounded-xl border border-slate-200/70 dark:border-slate-800/70">
-                    <table className="w-full text-sm">
-                      <thead className="bg-slate-50 dark:bg-slate-900/40 text-xs uppercase text-slate-400">
-                        <tr>
-                          <th className="py-2 px-4 text-left">Type</th>
-                          <th className="py-2 px-4 text-left">Description</th>
-                          <th className="py-2 px-4 text-right">Qty</th>
-                          <th className="py-2 px-4 text-right">Unit Price</th>
-                          <th className="py-2 px-4 text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(invoiceOrder.ServiceItems || invoiceOrder.items || []).map((item, idx) => (
-                          <tr key={idx} className={`border-t border-slate-200/70 dark:border-slate-800/70 ${item.itemType === 'labor' ? 'bg-blue-50/40 dark:bg-blue-900/10' : 'bg-amber-50/30 dark:bg-amber-900/10'}`}>
-                            <td className="py-2.5 px-4">
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${item.itemType === 'labor' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                                {item.itemType === 'labor' ? 'Labor' : 'Part'}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-4 text-slate-700 dark:text-slate-300">{item.description || item.productName || '—'}</td>
-                            <td className="py-2.5 px-4 text-right text-slate-600">{Number(item.quantity || 0).toFixed(item.quantity % 1 ? 3 : 0)}</td>
-                            <td className="py-2.5 px-4 text-right text-slate-600">{money(item.unitPrice)}</td>
-                            <td className="py-2.5 px-4 text-right font-semibold text-slate-800 dark:text-slate-200">{money(item.lineTotal)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  )}
                 </div>
-                <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-5 dark:border-slate-800/60 dark:bg-slate-900/40">
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+
+                {/* ── Line Items ── */}
+                <div className="px-8 py-6">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b-2 border-slate-200/70 dark:border-slate-700/70">
+                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 w-8"></th>
+                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Description</th>
+                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Product Name</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Qty</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Unit Price</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                      {(invoiceOrder.ServiceItems || invoiceOrder.items || []).map((item, idx) => (
+                        <tr key={idx}>
+                          <td className="py-3 pr-2">
+                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}>
+                              {item.itemType === 'labor' ? 'Service' : 'Product'}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                            {item.description || item.productName || '—'}
+                          </td>
+                          <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                            { item.productName || '—'}
+                          </td>
+                          <td className="py-3 text-right text-slate-500">
+                            {Number(item.quantity || 0).toFixed(item.quantity % 1 ? 3 : 0)}
+                          </td>
+                          <td className="py-3 text-right text-slate-500">{money(item.unitPrice)}</td>
+                          <td className="py-3 text-right font-semibold text-slate-800 dark:text-slate-200">{money(item.lineTotal)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* ── Totals ── */}
+                <div className="border-t border-slate-200/70 dark:border-slate-800/70 px-8 py-6">
+                  <div className="ml-auto max-w-xs space-y-2 text-sm">
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
                       <span>Labor Total</span><span>{money(invoiceOrder.laborTotal)}</span>
                     </div>
-                    <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
                       <span>Parts Total</span><span>{money(invoiceOrder.partsTotal)}</span>
                     </div>
-                    <div className="flex items-center justify-between border-t border-slate-200/70 pt-2 font-bold text-slate-900 dark:border-slate-700/60 dark:text-white">
-                      <span>Grand Total</span><span className="text-lg">{money(invoiceOrder.grandTotal)}</span>
+                    <div className="flex justify-between border-t border-slate-200/70 pt-3 font-bold text-slate-900 dark:border-slate-700 dark:text-white">
+                      <span className="text-base">Grand Total</span>
+                      <span className="text-lg">{money(invoiceOrder.grandTotal)}</span>
                     </div>
-                    <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400">
-                      <span>Amount Received</span><span className="font-semibold">{money(invoiceOrder.receivedTotal)}</span>
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                      <span>Amount Received</span>
+                      <span className="font-semibold">{money(invoiceOrder.receivedTotal)}</span>
                     </div>
                     {Math.max(Number(invoiceOrder.grandTotal || 0) - Number(invoiceOrder.receivedTotal || 0), 0) > 0 && (
-                      <div className="flex items-center justify-between rounded-xl bg-rose-50 px-3 py-2 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">
+                      <div className="flex justify-between rounded-xl bg-rose-50 px-4 py-2.5 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">
                         <span className="font-semibold">Due Amount</span>
                         <span className="font-bold">{money(Math.max(Number(invoiceOrder.grandTotal || 0) - Number(invoiceOrder.receivedTotal || 0), 0))}</span>
                       </div>
                     )}
                   </div>
                 </div>
+
+                {/* ── Attachment ── */}
                 {invoiceOrder.attachment && (
-                  <div>
-                    <p className="mb-2 text-xs uppercase text-slate-400">Attachment</p>
+                  <div className="border-t border-slate-200/70 px-8 py-5 dark:border-slate-800/70">
+                    <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Attachment</p>
                     {invoiceOrder.attachment.toLowerCase().endsWith('.pdf') ? (
                       <a href={invoiceOrder.attachment} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-primary-700 hover:underline">
                         <FileText size={16} /> View attached PDF
                       </a>
                     ) : (
-                      <img src={`${API_BASE}${invoiceOrder.attachment}`} alt="Attachment" className="max-h-64 rounded-xl border border-slate-200 object-contain dark:border-slate-800" />
+                      <img
+                        src={`${API_BASE}${invoiceOrder.attachment}`}
+                        alt="Attachment"
+                        className="max-h-56 rounded-xl border border-slate-200 object-contain dark:border-slate-800"
+                      />
                     )}
                   </div>
                 )}
-                <div className="border-t border-slate-200/70 pt-4 text-center text-xs text-slate-400 dark:border-slate-800/70">
-                  <p>Thank you for your business!</p>
-                  <p className="mt-1">Printed on {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+
+                {/* ── Footer ── */}
+                <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-8 py-4 dark:border-slate-800/70 dark:bg-slate-900/30">
+                  <p className="text-xs text-slate-400">Thank you for your business!</p>
+                  <p className="text-xs text-slate-400">
+                    Printed {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </p>
                 </div>
               </div>
             )}
@@ -1491,7 +1500,7 @@ export default function Services() {
               {statusError ? <Notice title={statusError} tone="error" /> : null}
               <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-900/60">
                 <p className="font-semibold text-slate-800 dark:text-slate-200">{statusDialog.orderNo || statusDialog.id.slice(0, 8)}</p>
-                {statusDialog.partyName ? <p className="text-slate-500">{statusDialog.partyName}</p> : null}
+                {statusDialog.Party?.name ? <p className="text-slate-500">{statusDialog.partyName}</p> : null}
               </div>
               <div className="space-y-2">
                 {STATUS_STEPS.map((step) => {

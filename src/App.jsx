@@ -61,7 +61,6 @@ function AppShell() {
               <Route path="order-attributes" element={<OrderAttributes />} />
               <Route path="settings" element={<Settings />} />
               <Route path="invoice/:type/:id" element={<Invoice />} />
-              <Route path="*" element={<Navigate to="/app" replace />} />
             </Routes>
           </main>
         </div>
