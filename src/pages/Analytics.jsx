@@ -60,6 +60,7 @@ function BarChart({ title, series, tone }) {
 export default function Analytics() {
   const [sales, setSales] = useState([]);
   const [purchases, setPurchases] = useState([]);
+  const [services, setServices] = useState([]);
   const [status, setStatus] = useState('');
   const [filters, setFilters] = useState({
     type: 'all',
@@ -72,10 +73,11 @@ export default function Analytics() {
   const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
-    Promise.all([api.listSales({ limit: 200 }), api.listPurchases({ limit: 200 })])
-      .then(([salesData, purchaseData]) => {
+    Promise.all([api.listSales({ limit: 200 }), api.listPurchases({ limit: 200 }), api.listServices({ limit: 200 })])
+      .then(([salesData, purchaseData, serviceData]) => {
         setSales(salesData || []);
         setPurchases(purchaseData || []);
+        setServices(serviceData || []);
       })
       .catch((err) => setStatus(err.message));
   }, []);
@@ -95,7 +97,9 @@ export default function Analytics() {
       .filter((record) => (filters.status === 'all' ? true : record.status === filters.status))
       .filter((record) => {
         if (!fromDate && !toDate) return true;
-        const rawDate = type === 'sale' ? record.saleDate : record.purchaseDate;
+        const rawDate = type === 'sale' ? record.saleDate
+          : type === 'purchase' ? record.purchaseDate
+          : (record.createdAt || record.deliveryDate);
         const recordDate = toDateValue(rawDate);
         if (!recordDate) return false;
         if (fromDate && recordDate < fromDate) return false;
@@ -108,52 +112,60 @@ export default function Analytics() {
       })
       .filter((record) => {
         if (!search) return true;
-        const invoice = (record.invoiceNo || record.id || '').toLowerCase();
+        const invoice = (record.invoiceNo || record.orderNo || record.id || '').toLowerCase();
         const party = type === 'sale'
-          ? (record.Customer?.name || record.customerName || record.customerId || 'walk-in')
-          : (record.Supplier?.name || record.supplierName || record.supplierId || '');
+          ? (record.partyName || record.customerName || record.Customer?.name || record.partyId || record.customerId || 'walk-in')
+          : type === 'purchase'
+          ? (record.partyName || record.supplierName || record.Party?.name || record.partyId || record.supplierId || '')
+          : (record.partyName || record.Party?.name || record.partyId || '');
         return invoice.includes(search) || party.toLowerCase().includes(search);
       });
   };
 
   const filteredSales = useMemo(() => filterByCommon(sales, 'sale'), [sales, filters]);
   const filteredPurchases = useMemo(() => filterByCommon(purchases, 'purchase'), [purchases, filters]);
+  const filteredServices = useMemo(() => filterByCommon(services, 'service'), [services, filters]);
 
   useEffect(() => {
     setPage(1);
   }, [filters]);
 
   const totals = useMemo(() => {
-    return {
-      salesTotal: filteredSales.reduce((sum, sale) => sum + Number(sale.grandTotal || 0), 0),
-      purchasesTotal: filteredPurchases.reduce((sum, purchase) => sum + Number(purchase.grandTotal || 0), 0),
-      receivedTotal: filteredSales.reduce((sum, sale) => {
-        const grand = Number(sale.grandTotal || 0);
-        const received = Number(sale.amountReceived ?? (sale.status === 'paid' ? grand : 0) ?? 0);
-        return sum + received;
-      }, 0),
-      paidTotal: filteredPurchases.reduce((sum, purchase) => {
-        const grand = Number(purchase.grandTotal || 0);
-        const paid = Number(purchase.amountReceived ?? (purchase.status === 'received' ? grand : 0) ?? 0);
-        return sum + paid;
-      }, 0),
-      salesDue: filteredSales.reduce((sum, sale) => {
-        const grand = Number(sale.grandTotal || 0);
-        const received = Number(sale.amountReceived ?? (sale.status === 'paid' ? grand : 0) ?? 0);
-        const due = Number(sale.dueAmount ?? Math.max(grand - received, 0));
-        return sum + due;
-      }, 0),
-      purchaseDue: filteredPurchases.reduce((sum, purchase) => {
-        const grand = Number(purchase.grandTotal || 0);
-        const paid = Number(purchase.amountReceived ?? (purchase.status === 'received' ? grand : 0) ?? 0);
-        const due = Number(purchase.dueAmount ?? Math.max(grand - paid, 0));
-        return sum + due;
-      }, 0),
-    };
-  }, [filteredSales, filteredPurchases]);
+    const salesTotal = filteredSales.reduce((sum, sale) => sum + Number(sale.grandTotal || 0), 0);
+    const servicesTotal = filteredServices.reduce((sum, svc) => sum + Number(svc.grandTotal || 0), 0);
+    const purchasesTotal = filteredPurchases.reduce((sum, purchase) => sum + Number(purchase.grandTotal || 0), 0);
+    const receivedTotal = filteredSales.reduce((sum, sale) => {
+      const grand = Number(sale.grandTotal || 0);
+      const received = Number(sale.amountReceived ?? (sale.status === 'paid' ? grand : 0) ?? 0);
+      return sum + received;
+    }, 0);
+    const serviceReceivedTotal = filteredServices.reduce((sum, svc) => sum + Number(svc.receivedTotal || 0), 0);
+    const paidTotal = filteredPurchases.reduce((sum, purchase) => {
+      const grand = Number(purchase.grandTotal || 0);
+      const paid = Number(purchase.amountReceived ?? (purchase.status === 'received' ? grand : 0) ?? 0);
+      return sum + paid;
+    }, 0);
+    const salesDue = filteredSales.reduce((sum, sale) => {
+      const grand = Number(sale.grandTotal || 0);
+      const received = Number(sale.amountReceived ?? (sale.status === 'paid' ? grand : 0) ?? 0);
+      const due = Number(sale.dueAmount ?? Math.max(grand - received, 0));
+      return sum + due;
+    }, 0);
+    const serviceDue = filteredServices.reduce((sum, svc) => {
+      return sum + Math.max(Number(svc.grandTotal || 0) - Number(svc.receivedTotal || 0), 0);
+    }, 0);
+    const purchaseDue = filteredPurchases.reduce((sum, purchase) => {
+      const grand = Number(purchase.grandTotal || 0);
+      const paid = Number(purchase.amountReceived ?? (purchase.status === 'received' ? grand : 0) ?? 0);
+      const due = Number(purchase.dueAmount ?? Math.max(grand - paid, 0));
+      return sum + due;
+    }, 0);
+    return { salesTotal, servicesTotal, purchasesTotal, receivedTotal, serviceReceivedTotal, paidTotal, salesDue, serviceDue, purchaseDue };
+  }, [filteredSales, filteredPurchases, filteredServices]);
 
   const salesSeries = useMemo(() => buildSeries(filteredSales, 'saleDate', 14), [filteredSales]);
   const purchaseSeries = useMemo(() => buildSeries(filteredPurchases, 'purchaseDate', 14), [filteredPurchases]);
+  const servicesSeries = useMemo(() => buildSeries(filteredServices, 'createdAt', 14), [filteredServices]);
   const tableRows = useMemo(() => {
     return [
       ...filteredSales.map((sale) => ({
@@ -161,7 +173,7 @@ export default function Analytics() {
         type: 'Sale',
         invoice: sale.invoiceNo || sale.id.slice(0, 6),
         date: sale.saleDate,
-        party: sale.Customer?.name || sale.customerName || sale.customerId || 'Walk-in',
+        party: sale.partyName || sale.customerName || sale.Customer?.name || sale.partyId || sale.customerId || 'Walk-in',
         total: Number(sale.grandTotal || 0),
         paid: Number(sale.amountReceived ?? (sale.status === 'paid' ? sale.grandTotal : 0) ?? 0),
         due: Number(
@@ -173,15 +185,25 @@ export default function Analytics() {
         type: 'Purchase',
         invoice: purchase.invoiceNo || purchase.id.slice(0, 6),
         date: purchase.purchaseDate,
-        party: purchase.Supplier?.name || purchase.supplierName || purchase.supplierId || '—',
+        party: purchase.partyName || purchase.supplierName || purchase.Party?.name || purchase.partyId || purchase.supplierId || '—',
         total: Number(purchase.grandTotal || 0),
         paid: Number(purchase.amountReceived ?? (purchase.status === 'received' ? purchase.grandTotal : 0) ?? 0),
         due: Number(
           purchase.dueAmount ?? Math.max(Number(purchase.grandTotal || 0) - Number(purchase.amountReceived || 0), 0)
         ),
       })),
+      ...filteredServices.map((svc) => ({
+        key: `service-${svc.id}`,
+        type: 'Service',
+        invoice: svc.orderNo || svc.id.slice(0, 6),
+        date: svc.createdAt,
+        party: svc.partyName || svc.Party?.name || svc.partyId || '—',
+        total: Number(svc.grandTotal || 0),
+        paid: Number(svc.receivedTotal || 0),
+        due: Math.max(Number(svc.grandTotal || 0) - Number(svc.receivedTotal || 0), 0),
+      })),
     ].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
-  }, [filteredSales, filteredPurchases]);
+  }, [filteredSales, filteredPurchases, filteredServices]);
   const totalRows = tableRows.length;
   const pagedRows = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -223,6 +245,7 @@ export default function Analytics() {
               <option value="all">All</option>
               <option value="sale">Sales</option>
               <option value="purchase">Purchases</option>
+              <option value="service">Services</option>
             </select>
           </div>
           <div>
@@ -233,6 +256,9 @@ export default function Analytics() {
               <option value="unpaid">Unpaid (sales)</option>
               <option value="received">Received (purchases)</option>
               <option value="ordered">Ordered (purchases)</option>
+              <option value="open">Open (services)</option>
+              <option value="in_progress">In Progress (services)</option>
+              <option value="closed">Closed (services)</option>
             </select>
           </div>
           <div className="md:col-span-4">
@@ -247,12 +273,18 @@ export default function Analytics() {
           </div>
         </div>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className="card">
-          <p className="text-xs uppercase text-slate-400">Revenue</p>
+          <p className="text-xs uppercase text-slate-400">Sales Revenue</p>
           <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">Rs {totals.salesTotal.toFixed(2)}</p>
           <p className="mt-2 text-sm text-slate-500">Received: Rs {totals.receivedTotal.toFixed(2)}</p>
           <p className="text-sm text-slate-500">Due: Rs {totals.salesDue.toFixed(2)}</p>
+        </div>
+        <div className="card">
+          <p className="text-xs uppercase text-slate-400">Services Revenue</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">Rs {totals.servicesTotal.toFixed(2)}</p>
+          <p className="mt-2 text-sm text-slate-500">Received: Rs {totals.serviceReceivedTotal.toFixed(2)}</p>
+          <p className="text-sm text-slate-500">Due: Rs {totals.serviceDue.toFixed(2)}</p>
         </div>
         <div className="card">
           <p className="text-xs uppercase text-slate-400">Purchases</p>
@@ -263,18 +295,49 @@ export default function Analytics() {
         <div className="card">
           <p className="text-xs uppercase text-slate-400">Net</p>
           <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-            Rs {(totals.salesTotal - totals.purchasesTotal).toFixed(2)}
+            Rs {(totals.salesTotal + totals.servicesTotal - totals.purchasesTotal).toFixed(2)}
           </p>
-          <p className="mt-2 text-sm text-slate-500">Cash flow: Rs {(totals.receivedTotal - totals.paidTotal).toFixed(2)}</p>
+          <p className="mt-2 text-sm text-slate-500">Cash flow: Rs {(totals.receivedTotal + totals.serviceReceivedTotal - totals.paidTotal).toFixed(2)}</p>
         </div>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
         <BarChart title="Sales trend" series={salesSeries} tone="bg-emerald-300 dark:bg-ocean" />
+        <BarChart title="Services trend" series={servicesSeries} tone="bg-blue-300 dark:bg-blue-400" />
         <BarChart title="Purchase trend" series={purchaseSeries} tone="bg-amber-300 dark:bg-amber-400" />
       </div>
       <div className="card">
         <h3 className="font-serif text-2xl text-slate-900 dark:text-white">Filtered transactions</h3>
-        <div className="mt-4 overflow-x-auto">
+        {/* Mobile card view */}
+        <div className="mt-4 md:hidden space-y-3">
+          {pagedRows.length === 0 ? (
+            <p className="py-3 text-sm text-slate-500">No transactions found.</p>
+          ) : (
+            pagedRows.map((row) => (
+              <div key={row.key} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
+                        row.type === 'sale' ? 'bg-emerald-100 text-emerald-700' :
+                        row.type === 'purchase' ? 'bg-amber-100 text-amber-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>{row.type}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-100 truncate">{row.invoice}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">{row.date}</p>
+                    {row.party && <p className="text-xs text-slate-500 truncate">{row.party}</p>}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-semibold text-slate-800 dark:text-slate-200">Rs {row.total.toFixed(2)}</p>
+                    {row.due > 0 && <p className="text-xs text-rose-600 dark:text-rose-300">Rs {row.due.toFixed(2)} due</p>}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        {/* Desktop table */}
+        <div className="mt-4 overflow-x-auto hidden md:block">
           <table className="w-full text-sm text-slate-600 dark:text-slate-300">
             <thead className="text-xs uppercase text-slate-400">
               <tr>

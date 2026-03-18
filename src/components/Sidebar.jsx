@@ -3,8 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 
 const navItems = [
   { to: '/app', key: 'nav.dashboard' },
-  { to: '/app/products', key: 'nav.products' },
-  { to: '/app/inventory', key: 'nav.inventory' },
+  { to: '/app/inventory', key: 'nav.items' },
   { to: '/app/parties', key: 'nav.parties' },
   { to: '/app/purchases', key: 'nav.purchases' },
   { to: '/app/sales', key: 'nav.sales' },
@@ -12,6 +11,7 @@ const navItems = [
   { to: '/app/ledger', key: 'nav.ledger' },
   { to: '/app/analytics', key: 'nav.analytics' },
   { to: '/app/order-attributes', key: 'nav.orderAttributes' },
+  { to: '/app/settings', label: 'Settings' },
 ];
 
 export default function Sidebar() {
@@ -36,7 +36,7 @@ export default function Sidebar() {
               }`
             }
           >
-            {t(item.key)}
+            {item.label ?? t(item.key)}
           </NavLink>
         ))}
       </nav>

@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom';
 
 const features = [
-  { title: 'Inventory & Batches', desc: 'Track stock by location, batch, and expiry with clarity.' },
+  { title: 'Inventory & Units', desc: 'Track stock with primary and secondary units.' },
   { title: 'Purchases', desc: 'Capture incoming stock with tax, totals, and supplier context.' },
   { title: 'Sales', desc: 'Record sales in seconds and keep stock accurate.' },
   { title: 'Service Orders', desc: 'Combine labor and parts into one clean service ticket.' },
-  { title: 'Multi-location', desc: 'Store, warehouse, or vehicle—always know where stock lives.' },
+  { title: 'Unit Conversion', desc: 'Sell smaller units while stock updates correctly.' },
   { title: 'Secure Access', desc: 'JWT-based login with business-level separation.' },
 ];
 
@@ -42,10 +42,10 @@ export default function Landing() {
           <div className="card">
             <h3 className="font-serif text-2xl text-slate-900 dark:text-white">What you can do</h3>
             <ul className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-              <li>Fast product creation with batch tracking when needed.</li>
+              <li>Fast item creation with unit conversions.</li>
               <li>Smart sales + purchase forms with automatic totals.</li>
               <li>Service tickets that combine labor and parts.</li>
-              <li>Location-based stock visibility.</li>
+              <li>Accurate stock updates in primary units.</li>
               <li>Works great on mobile and desktop.</li>
             </ul>
           </div>

@@ -11,13 +11,17 @@ const makeEmptyProduct = () => ({
   companyName: '',
   sku: '',
   itemType: 'goods',
+  openingStock: '',
   primaryUnit: '',
   secondaryUnit: '',
   conversionRate: '0',
-  secondarySalePrice: '0',
-  trackBatch: false,
-  purchasePrice: '0',
   salePrice: '0',
+  purchasePrice: '0',
+  secondarySalePrice: '0',
+  mrpPrice: '0',
+  wholesalePrice: '0',
+  minWholesaleQuantity: '',
+  lowStockAlert: false,
   taxRate: '0',
 });
 
@@ -26,13 +30,17 @@ const HEADER_MAP = {
   companyName: ['company', 'companyname', 'brand', 'manufacturer'],
   sku: ['sku', 'barcode', 'code'],
   itemType: ['type', 'itemtype', 'category'],
+  openingStock: ['openingstock', 'openingqty', 'openingquantity'],
   primaryUnit: ['primaryunit', 'unit', 'uom', 'baseunit'],
   secondaryUnit: ['secondaryunit', 'subunit', 'altunit', 'unit2'],
   conversionRate: ['conversionrate', 'conversion', 'ratio', 'rate', 'secondaryperprimary'],
   secondarySalePrice: ['secondarysaleprice', 'secondaryprice', 'secondaryunitprice', 'price2', 'unitprice2'],
-  trackBatch: ['trackbatch', 'batch', 'batchtracking'],
   purchasePrice: ['purchaseprice', 'buyprice', 'cost', 'costprice'],
   salePrice: ['saleprice', 'sellingprice', 'price'],
+  mrpPrice: ['mrp', 'mrpprice', 'retailprice', 'listprice'],
+  wholesalePrice: ['wholesale', 'wholesaleprice'],
+  minWholesaleQuantity: ['minwholesaleqty', 'minwholesalequantity', 'minwholesale'],
+  lowStockAlert: ['lowstock', 'lowstockalert'],
   taxRate: ['taxrate', 'tax', 'vat'],
 };
 
@@ -88,15 +96,24 @@ const parseNumber = (value) => {
 };
 
 const isBlankRow = (row) => {
-  const numericDefaults = ['purchasePrice', 'salePrice', 'taxRate', 'conversionRate', 'secondarySalePrice']
-    .every((key) => parseNumber(row[key]) === 0);
+  const numericDefaults = [
+    'purchasePrice',
+    'salePrice',
+    'taxRate',
+    'conversionRate',
+    'secondarySalePrice',
+    'openingStock',
+    'mrpPrice',
+    'wholesalePrice',
+    'minWholesaleQuantity',
+  ].every((key) => parseNumber(row[key]) === 0);
   return (
     !String(row.name || '').trim() &&
     !String(row.companyName || '').trim() &&
     !String(row.sku || '').trim() &&
     !String(row.primaryUnit || '').trim() &&
     !String(row.secondaryUnit || '').trim() &&
-    !row.trackBatch &&
+    !row.lowStockAlert &&
     row.itemType === 'goods' &&
     numericDefaults
   );
@@ -220,6 +237,10 @@ export default function Products() {
         taxRate: parseNumber(form.taxRate),
         conversionRate: parseNumber(form.conversionRate),
         secondarySalePrice: parseNumber(form.secondarySalePrice),
+        openingStock: parseNumber(form.openingStock),
+        mrpPrice: parseNumber(form.mrpPrice),
+        wholesalePrice: parseNumber(form.wholesalePrice),
+        minWholesaleQuantity: parseNumber(form.minWholesaleQuantity),
       });
       setForm(makeEmptyProduct());
       await loadProducts();
@@ -301,24 +322,38 @@ export default function Products() {
       'companyName',
       'sku',
       'itemType',
+      'openingStock',
       'primaryUnit',
       'secondaryUnit',
       'conversionRate',
-      'secondarySalePrice',
-      'trackBatch',
-      'purchasePrice',
       'salePrice',
+      'purchasePrice',
+      'secondarySalePrice',
+      'mrpPrice',
+      'wholesalePrice',
+      'minWholesaleQuantity',
+      'lowStockAlert',
       'taxRate',
     ];
     const rows = parsed.slice(hasHeader ? 1 : 0).map((cells) => {
       const row = makeEmptyProduct();
       const assignField = (field, rawValue) => {
         const value = String(rawValue ?? '').trim();
-        if (field === 'trackBatch') {
-          row.trackBatch = parseBoolean(value);
+        if (field === 'lowStockAlert') {
+          row.lowStockAlert = parseBoolean(value);
         } else if (field === 'itemType') {
           row.itemType = parseItemType(value || row.itemType);
-        } else if (['purchasePrice', 'salePrice', 'taxRate', 'conversionRate', 'secondarySalePrice'].includes(field)) {
+        } else if ([
+          'purchasePrice',
+          'salePrice',
+          'taxRate',
+          'conversionRate',
+          'secondarySalePrice',
+          'openingStock',
+          'mrpPrice',
+          'wholesalePrice',
+          'minWholesaleQuantity',
+        ].includes(field)) {
           row[field] = value || '0';
         } else {
           row[field] = value;
@@ -374,6 +409,10 @@ export default function Products() {
             taxRate: parseNumber(item.row.taxRate),
             conversionRate: parseNumber(item.row.conversionRate),
             secondarySalePrice: parseNumber(item.row.secondarySalePrice),
+            openingStock: parseNumber(item.row.openingStock),
+            mrpPrice: parseNumber(item.row.mrpPrice),
+            wholesalePrice: parseNumber(item.row.wholesalePrice),
+            minWholesaleQuantity: parseNumber(item.row.minWholesaleQuantity),
           })
         )
       );
@@ -466,17 +505,21 @@ export default function Products() {
                 <th className="py-2 text-left">{t('products.primaryUnit')}</th>
                 <th className="py-2 text-left">{t('products.secondaryUnit')}</th>
                 <th className="py-2 text-left">{t('products.conversionRate')}</th>
-                <th className="py-2 text-left">{t('products.batch')}</th>
+                <th className="py-2 text-right">{t('inventory.openingStock')}</th>
                 <th className="py-2 text-right">{t('products.purchasePrice')}</th>
                 <th className="py-2 text-right">{t('products.salePrice')}</th>
                 <th className="py-2 text-right">{t('products.secondaryPrice')}</th>
+                <th className="py-2 text-right">{t('inventory.mrpPrice')}</th>
+                <th className="py-2 text-right">{t('inventory.wholesalePrice')}</th>
+                <th className="py-2 text-right">{t('inventory.minWholesaleQty')}</th>
+                <th className="py-2 text-left">{t('inventory.lowStockAlert')}</th>
                 <th className="py-2 text-right">{t('products.taxRate')}</th>
               </tr>
             </thead>
             <tbody>
               {pagedProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-3 text-slate-500">
+                  <td colSpan={16} className="py-3 text-slate-500">
                     {t('products.noProducts')}
                   </td>
                 </tr>
@@ -500,7 +543,9 @@ export default function Products() {
                         ? `1 ${product.primaryUnit} = ${Number(product.conversionRate).toFixed(2)} ${product.secondaryUnit}`
                         : '—'}
                     </td>
-                    <td className="py-2">{product.trackBatch ? t('common.yes') : t('common.no')}</td>
+                    <td className="py-2 text-right">
+                      {Number(product.openingStock || 0).toFixed(2)} {product.primaryUnit || ''}
+                    </td>
                     <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(product.purchasePrice || 0).toFixed(2) })}</td>
                     <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(product.salePrice || 0).toFixed(2) })}</td>
                     <td className="py-2 text-right">
@@ -508,6 +553,22 @@ export default function Products() {
                         ? t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(product.secondarySalePrice || 0).toFixed(2) })
                         : '—'}
                     </td>
+                    <td className="py-2 text-right">
+                      {Number(product.mrpPrice || 0) > 0
+                        ? t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(product.mrpPrice || 0).toFixed(2) })
+                        : '—'}
+                    </td>
+                    <td className="py-2 text-right">
+                      {Number(product.wholesalePrice || 0) > 0
+                        ? t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(product.wholesalePrice || 0).toFixed(2) })
+                        : '—'}
+                    </td>
+                    <td className="py-2 text-right">
+                      {Number(product.minWholesaleQuantity || 0) > 0
+                        ? Number(product.minWholesaleQuantity || 0).toFixed(2)
+                        : '—'}
+                    </td>
+                    <td className="py-2">{product.lowStockAlert ? t('common.yes') : t('common.no')}</td>
                     <td className="py-2 text-right">{Number(product.taxRate || 0).toFixed(2)}</td>
                   </tr>
                 ))
@@ -626,6 +687,32 @@ export default function Products() {
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div>
+                <label className="label">{t('inventory.openingStock')}</label>
+                <input
+                  className="input mt-1"
+                  name="openingStock"
+                  type="number"
+                  step="0.01"
+                  value={form.openingStock}
+                  onChange={handleChange}
+                />
+              </div>
+              <div className="flex items-center gap-2 pt-7">
+                <input
+                  id="lowStockAlert"
+                  type="checkbox"
+                  name="lowStockAlert"
+                  checked={form.lowStockAlert}
+                  onChange={handleChange}
+                  className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+                />
+                <label htmlFor="lowStockAlert" className="text-sm text-slate-600 dark:text-slate-300">
+                  {t('inventory.lowStockAlert')}
+                </label>
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
                 <label className="label">{t('products.purchasePrice')}</label>
                 <input
                   className="input mt-1"
@@ -650,6 +737,41 @@ export default function Products() {
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div>
+                <label className="label">{t('inventory.mrpPrice')}</label>
+                <input
+                  className="input mt-1"
+                  name="mrpPrice"
+                  type="number"
+                  step="0.01"
+                  value={form.mrpPrice}
+                  onChange={handleChange}
+                />
+              </div>
+              <div>
+                <label className="label">{t('inventory.wholesalePrice')}</label>
+                <input
+                  className="input mt-1"
+                  name="wholesalePrice"
+                  type="number"
+                  step="0.01"
+                  value={form.wholesalePrice}
+                  onChange={handleChange}
+                />
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div>
+                <label className="label">{t('inventory.minWholesaleQty')}</label>
+                <input
+                  className="input mt-1"
+                  name="minWholesaleQuantity"
+                  type="number"
+                  step="0.01"
+                  value={form.minWholesaleQuantity}
+                  onChange={handleChange}
+                />
+              </div>
+              <div>
                 <label className="label">{t('products.taxRate')}</label>
                 <input
                   className="input mt-1"
@@ -659,19 +781,6 @@ export default function Products() {
                   value={form.taxRate}
                   onChange={handleChange}
                 />
-              </div>
-              <div className="flex items-center gap-2 pt-7">
-                <input
-                  id="trackBatch"
-                  type="checkbox"
-                  name="trackBatch"
-                  checked={form.trackBatch}
-                  onChange={handleChange}
-                  className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
-                />
-                <label htmlFor="trackBatch" className="text-sm text-slate-600 dark:text-slate-300">
-                  {t('products.trackBatches')}
-                </label>
               </div>
             </div>
             {status.message ? <Notice title={status.message} tone={status.type} /> : null}
@@ -705,7 +814,7 @@ export default function Products() {
                 className="input mt-1 min-h-[120px]"
                 value={bulkText}
                 onChange={(event) => setBulkText(event.target.value)}
-                placeholder="name,companyName,sku,goods,box,piece,3,0,false,0,0,0"
+                placeholder="name,companyName,sku,goods,10,box,piece,3,100,80,0,120,90,5,true,13"
               />
               <div className="mt-2 flex flex-wrap gap-2">
                 <button className="btn-secondary" type="button" onClick={importBulkRows}>
@@ -725,13 +834,17 @@ export default function Products() {
                     <th className="py-2 text-left">{t('products.company')}</th>
                     <th className="py-2 text-left">{t('products.sku')}</th>
                     <th className="py-2 text-left">{t('products.type')}</th>
+                    <th className="py-2 text-right">{t('inventory.openingStock')}</th>
                     <th className="py-2 text-left">{t('products.primaryUnit')}</th>
                     <th className="py-2 text-left">{t('products.secondaryUnit')}</th>
                     <th className="py-2 text-left">{t('products.conversionRate')}</th>
-                    <th className="py-2 text-left">{t('products.batch')}</th>
                     <th className="py-2 text-right">{t('products.purchasePrice')}</th>
                     <th className="py-2 text-right">{t('products.salePrice')}</th>
                     <th className="py-2 text-right">{t('products.secondaryPrice')}</th>
+                    <th className="py-2 text-right">{t('inventory.mrpPrice')}</th>
+                    <th className="py-2 text-right">{t('inventory.wholesalePrice')}</th>
+                    <th className="py-2 text-right">{t('inventory.minWholesaleQty')}</th>
+                    <th className="py-2 text-left">{t('inventory.lowStockAlert')}</th>
                     <th className="py-2 text-right">{t('products.taxRate')}</th>
                     <th className="py-2 text-right">{t('products.action')}</th>
                   </tr>
@@ -739,7 +852,7 @@ export default function Products() {
                 <tbody>
                   {bulkRows.length === 0 ? (
                     <tr>
-                      <td colSpan={14} className="py-3 text-slate-500">
+                      <td colSpan={18} className="py-3 text-slate-500">
                         {t('products.noRows')}
                       </td>
                     </tr>
@@ -785,6 +898,16 @@ export default function Products() {
                         </td>
                         <td className="py-2 pr-2">
                           <input
+                            className="input min-w-[110px] text-right"
+                            name="openingStock"
+                            type="number"
+                            step="0.01"
+                            value={row.openingStock}
+                            onChange={(event) => handleBulkChange(idx, event)}
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <input
                             className="input min-w-[120px]"
                             name="primaryUnit"
                             list={unitListId}
@@ -808,15 +931,6 @@ export default function Products() {
                             type="number"
                             step="0.0001"
                             value={row.conversionRate}
-                            onChange={(event) => handleBulkChange(idx, event)}
-                          />
-                        </td>
-                        <td className="py-2 pr-2">
-                          <input
-                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
-                            type="checkbox"
-                            name="trackBatch"
-                            checked={row.trackBatch}
                             onChange={(event) => handleBulkChange(idx, event)}
                           />
                         </td>
@@ -847,6 +961,45 @@ export default function Products() {
                             type="number"
                             step="0.01"
                             value={row.secondarySalePrice}
+                            onChange={(event) => handleBulkChange(idx, event)}
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <input
+                            className="input min-w-[90px] text-right"
+                            name="mrpPrice"
+                            type="number"
+                            step="0.01"
+                            value={row.mrpPrice}
+                            onChange={(event) => handleBulkChange(idx, event)}
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <input
+                            className="input min-w-[90px] text-right"
+                            name="wholesalePrice"
+                            type="number"
+                            step="0.01"
+                            value={row.wholesalePrice}
+                            onChange={(event) => handleBulkChange(idx, event)}
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <input
+                            className="input min-w-[90px] text-right"
+                            name="minWholesaleQuantity"
+                            type="number"
+                            step="0.01"
+                            value={row.minWholesaleQuantity}
+                            onChange={(event) => handleBulkChange(idx, event)}
+                          />
+                        </td>
+                        <td className="py-2 pr-2">
+                          <input
+                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
+                            type="checkbox"
+                            name="lowStockAlert"
+                            checked={row.lowStockAlert}
                             onChange={(event) => handleBulkChange(idx, event)}
                           />
                         </td>

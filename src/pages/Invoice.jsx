@@ -1,17 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { api } from '../lib/api';
+import { api, API_BASE } from '../lib/api';
+import { useBusinessSettings } from '../lib/businessSettings';
 import Notice from '../components/Notice';
 
 function formatDate(dateStr) {
   if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString();
+  return new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 export default function Invoice() {
   const { type, id } = useParams();
   const [record, setRecord] = useState(null);
   const [status, setStatus] = useState('');
+  const { settings: biz } = useBusinessSettings();
+  const printRef = useRef(null);
 
   useEffect(() => {
     const loader = type === 'sales' ? api.getSale : api.getPurchase;
@@ -19,6 +22,20 @@ export default function Invoice() {
       .then(setRecord)
       .catch((err) => setStatus(err.message));
   }, [type, id]);
+
+  const handlePrint = () => {
+    const source = printRef.current;
+    if (!source) { window.print(); return; }
+    const clone = source.cloneNode(true);
+    clone.classList.add('print-clone');
+    document.body.appendChild(clone);
+    const cleanup = () => {
+      if (document.body.contains(clone)) document.body.removeChild(clone);
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+  };
 
   const isSale = type === 'sales';
   const label = isSale ? 'Sale' : 'Purchase';
@@ -35,104 +52,151 @@ export default function Invoice() {
       Math.max(Number(record?.grandTotal || 0) - (isSale ? totalReceived : totalPaid), 0)
   );
 
+  const logoSrc = biz.logoUrl
+    ? biz.logoUrl.startsWith('http') ? biz.logoUrl : `${API_BASE}${biz.logoUrl}`
+    : null;
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Link className="btn-ghost" to={type === 'sales' ? '/app/sales' : '/app/purchases'}>
-          Back
+          ← Back
         </Link>
-        <button className="btn-primary" type="button" onClick={() => window.print()}>
+        <button className="btn-primary" type="button" onClick={handlePrint}>
           Download PDF
         </button>
       </div>
       {status ? <Notice title={status} tone="error" /> : null}
       {record ? (
-        <div className="print-area">
-          <div className="card print:shadow-none">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="font-serif text-3xl text-slate-900 dark:text-white">{label} Invoice</h1>
-              <p className="text-slate-500">#{record.invoiceNo || record.id.slice(0, 8)}</p>
+        <div ref={printRef} className="print-area card space-y-6 print:shadow-none print:border-none">
+          {/* Header */}
+          <div className="flex items-start justify-between border-b border-slate-200/70 pb-6 dark:border-slate-800/70">
+            {/* Company info */}
+            <div className="flex items-start gap-4">
+              {logoSrc && (
+                <img
+                  src={logoSrc}
+                  alt="Logo"
+                  className="h-14 w-14 rounded-xl object-contain border border-slate-200 bg-white p-0.5"
+                />
+              )}
+              <div>
+                <h1 className="font-serif text-2xl text-slate-900 dark:text-white">
+                  {biz.companyName || 'ManageMyShop'}
+                </h1>
+                {biz.address && (
+                  <p className="mt-0.5 text-xs text-slate-500 whitespace-pre-wrap">{biz.address}</p>
+                )}
+                {(biz.phone || biz.email) && (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {[biz.phone, biz.email].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+                {biz.panVat && (
+                  <p className="mt-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+                    PAN/VAT: {biz.panVat}
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="text-right text-sm text-slate-600 dark:text-slate-300">
-              <p>Date: {formatDate(dateValue)}</p>
-              <p>Status: {record.status}</p>
+            {/* Invoice meta */}
+            <div className="text-right shrink-0">
+              <p className="text-xs uppercase text-slate-400">{label} Invoice</p>
+              <p className="font-bold text-slate-900 dark:text-white">#{record.invoiceNo || record.id.slice(0, 8)}</p>
+              <p className="mt-1 text-xs text-slate-500">{formatDate(dateValue)}</p>
+              <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
+                record.status === 'paid' || record.status === 'received'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-amber-100 text-amber-700'
+              }`}>{record.status}</span>
             </div>
           </div>
-          <div className="mt-6 grid gap-4 text-sm text-slate-600 dark:text-slate-300 md:grid-cols-2">
-            <div>
-              <p className="text-xs uppercase text-slate-400">Business</p>
-              <p>ManageMyShop</p>
-            </div>
-            <div>
-              <p className="text-xs uppercase text-slate-400">Notes</p>
-              <p>{record.notes || '—'}</p>
-            </div>
+
+          {/* Customer / Supplier + Notes */}
+          <div className="grid gap-4 text-sm sm:grid-cols-2">
             <div>
               <p className="text-xs uppercase text-slate-400">{isSale ? 'Customer' : 'Supplier'}</p>
-              <p>
+              <p className="font-semibold text-slate-800 dark:text-slate-200">
                 {isSale
-                  ? record.Customer?.name || record.customerName || record.customerId || 'Walk-in'
-                  : record.Supplier?.name || record.supplierName || record.supplierId || '—'}
+                  ? record.partyName || record.customerName || record.Customer?.name || 'Walk-in'
+                  : record.partyName || record.supplierName || record.Party?.name || '—'}
               </p>
             </div>
-            <div>
-              <p className="text-xs uppercase text-slate-400">{isSale ? 'Received' : 'Paid'}</p>
-              <p>${isSale ? totalReceived.toFixed(2) : totalPaid.toFixed(2)}</p>
-            </div>
+            {record.notes && (
+              <div>
+                <p className="text-xs uppercase text-slate-400">Notes</p>
+                <p className="whitespace-pre-wrap text-slate-600 dark:text-slate-300">{record.notes}</p>
+              </div>
+            )}
           </div>
-          <div className="mt-6 border-t border-slate-200/70 pt-4 dark:border-slate-800/70">
-            <div className="mb-4 overflow-x-auto">
+
+          {/* Line items */}
+          <div>
+            <p className="mb-2 text-xs uppercase text-slate-400">Line Items</p>
+            <div className="overflow-x-auto rounded-xl border border-slate-200/70 dark:border-slate-800/70">
               <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-                <thead className="text-xs uppercase text-slate-400">
+                <thead className="bg-slate-50 dark:bg-slate-900/40 text-xs uppercase text-slate-400">
                   <tr>
-                    <th className="py-2 text-left">Product</th>
-                    <th className="py-2 text-left">Company</th>
-                    <th className="py-2 text-right">Qty</th>
-                    <th className="py-2 text-right">Unit</th>
-                    <th className="py-2 text-right">Tax %</th>
-                    <th className="py-2 text-right">Line total</th>
+                    <th className="py-2 px-4 text-left">Product</th>
+                    <th className="py-2 px-4 text-right">Qty</th>
+                    <th className="py-2 px-4 text-right">Unit Price</th>
+                    <th className="py-2 px-4 text-right">Tax %</th>
+                    <th className="py-2 px-4 text-right">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.length === 0 ? (
-                    <tr><td colSpan={6} className="py-3 text-slate-500">No line items.</td></tr>
+                    <tr><td colSpan={5} className="py-3 px-4 text-slate-500">No line items.</td></tr>
                   ) : (
                     items.map((item) => (
                       <tr key={item.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                        <td className="py-2">{item.Product?.name || item.description || item.productId || '—'}</td>
-                        <td className="py-2">{item.Product?.companyName || '—'}</td>
-                        <td className="py-2 text-right">{Number(item.quantity || 0).toFixed(2)}</td>
-                        <td className="py-2 text-right">Rs {Number(item.unitPrice || 0).toFixed(2)}</td>
-                        <td className="py-2 text-right">{Number(item.taxRate || 0).toFixed(2)}</td>
-                        <td className="py-2 text-right">Rs {Number(item.lineTotal || 0).toFixed(2)}</td>
+                        <td className="py-2.5 px-4">{item.Product?.name || item.description || '—'}</td>
+                        <td className="py-2.5 px-4 text-right">{Number(item.quantity || 0).toFixed(2)}</td>
+                        <td className="py-2.5 px-4 text-right">Rs {Number(item.unitPrice || 0).toFixed(2)}</td>
+                        <td className="py-2.5 px-4 text-right">{Number(item.taxRate || 0).toFixed(2)}%</td>
+                        <td className="py-2.5 px-4 text-right font-semibold">Rs {Number(item.lineTotal || 0).toFixed(2)}</td>
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
             </div>
-            <div className="flex justify-between text-sm">
-              <span>Subtotal</span>
-              <span>Rs {Number(record.subTotal || 0).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Tax</span>
-              <span>Rs {Number(record.taxTotal || 0).toFixed(2)}</span>
-            </div>
-            <div className="mt-2 flex justify-between text-base font-semibold">
-              <span>Grand total</span>
-              <span>Rs {Number(record.grandTotal || 0).toFixed(2)}</span>
-            </div>
-            <div className="mt-3 flex justify-between text-sm">
-              <span>{isSale ? 'Total received' : 'Total paid'}</span>
-              <span>Rs {isSale ? totalReceived.toFixed(2) : totalPaid.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-sm font-semibold text-rose-600 dark:text-rose-300">
-              <span>Due amount</span>
-              <span>Rs {dueAmount.toFixed(2)}</span>
+          </div>
+
+          {/* Totals */}
+          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-5 dark:border-slate-800/60 dark:bg-slate-900/40">
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                <span>Subtotal</span>
+                <span>Rs {Number(record.subTotal || 0).toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
+                <span>Tax</span>
+                <span>Rs {Number(record.taxTotal || 0).toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-slate-200/70 pt-2 font-bold text-slate-900 dark:border-slate-700/60 dark:text-white">
+                <span>Grand Total</span>
+                <span className="text-lg">Rs {Number(record.grandTotal || 0).toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400">
+                <span>{isSale ? 'Amount Received' : 'Amount Paid'}</span>
+                <span className="font-semibold">
+                  Rs {isSale ? totalReceived.toFixed(2) : totalPaid.toFixed(2)}
+                </span>
+              </div>
+              {dueAmount > 0 && (
+                <div className="flex items-center justify-between rounded-xl bg-rose-50 px-3 py-2 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">
+                  <span className="font-semibold">Due Amount</span>
+                  <span className="font-bold">Rs {dueAmount.toFixed(2)}</span>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Footer */}
+          <div className="border-t border-slate-200/70 pt-4 text-center text-xs text-slate-400 dark:border-slate-800/70">
+            <p>Thank you for your business!</p>
+            <p className="mt-1">Printed on {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</p>
           </div>
         </div>
       ) : null}

@@ -3,31 +3,53 @@ import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, UserCheck, Briefcase, Boxes, Package, BarChart3 } from 'lucide-react';
+import { ShoppingCart, UserCheck, Briefcase, Boxes, Package, BarChart3, Clock } from 'lucide-react';
 import { useI18n } from '../lib/i18n.jsx';
+import { useProductStore } from '../stores/products';
+import { useSaleStore } from '../stores/sales';
+import { usePurchaseStore } from '../stores/purchases';
+import { useServiceStore } from '../stores/services';
 
+function getDeliveryDaysLeft(deliveryDate) {
+  if (!deliveryDate) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const delivery = new Date(deliveryDate);
+  delivery.setHours(0, 0, 0, 0);
+  return Math.ceil((delivery - today) / (1000 * 60 * 60 * 24));
+}
+
+function DeliveryTag({ date }) {
+  if (!date) return <span className="text-xs text-slate-400">—</span>;
+  const days = getDeliveryDaysLeft(date);
+  const label = new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  if (days < 0) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">
+        <Clock size={10} /> {label} · Overdue
+      </span>
+    );
+  }
+  if (days < 3) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">
+        <Clock size={10} /> {label} · {days}d
+      </span>
+    );
+  }
+  if (days < 8) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+        <Clock size={10} /> {label} · {days}d
+      </span>
+    );
+  }
+  return <span className="text-xs text-slate-500">{label}</span>;
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return '-';
-  const date = new Date(dateStr);
-  return date.toLocaleDateString();
-}
-
-function buildSeries(items, dateKey) {
-  const days = Array.from({ length: 7 }).map((_, idx) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - idx));
-    const key = d.toISOString().slice(0, 10);
-    return { key, label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), value: 0 };
-  });
-  const map = Object.fromEntries(days.map((d) => [d.key, d]));
-  items.forEach((item) => {
-    const raw = item[dateKey] || item.createdAt;
-    if (!raw) return;
-    const key = new Date(raw).toISOString().slice(0, 10);
-    if (map[key]) map[key].value += Number(item.grandTotal || 0);
-  });
-  return days;
+  return new Date(dateStr).toLocaleDateString();
 }
 
 function parseDate(value) {
@@ -35,9 +57,7 @@ function parseDate(value) {
   if (value instanceof Date) return value;
   if (typeof value === 'string') {
     const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (match) {
-      return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-    }
+    if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
   }
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
@@ -48,8 +68,7 @@ function getRangeStart(range) {
   if (range === 'today') return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   if (range === 'week') {
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const day = start.getDay();
-    start.setDate(start.getDate() - day);
+    start.setDate(start.getDate() - start.getDay());
     return start;
   }
   if (range === 'month') return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -62,55 +81,47 @@ function isWithinRange(value, rangeStart, rangeEnd) {
   return date >= rangeStart && date <= rangeEnd;
 }
 
-function BarChart({ title, series, formatMoney, last7Label }) {
-  const { t } = useI18n();
-  const max = Math.max(...series.map((d) => d.value), 1);
-  return (
-    <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
-      <div className="flex items-center justify-between">
-        <h3 className="font-serif text-lg text-slate-900 dark:text-white">{title}</h3>
-        <span className="text-xs text-slate-500">{last7Label}</span>
-      </div>
-      <div className="mt-4 grid grid-cols-7 gap-2 items-end">
-        {series.map((point) => (
-          <div key={point.key} className="flex flex-col items-center gap-2">
-            <div className="h-20 w-full rounded-full bg-slate-100 dark:bg-slate-800 flex items-end">
-              <div
-                className="w-full rounded-full bg-emerald-300 dark:bg-ocean"
-                style={{ height: `${(point.value / max) * 100}%` }}
-                title={formatMoney(point.value)}
-              />
-            </div>
-            <span className="text-[10px] text-slate-500">{point.label}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function Dashboard() {
   const { t } = useI18n();
+
+  // ── Stores ──
+  const { products, fetch: fetchProducts } = useProductStore();
+  const { sales, fetch: fetchSales } = useSaleStore();
+  const { purchases, fetch: fetchPurchases } = usePurchaseStore();
+  const { services, fetch: fetchServices } = useServiceStore();
+
+  // ── Low stock: dashboard-only concern ──
+  const [lowStock, setLowStock] = useState([]);
+  const [loadError, setLoadError] = useState('');
+
+  const [dateRange, setDateRange] = useState('month');
   const rangeOptions = [
     { key: 'today', label: t('dashboard.filters.today') },
     { key: 'week', label: t('dashboard.filters.week') },
     { key: 'month', label: t('dashboard.filters.month') },
     { key: 'year', label: t('dashboard.filters.year') },
   ];
-  const [dateRange, setDateRange] = useState('month');
-  const [sales, setSales] = useState([]);
-  const [purchases, setPurchases] = useState([]);
-  const [services, setServices] = useState([]);
-  const [lowStock, setLowStock] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [status, setStatus] = useState('');
+
   const formatMoney = (value) => {
     const amount = Number(value || 0);
     const formatted = amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return t('currency.formatted', { symbol: t('currency.symbol'), amount: formatted });
   };
+
+  // ── Fetch data on mount (stores will skip if already loaded) ──
+  useEffect(() => {
+    fetchProducts();
+    fetchSales({ limit: 50 });
+    fetchPurchases({ limit: 50 });
+    fetchServices({ limit: 20 });
+    api.lowStock({ threshold: 5 })
+      .then((data) => setLowStock(data || []))
+      .catch((err) => setLoadError(err.message));
+  }, []);
+
   const rangeStart = useMemo(() => getRangeStart(dateRange), [dateRange]);
   const rangeEnd = useMemo(() => new Date(), [dateRange]);
+
   const filterByRange = useCallback(
     (items, dateKey) =>
       items.filter((item) => {
@@ -120,46 +131,32 @@ export default function Dashboard() {
     [rangeStart, rangeEnd],
   );
 
-  useEffect(() => {
-    Promise.all([
-      api.listSales({ limit: 50 }),
-      api.listPurchases({ limit: 50 }),
-      api.listServices({ limit: 20 }),
-      api.lowStock({ threshold: 5 }),
-      api.listProducts(),
-    ])
-      .then(([salesData, purchaseData, serviceData, lowStockData, productData]) => {
-        setSales(salesData || []);
-        setPurchases(purchaseData || []);
-        setServices(serviceData || []);
-        setLowStock(lowStockData || []);
-        setProducts(productData || []);
-      })
-      .catch((err) => setStatus(err.message));
-  }, []);
-
   const filteredSales = useMemo(() => filterByRange(sales, 'saleDate'), [sales, filterByRange]);
   const filteredPurchases = useMemo(() => filterByRange(purchases, 'purchaseDate'), [purchases, filterByRange]);
   const filteredServices = useMemo(() => filterByRange(services, 'createdAt'), [services, filterByRange]);
-  const salesSeries = useMemo(() => buildSeries(filteredSales, 'saleDate'), [filteredSales]);
-  const purchaseSeries = useMemo(() => buildSeries(filteredPurchases, 'purchaseDate'), [filteredPurchases]);
+
   const summary = useMemo(() => {
     const received = filteredSales.reduce((sum, sale) => sum + Number(sale.amountReceived || 0), 0);
     const pending = filteredSales.reduce((sum, sale) => {
-      if (sale.dueAmount !== undefined && sale.dueAmount !== null) {
-        return sum + Number(sale.dueAmount || 0);
-      }
       const total = Number(sale.grandTotal || 0);
       const paid = Number(sale.amountReceived || 0);
-      return sum + Math.max(total - paid, 0);
+      return sum + (sale.dueAmount !== undefined ? Number(sale.dueAmount || 0) : Math.max(total - paid, 0));
     }, 0);
     const salesTotal = filteredSales.reduce((sum, sale) => sum + Number(sale.grandTotal || 0), 0);
-    const purchaseTotal = filteredPurchases.reduce((sum, purchase) => sum + Number(purchase.grandTotal || 0), 0);
+    const purchaseTotal = filteredPurchases.reduce((sum, p) => sum + Number(p.grandTotal || 0), 0);
     return { received, pending, salesTotal, purchaseTotal };
   }, [filteredSales, filteredPurchases]);
 
   const recentSales = useMemo(() => filteredSales.slice(0, 5), [filteredSales]);
   const recentPurchases = useMemo(() => filteredPurchases.slice(0, 5), [filteredPurchases]);
+
+  const upcomingDeliveries = useMemo(() => {
+    return [...services]
+      .filter((s) => s.status !== 'closed' && s.deliveryDate)
+      .sort((a, b) => new Date(a.deliveryDate) - new Date(b.deliveryDate))
+      .slice(0, 6);
+  }, [services]);
+
   const selectedRangeLabel = rangeOptions.find((option) => option.key === dateRange)?.label ?? '';
 
   return (
@@ -191,7 +188,7 @@ export default function Dashboard() {
           </div>
         )}
       />
-      {status ? <Notice title={status} tone="error" /> : null}
+      {loadError ? <Notice title={loadError} tone="error" /> : null}
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-6 shadow-sm dark:border-emerald-800/50 dark:from-emerald-950/60 dark:via-slate-950/80 dark:to-slate-900/60">
           <div className="flex items-start justify-between gap-4">
@@ -207,15 +204,15 @@ export default function Dashboard() {
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl border border-amber-200/70 bg-white/80 p-4 dark:border-amber-700/40 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-amber-500/80">{t('dashboard.amountPending')}</p>
-              <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary?.pending)}</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.pending)}</p>
             </div>
             <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-slate-500">{t('dashboard.salesTotal')}</p>
-              <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary?.salesTotal)}</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.salesTotal)}</p>
             </div>
             <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-slate-500">{t('dashboard.purchaseSpend')}</p>
-              <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary?.purchaseTotal)}</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.purchaseTotal)}</p>
             </div>
             <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-slate-500">{t('dashboard.products')}</p>
@@ -232,27 +229,19 @@ export default function Dashboard() {
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-slate-500">
-                  <UserCheck size={14} /> {t('nav.sales')}
-                </div>
+                <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><UserCheck size={14} /> {t('nav.sales')}</div>
                 <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{filteredSales.length}</p>
               </div>
               <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-slate-500">
-                  <ShoppingCart size={14} /> {t('nav.purchases')}
-                </div>
+                <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><ShoppingCart size={14} /> {t('nav.purchases')}</div>
                 <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{filteredPurchases.length}</p>
               </div>
               <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-slate-500">
-                  <Briefcase size={14} /> {t('nav.services')}
-                </div>
+                <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><Briefcase size={14} /> {t('nav.services')}</div>
                 <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{filteredServices.length}</p>
               </div>
               <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-slate-500">
-                  <Boxes size={14} /> {t('dashboard.lowStockAlerts')}
-                </div>
+                <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><Boxes size={14} /> {t('dashboard.lowStockAlerts')}</div>
                 <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{lowStock.length}</p>
               </div>
             </div>
@@ -263,53 +252,31 @@ export default function Dashboard() {
               <Package size={18} className="text-slate-400" />
             </div>
             <div className="mt-4 grid gap-2">
-              <Link className="btn-primary w-full justify-center" to="/app/sales">
-                {t('dashboard.newSale')}
-              </Link>
-              <Link className="btn-secondary w-full justify-center" to="/app/purchases">
-                {t('dashboard.newPurchase')}
-              </Link>
-              <Link className="btn-ghost w-full justify-center" to="/app/products">
-                {t('dashboard.addProduct')}
-              </Link>
+              <Link className="btn-primary w-full justify-center" to="/app/sales">{t('dashboard.newSale')}</Link>
+              <Link className="btn-secondary w-full justify-center" to="/app/purchases">{t('dashboard.newPurchase')}</Link>
+              <Link className="btn-ghost w-full justify-center" to="/app/inventory">{t('dashboard.addProduct')}</Link>
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        {/*<BarChart title={t('dashboard.salesTrend')} series={salesSeries} formatMoney={formatMoney} last7Label={t('dashboard.last7Days')} />*/}
-        {/*<BarChart title={t('dashboard.purchaseTrend')} series={purchaseSeries} formatMoney={formatMoney} last7Label={t('dashboard.last7Days')} />*/}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
             <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.recentSales')}</h3>
-            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/sales">
-              {t('dashboard.viewAll')}
-            </Link>
+            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/sales">{t('dashboard.viewAll')}</Link>
           </div>
           <div className="mt-4 space-y-3">
             {recentSales.length === 0 ? (
               <p className="text-sm text-slate-500">{t('dashboard.noSales')}</p>
             ) : (
               recentSales.map((sale) => (
-                <div
-                  key={sale.id}
-                  className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60"
-                >
+                <div key={sale.id} className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                      {sale.invoiceNo || sale.id.slice(0, 6)}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {formatDate(sale.saleDate)} · {sale.status || t('nav.sales')}
-                    </p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{sale.invoiceNo || sale.id.slice(0, 6)}</p>
+                    <p className="text-xs text-slate-500">{formatDate(sale.saleDate)} · {sale.status || t('nav.sales')}</p>
                   </div>
-                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                    {formatMoney(sale.grandTotal)}
-                  </p>
+                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{formatMoney(sale.grandTotal)}</p>
                 </div>
               ))
             )}
@@ -318,30 +285,19 @@ export default function Dashboard() {
         <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
             <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.recentPurchases')}</h3>
-            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/purchases">
-              {t('dashboard.viewAll')}
-            </Link>
+            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/purchases">{t('dashboard.viewAll')}</Link>
           </div>
           <div className="mt-4 space-y-3">
             {recentPurchases.length === 0 ? (
               <p className="text-sm text-slate-500">{t('dashboard.noPurchases')}</p>
             ) : (
               recentPurchases.map((purchase) => (
-                <div
-                  key={purchase.id}
-                  className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60"
-                >
+                <div key={purchase.id} className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                      {purchase.invoiceNo || purchase.id.slice(0, 6)}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {formatDate(purchase.purchaseDate)} · {purchase.status || t('nav.purchases')}
-                    </p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{purchase.invoiceNo || purchase.id.slice(0, 6)}</p>
+                    <p className="text-xs text-slate-500">{formatDate(purchase.purchaseDate)} · {purchase.status || t('nav.purchases')}</p>
                   </div>
-                  <p className="text-sm font-semibold text-amber-600 dark:text-amber-300">
-                    {formatMoney(purchase.grandTotal)}
-                  </p>
+                  <p className="text-sm font-semibold text-amber-600 dark:text-amber-300">{formatMoney(purchase.grandTotal)}</p>
                 </div>
               ))
             )}
@@ -352,57 +308,66 @@ export default function Dashboard() {
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
-            <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.serviceOrders')}</h3>
-            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/services">
-              {t('dashboard.viewAll')}
-            </Link>
+            <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.upcomingDeliveries')}</h3>
+            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/services">{t('dashboard.viewAll')}</Link>
           </div>
-          <div className="mt-4 space-y-3">
-            {filteredServices.length === 0 ? (
-              <p className="text-sm text-slate-500">{t('dashboard.noService')}</p>
+          <div className="mt-4 space-y-2">
+            {upcomingDeliveries.length === 0 ? (
+              <p className="text-sm text-slate-500">{t('dashboard.noUpcomingDeliveries')}</p>
             ) : (
-              filteredServices.slice(0, 5).map((order) => (
-                <div
-                  key={order.id}
-                  className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                      {order.orderNo || order.id.slice(0, 6)}
-                    </p>
-                    <p className="text-xs text-slate-500">{order.status || t('nav.services')}</p>
+              upcomingDeliveries.map((order) => {
+                const days = getDeliveryDaysLeft(order.deliveryDate);
+                const isUrgent = days !== null && days < 3;
+                const isWarning = days !== null && days >= 3 && days < 8;
+                const rowClass = isUrgent
+                  ? 'border border-red-200/70 bg-red-50/60 dark:border-red-800/40 dark:bg-red-900/15'
+                  : isWarning
+                  ? 'border border-amber-200/70 bg-amber-50/60 dark:border-amber-800/40 dark:bg-amber-900/15'
+                  : 'border border-slate-200/70 bg-white/70 dark:border-slate-700/60 dark:bg-slate-900/60';
+                return (
+                  <div key={order.id} className={`flex items-center justify-between rounded-2xl p-3 ${rowClass}`}>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{order.orderNo || order.id.slice(0, 6)}</p>
+                        {order.vehicleId ? (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{order.vehicleId}</span>
+                        ) : null}
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        {order.partyName || order.customerName ? (
+                          <span className="text-xs text-slate-500">{order.partyName || order.customerName}</span>
+                        ) : null}
+                        <DeliveryTag date={order.deliveryDate} />
+                      </div>
+                    </div>
+                    <div className="ml-3 text-right">
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{formatMoney(order.grandTotal)}</p>
+                      <span className={`text-xs font-medium capitalize ${order.status === 'in_progress' ? 'text-amber-600 dark:text-amber-400' : order.status === 'open' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}>
+                        {order.status === 'in_progress' ? 'In progress' : order.status || '—'}
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                    {formatMoney(order.grandTotal)}
-                  </p>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
         <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
             <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.lowStockAlerts')}</h3>
-            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/inventory">
-              {t('dashboard.viewInventory')}
-            </Link>
+            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/inventory">{t('dashboard.viewInventory')}</Link>
           </div>
           <div className="mt-4 space-y-3">
             {lowStock.length === 0 ? (
               <p className="text-sm text-slate-500">{t('dashboard.noLowStock')}</p>
             ) : (
               lowStock.slice(0, 5).map((item) => (
-                <div
-                  key={item.productId}
-                  className="flex items-center justify-between rounded-2xl border border-rose-200/60 bg-rose-50/60 p-3 dark:border-rose-700/40 dark:bg-rose-900/20"
-                >
+                <div key={item.productId} className="flex items-center justify-between rounded-2xl border border-rose-200/60 bg-rose-50/60 p-3 dark:border-rose-700/40 dark:bg-rose-900/20">
                   <div>
                     <p className="text-sm font-semibold text-slate-900 dark:text-white">{item.name}</p>
                     <p className="text-xs text-slate-500">{item.sku || 'n/a'}</p>
                   </div>
-                  <p className="text-sm font-semibold text-rose-600 dark:text-rose-300">
-                    {Number(item.quantityOnHand || 0).toFixed(2)}
-                  </p>
+                  <p className="text-sm font-semibold text-rose-600 dark:text-rose-300">{Number(item.quantityOnHand || 0).toFixed(2)}</p>
                 </div>
               ))
             )}
@@ -425,16 +390,10 @@ export default function Dashboard() {
         <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200/70 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/90 md:shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <Link className="btn-primary w-full justify-center" to="/app/sales">
-              <span className="flex items-center gap-2">
-                <UserCheck size={16} />
-                {t('dashboard.newSale')}
-              </span>
+              <span className="flex items-center gap-2"><UserCheck size={16} />{t('dashboard.newSale')}</span>
             </Link>
             <Link className="btn-secondary w-full justify-center" to="/app/purchases">
-              <span className="flex items-center gap-2">
-                <ShoppingCart size={16} />
-                {t('dashboard.newPurchase')}
-              </span>
+              <span className="flex items-center gap-2"><ShoppingCart size={16} />{t('dashboard.newPurchase')}</span>
             </Link>
           </div>
         </div>

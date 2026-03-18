@@ -1,6 +1,6 @@
 import { getBusinessId, getToken } from './storage';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 async function request(path, options = {}) {
   const token = getToken();
@@ -27,7 +27,10 @@ async function request(path, options = {}) {
 
   if (!res.ok) {
     const message = payload?.message || 'Request failed';
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = res.status;
+    error.payload = payload;
+    throw error;
   }
 
   return payload;
@@ -36,16 +39,10 @@ async function request(path, options = {}) {
 export const api = {
   register: (data) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   login: (data) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  requestEmailOtp: (data) => request('/api/auth/request-email-otp', { method: 'POST', body: JSON.stringify(data) }),
+  verifyEmailOtp: (data) => request('/api/auth/verify-email-otp', { method: 'POST', body: JSON.stringify(data) }),
   listProducts: () => request('/api/products'),
   createProduct: (data) => request('/api/products', { method: 'POST', body: JSON.stringify(data) }),
-  listLocations: () => request('/api/inventory/locations'),
-  createLocation: (data) => request('/api/inventory/locations', { method: 'POST', body: JSON.stringify(data) }),
-  listBatches: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    const suffix = query ? `?${query}` : '';
-    return request(`/api/inventory/batches${suffix}`);
-  },
-  createBatch: (data) => request('/api/inventory/batches', { method: 'POST', body: JSON.stringify(data) }),
   createPurchase: (data) => request('/api/purchases', { method: 'POST', body: JSON.stringify(data) }),
   listPurchases: (params = {}) => {
     const query = new URLSearchParams(params).toString();
@@ -63,6 +60,8 @@ export const api = {
   getSale: (id) => request(`/api/sales/${id}`),
   updateSale: (id, data) => request(`/api/sales/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   createService: (data) => request('/api/services', { method: 'POST', body: JSON.stringify(data) }),
+  getService: (id) => request(`/api/services/${id}`),
+  updateService: (id, data) => request(`/api/services/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   listServices: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const suffix = query ? `?${query}` : '';
@@ -83,6 +82,12 @@ export const api = {
   getParty: (id) => request(`/api/parties/${id}`),
   updateParty: (id, data) => request(`/api/parties/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteParty: (id) => request(`/api/parties/${id}`, { method: 'DELETE' }),
+  listPartyTransactions: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const suffix = query ? `?${query}` : '';
+    return request(`/api/party-transactions${suffix}`);
+  },
+  createPartyTransaction: (data) => request('/api/party-transactions', { method: 'POST', body: JSON.stringify(data) }),
   listOrderAttributes: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const suffix = query ? `?${query}` : '';

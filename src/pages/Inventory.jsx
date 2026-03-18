@@ -5,6 +5,7 @@ import Pagination from '../components/Pagination';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
+import { useProductStore } from '../stores/products';
 import { Plus, Upload, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
 
 const makeEmptyItem = () => ({
@@ -20,7 +21,7 @@ const makeEmptyItem = () => ({
   secondarySalePrice: '0',
   mrpPrice: '0',
   wholesalePrice: '0',
-  minWholesaleQty: '',
+  minWholesaleQuantity: '',
   lowStockAlert: false,
 });
 
@@ -36,6 +37,8 @@ const parseNumber = (value) => {
 
 export default function Inventory() {
   const { t } = useI18n();
+  const { products, loading: productsLoading, error: productsError, fetch: fetchProducts, addProduct, invalidate } = useProductStore();
+
   const unitOptions = useMemo(() => ([
     t('products.units.piece'),
     t('products.units.box'),
@@ -67,8 +70,7 @@ export default function Inventory() {
     t('products.units.month'),
   ]), [t]);
   const unitListId = 'inventory-unit-options';
-  const [products, setProducts] = useState([]);
-  const [inventoryRows, setInventoryRows] = useState([]);
+
   const [status, setStatus] = useState({ type: 'info', message: '' });
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -82,55 +84,27 @@ export default function Inventory() {
   const [form, setForm] = useState(makeEmptyItem());
   const [saving, setSaving] = useState(false);
 
-  const loadData = async () => {
-    try {
-      const [productData, summaryData] = await Promise.all([
-        api.listProducts(),
-        api.inventorySummary(),
-      ]);
-      setProducts(productData || []);
-      setInventoryRows(summaryData || []);
-      setStatus({ type: 'info', message: '' });
-    } catch (err) {
-      setStatus({ type: 'error', message: err.message });
-    }
-  };
-
   useEffect(() => {
-    loadData();
+    fetchProducts();
   }, []);
 
+  useEffect(() => {
+    if (productsError) setStatus({ type: 'error', message: productsError });
+  }, [productsError]);
+
   const items = useMemo(() => {
-    const summaryMap = new Map(inventoryRows.map((row) => [row.productId, row]));
-    const merged = products.map((product) => {
-      const summary = summaryMap.get(product.id) || {};
-      return {
-        id: product.id,
-        name: product.name,
-        itemType: product.itemType || 'goods',
-        category: product.category || product.companyName || '-',
-        sku: product.sku || summary.sku || '-',
-        salePrice: Number(product.salePrice ?? summary.salePrice ?? 0),
-        purchasePrice: Number(product.purchasePrice ?? summary.purchasePrice ?? 0),
-        quantity: Number(summary.quantityOnHand ?? 0),
-        unit: product.primaryUnit || summary.primaryUnit || '',
-      };
-    });
-    const extra = inventoryRows
-      .filter((row) => !products.find((product) => product.id === row.productId))
-      .map((row) => ({
-        id: row.productId,
-        name: row.name,
-        itemType: row.itemType || 'goods',
-        category: row.category || '-',
-        sku: row.sku || '-',
-        salePrice: Number(row.salePrice ?? 0),
-        purchasePrice: Number(row.purchasePrice ?? 0),
-        quantity: Number(row.quantityOnHand ?? 0),
-        unit: row.primaryUnit || '',
-      }));
-    return [...merged, ...extra];
-  }, [products, inventoryRows]);
+    return products.map((product) => ({
+      id: product.id,
+      name: product.name,
+      itemType: product.itemType || 'goods',
+      category: product.category || product.companyName || '-',
+      sku: product.sku || '-',
+      salePrice: Number(product.salePrice ?? 0),
+      purchasePrice: Number(product.purchasePrice ?? 0),
+      quantity: Number(product.stockOnHand ?? product.openingStock ?? 0),
+      unit: product.primaryUnit || '',
+    }));
+  }, [products]);
 
   const categories = useMemo(() => {
     const unique = new Set(items.map((item) => item.category).filter(Boolean));
@@ -188,7 +162,7 @@ export default function Inventory() {
     setStatus({ type: 'info', message: '' });
 
     try {
-      await api.createProduct({
+      const product = await api.createProduct({
         name: form.name,
         companyName: form.category,
         itemType: form.itemType,
@@ -200,11 +174,12 @@ export default function Inventory() {
         secondarySalePrice: parseNumber(form.secondarySalePrice),
         mrpPrice: parseNumber(form.mrpPrice),
         wholesalePrice: parseNumber(form.wholesalePrice),
-        minWholesaleQty: parseNumber(form.minWholesaleQty),
+        minWholesaleQuantity: parseNumber(form.minWholesaleQuantity),
         openingStock: parseNumber(form.openingStock),
         lowStockAlert: form.lowStockAlert,
       });
-      await loadData();
+      // Update cache instead of re-fetching
+      addProduct(product);
       closeDialog();
       setStatus({ type: 'success', message: t('inventory.messages.itemCreated') });
     } catch (err) {
@@ -292,7 +267,39 @@ export default function Inventory() {
           </button>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
+        {/* Mobile card view */}
+        <div className="mt-4 md:hidden space-y-3">
+          {productsLoading && products.length === 0 ? (
+            <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+          ) : pagedItems.length === 0 ? (
+            <p className="py-3 text-sm text-slate-500">{t('inventory.noItems')}</p>
+          ) : (
+            pagedItems.map((item) => (
+              <div key={item.id} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                    {item.name?.slice(0, 1) || 'I'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-900 dark:text-white truncate">{item.name}</p>
+                    <p className="text-xs text-slate-500">{item.category} · {item.unit || t('inventory.noUnit')}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`text-xs font-semibold rounded-full px-2 py-0.5 ${item.quantity <= 0 ? 'bg-rose-100 text-rose-700' : item.quantity <= 5 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      {item.quantity.toFixed(2)} {item.unit || ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                  <span>{t('products.salePrice')}: <strong className="text-slate-700 dark:text-slate-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.salePrice.toFixed(2) })}</strong></span>
+                  <span>{t('products.purchasePrice')}: <strong className="text-slate-700 dark:text-slate-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.purchasePrice.toFixed(2) })}</strong></span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        {/* Desktop table */}
+        <div className="mt-4 overflow-x-auto hidden md:block">
           <table className="w-full text-sm text-slate-600 dark:text-slate-300">
             <thead className="text-xs uppercase text-slate-400">
               <tr>
@@ -306,7 +313,11 @@ export default function Inventory() {
               </tr>
             </thead>
             <tbody>
-              {pagedItems.length === 0 ? (
+              {productsLoading && products.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-3 text-slate-500">{t('common.loading')}</td>
+                </tr>
+              ) : pagedItems.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-3 text-slate-500">{t('inventory.noItems')}</td>
                 </tr>
@@ -398,11 +409,7 @@ export default function Inventory() {
                     key={type}
                     type="button"
                     onClick={() => setForm((prev) => ({ ...prev, itemType: type }))}
-                    className={
-                      form.itemType === type
-                        ? 'btn-primary'
-                        : 'btn-ghost'
-                    }
+                    className={form.itemType === type ? 'btn-primary' : 'btn-ghost'}
                   >
                     {type === 'goods' ? t('products.goods') : t('products.service')}
                   </button>
@@ -432,114 +439,46 @@ export default function Inventory() {
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="label">{t('inventory.openingStock')}</label>
-                <input
-                  className="input mt-1"
-                  name="openingStock"
-                  type="number"
-                  step="0.01"
-                  value={form.openingStock}
-                  onChange={handleFormChange}
-                />
+                <input className="input mt-1" name="openingStock" type="number" step="0.01" value={form.openingStock} onChange={handleFormChange} />
               </div>
               <div>
                 <label className="label">{t('inventory.measuringUnit')}</label>
-                <input
-                  className="input mt-1"
-                  name="primaryUnit"
-                  list={unitListId}
-                  value={form.primaryUnit}
-                  onChange={handleFormChange}
-                />
+                <input className="input mt-1" name="primaryUnit" list={unitListId} value={form.primaryUnit} onChange={handleFormChange} />
               </div>
               <div>
                 <label className="label">{t('products.salePrice')}</label>
-                <input
-                  className="input mt-1"
-                  name="salePrice"
-                  type="number"
-                  step="0.01"
-                  value={form.salePrice}
-                  onChange={handleFormChange}
-                />
+                <input className="input mt-1" name="salePrice" type="number" step="0.01" value={form.salePrice} onChange={handleFormChange} />
               </div>
               <div>
                 <label className="label">{t('products.purchasePrice')}</label>
-                <input
-                  className="input mt-1"
-                  name="purchasePrice"
-                  type="number"
-                  step="0.01"
-                  value={form.purchasePrice}
-                  onChange={handleFormChange}
-                />
+                <input className="input mt-1" name="purchasePrice" type="number" step="0.01" value={form.purchasePrice} onChange={handleFormChange} />
               </div>
               <div>
                 <label className="label">{t('inventory.mrpPrice')}</label>
-                <input
-                  className="input mt-1"
-                  name="mrpPrice"
-                  type="number"
-                  step="0.01"
-                  value={form.mrpPrice}
-                  onChange={handleFormChange}
-                />
+                <input className="input mt-1" name="mrpPrice" type="number" step="0.01" value={form.mrpPrice} onChange={handleFormChange} />
               </div>
               <div>
                 <label className="label">{t('inventory.wholesalePrice')}</label>
-                <input
-                  className="input mt-1"
-                  name="wholesalePrice"
-                  type="number"
-                  step="0.01"
-                  value={form.wholesalePrice}
-                  onChange={handleFormChange}
-                />
+                <input className="input mt-1" name="wholesalePrice" type="number" step="0.01" value={form.wholesalePrice} onChange={handleFormChange} />
               </div>
               <div>
                 <label className="label">{t('inventory.minWholesaleQty')}</label>
-                <input
-                  className="input mt-1"
-                  name="minWholesaleQty"
-                  type="number"
-                  step="0.01"
-                  value={form.minWholesaleQty}
-                  onChange={handleFormChange}
-                />
+                <input className="input mt-1" name="minWholesaleQuantity" type="number" step="0.01" value={form.minWholesaleQuantity} onChange={handleFormChange} />
               </div>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <label className="label">{t('products.secondaryUnit')}</label>
-                <input
-                  className="input mt-1"
-                  name="secondaryUnit"
-                  list={unitListId}
-                  value={form.secondaryUnit}
-                  onChange={handleFormChange}
-                />
+                <input className="input mt-1" name="secondaryUnit" list={unitListId} value={form.secondaryUnit} onChange={handleFormChange} />
               </div>
               <div>
                 <label className="label">{t('products.conversionRate')}</label>
-                <input
-                  className="input mt-1"
-                  name="conversionRate"
-                  type="number"
-                  step="0.0001"
-                  value={form.conversionRate}
-                  onChange={handleFormChange}
-                />
+                <input className="input mt-1" name="conversionRate" type="number" step="0.0001" value={form.conversionRate} onChange={handleFormChange} />
               </div>
               <div>
                 <label className="label">{t('products.secondaryPrice')}</label>
-                <input
-                  className="input mt-1"
-                  name="secondarySalePrice"
-                  type="number"
-                  step="0.01"
-                  value={form.secondarySalePrice}
-                  onChange={handleFormChange}
-                />
+                <input className="input mt-1" name="secondarySalePrice" type="number" step="0.01" value={form.secondarySalePrice} onChange={handleFormChange} />
               </div>
               <div className="flex items-center gap-3 pt-7">
                 <input

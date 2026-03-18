@@ -7,10 +7,12 @@ import { useAuth } from '../lib/auth';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import Pagination from '../components/Pagination';
 import { useI18n } from '../lib/i18n.jsx';
+import { useProductStore } from '../stores/products';
+import { usePartyStore } from '../stores/parties';
+import { usePurchaseStore } from '../stores/purchases';
 
 const emptyPurchaseItem = {
   productId: '',
-  batchId: '',
   quantity: '1',
   unitType: 'primary',
   unitPrice: '0',
@@ -22,7 +24,6 @@ const emptyPurchaseItem = {
 
 const emptyExpenseItem = {
   productId: '',
-  batchId: '',
   quantity: '1',
   unitType: 'primary',
   unitPrice: '0',
@@ -37,15 +38,21 @@ const getEmptyItem = (entryType) => (entryType === 'expense' ? { ...emptyExpense
 export default function Purchases() {
   const { t } = useI18n();
   const { businessId } = useAuth();
-  const [products, setProducts] = useState([]);
-  const [batchesByProduct, setBatchesByProduct] = useState({});
-  const [suppliers, setSuppliers] = useState([]);
-  const [purchaseList, setPurchaseList] = useState([]);
+
+  // ── Stores ──
+  const { products, fetch: fetchProducts } = useProductStore();
+  const { parties, fetch: fetchParties } = usePartyStore();
+  const { purchases: purchaseList, loading: purchasesLoading, fetch: fetchPurchases, invalidate: invalidatePurchases } = usePurchaseStore();
+
+  // ── Derived: suppliers ──
+  const suppliers = useMemo(() => parties.filter((p) => p.type === 'supplier'), [parties]);
+
+  // ── UI state ──
   const [statusFilter, setStatusFilter] = useState('all');
   const [header, setHeader] = useState({
     entryType: 'purchase',
-    supplierId: '',
-    supplierName: '',
+    partyId: '',
+    partyName: '',
     invoiceNo: '',
     purchaseDate: new Date().toISOString().slice(0, 10),
     status: 'received',
@@ -63,31 +70,23 @@ export default function Purchases() {
 
   const isExpense = header.entryType === 'expense';
 
+  // ── Load shared data (cached) ──
   useEffect(() => {
-    api.listProducts().then(setProducts).catch(() => null);
-    api.listParties({ type: 'supplier' }).then(setSuppliers).catch(() => null);
+    fetchProducts();
+    fetchParties();
   }, []);
 
+  // ── Load purchases list (page-specific) ──
   useEffect(() => {
     if (!businessId) return;
-    const params = { limit: 25 };
+    const params = { limit: 50 };
     if (statusFilter !== 'all') params.status = statusFilter;
-    api.listPurchases(params).then(setPurchaseList).catch(() => null);
+    fetchPurchases(params, true);
   }, [businessId, statusFilter]);
 
   useEffect(() => {
     setPage(1);
   }, [statusFilter]);
-
-  const ensureBatches = async (productId) => {
-    if (!productId || batchesByProduct[productId]) return;
-    try {
-      const data = await api.listBatches({ productId });
-      setBatchesByProduct((prev) => ({ ...prev, [productId]: data || [] }));
-    } catch (err) {
-      setStatus({ type: 'error', message: err.message });
-    }
-  };
 
   const totals = useMemo(() => {
     const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
@@ -95,11 +94,7 @@ export default function Purchases() {
       (sum, item) => sum + (Number(item.lineTotal || 0) * Number(item.taxRate || 0)) / 100,
       0
     );
-    return {
-      subTotal,
-      taxTotal,
-      grandTotal: subTotal + taxTotal,
-    };
+    return { subTotal, taxTotal, grandTotal: subTotal + taxTotal };
   }, [items]);
 
   const expenseTotals = useMemo(() => {
@@ -128,8 +123,8 @@ export default function Purchases() {
     setHeader((prev) => ({
       ...prev,
       entryType: value,
-      supplierId: value === 'expense' ? '' : prev.supplierId,
-      supplierName: value === 'expense' ? prev.supplierName : '',
+      partyId: value === 'expense' ? '' : prev.partyId,
+      partyName: value === 'expense' ? prev.partyName : '',
     }));
     setItems([getEmptyItem(value)]);
     setDeletedItemIds([]);
@@ -140,18 +135,11 @@ export default function Purchases() {
       prev.map((item, idx) => {
         if (idx !== index) return item;
         const next = { ...item, [field]: value };
-        if (field === 'productId') next.batchId = '';
-        if (field === 'itemType' && value !== 'part') {
-          next.productId = '';
-          next.batchId = '';
-        }
-        const quantity = Number(next.quantity || 0);
-        const unitPrice = Number(next.unitPrice || 0);
-        next.lineTotal = (quantity * unitPrice).toFixed(2);
+        if (field === 'itemType' && value !== 'part') next.productId = '';
+        next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
         return next;
       })
     );
-    if (field === 'productId') ensureBatches(value);
   };
 
   const getProductById = (id) => products.find((p) => p.id === id);
@@ -181,9 +169,7 @@ export default function Purchases() {
       } else if (next.unitType === 'primary' && Number(product.purchasePrice || 0) > 0) {
         next.unitPrice = String(product.purchasePrice || 0);
       }
-      const quantity = Number(next.quantity || 0);
-      const unitPrice = Number(next.unitPrice || 0);
-      next.lineTotal = (quantity * unitPrice).toFixed(2);
+      next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
       return next;
     }));
   };
@@ -192,33 +178,20 @@ export default function Purchases() {
   const removeItem = (index) => {
     setItems((prev) => {
       const target = prev[index];
-      if (target?.id) {
-        setDeletedItemIds((ids) => [...ids, target.id]);
-      }
+      if (target?.id) setDeletedItemIds((ids) => [...ids, target.id]);
       return prev.filter((_, idx) => idx !== index);
     });
   };
 
   const exportCsv = () => {
     const rows = [
-      [
-        t('common.invoice'),
-        t('common.date'),
-        t('common.status'),
-        t('purchases.entryType'),
-        t('purchases.supplier'),
-        t('purchases.subTotal'),
-        t('purchases.taxTotal'),
-        t('purchases.grandTotal'),
-        t('purchases.totalPaid'),
-        t('purchases.dueLabel'),
-      ],
+      [t('common.invoice'), t('common.date'), t('common.status'), t('purchases.entryType'), t('purchases.supplier'), t('purchases.subTotal'), t('purchases.taxTotal'), t('purchases.grandTotal'), t('purchases.totalPaid'), t('purchases.dueLabel')],
       ...purchaseList.map((p) => [
         p.invoiceNo || p.id,
         p.purchaseDate || '',
         p.status || '',
         p.entryType || p.type || 'purchase',
-        p.Supplier?.name || p.supplierName || p.supplierId || '',
+        p.partyName || p.supplierName || p.Party?.name || p.partyId || p.supplierId || '',
         Number(p.subTotal || 0).toFixed(2),
         Number(p.taxTotal || 0).toFixed(2),
         Number(p.grandTotal || 0).toFixed(2),
@@ -226,7 +199,7 @@ export default function Purchases() {
         Number(p.dueAmount || 0).toFixed(2),
       ]),
     ];
-    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/\"/g, '""')}"`).join(',')).join('\\n');
+    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/\"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -243,39 +216,24 @@ export default function Purchases() {
   }, [page, pageSize, purchaseList]);
 
   const resetForm = () => {
-    setHeader({
-      entryType: 'purchase',
-      supplierId: '',
-      supplierName: '',
-      invoiceNo: '',
-      purchaseDate: new Date().toISOString().slice(0, 10),
-      status: 'received',
-      notes: '',
-      amountReceived: '0',
-    });
+    setHeader({ entryType: 'purchase', partyId: '', partyName: '', invoiceNo: '', purchaseDate: new Date().toISOString().slice(0, 10), status: 'received', notes: '', amountReceived: '0' });
     setItems([getEmptyItem('purchase')]);
     setDeletedItemIds([]);
     setEditingId(null);
     setFormMode('create');
   };
 
-  const openCreate = () => {
-    resetForm();
-    setIsOpen(true);
-  };
+  const openCreate = () => { resetForm(); setIsOpen(true); };
 
   const openEdit = async (purchaseId) => {
     try {
       const purchase = await api.getPurchase(purchaseId);
       const purchaseItems = purchase?.PurchaseItems || [];
-      purchaseItems.forEach((item) => {
-        if (item.productId) ensureBatches(item.productId);
-      });
       const entryType = purchase.entryType || purchase.type || 'purchase';
       setHeader({
         entryType,
-        supplierId: purchase.supplierId || '',
-        supplierName: purchase.supplierName || '',
+        partyId: purchase.partyId || purchase.supplierId || '',
+        partyName: purchase.partyName || purchase.supplierName || '',
         invoiceNo: purchase.invoiceNo || '',
         purchaseDate: purchase.purchaseDate || '',
         status: purchase.status || 'received',
@@ -285,7 +243,6 @@ export default function Purchases() {
       const mappedItems = purchaseItems.map((item) => ({
         id: item.id,
         productId: item.productId || '',
-        batchId: item.batchId || '',
         quantity: String(item.quantity ?? '1'),
         unitType: item.unitType || 'primary',
         unitPrice: String(item.unitPrice ?? '0'),
@@ -306,58 +263,35 @@ export default function Purchases() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!businessId) {
-      setStatus({ type: 'error', message: t('errors.businessIdRequired') });
-      return;
-    }
-    if (!header.purchaseDate) {
-      setStatus({ type: 'error', message: t('errors.purchaseDateRequired') });
-      return;
-    }
+    if (!businessId) { setStatus({ type: 'error', message: t('errors.businessIdRequired') }); return; }
+    if (!header.purchaseDate) { setStatus({ type: 'error', message: t('errors.purchaseDateRequired') }); return; }
     if (header.entryType === 'expense') {
-      const payee = header.supplierId || header.supplierName?.trim();
-      if (!payee) {
-        setStatus({ type: 'error', message: t('errors.payeeRequired') });
-        return;
-      }
+      const payee = header.partyId || header.partyName?.trim();
+      if (!payee) { setStatus({ type: 'error', message: t('errors.payeeRequired') }); return; }
       const validItem = items.find((item) => Number(item.lineTotal || 0) > 0);
-      if (!validItem) {
-        setStatus({ type: 'error', message: t('errors.expenseLineRequired') });
-        return;
-      }
+      if (!validItem) { setStatus({ type: 'error', message: t('errors.expenseLineRequired') }); return; }
       const invalidPart = items.find((item) => item.itemType === 'part' && !item.productId);
-      if (invalidPart) {
-        setStatus({ type: 'error', message: t('errors.selectProductPart') });
-        return;
-      }
+      if (invalidPart) { setStatus({ type: 'error', message: t('errors.selectProductPart') }); return; }
     } else {
       const invalidItem = items.find((item) => !item.productId);
-      if (invalidItem) {
-        setStatus({ type: 'error', message: t('errors.selectProductPurchase') });
-        return;
-      }
+      if (invalidItem) { setStatus({ type: 'error', message: t('errors.selectProductPurchase') }); return; }
     }
     const invalidConversion = items.find((item) => {
-      if (!item.productId) return false;
-      if (item.unitType !== 'secondary') return false;
-      const product = getProductById(item.productId);
-      return Number(product?.conversionRate || 0) <= 0;
+      if (!item.productId || item.unitType !== 'secondary') return false;
+      return Number(getProductById(item.productId)?.conversionRate || 0) <= 0;
     });
-    if (invalidConversion) {
-      setStatus({ type: 'error', message: t('errors.conversionRequired') });
-      return;
-    }
+    if (invalidConversion) { setStatus({ type: 'error', message: t('errors.conversionRequired') }); return; }
+
     try {
       const payload = {
         ...header,
-        supplierId: header.supplierId || null,
-        supplierName: header.entryType === 'expense' ? header.supplierName || null : null,
+        partyId: header.partyId || null,
+        partyName: header.entryType === 'expense' ? header.partyName || null : null,
         amountReceived: totalPaid,
         ...totals,
         items: [
           ...items.map((item) => ({
             ...item,
-            batchId: item.batchId || null,
             quantity: Number(item.quantity),
             unitType: item.unitType || 'primary',
             conversionRate: Number(getProductById(item.productId)?.conversionRate || 0),
@@ -379,9 +313,10 @@ export default function Purchases() {
       }
       resetForm();
       setIsOpen(false);
-      const params = { limit: 25 };
+      invalidatePurchases();
+      const params = { limit: 50 };
       if (statusFilter !== 'all') params.status = statusFilter;
-      api.listPurchases(params).then(setPurchaseList).catch(() => null);
+      fetchPurchases(params, true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     }
@@ -395,12 +330,7 @@ export default function Purchases() {
         action={<button className="btn-primary" type="button" onClick={openCreate}>{t('purchases.newPurchase')}</button>}
       />
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
-      <Dialog
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-        title={formMode === 'edit' ? t('purchases.editPurchase') : t('purchases.newPurchase')}
-        size="full"
-      >
+      <Dialog isOpen={isOpen} onClose={() => setIsOpen(false)} title={formMode === 'edit' ? t('purchases.editPurchase') : t('purchases.newPurchase')} size="full">
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="grid gap-4 md:grid-cols-3">
             <div>
@@ -412,12 +342,10 @@ export default function Purchases() {
             </div>
             <div>
               <label className="label">{t('purchases.supplier')}</label>
-              <select className="input mt-1" name="supplierId" value={header.supplierId} onChange={handleHeaderChange}>
+              <select className="input mt-1" name="partyId" value={header.partyId} onChange={handleHeaderChange}>
                 <option value="">{t('purchases.selectSupplier')}</option>
                 {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
+                  <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
                 ))}
               </select>
               <p className="mt-1 text-xs text-slate-500">{t('purchases.supplierOptional')}</p>
@@ -428,13 +356,7 @@ export default function Purchases() {
             </div>
             <div>
               <label className="label">{t('purchases.purchaseDate')}</label>
-              <input
-                type="date"
-                className="input mt-1"
-                name="purchaseDate"
-                value={header.purchaseDate}
-                onChange={handleHeaderChange}
-              />
+              <input type="date" className="input mt-1" name="purchaseDate" value={header.purchaseDate} onChange={handleHeaderChange} />
             </div>
             <div>
               <label className="label">{t('purchases.status')}</label>
@@ -446,14 +368,7 @@ export default function Purchases() {
             </div>
             <div>
               <label className="label">{t('purchases.totalPaid')}</label>
-              <input
-                className="input mt-1"
-                type="number"
-                step="0.01"
-                name="amountReceived"
-                value={header.amountReceived}
-                onChange={handleHeaderChange}
-              />
+              <input className="input mt-1" type="number" step="0.01" name="amountReceived" value={header.amountReceived} onChange={handleHeaderChange} />
             </div>
             <div className="md:col-span-2">
               <label className="label">{t('purchases.notes')}</label>
@@ -462,21 +377,13 @@ export default function Purchases() {
             {isExpense ? (
               <div className="md:col-span-2">
                 <label className="label">{t('purchases.supplier')}</label>
-                <input
-                  className="input mt-1"
-                  name="supplierName"
-                  value={header.supplierName}
-                  onChange={handleHeaderChange}
-                  placeholder={t('purchases.payeeHint')}
-                />
+                <input className="input mt-1" name="partyName" value={header.partyName} onChange={handleHeaderChange} placeholder={t('purchases.payeeHint')} />
               </div>
             ) : null}
           </div>
           <div className="flex items-center justify-between">
             <h4 className="font-semibold text-slate-800 dark:text-slate-100">{t('purchases.items')}</h4>
-            <button className="btn-ghost" type="button" onClick={addItem}>
-              {isExpense ? t('purchases.addExpenseLine') : t('common.addItem')}
-            </button>
+            <button className="btn-ghost" type="button" onClick={addItem}>{isExpense ? t('purchases.addExpenseLine') : t('common.addItem')}</button>
           </div>
           <div className="space-y-4">
             {items.map((item, idx) => (
@@ -485,11 +392,7 @@ export default function Purchases() {
                   <div className="grid gap-3 md:grid-cols-6">
                     <div>
                       <label className="label">{t('purchases.expenseCategory')}</label>
-                      <select
-                        className="input mt-1"
-                        value={item.itemType}
-                        onChange={(event) => handleItemChange(idx, 'itemType', event.target.value)}
-                      >
+                      <select className="input mt-1" value={item.itemType} onChange={(event) => handleItemChange(idx, 'itemType', event.target.value)}>
                         <option value="expense">{t('purchases.normalExpense')}</option>
                         <option value="labor">{t('purchases.labor')}</option>
                         <option value="part">{t('purchases.part')}</option>
@@ -497,183 +400,71 @@ export default function Purchases() {
                     </div>
                     <div className="md:col-span-2">
                       <label className="label">{t('purchases.expenseDescription')}</label>
-                      <input
-                        className="input mt-1"
-                        value={item.description}
-                        onChange={(event) => handleItemChange(idx, 'description', event.target.value)}
-                      />
+                      <input className="input mt-1" value={item.description} onChange={(event) => handleItemChange(idx, 'description', event.target.value)} />
                     </div>
                     <div className="md:col-span-2">
                       <label className="label">{t('purchases.product')}</label>
-                      <select
-                        className="input mt-1"
-                        value={item.productId}
-                        onChange={(event) => {
-                          handleItemChange(idx, 'productId', event.target.value);
-                          syncItemDefaults(idx, getProductById(event.target.value));
-                        }}
-                        disabled={item.itemType !== 'part'}
-                      >
+                      <select className="input mt-1" value={item.productId} onChange={(event) => { handleItemChange(idx, 'productId', event.target.value); syncItemDefaults(idx, getProductById(event.target.value)); }} disabled={item.itemType !== 'part'}>
                         <option value="">{t('purchases.selectProduct')}</option>
                         {products.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name}
-                            {product.companyName ? ` · ${product.companyName}` : ''}
-                            {product.primaryUnit ? ` · ${product.primaryUnit}` : ''}
-                          </option>
+                          <option key={product.id} value={product.id}>{product.name}{product.companyName ? ` · ${product.companyName}` : ''}{product.primaryUnit ? ` · ${product.primaryUnit}` : ''}</option>
                         ))}
                       </select>
                     </div>
                     <div>
                       <label className="label">{t('purchases.qty')}</label>
-                      <input
-                        className="input mt-1"
-                        type="number"
-                        step="0.001"
-                        value={item.quantity}
-                        onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)}
-                      />
-                      <p className="mt-1 text-xs text-slate-500">
-                        {getUnitLabel(getProductById(item.productId), item.unitType)}
-                      </p>
+                      <input className="input mt-1" type="number" step="0.001" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
+                      <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(item.productId), item.unitType)}</p>
                     </div>
                     <div>
                       <label className="label">{t('products.unitType')}</label>
-                      <select
-                        className="input mt-1"
-                        value={item.unitType}
-                        onChange={(event) => {
-                          handleItemChange(idx, 'unitType', event.target.value);
-                          syncItemDefaults(idx, getProductById(item.productId));
-                        }}
-                        disabled={item.itemType !== 'part'}
-                      >
+                      <select className="input mt-1" value={item.unitType} onChange={(event) => { handleItemChange(idx, 'unitType', event.target.value); syncItemDefaults(idx, getProductById(item.productId)); }} disabled={item.itemType !== 'part'}>
                         <option value="primary">{t('products.primaryUnit')}</option>
                         <option value="secondary">{t('products.secondaryUnit')}</option>
                       </select>
                     </div>
                     <div>
                       <label className="label">{t('purchases.unitPrice')}</label>
-                      <input
-                        className="input mt-1"
-                        type="number"
-                        step="0.01"
-                        value={item.unitPrice}
-                        onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="label">{t('purchases.batch')}</label>
-                      <select
-                        className="input mt-1"
-                        value={item.batchId}
-                        onChange={(event) => handleItemChange(idx, 'batchId', event.target.value)}
-                        disabled={item.itemType !== 'part'}
-                      >
-                        <option value="">{t('purchases.autoNone')}</option>
-                        {(batchesByProduct[item.productId] || []).map((batch) => (
-                          <option key={batch.id} value={batch.id}>
-                            {batch.batchNumber || batch.id.slice(0, 6)} · {batch.quantityOnHand}
-                          </option>
-                        ))}
-                      </select>
+                      <input className="input mt-1" type="number" step="0.01" value={item.unitPrice} onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)} />
                     </div>
                   </div>
                 ) : (
                   <div className="grid gap-3 md:grid-cols-6">
                     <div className="md:col-span-2">
                       <label className="label">{t('purchases.product')}</label>
-                      <select
-                        className="input mt-1"
-                        value={item.productId}
-                        onChange={(event) => {
-                          handleItemChange(idx, 'productId', event.target.value);
-                          syncItemDefaults(idx, getProductById(event.target.value));
-                        }}
-                        required={!isExpense}
-                      >
+                      <select className="input mt-1" value={item.productId} onChange={(event) => { handleItemChange(idx, 'productId', event.target.value); syncItemDefaults(idx, getProductById(event.target.value)); }} required={!isExpense}>
                         <option value="">{t('purchases.selectProduct')}</option>
                         {products.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name}
-                            {product.companyName ? ` · ${product.companyName}` : ''}
-                            {product.primaryUnit ? ` · ${product.primaryUnit}` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="label">{t('purchases.batch')}</label>
-                      <select
-                        className="input mt-1"
-                        value={item.batchId}
-                        onChange={(event) => handleItemChange(idx, 'batchId', event.target.value)}
-                      >
-                        <option value="">{t('purchases.autoNone')}</option>
-                        {(batchesByProduct[item.productId] || []).map((batch) => (
-                          <option key={batch.id} value={batch.id}>
-                            {batch.batchNumber || batch.id.slice(0, 6)} · {batch.quantityOnHand}
-                          </option>
+                          <option key={product.id} value={product.id}>{product.name}{product.companyName ? ` · ${product.companyName}` : ''}{product.primaryUnit ? ` · ${product.primaryUnit}` : ''}</option>
                         ))}
                       </select>
                     </div>
                     <div>
                       <label className="label">{t('purchases.qty')}</label>
-                      <input
-                        className="input mt-1"
-                        type="number"
-                        step="0.001"
-                        value={item.quantity}
-                        onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)}
-                      />
-                      <p className="mt-1 text-xs text-slate-500">
-                        {getUnitLabel(getProductById(item.productId), item.unitType)}
-                      </p>
+                      <input className="input mt-1" type="number" step="0.001" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
+                      <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(item.productId), item.unitType)}</p>
                     </div>
                     <div>
                       <label className="label">{t('products.unitType')}</label>
-                      <select
-                        className="input mt-1"
-                        value={item.unitType}
-                        onChange={(event) => {
-                          handleItemChange(idx, 'unitType', event.target.value);
-                          syncItemDefaults(idx, getProductById(item.productId));
-                        }}
-                      >
+                      <select className="input mt-1" value={item.unitType} onChange={(event) => { handleItemChange(idx, 'unitType', event.target.value); syncItemDefaults(idx, getProductById(item.productId)); }}>
                         <option value="primary">{t('products.primaryUnit')}</option>
                         <option value="secondary">{t('products.secondaryUnit')}</option>
                       </select>
                     </div>
                     <div>
                       <label className="label">{t('purchases.unitPrice')}</label>
-                      <input
-                        className="input mt-1"
-                        type="number"
-                        step="0.01"
-                        value={item.unitPrice}
-                        onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)}
-                      />
+                      <input className="input mt-1" type="number" step="0.01" value={item.unitPrice} onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)} />
                     </div>
                     <div>
                       <label className="label">{t('purchases.tax')}</label>
-                      <input
-                        className="input mt-1"
-                        type="number"
-                        step="0.01"
-                        value={item.taxRate}
-                        onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)}
-                      />
+                      <input className="input mt-1" type="number" step="0.01" value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
                     </div>
                   </div>
                 )}
                 <div className="mt-3 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
-                  <span>
-                    {t('common.lineTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.lineTotal })}
-                  </span>
+                  <span>{t('common.lineTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.lineTotal })}</span>
                   {items.length > 1 ? (
-                    <button className="btn-ghost" type="button" onClick={() => removeItem(idx)}>
-                      {t('common.remove')}
-                    </button>
+                    <button className="btn-ghost" type="button" onClick={() => removeItem(idx)}>{t('common.remove')}</button>
                   ) : null}
                 </div>
               </div>
@@ -696,22 +487,15 @@ export default function Purchases() {
                 </>
               )}
               <p>{t('purchases.totalPaidLabel')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totalPaid.toFixed(2) })}</p>
-              <p className="font-semibold text-rose-600 dark:text-rose-300">
-                {t('purchases.dueLabel')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}
-              </p>
+              <p className="font-semibold text-rose-600 dark:text-rose-300">{t('purchases.dueLabel')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}</p>
             </div>
             <div className="flex gap-2 w-full justify-end md:w-auto">
-              <button className="btn-secondary" type="button" onClick={() => setIsOpen(false)}>
-                {t('common.cancel')}
-              </button>
-              <button className="btn-primary" type="submit">
-                {formMode === 'edit' ? t('purchases.updatePurchase') : t('purchases.savePurchase')}
-              </button>
+              <button className="btn-secondary" type="button" onClick={() => setIsOpen(false)}>{t('common.cancel')}</button>
+              <button className="btn-primary" type="submit">{formMode === 'edit' ? t('purchases.updatePurchase') : t('purchases.savePurchase')}</button>
             </div>
           </div>
         </form>
       </Dialog>
-
 
       <div className="card">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -735,17 +519,11 @@ export default function Purchases() {
                   <div>
                     <p className="font-semibold text-slate-800 dark:text-slate-100">{p.invoiceNo || p.id}</p>
                     <p className="text-xs text-slate-500">{p.purchaseDate || '-'}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {t('purchases.supplier')}: {p.Supplier?.name || p.supplierName || p.supplierId || '-'}
-                    </p>
+                    <p className="mt-1 text-xs text-slate-500">{t('purchases.supplier')}: {p.partyName || p.supplierName || p.Party?.name || p.partyId || p.supplierId || '-'}</p>
                   </div>
                   <div className="text-right">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                      p.status === 'received' ? 'bg-emerald-100 text-emerald-700' : p.status === 'ordered' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
-                    }`}>{p.status}</span>
-                    <p className="mt-2 font-semibold">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(p.grandTotal || 0).toFixed(2) })}
-                    </p>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${p.status === 'received' ? 'bg-emerald-100 text-emerald-700' : p.status === 'ordered' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>{p.status}</span>
+                    <p className="mt-2 font-semibold">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(p.grandTotal || 0).toFixed(2) })}</p>
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-end gap-2">
@@ -772,7 +550,9 @@ export default function Purchases() {
               </tr>
             </thead>
             <tbody>
-              {pagedPurchases.length === 0 ? (
+              {purchasesLoading && purchaseList.length === 0 ? (
+                <tr><td colSpan={8} className="py-3 text-slate-500">{t('common.loading')}</td></tr>
+              ) : pagedPurchases.length === 0 ? (
                 <tr><td colSpan={8} className="py-3 text-slate-500">{t('purchases.noPurchases')}</td></tr>
               ) : (
                 pagedPurchases.map((purchase) => (
@@ -780,24 +560,14 @@ export default function Purchases() {
                     <td className="py-2">{purchase.invoiceNo || purchase.id.slice(0, 6)}</td>
                     <td className="py-2">{purchase.purchaseDate}</td>
                     <td className="py-2 capitalize">{purchase.status}</td>
-                    <td className="py-2">{purchase.Supplier?.name || purchase.supplierName || purchase.supplierId || '—'}</td>
-                    <td className="py-2 text-right">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.grandTotal || 0).toFixed(2) })}
-                    </td>
-                    <td className="py-2 text-right">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.amountReceived || 0).toFixed(2) })}
-                    </td>
-                    <td className="py-2 text-right text-rose-600 dark:text-rose-300">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.dueAmount || 0).toFixed(2) })}
-                    </td>
+                    <td className="py-2">{purchase.partyName || purchase.supplierName || purchase.Party?.name || purchase.partyId || purchase.supplierId || '—'}</td>
+                    <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.grandTotal || 0).toFixed(2) })}</td>
+                    <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.amountReceived || 0).toFixed(2) })}</td>
+                    <td className="py-2 text-right text-rose-600 dark:text-rose-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.dueAmount || 0).toFixed(2) })}</td>
                     <td className="py-2 text-right">
                       <div className="flex items-center justify-end gap-3">
-                        <button className="text-slate-600 hover:text-slate-900" type="button" onClick={() => openEdit(purchase.id)}>
-                          {t('common.edit')}
-                        </button>
-                        <Link className="text-emerald-600 hover:text-emerald-500 dark:text-ocean dark:hover:text-teal-300" to={`/app/invoice/purchases/${purchase.id}`}>
-                          {t('common.view')}
-                        </Link>
+                        <button className="text-slate-600 hover:text-slate-900" type="button" onClick={() => openEdit(purchase.id)}>{t('common.edit')}</button>
+                        <Link className="text-emerald-600 hover:text-emerald-500 dark:text-ocean dark:hover:text-teal-300" to={`/app/invoice/purchases/${purchase.id}`}>{t('common.view')}</Link>
                       </div>
                     </td>
                   </tr>
@@ -806,16 +576,7 @@ export default function Purchases() {
             </tbody>
           </table>
         </div>
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={totalPurchases}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
-        />
+        <Pagination page={page} pageSize={pageSize} total={totalPurchases} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
       </div>
     </div>
   );

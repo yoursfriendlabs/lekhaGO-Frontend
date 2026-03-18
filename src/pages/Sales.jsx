@@ -9,10 +9,12 @@ import Pagination from '../components/Pagination';
 import { useI18n } from '../lib/i18n.jsx';
 import FileUpload from '../components/FileUpload';
 import DynamicAttributes from '../components/DynamicAttributes';
+import { useProductStore } from '../stores/products';
+import { usePartyStore } from '../stores/parties';
+import { useSaleStore } from '../stores/sales';
 
 const emptyItem = {
   productId: '',
-  batchId: '',
   quantity: '1',
   unitType: 'primary',
   unitPrice: '0',
@@ -22,15 +24,18 @@ const emptyItem = {
 
 export default function Sales() {
   const { t } = useI18n();
-  const { businessId, user } = useAuth();
-  const [products, setProducts] = useState([]);
-  const [batchesByProduct, setBatchesByProduct] = useState({});
-  const [customers, setCustomers] = useState([]);
+  const { businessId } = useAuth();
+
+  // ── Stores ──
+  const { products, fetch: fetchProducts } = useProductStore();
+  const { parties, fetch: fetchParties } = usePartyStore();
+  const { sales: salesList, loading: salesLoading, fetch: fetchSales, invalidate: invalidateSales } = useSaleStore();
+
+  // ── UI state ──
   const [customerQuery, setCustomerQuery] = useState('');
-  const [salesList, setSalesList] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [header, setHeader] = useState({
-    customerId: '',
+    partyId: '',
     invoiceNo: '',
     saleDate: new Date().toISOString().slice(0, 10),
     status: 'paid',
@@ -48,54 +53,45 @@ export default function Sales() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // ── Load shared data (cached) ──
   useEffect(() => {
-    api.listProducts().then(setProducts).catch(() => null);
+    fetchProducts();
+    fetchParties();
   }, []);
 
-  useEffect(() => {
-    if (customerQuery.length > 1) {
-      api.listParties({ type: 'customer', q: customerQuery })
-        .then(setCustomers)
-        .catch(() => null);
-    } else {
-      api.listParties({ type: 'customer' })
-        .then(setCustomers)
-        .catch(() => null);
-    }
-  }, [customerQuery]);
-
+  // ── Load sales list (page-specific) ──
   useEffect(() => {
     if (!businessId) return;
-    const params = { limit: 25 };
+    const params = { limit: 50 };
     if (statusFilter !== 'all') params.status = statusFilter;
-    api.listSales(params).then(setSalesList).catch(() => null);
+    fetchSales(params, true);
   }, [businessId, statusFilter]);
 
   useEffect(() => {
     setPage(1);
   }, [statusFilter]);
 
-  const ensureBatches = async (productId) => {
-    if (!productId || batchesByProduct[productId]) return;
-    try {
-      const data = await api.listBatches({ productId });
-      setBatchesByProduct((prev) => ({ ...prev, [productId]: data || [] }));
-    } catch (err) {
-      setStatus({ type: 'error', message: err.message });
-    }
-  };
+  // ── Derived: customer list filtered client-side ──
+  const customers = useMemo(() => {
+    const q = customerQuery.trim().toLowerCase();
+    return parties.filter((p) => {
+      if (p.type !== 'customer') return false;
+      if (!q) return true;
+      return (
+        String(p.name || '').toLowerCase().includes(q) ||
+        String(p.phone || '').toLowerCase().includes(q)
+      );
+    });
+  }, [parties, customerQuery]);
 
+  // ── Totals ──
   const totals = useMemo(() => {
     const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
     const taxTotal = items.reduce(
       (sum, item) => sum + (Number(item.lineTotal || 0) * Number(item.taxRate || 0)) / 100,
       0
     );
-    return {
-      subTotal,
-      taxTotal,
-      grandTotal: subTotal + taxTotal,
-    };
+    return { subTotal, taxTotal, grandTotal: subTotal + taxTotal };
   }, [items]);
 
   const totalReceived = Number(header.amountReceived || 0);
@@ -111,14 +107,10 @@ export default function Sales() {
       prev.map((item, idx) => {
         if (idx !== index) return item;
         const next = { ...item, [field]: value };
-        if (field === 'productId') next.batchId = '';
-        const quantity = Number(next.quantity || 0);
-        const unitPrice = Number(next.unitPrice || 0);
-        next.lineTotal = (quantity * unitPrice).toFixed(2);
+        next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
         return next;
       })
     );
-    if (field === 'productId') ensureBatches(value);
   };
 
   const getProductById = (id) => products.find((p) => p.id === id);
@@ -148,9 +140,7 @@ export default function Sales() {
       } else if (next.unitType === 'primary' && Number(product.salePrice || 0) > 0) {
         next.unitPrice = String(product.salePrice || 0);
       }
-      const quantity = Number(next.quantity || 0);
-      const unitPrice = Number(next.unitPrice || 0);
-      next.lineTotal = (quantity * unitPrice).toFixed(2);
+      next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
       return next;
     }));
   };
@@ -159,31 +149,19 @@ export default function Sales() {
   const removeItem = (index) => {
     setItems((prev) => {
       const target = prev[index];
-      if (target?.id) {
-        setDeletedItemIds((ids) => [...ids, target.id]);
-      }
+      if (target?.id) setDeletedItemIds((ids) => [...ids, target.id]);
       return prev.filter((_, idx) => idx !== index);
     });
   };
 
   const exportCsv = () => {
     const rows = [
-      [
-        t('common.invoice'),
-        t('common.date'),
-        t('common.status'),
-        t('sales.customer'),
-        t('sales.subTotal'),
-        t('sales.taxTotal'),
-        t('sales.grandTotal'),
-        t('sales.totalReceived'),
-        t('sales.dueLabel'),
-      ],
+      [t('common.invoice'), t('common.date'), t('common.status'), t('sales.customer'), t('sales.subTotal'), t('sales.taxTotal'), t('sales.grandTotal'), t('sales.totalReceived'), t('sales.dueLabel')],
       ...salesList.map((s) => [
         s.invoiceNo || s.id,
         s.saleDate || '',
         s.status || '',
-        s.Customer?.name || s.customerName || s.customerId || '',
+        s.partyName || s.customerName || s.Customer?.name || s.partyId || s.customerId || '',
         Number(s.subTotal || 0).toFixed(2),
         Number(s.taxTotal || 0).toFixed(2),
         Number(s.grandTotal || 0).toFixed(2),
@@ -191,7 +169,7 @@ export default function Sales() {
         Number(s.dueAmount || 0).toFixed(2),
       ]),
     ];
-    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/\"/g, '""')}"`).join(',')).join('\\n');
+    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/\"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -208,36 +186,22 @@ export default function Sales() {
   }, [page, pageSize, salesList]);
 
   const resetForm = () => {
-    setHeader({
-      customerId: '',
-      invoiceNo: '',
-      saleDate: new Date().toISOString().slice(0, 10),
-      status: 'paid',
-      notes: '',
-      amountReceived: '0',
-      attachment: '',
-      attributes: {},
-    });
+    setHeader({ partyId: '', invoiceNo: '', saleDate: new Date().toISOString().slice(0, 10), status: 'paid', notes: '', amountReceived: '0', attachment: '', attributes: {} });
     setItems([{ ...emptyItem }]);
     setDeletedItemIds([]);
     setEditingId(null);
     setFormMode('create');
+    setCustomerQuery('');
   };
 
-  const openCreate = () => {
-    resetForm();
-    setIsOpen(true);
-  };
+  const openCreate = () => { resetForm(); setIsOpen(true); };
 
   const openEdit = async (saleId) => {
     try {
       const sale = await api.getSale(saleId);
       const saleItems = sale?.SaleItems || [];
-      saleItems.forEach((item) => {
-        if (item.productId) ensureBatches(item.productId);
-      });
       setHeader({
-        customerId: sale.customerId || '',
+        partyId: sale.partyId || sale.customerId || '',
         invoiceNo: sale.invoiceNo || '',
         saleDate: sale.saleDate || '',
         status: sale.status || 'paid',
@@ -249,7 +213,6 @@ export default function Sales() {
       const mappedItems = saleItems.map((item) => ({
         id: item.id,
         productId: item.productId || '',
-        batchId: item.batchId || '',
         quantity: String(item.quantity ?? '1'),
         unitType: item.unitType || 'primary',
         unitPrice: String(item.unitPrice ?? '0'),
@@ -268,38 +231,25 @@ export default function Sales() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!businessId) {
-      setStatus({ type: 'error', message: t('errors.businessIdRequired') });
-      return;
-    }
-    if (!header.saleDate) {
-      setStatus({ type: 'error', message: t('errors.saleDateRequired') });
-      return;
-    }
+    if (!businessId) { setStatus({ type: 'error', message: t('errors.businessIdRequired') }); return; }
+    if (!header.saleDate) { setStatus({ type: 'error', message: t('errors.saleDateRequired') }); return; }
     const invalidItem = items.find((item) => !item.productId);
-    if (invalidItem) {
-      setStatus({ type: 'error', message: t('errors.selectProductSale') });
-      return;
-    }
+    if (invalidItem) { setStatus({ type: 'error', message: t('errors.selectProductSale') }); return; }
     const invalidConversion = items.find((item) => {
       if (item.unitType !== 'secondary') return false;
-      const product = getProductById(item.productId);
-      return Number(product?.conversionRate || 0) <= 0;
+      return Number(getProductById(item.productId)?.conversionRate || 0) <= 0;
     });
-    if (invalidConversion) {
-      setStatus({ type: 'error', message: t('errors.conversionRequired') });
-      return;
-    }
+    if (invalidConversion) { setStatus({ type: 'error', message: t('errors.conversionRequired') }); return; }
+
     try {
       const payload = {
         ...header,
-        customerId: header.customerId || null,
+        partyId: header.partyId || null,
         amountReceived: totalReceived,
         ...totals,
         items: [
           ...items.map((item) => ({
             ...item,
-            batchId: item.batchId || null,
             quantity: Number(item.quantity),
             unitType: item.unitType || 'primary',
             conversionRate: Number(getProductById(item.productId)?.conversionRate || 0),
@@ -319,9 +269,11 @@ export default function Sales() {
       }
       resetForm();
       setIsOpen(false);
-      const params = { limit: 25 };
+      // Invalidate and re-fetch the sales list
+      invalidateSales();
+      const params = { limit: 50 };
       if (statusFilter !== 'all') params.status = statusFilter;
-      api.listSales(params).then(setSalesList).catch(() => null);
+      fetchSales(params, true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     }
@@ -340,7 +292,7 @@ export default function Sales() {
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label className="label">{t('sales.customer')}</label>
-              <select className="input mt-1" name="customerId" value={header.customerId} onChange={handleHeaderChange}>
+              <select className="input mt-1" name="partyId" value={header.partyId} onChange={handleHeaderChange}>
                 <option value="">{t('sales.walkIn')}</option>
                 {customers.map((customer) => (
                   <option key={customer.id} value={customer.id}>
@@ -348,6 +300,12 @@ export default function Sales() {
                   </option>
                 ))}
               </select>
+              <input
+                className="input mt-1 text-xs"
+                placeholder={t('common.search') + '...'}
+                value={customerQuery}
+                onChange={(e) => setCustomerQuery(e.target.value)}
+              />
               <p className="mt-1 text-xs text-slate-500">{t('sales.customerOptional')}</p>
             </div>
             <div>
@@ -356,13 +314,7 @@ export default function Sales() {
             </div>
             <div>
               <label className="label">{t('sales.saleDate')}</label>
-              <input
-                type="date"
-                className="input mt-1"
-                name="saleDate"
-                value={header.saleDate}
-                onChange={handleHeaderChange}
-              />
+              <input type="date" className="input mt-1" name="saleDate" value={header.saleDate} onChange={handleHeaderChange} />
             </div>
             <div>
               <label className="label">{t('sales.status')}</label>
@@ -373,14 +325,7 @@ export default function Sales() {
             </div>
             <div>
               <label className="label">{t('sales.totalReceived')}</label>
-              <input
-                className="input mt-1"
-                type="number"
-                step="0.01"
-                name="amountReceived"
-                value={header.amountReceived}
-                onChange={handleHeaderChange}
-              />
+              <input className="input mt-1" type="number" step="0.01" name="amountReceived" value={header.amountReceived} onChange={handleHeaderChange} />
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -391,30 +336,16 @@ export default function Sales() {
             />
             <div className="md:col-span-1">
               <label className="label">{t('sales.notes')}</label>
-              <textarea
-                className="input mt-1 h-20 resize-none"
-                name="notes"
-                value={header.notes}
-                onChange={handleHeaderChange}
-                placeholder={t('sales.notesPlaceholder')}
-              />
+              <textarea className="input mt-1 h-20 resize-none" name="notes" value={header.notes} onChange={handleHeaderChange} placeholder={t('sales.notesPlaceholder')} />
             </div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-            <h3 className="mb-4 text-sm font-medium text-slate-700">
-              {t('services.orderInformation') || 'Order Information'}
-            </h3>
-            <DynamicAttributes
-              entityType="sale"
-              attributes={header.attributes}
-              onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))}
-            />
+            <h3 className="mb-4 text-sm font-medium text-slate-700">{t('services.orderInformation') || 'Order Information'}</h3>
+            <DynamicAttributes entityType="sale" attributes={header.attributes} onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))} />
           </div>
           <div className="flex items-center justify-between">
             <h4 className="font-semibold text-slate-800 dark:text-slate-100">{t('sales.items')}</h4>
-            <button className="btn-ghost" type="button" onClick={addItem}>
-              {t('sales.addItem')}
-            </button>
+            <button className="btn-ghost" type="button" onClick={addItem}>{t('sales.addItem')}</button>
           </div>
           <div className="space-y-4">
             {items.map((item, idx) => (
@@ -434,40 +365,15 @@ export default function Sales() {
                       <option value="">{t('purchases.selectProduct')}</option>
                       {products.map((product) => (
                         <option key={product.id} value={product.id}>
-                          {product.name}
-                          {product.companyName ? ` · ${product.companyName}` : ''}
-                          {product.primaryUnit ? ` · ${product.primaryUnit}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label">{t('sales.batch')}</label>
-                    <select
-                      className="input mt-1"
-                      value={item.batchId}
-                      onChange={(event) => handleItemChange(idx, 'batchId', event.target.value)}
-                    >
-                      <option value="">{t('purchases.autoNone')}</option>
-                      {(batchesByProduct[item.productId] || []).map((batch) => (
-                        <option key={batch.id} value={batch.id}>
-                          {batch.batchNumber || batch.id.slice(0, 6)} · {batch.quantityOnHand}
+                          {product.name}{product.companyName ? ` · ${product.companyName}` : ''}{product.primaryUnit ? ` · ${product.primaryUnit}` : ''}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div>
                     <label className="label">{t('sales.qty')}</label>
-                    <input
-                      className="input mt-1"
-                      type="number"
-                      step="0.001"
-                      value={item.quantity}
-                      onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)}
-                    />
-                    <p className="mt-1 text-xs text-slate-500">
-                      {getUnitLabel(getProductById(item.productId), item.unitType)}
-                    </p>
+                    <input className="input mt-1" type="number" step="0.001" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
+                    <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(item.productId), item.unitType)}</p>
                   </div>
                   <div>
                     <label className="label">{t('products.unitType')}</label>
@@ -485,33 +391,17 @@ export default function Sales() {
                   </div>
                   <div>
                     <label className="label">{t('sales.unitPrice')}</label>
-                    <input
-                      className="input mt-1"
-                      type="number"
-                      step="0.01"
-                      value={item.unitPrice}
-                      onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)}
-                    />
+                    <input className="input mt-1" type="number" step="0.01" value={item.unitPrice} onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)} />
                   </div>
                   <div>
                     <label className="label">{t('sales.tax')}</label>
-                    <input
-                      className="input mt-1"
-                      type="number"
-                      step="0.01"
-                      value={item.taxRate}
-                      onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)}
-                    />
+                    <input className="input mt-1" type="number" step="0.01" value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
-                  <span>
-                    {t('sales.lineTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.lineTotal })}
-                  </span>
+                  <span>{t('sales.lineTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.lineTotal })}</span>
                   {items.length > 1 ? (
-                    <button className="btn-ghost" type="button" onClick={() => removeItem(idx)}>
-                      {t('common.remove')}
-                    </button>
+                    <button className="btn-ghost" type="button" onClick={() => removeItem(idx)}>{t('common.remove')}</button>
                   ) : null}
                 </div>
               </div>
@@ -523,17 +413,11 @@ export default function Sales() {
               <p>{t('sales.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</p>
               <p className="font-semibold">{t('sales.grandTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</p>
               <p>{t('sales.totalReceived')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totalReceived.toFixed(2) })}</p>
-              <p className="font-semibold text-rose-600 dark:text-rose-300">
-                {t('sales.dueLabel')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}
-              </p>
+              <p className="font-semibold text-rose-600 dark:text-rose-300">{t('sales.dueLabel')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}</p>
             </div>
             <div className="flex gap-2">
-              <button className="btn-secondary" type="button" onClick={() => setIsOpen(false)}>
-                {t('common.cancel')}
-              </button>
-              <button className="btn-primary" type="submit">
-                {formMode === 'edit' ? t('sales.updateSale') : t('sales.saveSale')}
-              </button>
+              <button className="btn-secondary" type="button" onClick={() => setIsOpen(false)}>{t('common.cancel')}</button>
+              <button className="btn-primary" type="submit">{formMode === 'edit' ? t('sales.updateSale') : t('sales.saveSale')}</button>
             </div>
           </div>
         </form>
@@ -550,7 +434,41 @@ export default function Sales() {
             <button className="btn-ghost" type="button" onClick={exportCsv}>{t('sales.exportCsv')}</button>
           </div>
         </div>
-        <div className="mt-4 overflow-x-auto">
+        {/* Mobile card view */}
+        <div className="mt-4 md:hidden space-y-3">
+          {salesLoading && salesList.length === 0 ? (
+            <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+          ) : pagedSales.length === 0 ? (
+            <p className="py-3 text-sm text-slate-500">{t('sales.noSales')}</p>
+          ) : (
+            pagedSales.map((sale) => (
+              <div key={sale.id} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{sale.invoiceNo || sale.id.slice(0, 6)}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{sale.saleDate || '-'}</p>
+                    <p className="mt-1 text-xs text-slate-500 truncate">{sale.partyName || sale.customerName || sale.Customer?.name || '—'}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${sale.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {sale.status}
+                    </span>
+                    <p className="mt-1.5 font-semibold text-slate-800 dark:text-slate-200">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.grandTotal || 0).toFixed(2) })}</p>
+                    {Number(sale.dueAmount || 0) > 0 && (
+                      <p className="text-xs text-rose-600 dark:text-rose-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.dueAmount || 0).toFixed(2) })} due</p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-end gap-2 border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
+                  <button className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" type="button" onClick={() => openEdit(sale.id)}>{t('common.edit')}</button>
+                  <Link className="rounded-lg px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20" to={`/app/invoice/sales/${sale.id}`}>{t('common.view')}</Link>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        {/* Desktop table */}
+        <div className="mt-4 overflow-x-auto hidden md:block">
           <table className="w-full text-sm text-slate-600 dark:text-slate-300">
             <thead className="text-xs uppercase text-slate-400">
               <tr>
@@ -565,7 +483,9 @@ export default function Sales() {
               </tr>
             </thead>
             <tbody>
-              {pagedSales.length === 0 ? (
+              {salesLoading && salesList.length === 0 ? (
+                <tr><td colSpan={8} className="py-3 text-slate-500">{t('common.loading')}</td></tr>
+              ) : pagedSales.length === 0 ? (
                 <tr><td colSpan={8} className="py-3 text-slate-500">{t('sales.noSales')}</td></tr>
               ) : (
                 pagedSales.map((sale) => (
@@ -573,24 +493,14 @@ export default function Sales() {
                     <td className="py-2">{sale.invoiceNo || sale.id.slice(0, 6)}</td>
                     <td className="py-2">{sale.saleDate}</td>
                     <td className="py-2 capitalize">{sale.status}</td>
-                    <td className="py-2">{sale.Customer?.name || sale.customerName || sale.customerId || '—'}</td>
-                    <td className="py-2 text-right">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.grandTotal || 0).toFixed(2) })}
-                    </td>
-                    <td className="py-2 text-right">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.amountReceived || 0).toFixed(2) })}
-                    </td>
-                    <td className="py-2 text-right text-rose-600 dark:text-rose-300">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.dueAmount || 0).toFixed(2) })}
-                    </td>
+                    <td className="py-2">{sale.partyName || sale.customerName || sale.Customer?.name || sale.partyId || sale.customerId || '—'}</td>
+                    <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.grandTotal || 0).toFixed(2) })}</td>
+                    <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.amountReceived || 0).toFixed(2) })}</td>
+                    <td className="py-2 text-right text-rose-600 dark:text-rose-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.dueAmount || 0).toFixed(2) })}</td>
                     <td className="py-2 text-right">
                       <div className="flex items-center justify-end gap-3">
-                        <button className="text-slate-600 hover:text-slate-900" type="button" onClick={() => openEdit(sale.id)}>
-                          {t('common.edit')}
-                        </button>
-                        <Link className="text-emerald-600 hover:text-emerald-500 dark:text-ocean dark:hover:text-teal-300" to={`/app/invoice/sales/${sale.id}`}>
-                          {t('common.view')}
-                        </Link>
+                        <button className="text-slate-600 hover:text-slate-900" type="button" onClick={() => openEdit(sale.id)}>{t('common.edit')}</button>
+                        <Link className="text-emerald-600 hover:text-emerald-500 dark:text-ocean dark:hover:text-teal-300" to={`/app/invoice/sales/${sale.id}`}>{t('common.view')}</Link>
                       </div>
                     </td>
                   </tr>
@@ -599,16 +509,7 @@ export default function Sales() {
             </tbody>
           </table>
         </div>
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={totalSales}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
-        />
+        <Pagination page={page} pageSize={pageSize} total={totalSales} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
       </div>
     </div>
   );

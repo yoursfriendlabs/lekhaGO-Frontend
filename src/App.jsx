@@ -2,12 +2,12 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { ThemeProvider } from './lib/theme';
 import { I18nProvider } from './lib/i18n.jsx';
+import { BusinessSettingsProvider } from './lib/businessSettings';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import MobileNav from './components/MobileNav';
 import Notice from './components/Notice';
 import Dashboard from './pages/Dashboard';
-import Products from './pages/Products';
 import Inventory from './pages/Inventory';
 import Purchases from './pages/Purchases';
 import Sales from './pages/Sales';
@@ -16,6 +16,7 @@ import Parties from './pages/Parties';
 import Ledger from './pages/Ledger';
 import Analytics from './pages/Analytics';
 import OrderAttributes from './pages/OrderAttributes';
+import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Landing from './pages/Landing';
@@ -49,7 +50,7 @@ function AppShell() {
             ) : null}
             <Routes>
               <Route path="/" element={<Dashboard />} />
-              <Route path="products" element={<Products />} />
+              <Route path="products" element={<Navigate to="/app/inventory" replace />} />
               <Route path="inventory" element={<Inventory />} />
               <Route path="purchases" element={<Purchases />} />
               <Route path="sales" element={<Sales />} />
@@ -58,6 +59,7 @@ function AppShell() {
               <Route path="ledger" element={<Ledger />} />
               <Route path="analytics" element={<Analytics />} />
               <Route path="order-attributes" element={<OrderAttributes />} />
+              <Route path="settings" element={<Settings />} />
               <Route path="invoice/:type/:id" element={<Invoice />} />
               <Route path="*" element={<Navigate to="/app" replace />} />
             </Routes>
@@ -74,6 +76,7 @@ export default function App() {
     <ThemeProvider>
       <I18nProvider>
         <AuthProvider>
+          <BusinessSettingsProvider>
           <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
@@ -87,6 +90,7 @@ export default function App() {
           }
         />
       </Routes>
+          </BusinessSettingsProvider>
         </AuthProvider>
       </I18nProvider>
     </ThemeProvider>

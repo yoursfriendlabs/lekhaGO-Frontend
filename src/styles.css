@@ -65,28 +65,42 @@ body {
 }
 
 @media print {
-  body * {
-    visibility: hidden !important;
+  /* Hide all top-level body children */
+  body > * {
+    display: none !important;
   }
-  .print-area,
-  .print-area * {
-    visibility: visible !important;
+
+  /* The JS-cloned print area appended directly to <body> */
+  body > .print-clone {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-  .print-area {
-    position: absolute;
-    inset: 0;
-    width: 100%;
+
+  /* Reset card / glass styles inside the clone */
+  .print-clone .card,
+  .print-clone .glass {
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    background: white !important;
+    backdrop-filter: none !important;
   }
+
+  /* Ensure images render */
+  .print-clone img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
   body {
     background: white !important;
     color: black !important;
   }
-  .card {
-    border: none !important;
-    box-shadow: none !important;
-    background: white !important;
-  }
-  .print\\:hidden {
-    display: none !important;
+
+  @page {
+    margin: 1.5cm;
+    size: A4 portrait;
   }
 }

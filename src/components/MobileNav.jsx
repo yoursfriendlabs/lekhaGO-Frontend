@@ -1,11 +1,10 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Package, Boxes, Users, ShoppingCart, UserCheck, Briefcase, FileText, BarChart3, Settings2 } from 'lucide-react';
+import { LayoutDashboard, Boxes, Users, ShoppingCart, UserCheck, Briefcase, FileText, BarChart3, Settings2, Building2 } from 'lucide-react';
 import { useI18n } from '../lib/i18n.jsx';
 
 const navItems = [
   { to: '/app', key: 'nav.home', icon: LayoutDashboard },
-  { to: '/app/products', key: 'nav.items', icon: Package },
-  { to: '/app/inventory', key: 'nav.stocks', icon: Boxes },
+  { to: '/app/inventory', key: 'nav.items', icon: Boxes },
   { to: '/app/parties', key: 'nav.parties', icon: Users },
   { to: '/app/purchases', key: 'nav.buy', icon: ShoppingCart },
   { to: '/app/sales', key: 'nav.sell', icon: UserCheck },
@@ -13,6 +12,7 @@ const navItems = [
   { to: '/app/ledger', key: 'nav.ledger', icon: FileText },
   { to: '/app/analytics', key: 'nav.stats', icon: BarChart3 },
   { to: '/app/order-attributes', key: 'nav.orderAttributes', icon: Settings2 },
+  { to: '/app/settings', label: 'Settings', icon: Building2 },
 ];
 
 export default function MobileNav() {
@@ -34,7 +34,7 @@ export default function MobileNav() {
             }
           >
             <item.icon size={20} strokeWidth={2} />
-            <span className="text-[10px] font-medium leading-none">{t(item.key)}</span>
+            <span className="text-[10px] font-medium leading-none">{item.label ?? t(item.key)}</span>
           </NavLink>
         ))}
       </div>

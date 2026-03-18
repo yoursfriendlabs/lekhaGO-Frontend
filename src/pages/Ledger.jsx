@@ -32,6 +32,7 @@ export default function Ledger() {
   const { t } = useI18n();
   const [sales, setSales] = useState([]);
   const [purchases, setPurchases] = useState([]);
+  const [services, setServices] = useState([]);
   const [parties, setParties] = useState([]);
   const [status, setStatus] = useState('');
   const [selectedPartyId, setSelectedPartyId] = useState('all');
@@ -42,11 +43,13 @@ export default function Ledger() {
     Promise.all([
       api.listSales({ limit: 200 }),
       api.listPurchases({ limit: 200 }),
+      api.listServices({ limit: 200 }),
       api.listParties(),
     ])
-      .then(([salesData, purchaseData, partyData]) => {
+      .then(([salesData, purchaseData, serviceData, partyData]) => {
         setSales(salesData || []);
         setPurchases(purchaseData || []);
+        setServices(serviceData || []);
         setParties(partyData || []);
       })
       .catch((err) => setStatus(err.message));
@@ -65,8 +68,8 @@ export default function Ledger() {
         invoiceNo: sale.invoiceNo || sale.id.slice(0, 6),
         date: sale.saleDate,
         status: sale.status || 'paid',
-        party: sale.Customer?.name || sale.customerName || sale.customerId || t('sales.walkIn'),
-        partyId: sale.customerId || sale.Customer?.id || null,
+        party: sale.partyName || sale.customerName || sale.Customer?.name || sale.partyId || sale.customerId || t('sales.walkIn'),
+        partyId: sale.partyId || sale.customerId || sale.Customer?.id || null,
         grandTotal,
         cashAmount: totalReceived,
         dueAmount,
@@ -84,15 +87,32 @@ export default function Ledger() {
         invoiceNo: purchase.invoiceNo || purchase.id.slice(0, 6),
         date: purchase.purchaseDate,
         status: purchase.status || 'received',
-        party: purchase.Supplier?.name || purchase.supplierName || purchase.supplierId || '—',
-        partyId: purchase.supplierId || purchase.Supplier?.id || null,
+        party: purchase.partyName || purchase.supplierName || purchase.Party?.name || purchase.partyId || purchase.supplierId || '—',
+        partyId: purchase.partyId || purchase.supplierId || purchase.Supplier?.id || null,
         grandTotal,
         cashAmount: totalPaid,
         dueAmount,
       };
     });
-    return [...normalizedSales, ...normalizedPurchases];
-  }, [sales, purchases, t]);
+    const normalizedServices = services.map((service) => {
+      const grandTotal = Number(service.grandTotal || 0);
+      const receivedTotal = Number(service.receivedTotal || 0);
+      const dueAmount = Math.max(grandTotal - receivedTotal, 0);
+      return {
+        id: service.id,
+        type: 'service',
+        invoiceNo: service.orderNo || service.id.slice(0, 6),
+        date: service.createdAt,
+        status: service.status || 'open',
+        party: service.partyName || service.Party?.name || service.partyId || '—',
+        partyId: service.partyId || null,
+        grandTotal,
+        cashAmount: receivedTotal,
+        dueAmount,
+      };
+    });
+    return [...normalizedSales, ...normalizedPurchases, ...normalizedServices];
+  }, [sales, purchases, services, t]);
 
   const { from, to } = useMemo(() => buildRange(period), [period]);
 
@@ -121,6 +141,7 @@ export default function Ledger() {
       if (tx.type === 'purchase') {
         totalDebit += tx.grandTotal;
       } else {
+        // sales and services are both credit (income)
         totalCredit += tx.grandTotal;
       }
     });
@@ -132,7 +153,7 @@ export default function Ledger() {
     let runningBalance = 0;
     return filteredTransactions.map((tx) => {
       const debit = tx.type === 'purchase' ? tx.grandTotal : 0;
-      const credit = tx.type === 'sale' ? tx.grandTotal : 0;
+      const credit = tx.type !== 'purchase' ? tx.grandTotal : 0;
       runningBalance += credit - debit;
       return {
         ...tx,
@@ -141,7 +162,9 @@ export default function Ledger() {
         runningBalance,
         label: tx.type === 'sale'
           ? `${t('ledger.salesInvoice')} ${tx.invoiceNo}`
-          : `${t('ledger.purchaseInvoice')} ${tx.invoiceNo}`,
+          : tx.type === 'purchase'
+          ? `${t('ledger.purchaseInvoice')} ${tx.invoiceNo}`
+          : `${t('parties.serviceOrder')} ${tx.invoiceNo}`,
       };
     });
   }, [filteredTransactions, t]);
@@ -223,7 +246,40 @@ export default function Ledger() {
       </div>
 
       <div className="card">
-        <div className="mt-4 overflow-x-auto">
+        {/* Mobile card view */}
+        <div className="md:hidden space-y-3">
+          {statementRows.length === 0 ? (
+            <p className="py-3 text-sm text-slate-500">{t('ledger.noTransactions')}</p>
+          ) : (
+            statementRows.map((row) => (
+              <div key={`${row.type}-${row.id}`} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{row.label}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{formatDate(row.date)}</p>
+                    {row.party && row.party !== '—' && <p className="text-xs text-slate-500 truncate">{row.party}</p>}
+                  </div>
+                  <div className="text-right shrink-0">
+                    {row.debit > 0 ? (
+                      <p className="font-semibold text-rose-600 dark:text-rose-400">
+                        -{t('currency.formatted', { symbol: t('currency.symbol'), amount: row.debit.toFixed(2) })}
+                      </p>
+                    ) : (
+                      <p className="font-semibold text-emerald-600 dark:text-emerald-400">
+                        +{t('currency.formatted', { symbol: t('currency.symbol'), amount: row.credit.toFixed(2) })}
+                      </p>
+                    )}
+                    <p className={`text-xs font-medium mt-0.5 ${row.runningBalance < 0 ? 'text-rose-500' : 'text-emerald-600'}`}>
+                      Bal: {t('currency.formatted', { symbol: t('currency.symbol'), amount: row.runningBalance.toFixed(2) })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm text-slate-600">
             <thead className="text-xs uppercase text-slate-400">
               <tr>

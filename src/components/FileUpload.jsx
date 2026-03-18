@@ -1,12 +1,22 @@
-import { useState } from 'react';
-import { api } from '../lib/api';
+import { useEffect, useState } from 'react';
+import { api, API_BASE } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
+
+function toAbsoluteUrl(url) {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${API_BASE}${url}`;
+}
 
 export default function FileUpload({ onUpload, initialUrl = '', label }) {
   const { t } = useI18n();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState(initialUrl);
+
+  useEffect(() => {
+    setPreview(toAbsoluteUrl(initialUrl));
+  }, [initialUrl]);
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
@@ -16,7 +26,7 @@ export default function FileUpload({ onUpload, initialUrl = '', label }) {
     setError('');
     try {
       const { url } = await api.uploadAttachment(file);
-      setPreview(url);
+      setPreview(toAbsoluteUrl(url));
       onUpload(url);
     } catch (err) {
       setError(err.message || 'Upload failed');
