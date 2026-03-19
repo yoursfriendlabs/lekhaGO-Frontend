@@ -947,6 +947,7 @@ export default function Services() {
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{selectedParty.name}</p>
                           {selectedParty.phone && <p className="text-xs text-slate-500">{selectedParty.phone}</p>}
+                          {selectedParty.currentAmount && <p className="text-xs text-slate-500">{selectedParty.currentAmount}</p>}
                         </div>
                         <button type="button" onClick={clearParty} className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600 dark:hover:bg-slate-800">
                           <X size={16} />

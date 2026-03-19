@@ -99,54 +99,22 @@ export default function Parties() {
     //             positive = we owe party (they have credit / purchase due)
     const map = new Map();
     parties.forEach((party) => {
-      const opening = Number(party.openingBalance || 0);
+      const opening = Number(party.currentAmount || 0);
       // balanceType 'receive' = they owe us → negative
       // balanceType 'give'    = we owe them  → positive
       const signed = party.balanceType === 'give' ? Math.abs(opening) : -Math.abs(opening);
       map.set(party.id, signed);
     });
-    sales.forEach((sale) => {
-      const id = sale.partyId || sale.customerId || sale.Customer?.id;
-      if (!id) return;
-      const total = Number(sale.grandTotal || 0);
-      const received = Number(sale.amountReceived ?? (sale.status === 'paid' ? total : 0) ?? 0);
-      const due = Number(sale.dueAmount ?? computeDue(total, received));
-      // Sale due: party owes us → subtract (move toward negative)
-      map.set(id, (map.get(id) || 0) - due);
-    });
-    purchases.forEach((purchase) => {
-      const id = purchase.partyId || purchase.supplierId || purchase.Supplier?.id;
-      if (!id) return;
-      const total = Number(purchase.grandTotal || 0);
-      const paid = Number(purchase.amountReceived ?? (purchase.status === 'received' ? total : 0) ?? 0);
-      const due = Number(purchase.dueAmount ?? computeDue(total, paid));
-      // Purchase due: we owe them → add (move toward positive)
-      map.set(id, (map.get(id) || 0) + due);
-    });
-    services.forEach((service) => {
-      const id = service.partyId;
-      if (!id) return;
-      const due = Math.max(Number(service.grandTotal || 0) - Number(service.receivedTotal || 0), 0);
-      // Service due: party owes us → subtract (move toward negative)
-      map.set(id, (map.get(id) || 0) - due);
-    });
-    manualTx.forEach((tx) => {
-      const id = tx.partyId;
-      if (!id) return;
-      const amount = Number(tx.amount || 0);
-      // receive: party pays us → move toward positive (reduces their debt)
-      // give: we pay them → move toward negative (reduces our debt)
-      const signed = tx.direction === 'give' ? -Math.abs(amount) : Math.abs(amount);
-      map.set(id, (map.get(id) || 0) + signed);
-    });
     return map;
-  }, [sales, purchases, services, parties, manualTx]);
+  }, [parties]);
 
 
   const totalsummary = useMemo(() => {
     let totalReceive = 0;
     let totalGive = 0;
+
     balanceByParty.forEach((bal) => {
+
       // negative = they owe us (we will receive)
       // positive = we owe them (we will give)
       if (bal < 0) totalReceive += Math.abs(bal);
@@ -159,8 +127,8 @@ export default function Parties() {
   const selectedBalance = selectedParty ? balanceByParty.get(selectedParty.id) || 0 : 0;
   // negative = they owe us → "To Receive" (rose)
   // positive = we owe them → "To Give" (blue)
-  const balanceLabel = selectedBalance < 0 ? t('parties.toReceive') : selectedBalance > 0 ? t('parties.toGive') : 'Settled';
-  const balanceColor = selectedBalance < 0 ? 'text-rose-500' : selectedBalance > 0 ? 'text-blue-600' : 'text-slate-400';
+  const balanceLabel = selectedParty.currentAmount < 0 ? t('parties.toReceive') : selectedParty.currentAmount > 0 ? t('parties.toGive') : 'Settled';
+  const balanceColor = selectedParty.currentAmount < 0 ? 'text-rose-500' : selectedParty.currentAmount > 0 ? 'text-blue-600' : 'text-slate-400';
 
   const partyTransactions = useMemo(() => {
     if (!selectedParty) return [];
@@ -407,11 +375,11 @@ export default function Parties() {
                         <p className="text-xs text-slate-500">{party.phone || '-'}</p>
                       </div>
                       <div className="text-right">
-                        <p className={balance < 0 ? 'font-semibold text-rose-500' : balance > 0 ? 'font-semibold text-blue-600' : 'font-semibold text-slate-400'}>
+                        <p className={party.currentAmount < 0 ? 'font-semibold text-rose-500' : party.currentAmount > 0 ? 'font-semibold text-blue-600' : 'font-semibold text-slate-400'}>
                           {t('currency.formatted', { symbol: t('currency.symbol'), amount: Math.abs(party?.currentAmount).toFixed(2) })}
                         </p>
                         <p className="text-xs text-slate-500">
-                          {balance < 0 ? t('parties.toReceive') : balance > 0 ? t('parties.toGive') : 'Settled'}
+                          {party.currentAmount < 0 ? t('parties.toReceive') : party.currentAmount > 0 ? t('parties.toGive') : 'Settled'}
                         </p>
                       </div>
                     </div>
@@ -438,9 +406,9 @@ export default function Parties() {
                 <div className="text-right">
                   <p className="text-xs uppercase text-slate-400">{balanceLabel}</p>
                   <p className={`text-2xl font-semibold ${balanceColor}`}>
-                    {t('currency.formatted', { symbol: t('currency.symbol'), amount: Math.abs(selectedBalance).toFixed(2) })}
+                    {t('currency.formatted', { symbol: t('currency.symbol'), amount: Math.abs(selectedParty.currentAmount).toFixed(2) })}
                   </p>
-                  {selectedBalance > 0 && (
+                  {selectedParty.currentAmount > 0 && (
                     <p className="mt-0.5 text-xs text-blue-500">Party has advance credit</p>
                   )}
                 </div>
@@ -625,8 +593,8 @@ export default function Parties() {
             <label className="label">{t('parties.transactionType')}</label>
             <div className="mt-1 grid grid-cols-2 gap-2">
               {[
-                { value: 'give', label: t('parties.paymentIn') },
-                { value: 'receive', label: t('parties.paymentOut') },
+                { value: 'receive', label: t('parties.paymentIn') },
+                { value: 'give', label: t('parties.paymentOut') },
               ].map((opt) => (
                 <button key={opt.value} type="button" onClick={() => setTxForm((prev) => ({ ...prev, direction: opt.value }))}
                   className={
