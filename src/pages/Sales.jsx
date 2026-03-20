@@ -325,7 +325,7 @@ export default function Sales() {
             </div>
             <div>
               <label className="label">{t('sales.totalReceived')}</label>
-              <input className="input mt-1" type="number" step="0.01" name="amountReceived" value={header.amountReceived} onChange={handleHeaderChange} />
+              <input className="input mt-1" type="number" step="1" min={0} name="amountReceived" value={header.amountReceived} onChange={handleHeaderChange} />
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -372,7 +372,7 @@ export default function Sales() {
                   </div>
                   <div>
                     <label className="label">{t('sales.qty')}</label>
-                    <input className="input mt-1" type="number" step="0.001" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
+                    <input className="input mt-1" type="number" step="1" min={0} value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
                     <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(item.productId), item.unitType)}</p>
                   </div>
                   <div>

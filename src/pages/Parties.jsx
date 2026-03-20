@@ -127,8 +127,8 @@ export default function Parties() {
   const selectedBalance = selectedParty ? balanceByParty.get(selectedParty.id) || 0 : 0;
   // negative = they owe us → "To Receive" (rose)
   // positive = we owe them → "To Give" (blue)
-  const balanceLabel = selectedParty.currentAmount < 0 ? t('parties.toReceive') : selectedParty.currentAmount > 0 ? t('parties.toGive') : 'Settled';
-  const balanceColor = selectedParty.currentAmount < 0 ? 'text-rose-500' : selectedParty.currentAmount > 0 ? 'text-blue-600' : 'text-slate-400';
+  const balanceLabel = selectedParty?.currentAmount < 0 ? t('parties.toReceive') : selectedParty?.currentAmount > 0 ? t('parties.toGive') : 'Settled';
+  const balanceColor = selectedParty?.currentAmount < 0 ? 'text-rose-500' : selectedParty?.currentAmount > 0 ? 'text-blue-600' : 'text-slate-400';
 
   const partyTransactions = useMemo(() => {
     if (!selectedParty) return [];

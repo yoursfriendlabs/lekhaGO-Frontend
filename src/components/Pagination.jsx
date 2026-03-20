@@ -21,7 +21,7 @@ export default function Pagination({
       <div className="flex items-center gap-2">
         <label className="text-xs uppercase text-slate-400">{t('pagination.rows')}</label>
         <select
-          className="input max-w-[90px]"
+          className="rounded-md w-18  "
           value={pageSize}
           onChange={(event) => onPageSizeChange(Number(event.target.value))}
         >
