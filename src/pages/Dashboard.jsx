@@ -84,13 +84,11 @@ function isWithinRange(value, rangeStart, rangeEnd) {
 export default function Dashboard() {
   const { t } = useI18n();
 
-  // ── Stores ──
   const { products, fetch: fetchProducts } = useProductStore();
   const { sales, fetch: fetchSales } = useSaleStore();
   const { purchases, fetch: fetchPurchases } = usePurchaseStore();
   const { services, fetch: fetchServices } = useServiceStore();
 
-  // ── Low stock: dashboard-only concern ──
   const [lowStock, setLowStock] = useState([]);
   const [loadError, setLoadError] = useState('');
 
@@ -108,7 +106,6 @@ export default function Dashboard() {
     return t('currency.formatted', { symbol: t('currency.symbol'), amount: formatted });
   };
 
-  // ── Fetch data on mount (stores will skip if already loaded) ──
   useEffect(() => {
     fetchProducts();
     fetchSales({ limit: 50 });
@@ -263,51 +260,6 @@ export default function Dashboard() {
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
-            <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.recentSales')}</h3>
-            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/sales">{t('dashboard.viewAll')}</Link>
-          </div>
-          <div className="mt-4 space-y-3">
-            {recentSales.length === 0 ? (
-              <p className="text-sm text-slate-500">{t('dashboard.noSales')}</p>
-            ) : (
-              recentSales.map((sale) => (
-                <div key={sale.id} className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{sale.invoiceNo || sale.id.slice(0, 6)}</p>
-                    <p className="text-xs text-slate-500">{formatDate(sale.saleDate)} · {sale.status || t('nav.sales')}</p>
-                  </div>
-                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{formatMoney(sale.grandTotal)}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-        <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
-          <div className="flex items-center justify-between">
-            <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.recentPurchases')}</h3>
-            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/purchases">{t('dashboard.viewAll')}</Link>
-          </div>
-          <div className="mt-4 space-y-3">
-            {recentPurchases.length === 0 ? (
-              <p className="text-sm text-slate-500">{t('dashboard.noPurchases')}</p>
-            ) : (
-              recentPurchases.map((purchase) => (
-                <div key={purchase.id} className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{purchase.invoiceNo || purchase.id.slice(0, 6)}</p>
-                    <p className="text-xs text-slate-500">{formatDate(purchase.purchaseDate)} · {purchase.status || t('nav.purchases')}</p>
-                  </div>
-                  <p className="text-sm font-semibold text-amber-600 dark:text-amber-300">{formatMoney(purchase.grandTotal)}</p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
-          <div className="flex items-center justify-between">
             <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.upcomingDeliveries')}</h3>
             <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/services">{t('dashboard.viewAll')}</Link>
           </div>
@@ -354,6 +306,51 @@ export default function Dashboard() {
         </div>
         <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
+            <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.recentPurchases')}</h3>
+            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/purchases">{t('dashboard.viewAll')}</Link>
+          </div>
+          <div className="mt-4 space-y-3">
+            {recentPurchases.length === 0 ? (
+              <p className="text-sm text-slate-500">{t('dashboard.noPurchases')}</p>
+            ) : (
+              recentPurchases.map((purchase) => (
+                <div key={purchase.id} className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{purchase.invoiceNo || purchase.id.slice(0, 6)}</p>
+                    <p className="text-xs text-slate-500">{formatDate(purchase.purchaseDate)} · {purchase.status || t('nav.purchases')}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-amber-600 dark:text-amber-300">{formatMoney(purchase.grandTotal)}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
+          <div className="flex items-center justify-between">
+            <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.recentSales')}</h3>
+            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/sales">{t('dashboard.viewAll')}</Link>
+          </div>
+          <div className="mt-4 space-y-3">
+            {recentSales.length === 0 ? (
+              <p className="text-sm text-slate-500">{t('dashboard.noSales')}</p>
+            ) : (
+              recentSales.map((sale) => (
+                <div key={sale.id} className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{sale.invoiceNo || sale.id.slice(0, 6)}</p>
+                    <p className="text-xs text-slate-500">{formatDate(sale.saleDate)} · {sale.status || t('nav.sales')}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{formatMoney(sale.grandTotal)}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+        <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
+          <div className="flex items-center justify-between">
             <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.lowStockAlerts')}</h3>
             <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/inventory">{t('dashboard.viewInventory')}</Link>
           </div>
@@ -371,30 +368,6 @@ export default function Dashboard() {
                 </div>
               ))
             )}
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
-        <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.quickStart')}</h3>
-        <ul className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-          <li>1. {t('dashboard.quickStartSteps.step1')}</li>
-          <li>2. {t('dashboard.quickStartSteps.step2')}</li>
-          <li>3. {t('dashboard.quickStartSteps.step3')}</li>
-          <li>4. {t('dashboard.quickStartSteps.step4')}</li>
-          <li>5. {t('dashboard.quickStartSteps.step5')}</li>
-        </ul>
-      </div>
-
-      <div className="fixed bottom-24 left-0 right-0 z-20 px-4 md:static md:px-0">
-        <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200/70 bg-white/95 p-3 shadow-lg backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/90 md:shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <Link className="btn-primary w-full justify-center" to="/app/sales">
-              <span className="flex items-center gap-2"><UserCheck size={16} />{t('dashboard.newSale')}</span>
-            </Link>
-            <Link className="btn-secondary w-full justify-center" to="/app/purchases">
-              <span className="flex items-center gap-2"><ShoppingCart size={16} />{t('dashboard.newPurchase')}</span>
-            </Link>
           </div>
         </div>
       </div>
