@@ -183,32 +183,6 @@ export default function Purchases() {
     });
   };
 
-  const exportCsv = () => {
-    const rows = [
-      [t('common.invoice'), t('common.date'), t('common.status'), t('purchases.entryType'), t('purchases.supplier'), t('purchases.subTotal'), t('purchases.taxTotal'), t('purchases.grandTotal'), t('purchases.totalPaid'), t('purchases.dueLabel')],
-      ...purchaseList.map((p) => [
-        p.invoiceNo || p.id,
-        p.purchaseDate || '',
-        p.status || '',
-        p.entryType || p.type || 'purchase',
-        p.partyName || p.supplierName || p.Party?.name || p.partyId || p.supplierId || '',
-        Number(p.subTotal || 0).toFixed(2),
-        Number(p.taxTotal || 0).toFixed(2),
-        Number(p.grandTotal || 0).toFixed(2),
-        Number(p.amountReceived || 0).toFixed(2),
-        Number(p.dueAmount || 0).toFixed(2),
-      ]),
-    ];
-    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/\"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `purchases-${statusFilter}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   const totalPurchases = purchaseList.length;
   const pagedPurchases = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -368,7 +342,7 @@ export default function Purchases() {
             </div>
             <div>
               <label className="label">{t('purchases.totalPaid')}</label>
-              <input className="input mt-1" type="number" step="0.01" name="amountReceived" value={header.amountReceived} onChange={handleHeaderChange} />
+              <input className="input mt-1" type="number" step="1" min="0" name="amountReceived" value={header.amountReceived} onChange={handleHeaderChange} />
             </div>
             <div className="md:col-span-2">
               <label className="label">{t('purchases.notes')}</label>
@@ -413,7 +387,7 @@ export default function Purchases() {
                     </div>
                     <div>
                       <label className="label">{t('purchases.qty')}</label>
-                      <input className="input mt-1" type="number" step="0.001" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
+                      <input className="input mt-1" type="number" step="1" min="0" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
                       <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(item.productId), item.unitType)}</p>
                     </div>
                     <div>
@@ -441,7 +415,7 @@ export default function Purchases() {
                     </div>
                     <div>
                       <label className="label">{t('purchases.qty')}</label>
-                      <input className="input mt-1" type="number" step="0.001" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
+                      <input className="input mt-1" type="number" step="1" min="0" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
                       <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(item.productId), item.unitType)}</p>
                     </div>
                     <div>
@@ -507,7 +481,6 @@ export default function Purchases() {
               <option value="ordered">{t('purchases.ordered')}</option>
               <option value="due">{t('purchases.due')}</option>
             </select>
-            <button className="btn-ghost" type="button" onClick={exportCsv}>{t('purchases.exportCsv')}</button>
           </div>
         </div>
         {/* Card list on small screens */}
