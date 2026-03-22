@@ -342,7 +342,7 @@ export default function Purchases() {
             </div>
             <div>
               <label className="label">{t('purchases.totalPaid')}</label>
-              <input className="input mt-1" type="number" step="0.01" name="amountReceived" value={header.amountReceived} onChange={handleHeaderChange} />
+              <input className="input mt-1" type="number" step="1" min="0" name="amountReceived" value={header.amountReceived} onChange={handleHeaderChange} />
             </div>
             <div className="md:col-span-2">
               <label className="label">{t('purchases.notes')}</label>
@@ -387,7 +387,7 @@ export default function Purchases() {
                     </div>
                     <div>
                       <label className="label">{t('purchases.qty')}</label>
-                      <input className="input mt-1" type="number" step="0.001" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
+                      <input className="input mt-1" type="number" step="1" min="0" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
                       <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(item.productId), item.unitType)}</p>
                     </div>
                     <div>
@@ -415,7 +415,7 @@ export default function Purchases() {
                     </div>
                     <div>
                       <label className="label">{t('purchases.qty')}</label>
-                      <input className="input mt-1" type="number" step="0.001" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
+                      <input className="input mt-1" type="number" step="1" min="0" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
                       <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(item.productId), item.unitType)}</p>
                     </div>
                     <div>
