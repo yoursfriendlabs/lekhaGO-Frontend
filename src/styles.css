@@ -7,7 +7,7 @@
 }
 
 body {
-  font-family: 'Space Grotesk', system-ui, sans-serif;
+  font-family: "Space Grotesk", system-ui, sans-serif;
   @apply bg-mist text-ink;
 }
 
@@ -15,14 +15,28 @@ body {
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(215, 188, 171, 0.3);
   box-shadow: 0 20px 60px -40px rgba(155, 104, 53, 0.15);
+
+  -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
 
 .gradient-bg {
   background-image:
-    radial-gradient(circle at top left, rgba(155, 104, 53, 0.08), transparent 45%),
-    radial-gradient(circle at 35% 20%, rgba(165, 119, 73, 0.08), transparent 45%),
-    radial-gradient(circle at 80% 15%, rgba(199, 163, 130, 0.1), transparent 50%);
+    radial-gradient(
+      circle at top left,
+      rgba(155, 104, 53, 0.08),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 35% 20%,
+      rgba(165, 119, 73, 0.08),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 80% 15%,
+      rgba(199, 163, 130, 0.1),
+      transparent 50%
+    );
 }
 
 .card {
@@ -64,6 +78,64 @@ body {
   }
 }
 
+/* Login page — motion-style entrance (matches PasalManager-style layout, no extra JS lib) */
+@keyframes login-fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes login-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes login-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes login-slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.login-animate-fade-down {
+  animation: login-fade-down 0.5s ease both;
+}
+.login-animate-fade-up {
+  animation: login-fade-up 0.5s 0.1s ease both;
+}
+.login-animate-fade-in-delay {
+  animation: login-fade-in 0.5s 0.3s ease both;
+}
+.login-animate-panel {
+  animation: login-slide-right 0.6s 0.2s ease both;
+}
+.login-animate-brand-copy {
+  animation: login-fade-up 0.6s 0.4s ease both;
+}
+.login-animate-brand-stats {
+  animation: login-fade-up 0.6s 0.5s ease both;
+}
+
 @media print {
   /* Hide all top-level body children */
   body > * {
@@ -79,12 +151,12 @@ body {
     padding: 0 !important;
   }
 
-  /* Reset card / glass styles inside the clone */
   .print-clone .card,
   .print-clone .glass {
     border: 1px solid #e2e8f0 !important;
     box-shadow: none !important;
     background: white !important;
+    -webkit-backdrop-filter: blur(14px);
     backdrop-filter: none !important;
   }
 
