@@ -165,7 +165,8 @@ export default function Login() {
                   required
                 />
               </div>
-              <div>
+              {/* Bussiness id not required yet */}
+              {/* <div>
                 <label className="label">{t('topbar.businessId')}</label>
                 <input
                   className="input mt-1"
@@ -175,7 +176,7 @@ export default function Login() {
                   placeholder={t('topbar.businessPlaceholder')}
                 />
                 <p className="mt-1 text-xs text-secondary-500">{t('notices.businessRequiredDesc')}</p>
-              </div>
+              </div> */}
               {status.message ? <Notice title={status.message} tone={status.type} /> : null}
               <button className="btn-primary w-full" type="submit" disabled={loading}>
                 {loading ? t('common.loading') : t('auth.login')}
