@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Pencil, FileText, Plus } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import Pagination from '../components/Pagination';
@@ -21,6 +22,39 @@ const emptyItem = {
   taxRate: '0',
   lineTotal: '0'
 };
+
+// ── Matches Services StatusBadge exactly ──
+function StatusBadge({ status }) {
+  const map = {
+    paid: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+    due:  'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+  };
+  const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : '—';
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[status] || 'bg-slate-100 text-slate-600'}`}>
+      {label}
+    </span>
+  );
+}
+
+// ── Format date like Services: "22 Mar" ──
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+// ── Resolve customer name from sale object ──
+function getCustomerName(sale) {
+  return (
+    sale.partyName ||
+    sale.customerName ||
+    sale.Party?.name ||
+    sale.Customer?.name ||
+    null
+  );
+}
 
 export default function Sales() {
   const { t } = useI18n();
@@ -53,13 +87,13 @@ export default function Sales() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // ── Load shared data (cached) ──
+  // ── Load shared data ──
   useEffect(() => {
     fetchProducts();
     fetchParties();
   }, []);
 
-  // ── Load sales list (page-specific) ──
+  // ── Load sales list ──
   useEffect(() => {
     if (!businessId) return;
     const params = { limit: 50 };
@@ -71,7 +105,7 @@ export default function Sales() {
     setPage(1);
   }, [statusFilter]);
 
-  // ── Derived: customer list filtered client-side ──
+  // ── Customer list ──
   const customers = useMemo(() => {
     const q = customerQuery.trim().toLowerCase();
     return parties.filter((p) => {
@@ -114,6 +148,7 @@ export default function Sales() {
   };
 
   const getProductById = (id) => products.find((p) => p.id === id);
+
   const getUnitLabel = (product, unitType) => {
     if (!product) return '';
     if (unitType === 'secondary') return product.secondaryUnit || product.primaryUnit || '';
@@ -146,6 +181,7 @@ export default function Sales() {
   };
 
   const addItem = () => setItems((prev) => [...prev, { ...emptyItem }]);
+
   const removeItem = (index) => {
     setItems((prev) => {
       const target = prev[index];
@@ -161,7 +197,7 @@ export default function Sales() {
         s.invoiceNo || s.id,
         s.saleDate || '',
         s.status || '',
-        s.partyName || s.customerName || s.Customer?.name || s.partyId || s.customerId || '',
+        getCustomerName(s) || '',
         Number(s.subTotal || 0).toFixed(2),
         Number(s.taxTotal || 0).toFixed(2),
         Number(s.grandTotal || 0).toFixed(2),
@@ -169,7 +205,7 @@ export default function Sales() {
         Number(s.dueAmount || 0).toFixed(2),
       ]),
     ];
-    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/\"/g, '""')}"`).join(',')).join('\n');
+    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -269,7 +305,6 @@ export default function Sales() {
       }
       resetForm();
       setIsOpen(false);
-      // Invalidate and re-fetch the sales list
       invalidateSales();
       const params = { limit: 50 };
       if (statusFilter !== 'all') params.status = statusFilter;
@@ -284,9 +319,17 @@ export default function Sales() {
       <PageHeader
         title={t('sales.title')}
         subtitle={t('sales.subtitle')}
-        action={<button className="btn-primary" type="button" onClick={openCreate}>{t('sales.newSale')}</button>}
+        action={
+          <button className="btn-primary" type="button" onClick={openCreate}>
+            <Plus size={16} className="mr-1.5 inline" />
+            {t('sales.newSale')}
+          </button>
+        }
       />
+
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
+
+      {/* ── Form Dialog ── */}
       <Dialog isOpen={isOpen} onClose={() => setIsOpen(false)} title={formMode === 'edit' ? t('sales.editSale') : t('sales.newSale')} size="full">
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="grid gap-4 md:grid-cols-3">
@@ -422,64 +465,117 @@ export default function Sales() {
           </div>
         </form>
       </Dialog>
+
+      {/* ── Sales Table Card ── */}
       <div className="card">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('sales.recentSales')}</h3>
-          <div className="flex flex-wrap items-center gap-3">
-            <select className="input max-w-[200px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="all">{t('sales.allStatuses')}</option>
-              <option value="paid">{t('sales.paid')}</option>
-              <option value="due">{t('sales.due')}</option>
-            </select>
-            <button className="btn-ghost" type="button" onClick={exportCsv}>{t('sales.exportCsv')}</button>
+
+        {/* Header: title + pill filters on left, export on right */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col items-start gap-2">
+            <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('sales.recentSales')}</h3>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                className={statusFilter === 'all'
+                  ? 'bg-blue-50 border border-blue-500 text-blue-500 px-2 py-0.5 rounded text-sm'
+                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
+              >
+                {t('sales.allStatuses')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('paid')}
+                className={statusFilter === 'paid'
+                  ? 'bg-emerald-50 border border-emerald-500 text-emerald-600 px-2 py-0.5 rounded text-sm'
+                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
+              >
+                {t('sales.paid')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('due')}
+                className={statusFilter === 'due'
+                  ? 'bg-rose-50 border border-rose-500 text-rose-600 px-2 py-0.5 rounded text-sm'
+                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
+              >
+                {t('sales.due')}
+              </button>
+            </div>
           </div>
+          <button className="btn-ghost" type="button" onClick={exportCsv}>{t('sales.exportCsv')}</button>
         </div>
-        {/* Mobile card view */}
+
+        {/* ── Mobile card view ── */}
         <div className="mt-4 md:hidden space-y-3">
           {salesLoading && salesList.length === 0 ? (
             <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
           ) : pagedSales.length === 0 ? (
             <p className="py-3 text-sm text-slate-500">{t('sales.noSales')}</p>
           ) : (
-            pagedSales.map((sale) => (
-              <div key={sale.id} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{sale.invoiceNo || sale.id.slice(0, 6)}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{sale.saleDate || '-'}</p>
-                    <p className="mt-1 text-xs text-slate-500 truncate">{sale.partyName || sale.customerName || sale.Customer?.name || '—'}</p>
+            pagedSales.map((sale) => {
+              const customerName = getCustomerName(sale);
+              const due = Number(sale.dueAmount || 0);
+              return (
+                <div key={sale.id} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
+                        {sale.invoiceNo || sale.id.slice(0, 8)}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">{formatDate(sale.saleDate)}</p>
+                      <p className="mt-1 text-xs text-slate-500 truncate">{customerName || '—'}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <StatusBadge status={sale.status} />
+                      <p className="mt-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                        {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.grandTotal || 0).toFixed(2) })}
+                      </p>
+                      {due > 0 ? (
+                        <span className="mt-0.5 inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                          {t('currency.formatted', { symbol: t('currency.symbol'), amount: due.toFixed(2) })} due
+                        </span>
+                      ) : (
+                        <p className="mt-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">Paid</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${sale.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                      {sale.status}
-                    </span>
-                    <p className="mt-1.5 font-semibold text-slate-800 dark:text-slate-200">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.grandTotal || 0).toFixed(2) })}</p>
-                    {Number(sale.dueAmount || 0) > 0 && (
-                      <p className="text-xs text-rose-600 dark:text-rose-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.dueAmount || 0).toFixed(2) })} due</p>
-                    )}
+                  <div className="mt-3 flex items-center justify-end gap-1 border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
+                    <button
+                      type="button"
+                      title={t('common.edit')}
+                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+                      onClick={() => openEdit(sale.id)}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <Link
+                      title={t('common.view')}
+                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800"
+                      to={`/app/invoice/sales/${sale.id}`}
+                    >
+                      <FileText size={14} />
+                    </Link>
                   </div>
                 </div>
-                <div className="mt-3 flex items-center justify-end gap-2 border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
-                  <button className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" type="button" onClick={() => openEdit(sale.id)}>{t('common.edit')}</button>
-                  <Link className="rounded-lg px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20" to={`/app/invoice/sales/${sale.id}`}>{t('common.view')}</Link>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
-        {/* Desktop table */}
+
+        {/* ── Desktop table ── */}
         <div className="mt-4 overflow-x-auto hidden md:block">
-          <table className="w-full text-sm text-slate-600 dark:text-slate-300">
+          <table className="w-full text-sm">
             <thead className="text-xs uppercase text-slate-400">
               <tr>
-                <th className="py-2 text-left">{t('common.invoice')}</th>
-                <th className="py-2 text-left">{t('common.date')}</th>
-                <th className="py-2 text-left">{t('common.status')}</th>
-                <th className="py-2 text-left">{t('sales.customer')}</th>
-                <th className="py-2 text-right">{t('common.total')}</th>
-                <th className="py-2 text-right">{t('sales.totalReceived')}</th>
-                <th className="py-2 text-right">{t('sales.due')}</th>
-                <th className="py-2 text-right">{t('common.invoice')}</th>
+                <th className="py-2 pr-4 text-left">{t('common.invoice')}</th>
+                <th className="py-2 pr-4 text-left">{t('common.date')}</th>
+                <th className="py-2 pr-4 text-left">{t('common.status')}</th>
+                <th className="py-2 pr-4 text-left">{t('sales.customer')}</th>
+                <th className="py-2 pr-4 text-right">{t('common.total')}</th>
+                <th className="py-2 pr-4 text-right">{t('sales.totalReceived')}</th>
+                <th className="py-2 pr-4 text-right">{t('sales.due')}</th>
+                <th className="py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -488,28 +584,88 @@ export default function Sales() {
               ) : pagedSales.length === 0 ? (
                 <tr><td colSpan={8} className="py-3 text-slate-500">{t('sales.noSales')}</td></tr>
               ) : (
-                pagedSales.map((sale) => (
-                  <tr key={sale.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                    <td className="py-2">{sale.invoiceNo || sale.id.slice(0, 6)}</td>
-                    <td className="py-2">{sale.saleDate}</td>
-                    <td className="py-2 capitalize">{sale.status}</td>
-                    <td className="py-2">{sale.partyName || sale.customerName || sale.Customer?.name || sale.partyId || sale.customerId || '—'}</td>
-                    <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.grandTotal || 0).toFixed(2) })}</td>
-                    <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.amountReceived || 0).toFixed(2) })}</td>
-                    <td className="py-2 text-right text-rose-600 dark:text-rose-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.dueAmount || 0).toFixed(2) })}</td>
-                    <td className="py-2 text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        <button className="text-slate-600 hover:text-slate-900" type="button" onClick={() => openEdit(sale.id)}>{t('common.edit')}</button>
-                        <Link className="text-emerald-600 hover:text-emerald-500 dark:text-ocean dark:hover:text-teal-300" to={`/app/invoice/sales/${sale.id}`}>{t('common.view')}</Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                pagedSales.map((sale) => {
+                  const customerName = getCustomerName(sale);
+                  const due = Number(sale.dueAmount || 0);
+                  return (
+                    <tr key={sale.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
+
+                      {/* Invoice No */}
+                      <td className="py-2.5 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                        {sale.invoiceNo || sale.id.slice(0, 8)}
+                      </td>
+
+                      {/* Date — formatted like Services "22 Mar" */}
+                      <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
+                        {formatDate(sale.saleDate)}
+                      </td>
+
+                      {/* Status — colored badge */}
+                      <td className="py-2.5 pr-4">
+                        <StatusBadge status={sale.status} />
+                      </td>
+
+                      {/* Customer — resolved through full fallback chain */}
+                      <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
+                        {customerName || <span className="text-slate-400">—</span>}
+                      </td>
+
+                      {/* Grand total */}
+                      <td className="py-2.5 pr-4 text-right font-semibold text-slate-800 dark:text-slate-200">
+                        {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.grandTotal || 0).toFixed(2) })}
+                      </td>
+
+                      {/* Amount received */}
+                      <td className="py-2.5 pr-4 text-right text-emerald-700 dark:text-emerald-400">
+                        {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.amountReceived || 0).toFixed(2) })}
+                      </td>
+
+                      {/* Due — rose pill or green "Paid" exactly like Services */}
+                      <td className="py-2.5 pr-4 text-right">
+                        {due > 0 ? (
+                          <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                            {t('currency.formatted', { symbol: t('currency.symbol'), amount: due.toFixed(2) })} due
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Paid</span>
+                        )}
+                      </td>
+
+                      {/* Actions — icon buttons matching Services exactly */}
+                      <td className="py-2.5 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            title={t('common.edit')}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+                            onClick={() => openEdit(sale.id)}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <Link
+                            title={t('common.view')}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800"
+                            to={`/app/invoice/sales/${sale.id}`}
+                          >
+                            <FileText size={14} />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
-        <Pagination page={page} pageSize={pageSize} total={totalSales} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
+
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={totalSales}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+        />
       </div>
     </div>
   );
