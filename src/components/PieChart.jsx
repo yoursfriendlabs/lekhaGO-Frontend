@@ -18,7 +18,7 @@ function PieChart({ data, height = 300 }) {
             data={formattedData}
             cx="50%"
             cy="50%"
-            outerRadius={120}
+            outerRadius={130}
             paddingAngle={2}
             dataKey="value"
           >
