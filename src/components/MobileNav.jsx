@@ -25,6 +25,7 @@ export default function MobileNav() {
           <NavLink
             key={item.to}
             to={item.to}
+            end={item.to === '/app'}
             className={({ isActive }) =>
               `flex flex-col items-center gap-1 min-w-[60px] rounded-xl px-2 py-1.5 transition-all ${
                 isActive

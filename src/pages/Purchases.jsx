@@ -13,6 +13,7 @@ import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useProductStore } from '../stores/products';
 import { usePartyStore } from '../stores/parties';
 import { usePurchaseStore } from '../stores/purchases';
+import { nextSequence } from '../lib/sequence';
 
 // ── Status badge matching Sales/Services design ──
 function StatusBadge({ status }) {
@@ -77,6 +78,7 @@ export default function Purchases() {
   const { products, fetch: fetchProducts } = useProductStore();
   const { parties, fetch: fetchParties } = usePartyStore();
   const { purchases: purchaseList, loading: purchasesLoading, fetch: fetchPurchases, invalidate: invalidatePurchases } = usePurchaseStore();
+  const [invoiceSeedValues, setInvoiceSeedValues] = useState([]);
 
   const supplierOptions = useMemo(
     () =>
@@ -112,9 +114,20 @@ export default function Purchases() {
 
   // ── Load shared data (cached) ──
   useEffect(() => {
-    fetchProducts();
-    fetchParties();
-  }, []);
+    if (!businessId) return;
+    fetchProducts(true);
+    fetchParties(true);
+  }, [businessId]);
+
+  useEffect(() => {
+    if (!businessId) return;
+    api.listPurchases({ limit: 500 })
+      .then((data) => {
+        const values = (data || []).map((p) => p?.invoiceNo).filter(Boolean);
+        setInvoiceSeedValues(values);
+      })
+      .catch(() => {});
+  }, [businessId]);
 
   // ── Load purchases list (page-specific) ──
   useEffect(() => {
@@ -136,6 +149,14 @@ export default function Purchases() {
     );
     return { subTotal, taxTotal, grandTotal: subTotal + taxTotal };
   }, [items]);
+
+  const nextInvoiceNo = useMemo(() => {
+    const values = [
+      ...invoiceSeedValues,
+      ...purchaseList.map((p) => p?.invoiceNo).filter(Boolean),
+    ];
+    return String(nextSequence(values, 1));
+  }, [invoiceSeedValues, purchaseList]);
 
   const expenseTotals = useMemo(() => {
     return items.reduce(
@@ -252,8 +273,8 @@ export default function Purchases() {
     return purchaseList.slice(start, start + pageSize);
   }, [page, pageSize, purchaseList]);
 
-  const resetForm = () => {
-    setHeader({ entryType: 'purchase', partyId: '', partyName: '', invoiceNo: '', purchaseDate: todayISODate(), status: 'received', notes: '', amountReceived: '0' });
+  const resetForm = (invoiceNoOverride = null) => {
+    setHeader({ entryType: 'purchase', partyId: '', partyName: '', invoiceNo: invoiceNoOverride ?? nextInvoiceNo, purchaseDate: todayISODate(), status: 'received', notes: '', amountReceived: '0' });
     setItems([getEmptyItem('purchase')]);
     setDeletedItemIds([]);
     setEditingId(null);
@@ -261,7 +282,21 @@ export default function Purchases() {
     setIsPaid(false);
   };
 
-  const openCreate = () => { resetForm(); setIsOpen(true); };
+  const openCreate = async () => {
+    let nextFromServer = null;
+    if (businessId) {
+      try {
+        const data = await api.listPurchases({ limit: 500 });
+        const values = (data || []).map((p) => p?.invoiceNo).filter(Boolean);
+        setInvoiceSeedValues(values);
+        nextFromServer = String(nextSequence(values, 1));
+      } catch {
+        nextFromServer = null;
+      }
+    }
+    resetForm(nextFromServer);
+    setIsOpen(true);
+  };
 
   const openEdit = async (purchaseId) => {
     try {
@@ -323,8 +358,10 @@ export default function Purchases() {
     if (invalidConversion) { setStatus({ type: 'error', message: t('errors.conversionRequired') }); return; }
 
     try {
+      const invoiceNo = String(header.invoiceNo || '').trim() || nextInvoiceNo;
       const payload = {
         ...header,
+        invoiceNo,
         partyId: header.partyId || null,
         partyName: header.entryType === 'expense' ? header.partyName || null : null,
         amountReceived: paidAmount,
@@ -348,7 +385,11 @@ export default function Purchases() {
         await api.updatePurchase(editingId, payload);
         setStatus({ type: 'success', message: t('purchases.messages.updated') });
       } else {
-        await api.createPurchase(payload);
+        const created = await api.createPurchase(payload);
+        const savedInvoice = created?.invoiceNo || invoiceNo;
+        if (savedInvoice) {
+          setInvoiceSeedValues((prev) => (prev.includes(savedInvoice) ? prev : [...prev, savedInvoice]));
+        }
         setStatus({ type: 'success', message: t('purchases.messages.created') });
       }
       resetForm();

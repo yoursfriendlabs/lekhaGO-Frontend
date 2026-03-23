@@ -224,6 +224,20 @@ export default function Ledger() {
     return biz.logoUrl.startsWith('http') ? biz.logoUrl : `${API_BASE}${biz.logoUrl}`;
   }, [biz?.logoUrl]);
 
+  const renderTypeBadge = (type) => {
+    const map = {
+      sale: { label: t('ledger.sales'), className: 'bg-emerald-100 text-emerald-700' },
+      purchase: { label: t('ledger.purchases'), className: 'bg-rose-100 text-rose-700' },
+      service: { label: t('services.title'), className: 'bg-blue-100 text-blue-700' },
+    };
+    const cfg = map[type] || { label: String(type || '—'), className: 'bg-slate-100 text-slate-600' };
+    return (
+      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${cfg.className}`}>
+        {cfg.label}
+      </span>
+    );
+  };
+
   const handlePrint = () => {
     const source = printRef.current;
     if (!source) {
@@ -513,40 +527,51 @@ export default function Ledger() {
               {statementRows.length === 0 ? (
                 <p className="py-3 text-sm text-slate-500">{t('ledger.noTransactions')}</p>
               ) : (
-                statementRows.map((row) => (
-                  <div key={`${row.type}-${row.id}`} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{row.label}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{formatStatementDate(row.date)}</p>
-                        {selectedPartyId === 'all' && row.party && row.party !== '—' && (
-                          <p className="text-xs text-slate-500 truncate">{row.party}</p>
-                        )}
-                      </div>
-                      <div className="text-right shrink-0">
-                        {row.debit > 0 ? (
-                          <p className="font-semibold text-rose-600 dark:text-rose-400">
-                            -{t('currency.formatted', { symbol: t('currency.symbol'), amount: row.debit.toFixed(2) })}
+                statementRows.map((row) => {
+                  const tone =
+                    row.type === 'purchase'
+                      ? 'border-rose-200/70 bg-rose-50/40'
+                      : row.type === 'service'
+                      ? 'border-blue-200/70 bg-blue-50/40'
+                      : 'border-emerald-200/70 bg-emerald-50/40';
+                  return (
+                    <div key={`${row.type}-${row.id}`} className={`rounded-2xl border p-4 text-sm ${tone}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {renderTypeBadge(row.type)}
+                            <p className="text-xs text-slate-500">{formatStatementDate(row.date)}</p>
+                          </div>
+                          <p className="mt-1 font-semibold text-slate-800 truncate">{row.label}</p>
+                          {selectedPartyId === 'all' && row.party && row.party !== '—' && (
+                            <p className="text-xs text-slate-500 truncate">{row.party}</p>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          {row.debit > 0 ? (
+                            <p className="font-semibold text-rose-700">
+                              -{t('currency.formatted', { symbol: t('currency.symbol'), amount: row.debit.toFixed(2) })}
+                            </p>
+                          ) : (
+                            <p className="font-semibold text-emerald-700">
+                              +{t('currency.formatted', { symbol: t('currency.symbol'), amount: row.credit.toFixed(2) })}
+                            </p>
+                          )}
+                          <p className={`text-xs font-medium mt-0.5 ${row.runningBalance < 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                            Bal: {t('currency.formatted', { symbol: t('currency.symbol'), amount: row.runningBalance.toFixed(2) })}
                           </p>
-                        ) : (
-                          <p className="font-semibold text-emerald-600 dark:text-emerald-400">
-                            +{t('currency.formatted', { symbol: t('currency.symbol'), amount: row.credit.toFixed(2) })}
-                          </p>
-                        )}
-                        <p className={`text-xs font-medium mt-0.5 ${row.runningBalance < 0 ? 'text-rose-500' : 'text-emerald-600'}`}>
-                          Bal: {t('currency.formatted', { symbol: t('currency.symbol'), amount: row.runningBalance.toFixed(2) })}
-                        </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
             {/* Desktop table */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm text-slate-600">
-                <thead className="text-xs text-slate-400">
+              <table className="w-full text-sm">
+                <thead className="text-xs uppercase text-slate-400">
                   <tr>
                     <th colSpan={selectedPartyId === 'all' ? 6 : 5} className="pb-3 normal-case text-slate-500">
                       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -555,13 +580,13 @@ export default function Ledger() {
                       </div>
                     </th>
                   </tr>
-                  <tr className="uppercase">
-                    <th className="py-2 text-left">{t('common.date')}</th>
-                    {selectedPartyId === 'all' ? <th className="py-2 text-left">{t('ledger.party')}</th> : null}
-                    <th className="py-2 text-left">{t('ledger.transaction')}</th>
-                    <th className="py-2 text-right">{t('ledger.debit')}</th>
-                    <th className="py-2 text-right">{t('ledger.credit')}</th>
-                    <th className="py-2 text-right">{t('ledger.runningBalance')}</th>
+                  <tr>
+                    <th className="py-2.5 pr-4 text-left">{t('common.date')}</th>
+                    {selectedPartyId === 'all' ? <th className="py-2.5 pr-4 text-left">{t('ledger.party')}</th> : null}
+                    <th className="py-2.5 pr-4 text-left">{t('ledger.transaction')}</th>
+                    <th className="py-2.5 pr-4 text-right">{t('ledger.debit')}</th>
+                    <th className="py-2.5 pr-4 text-right">{t('ledger.credit')}</th>
+                    <th className="py-2.5 text-right">{t('ledger.runningBalance')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -570,22 +595,35 @@ export default function Ledger() {
                       <td colSpan={selectedPartyId === 'all' ? 6 : 5} className="py-3 text-slate-500">{t('ledger.noTransactions')}</td>
                     </tr>
                   ) : (
-                    statementRows.map((row) => (
-                      <tr key={`${row.type}-${row.id}`} className="border-t border-slate-200/70">
-                        <td className="py-2">{formatStatementDate(row.date)}</td>
-                        {selectedPartyId === 'all' ? <td className="py-2">{row.party || '—'}</td> : null}
-                        <td className="py-2">{row.label}</td>
-                        <td className="py-2 text-right">
-                          {row.debit > 0 ? t('currency.formatted', { symbol: t('currency.symbol'), amount: row.debit.toFixed(2) }) : '--'}
-                        </td>
-                        <td className="py-2 text-right">
-                          {row.credit > 0 ? t('currency.formatted', { symbol: t('currency.symbol'), amount: row.credit.toFixed(2) }) : '--'}
-                        </td>
-                        <td className={`py-2 text-right ${row.runningBalance < 0 ? 'text-rose-500' : 'text-emerald-600'}`}>
-                          {t('currency.formatted', { symbol: t('currency.symbol'), amount: row.runningBalance.toFixed(2) })}
-                        </td>
-                      </tr>
-                    ))
+                    statementRows.map((row) => {
+                      const rowClass =
+                        row.type === 'purchase'
+                          ? 'border-t border-rose-200/60 bg-rose-50/40'
+                          : row.type === 'service'
+                          ? 'border-t border-blue-200/60 bg-blue-50/40'
+                          : 'border-t border-emerald-200/60 bg-emerald-50/30';
+                      return (
+                        <tr key={`${row.type}-${row.id}`} className={rowClass}>
+                          <td className="py-2.5 pr-4 font-medium text-slate-800">{formatStatementDate(row.date)}</td>
+                          {selectedPartyId === 'all' ? <td className="py-2.5 pr-4 text-slate-700">{row.party || '—'}</td> : null}
+                          <td className="py-2.5 pr-4 text-slate-700">
+                            <div className="flex items-center gap-2">
+                              {renderTypeBadge(row.type)}
+                              <span className="truncate">{row.label}</span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 pr-4 text-right font-semibold text-rose-700">
+                            {row.debit > 0 ? t('currency.formatted', { symbol: t('currency.symbol'), amount: row.debit.toFixed(2) }) : '—'}
+                          </td>
+                          <td className="py-2.5 pr-4 text-right font-semibold text-emerald-700">
+                            {row.credit > 0 ? t('currency.formatted', { symbol: t('currency.symbol'), amount: row.credit.toFixed(2) }) : '—'}
+                          </td>
+                          <td className={`py-2.5 text-right font-semibold ${row.runningBalance < 0 ? 'text-rose-700' : 'text-emerald-800'}`}>
+                            {t('currency.formatted', { symbol: t('currency.symbol'), amount: row.runningBalance.toFixed(2) })}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

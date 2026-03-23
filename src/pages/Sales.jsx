@@ -16,6 +16,7 @@ import { useProductStore } from '../stores/products';
 import { usePartyStore } from '../stores/parties';
 import { useSaleStore } from '../stores/sales';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
+import { nextSequence } from '../lib/sequence';
 
 const emptyItem = {
   productId: '',
@@ -64,6 +65,7 @@ export default function Sales() {
   const { products, fetch: fetchProducts } = useProductStore();
   const { parties, fetch: fetchParties } = usePartyStore();
   const { sales: salesList, loading: salesLoading, fetch: fetchSales, invalidate: invalidateSales } = useSaleStore();
+  const [invoiceSeedValues, setInvoiceSeedValues] = useState([]);
 
   // ── UI state ──
   const [statusFilter, setStatusFilter] = useState('all');
@@ -89,9 +91,20 @@ export default function Sales() {
 
   // ── Load shared data ──
   useEffect(() => {
-    fetchProducts();
-    fetchParties();
-  }, []);
+    if (!businessId) return;
+    fetchProducts(true);
+    fetchParties(true);
+  }, [businessId]);
+
+  useEffect(() => {
+    if (!businessId) return;
+    api.listSales({ limit: 500 })
+      .then((data) => {
+        const values = (data || []).map((s) => s?.invoiceNo).filter(Boolean);
+        setInvoiceSeedValues(values);
+      })
+      .catch(() => {});
+  }, [businessId]);
 
   // ── Load sales list ──
   useEffect(() => {
@@ -115,6 +128,33 @@ export default function Sales() {
         })),
     [parties]
   );
+
+  const partyNameById = useMemo(() => {
+    const map = new Map();
+    parties.forEach((party) => {
+      if (party?.id === null || party?.id === undefined || party?.id === '') return;
+      map.set(String(party.id), party?.name || '—');
+    });
+    return map;
+  }, [parties]);
+
+  const resolveCustomerName = (sale) => {
+    const direct = getCustomerName(sale);
+    if (direct) return direct;
+
+    const id = sale?.partyId || sale?.customerId || sale?.Customer?.id || sale?.Party?.id || null;
+    if (id === null || id === undefined || id === '') return t('sales.walkIn');
+
+    return partyNameById.get(String(id)) || '—';
+  };
+
+  const nextInvoiceNo = useMemo(() => {
+    const values = [
+      ...invoiceSeedValues,
+      ...salesList.map((s) => s?.invoiceNo).filter(Boolean),
+    ];
+    return String(nextSequence(values, 1));
+  }, [invoiceSeedValues, salesList]);
 
   // ── Totals ──
   const totals = useMemo(() => {
@@ -210,7 +250,7 @@ export default function Sales() {
         s.invoiceNo || s.id,
         s.saleDate || '',
         s.status || '',
-        getCustomerName(s) || '',
+        resolveCustomerName(s) || '',
         Number(s.subTotal || 0).toFixed(2),
         Number(s.taxTotal || 0).toFixed(2),
         Number(s.grandTotal || 0).toFixed(2),
@@ -234,8 +274,8 @@ export default function Sales() {
     return salesList.slice(start, start + pageSize);
   }, [page, pageSize, salesList]);
 
-  const resetForm = () => {
-    setHeader({ partyId: '', invoiceNo: '', saleDate: todayISODate(), status: 'paid', notes: '', amountReceived: '0', attachment: '', attributes: {} });
+  const resetForm = (invoiceNoOverride = null) => {
+    setHeader({ partyId: '', invoiceNo: invoiceNoOverride ?? nextInvoiceNo, saleDate: todayISODate(), status: 'paid', notes: '', amountReceived: '0', attachment: '', attributes: {} });
     setItems([{ ...emptyItem }]);
     setDeletedItemIds([]);
     setEditingId(null);
@@ -243,7 +283,21 @@ export default function Sales() {
     setIsPaid(false);
   };
 
-  const openCreate = () => { resetForm(); setIsOpen(true); };
+  const openCreate = async () => {
+    let nextFromServer = null;
+    if (businessId) {
+      try {
+        const data = await api.listSales({ limit: 500 });
+        const values = (data || []).map((s) => s?.invoiceNo).filter(Boolean);
+        setInvoiceSeedValues(values);
+        nextFromServer = String(nextSequence(values, 1));
+      } catch {
+        nextFromServer = null;
+      }
+    }
+    resetForm(nextFromServer);
+    setIsOpen(true);
+  };
 
   const openEdit = async (saleId) => {
     try {
@@ -294,8 +348,10 @@ export default function Sales() {
 
     try {
       const derivedStatus = dueAmount > 0 ? 'due' : 'paid';
+      const invoiceNo = String(header.invoiceNo || '').trim() || nextInvoiceNo;
       const payload = {
         ...header,
+        invoiceNo,
         status: derivedStatus,
         partyId: header.partyId || null,
         amountReceived: receivedAmount,
@@ -321,7 +377,11 @@ export default function Sales() {
         await api.updateSale(editingId, payload);
         setStatus({ type: 'success', message: t('sales.messages.updated') });
       } else {
-        await api.createSale(createPayload);
+        const created = await api.createSale(createPayload);
+        const savedInvoice = created?.invoiceNo || invoiceNo;
+        if (savedInvoice) {
+          setInvoiceSeedValues((prev) => (prev.includes(savedInvoice) ? prev : [...prev, savedInvoice]));
+        }
         setStatus({ type: 'success', message: t('sales.messages.created') });
       }
       resetForm();
@@ -561,7 +621,7 @@ export default function Sales() {
             <p className="py-3 text-sm text-slate-500">{t('sales.noSales')}</p>
           ) : (
             pagedSales.map((sale) => {
-              const customerName = getCustomerName(sale);
+              const customerName = resolveCustomerName(sale);
               const due = Number(sale.dueAmount || 0);
               return (
                 <div key={sale.id} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
@@ -633,7 +693,7 @@ export default function Sales() {
                 <tr><td colSpan={8} className="py-3 text-slate-500">{t('sales.noSales')}</td></tr>
               ) : (
                 pagedSales.map((sale) => {
-                  const customerName = getCustomerName(sale);
+                  const customerName = resolveCustomerName(sale);
                   const due = Number(sale.dueAmount || 0);
                   return (
                     <tr key={sale.id} className="border-t border-slate-200/70 dark:border-slate-800/70">

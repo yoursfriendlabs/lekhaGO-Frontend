@@ -16,6 +16,7 @@ import { usePartyStore } from '../stores/parties';
 import { useServiceStore } from '../stores/services';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
 import dayjs, { formatMaybeDate, todayISODate, toDateInputValue } from '../lib/datetime';
+import { nextSequence } from '../lib/sequence';
 
 const emptyItem = {
   itemType: 'labor',
@@ -29,7 +30,7 @@ const emptyItem = {
 
 const makeEmptyHeader = () => ({
   partyId: '',
-  orderNo: Number(dayjs().format('Hmm')),
+  orderNo: '',
   status: 'open',
   notes: '',
   deliveryDate: todayISODate(),
@@ -126,6 +127,7 @@ export default function Services() {
   const { products, fetch: fetchProducts } = useProductStore();
   const { parties, fetch: fetchParties, upsert: upsertParty } = usePartyStore();
   const { services: serviceList, loading: listLoading, error: serviceError, fetch: fetchServices, patch: patchService, invalidate: invalidateServices } = useServiceStore();
+  const [orderNoSeedValues, setOrderNoSeedValues] = useState([]);
 
   // ── List state ──
   const [statusFilter, setStatusFilter] = useState('all');
@@ -195,6 +197,16 @@ export default function Services() {
     if (statusFilter !== 'all') params.status = statusFilter;
     fetchServices(params, true).catch((err) => setListError(err.message));
   }, [businessId, statusFilter]);
+
+  useEffect(() => {
+    if (!businessId) return;
+    api.listServices({ limit: 500 })
+      .then((data) => {
+        const values = (data || []).map((s) => s?.orderNo).filter(Boolean);
+        setOrderNoSeedValues(values);
+      })
+      .catch(() => {});
+  }, [businessId]);
 
   useEffect(() => {
     setPage(1);
@@ -451,9 +463,17 @@ export default function Services() {
     }
   };
 
+  const nextOrderNo = useMemo(() => {
+    const values = [
+      ...orderNoSeedValues,
+      ...serviceList.map((s) => s?.orderNo).filter(Boolean),
+    ];
+    return String(nextSequence(values, 1));
+  }, [orderNoSeedValues, serviceList]);
+
   // ── Reset & open/close dialog ──
-  const resetForm = () => {
-    setHeader(makeEmptyHeader());
+  const resetForm = (orderNoOverride = null) => {
+    setHeader({ ...makeEmptyHeader(), orderNo: orderNoOverride ?? nextOrderNo });
     setItems([{ ...emptyItem }]);
     setPartyQuery('');
     setSelectedParty(null);
@@ -469,7 +489,21 @@ export default function Services() {
     setEditingItemIdx(null);
   };
 
-  const openDialog = () => { resetForm(); setDialogOpen(true); };
+  const openDialog = async () => {
+    let nextFromServer = null;
+    if (businessId) {
+      try {
+        const data = await api.listServices({ limit: 500 });
+        const values = (data || []).map((s) => s?.orderNo).filter(Boolean);
+        setOrderNoSeedValues(values);
+        nextFromServer = String(nextSequence(values, 1));
+      } catch {
+        nextFromServer = null;
+      }
+    }
+    resetForm(nextFromServer);
+    setDialogOpen(true);
+  };
   const openEditDialog = async (order) => {
     resetForm();
     setEditingId(order.id);
@@ -522,9 +556,11 @@ export default function Services() {
     });
     if (invalidConversion) { setFormNotice({ type: 'error', message: t('errors.conversionRequired') }); return; }
     try {
+      const orderNo = String(header.orderNo || '').trim() || nextOrderNo;
       if (editingId) {
         await api.updateService(editingId, {
           ...header,
+          orderNo,
           laborTotal: totals.laborTotal,
           partsTotal: totals.partsTotal,
           grandTotal: totals.grandTotal,
@@ -541,6 +577,7 @@ export default function Services() {
       } else {
         const createPayload = {
           ...header,
+          orderNo,
           laborTotal: totals.laborTotal,
           partsTotal: totals.partsTotal,
           grandTotal: totals.grandTotal,
@@ -555,10 +592,14 @@ export default function Services() {
           })),
         };
         const creatorValue = getCurrentCreatorValue(user);
-        await api.createService({
+        const created = await api.createService({
           ...createPayload,
           ...(creatorValue ? { createdBy: creatorValue } : {}),
         });
+        const savedOrderNo = created?.orderNo || orderNo;
+        if (savedOrderNo) {
+          setOrderNoSeedValues((prev) => (prev.includes(savedOrderNo) ? prev : [...prev, savedOrderNo]));
+        }
       }
       closeDialog();
       loadServices();

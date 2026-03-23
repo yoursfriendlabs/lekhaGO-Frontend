@@ -1,5 +1,4 @@
 import { useAuth } from '../lib/auth';
-import { useTheme } from '../lib/theme';
 import { useI18n } from '../lib/i18n.jsx';
 
 export default function Topbar() {
