@@ -15,12 +15,12 @@ import { useProductStore } from '../stores/products';
 import { usePartyStore } from '../stores/parties';
 import { useServiceStore } from '../stores/services';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
-<<<<<<< Updated upstream
+
 import dayjs, { formatMaybeDate, todayISODate, toDateInputValue } from '../lib/datetime';
 import { nextSequence } from '../lib/sequence';
-=======
+
 import { getPartyBalanceMeta } from '../lib/partyBalances.js';
->>>>>>> Stashed changes
+
 
 const emptyItem = {
   itemType: 'labor',
