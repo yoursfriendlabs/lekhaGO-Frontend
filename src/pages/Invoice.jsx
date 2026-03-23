@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { useBusinessSettings } from '../lib/businessSettings';
 import InvoiceHeader from '../components/InvoiceHeader';
 import Notice from '../components/Notice';
+import { getCreatorDisplayName } from '../lib/records';
 
 function fmt(dateStr) {
   if (!dateStr) return '—';
@@ -62,6 +63,7 @@ export default function Invoice() {
   const partyName = isSale
     ? record?.partyName || record?.customerName || record?.Customer?.name || 'Walk-in Customer'
     : record?.partyName || record?.supplierName || record?.Party?.name || '—';
+  const creatorName = getCreatorDisplayName(record);
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4">
@@ -99,6 +101,10 @@ export default function Invoice() {
               </p>
               <p className="font-semibold text-slate-800 dark:text-slate-200">{partyName}</p>
               {record.partyPhone && <p className="mt-0.5 text-sm text-slate-500">{record.partyPhone}</p>}
+              <p className="mt-2 text-sm text-slate-500">
+                Created By:{' '}
+                <span className="font-medium text-slate-700 dark:text-slate-300">{creatorName}</span>
+              </p>
             </div>
             {record.notes && (
               <div>

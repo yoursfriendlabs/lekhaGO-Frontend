@@ -17,7 +17,7 @@ export default function Register() {
     businessType: '',
   });
   const [step, setStep] = useState('form');
-  const [pending, setPending] = useState({ email: '', token: '', user: null, businessId: '' });
+  const [pending, setPending] = useState({ email: '', token: '', user: null, businessId: '', role: 'owner' });
   const [otpCode, setOtpCode] = useState('');
   const [otpStatus, setOtpStatus] = useState({ type: 'info', message: '' });
   const [status, setStatus] = useState({ type: 'info', message: '' });
@@ -38,12 +38,12 @@ export default function Register() {
       const data = await api.register(form);
       const businessId = data.business?.id || '';
       if (data.user?.emailVerified && data.token) {
-        setSession(data.token, data.user, businessId);
+        setSession(data.token, data.user, businessId, data.role || 'owner');
         navigate('/app');
         return;
       }
       const email = data.user?.email || form.email;
-      setPending({ email, token: data.token || '', user: data.user, businessId });
+      setPending({ email, token: data.token || '', user: data.user, businessId, role: data.role || 'owner' });
       setStep('verify');
       if (!data.otpSent) {
         try {
@@ -75,8 +75,9 @@ export default function Register() {
       const token = response?.token || pending.token;
       const nextUser = response?.user || (pending.user ? { ...pending.user, emailVerified: true } : null);
       const businessId = response?.business?.id || pending.businessId;
+      const role = response?.role || pending.role || 'owner';
       if (token) {
-        setSession(token, nextUser, businessId);
+        setSession(token, nextUser, businessId, role);
         navigate('/app');
       } else {
         setOtpStatus({ type: 'success', message: t('auth.verifiedLogin') });

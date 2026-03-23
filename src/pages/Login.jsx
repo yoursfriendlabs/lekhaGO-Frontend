@@ -4,6 +4,7 @@ import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
+import { consumeSessionNotice } from '../lib/storage';
 
 function SpinIcon() {
   return (
@@ -38,9 +39,15 @@ export default function Login() {
   const navigate = useNavigate();
   const { setSession } = useAuth();
   const { t } = useI18n();
-
   const [form, setForm] = useState({ email: '', password: '', businessId: '' });
-  const [status, setStatus] = useState({ type: 'info', message: '' });
+  const [status, setStatus] = useState(() => {
+    const message = consumeSessionNotice();
+    return { type: message ? 'error' : 'info', message };
+  });
+  const [step, setStep] = useState('login');
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpStatus, setOtpStatus] = useState({ type: 'info', message: '' });
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
 
