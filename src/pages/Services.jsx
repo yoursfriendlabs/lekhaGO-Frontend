@@ -14,6 +14,7 @@ import { X, Plus, Clock, Check, Search, Pencil, FileText, ChevronDown, Phone } f
 import { useProductStore } from '../stores/products';
 import { usePartyStore } from '../stores/parties';
 import { useServiceStore } from '../stores/services';
+import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
 
 const emptyItem = {
   itemType: 'labor',
@@ -533,7 +534,7 @@ export default function Services() {
           })),
         });
       } else {
-        await api.createService({
+        const createPayload = {
           ...header,
           laborTotal: totals.laborTotal,
           partsTotal: totals.partsTotal,
@@ -547,6 +548,11 @@ export default function Services() {
             unitPrice: Number(item.unitPrice),
             lineTotal: Number(item.lineTotal),
           })),
+        };
+        const creatorValue = getCurrentCreatorValue(user);
+        await api.createService({
+          ...createPayload,
+          ...(creatorValue ? { createdBy: creatorValue } : {}),
         });
       }
       closeDialog();
@@ -742,6 +748,7 @@ export default function Services() {
                         {order.orderNo || order.id.slice(0, 8)}
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5">{order.Party?.name || order.partyName || '—'}</p>
+                      <p className="mt-1 text-xs text-slate-400">Created By: {getCreatorDisplayName(order)}</p>
                       <div className="mt-1">
                         <DeliveryBadge date={order.deliveryDate} />
                       </div>
@@ -840,7 +847,8 @@ export default function Services() {
                         {order.orderNo || order.id.slice(0, 8)}
                       </td>
                       <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
-                        {order.Party?.name || order.partyName || <span className="text-slate-400">—</span>}
+                        <div>{order.Party?.name || order.partyName || <span className="text-slate-400">—</span>}</div>
+                        <div className="text-xs text-slate-400">Created By: {getCreatorDisplayName(order)}</div>
                       </td>
                       <td className="py-2.5 pr-4"><DeliveryBadge date={order.deliveryDate} /></td>
                       <td className="py-2.5 pr-4">
@@ -1368,8 +1376,12 @@ export default function Services() {
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div>
                       <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Bill To</p>
-                      <p className="font-semibold text-slate-800 dark:text-slate-200">{invoiceOrder.Party.name || '—'}</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200">{invoiceOrder.Party?.name || invoiceOrder.partyName || '—'}</p>
                       {invoiceOrder.Party?.phone && <p className="mt-0.5 text-sm text-slate-500">{invoiceOrder.Party?.phone}</p>}
+                      <p className="mt-2 text-sm text-slate-500">
+                        Created By:{' '}
+                        <span className="font-medium text-slate-700 dark:text-slate-300">{getCreatorDisplayName(invoiceOrder)}</span>
+                      </p>
                     </div>
                     {invoiceOrder.notes && (
                       <div>

@@ -13,6 +13,7 @@ import DynamicAttributes from '../components/DynamicAttributes';
 import { useProductStore } from '../stores/products';
 import { usePartyStore } from '../stores/parties';
 import { useSaleStore } from '../stores/sales';
+import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
 
 const emptyItem = {
   productId: '',
@@ -58,7 +59,7 @@ function getCustomerName(sale) {
 
 export default function Sales() {
   const { t } = useI18n();
-  const { businessId } = useAuth();
+  const { businessId, user } = useAuth();
 
   // ── Stores ──
   const { products, fetch: fetchProducts } = useProductStore();
@@ -296,11 +297,15 @@ export default function Sales() {
           ...deletedItemIds.map((id) => ({ id, _delete: true })),
         ],
       };
+      const creatorValue = getCurrentCreatorValue(user);
+      const createPayload = creatorValue
+        ? { ...payload, createdBy: creatorValue }
+        : payload;
       if (formMode === 'edit' && editingId) {
         await api.updateSale(editingId, payload);
         setStatus({ type: 'success', message: t('sales.messages.updated') });
       } else {
-        await api.createSale(payload);
+        await api.createSale(createPayload);
         setStatus({ type: 'success', message: t('sales.messages.created') });
       }
       resetForm();
@@ -525,6 +530,7 @@ export default function Sales() {
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5">{formatDate(sale.saleDate)}</p>
                       <p className="mt-1 text-xs text-slate-500 truncate">{customerName || '—'}</p>
+                      <p className="mt-1 text-xs text-slate-400 truncate">Created By: {getCreatorDisplayName(sale)}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <StatusBadge status={sale.status} />
@@ -607,7 +613,8 @@ export default function Sales() {
 
                       {/* Customer — resolved through full fallback chain */}
                       <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
-                        {customerName || <span className="text-slate-400">—</span>}
+                        <div>{customerName || <span className="text-slate-400">—</span>}</div>
+                        <div className="text-xs text-slate-400">Created By: {getCreatorDisplayName(sale)}</div>
                       </td>
 
                       {/* Grand total */}

@@ -1,6 +1,16 @@
-import { getBusinessId, getToken } from './storage';
+import { clearSession, getBusinessId, getToken, setSessionNotice } from './storage';
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://api.yoursfriend.com';
+const INACTIVE_USER_REGEX = /user is inactive/i;
+
+function handleInactiveUser(message) {
+  clearSession();
+  setSessionNotice(message);
+
+  if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
+    window.location.replace('/login');
+  }
+}
 
 async function request(path, options = {}) {
   const token = getToken();
@@ -30,6 +40,10 @@ async function request(path, options = {}) {
     const error = new Error(message);
     error.status = res.status;
     error.payload = payload;
+    if (res.status === 403 && INACTIVE_USER_REGEX.test(message)) {
+      error.inactiveUser = true;
+      handleInactiveUser(message);
+    }
     throw error;
   }
 
@@ -41,6 +55,10 @@ export const api = {
   login: (data) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   requestEmailOtp: (data) => request('/api/auth/request-email-otp', { method: 'POST', body: JSON.stringify(data) }),
   verifyEmailOtp: (data) => request('/api/auth/verify-email-otp', { method: 'POST', body: JSON.stringify(data) }),
+  listStaff: () => request('/api/staff'),
+  createStaff: (data) => request('/api/staff', { method: 'POST', body: JSON.stringify(data) }),
+  updateStaff: (membershipId, data) => request(`/api/staff/${membershipId}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  deleteStaff: (membershipId) => request(`/api/staff/${membershipId}`, { method: 'DELETE' }),
   listProducts: () => request('/api/products'),
   createProduct: (data) => request('/api/products', { method: 'POST', body: JSON.stringify(data) }),
   createPurchase: (data) => request('/api/purchases', { method: 'POST', body: JSON.stringify(data) }),

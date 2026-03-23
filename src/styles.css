@@ -51,6 +51,10 @@ body {
   @apply w-full rounded-xl border border-secondary-200 bg-white px-3 py-2.5 text-base md:text-sm text-ink placeholder:text-secondary-400 focus:border-primary-400 focus:ring-primary-400;
 }
 
+.input-compact {
+  @apply rounded-xl border border-secondary-200 bg-white px-3 py-2 text-sm text-ink placeholder:text-secondary-400 focus:border-primary-400 focus:ring-primary-400;
+}
+
 .btn {
   @apply inline-flex items-center justify-center rounded-xl md:rounded-full px-5 py-2.5 md:py-2 text-sm font-semibold transition active:scale-95;
 }

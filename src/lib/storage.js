@@ -1,6 +1,8 @@
 const TOKEN_KEY = 'mms_token';
 const USER_KEY = 'mms_user';
 const BUSINESS_KEY = 'mms_business_id';
+const ROLE_KEY = 'mms_role';
+const SESSION_NOTICE_KEY = 'mms_session_notice';
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -30,8 +32,29 @@ export function setBusinessId(id) {
   else localStorage.removeItem(BUSINESS_KEY);
 }
 
+export function getRole() {
+  return localStorage.getItem(ROLE_KEY) || getUser()?.role || '';
+}
+
+export function setRole(role) {
+  if (role) localStorage.setItem(ROLE_KEY, role);
+  else localStorage.removeItem(ROLE_KEY);
+}
+
+export function setSessionNotice(message) {
+  if (message) localStorage.setItem(SESSION_NOTICE_KEY, message);
+  else localStorage.removeItem(SESSION_NOTICE_KEY);
+}
+
+export function consumeSessionNotice() {
+  const message = localStorage.getItem(SESSION_NOTICE_KEY) || '';
+  localStorage.removeItem(SESSION_NOTICE_KEY);
+  return message;
+}
+
 export function clearSession() {
   setToken('');
   setUser(null);
   setBusinessId('');
+  setRole('');
 }
