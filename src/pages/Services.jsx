@@ -15,8 +15,12 @@ import { useProductStore } from '../stores/products';
 import { usePartyStore } from '../stores/parties';
 import { useServiceStore } from '../stores/services';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
+<<<<<<< Updated upstream
 import dayjs, { formatMaybeDate, todayISODate, toDateInputValue } from '../lib/datetime';
 import { nextSequence } from '../lib/sequence';
+=======
+import { getPartyBalanceMeta } from '../lib/partyBalances.js';
+>>>>>>> Stashed changes
 
 const emptyItem = {
   itemType: 'labor',
@@ -125,7 +129,7 @@ export default function Services() {
   const { settings: bizSettings } = useBusinessSettings();
 
   const { products, fetch: fetchProducts } = useProductStore();
-  const { parties, fetch: fetchParties, upsert: upsertParty } = usePartyStore();
+  const { upsert: upsertParty } = usePartyStore();
   const { services: serviceList, loading: listLoading, error: serviceError, fetch: fetchServices, patch: patchService, invalidate: invalidateServices } = useServiceStore();
   const [orderNoSeedValues, setOrderNoSeedValues] = useState([]);
 
@@ -169,6 +173,7 @@ export default function Services() {
 
   // ── Form data ──
   const [partyQuery, setPartyQuery] = useState('');
+  const [partySearchResults, setPartySearchResults] = useState([]);
   const [selectedParty, setSelectedParty] = useState(null);
   const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
   const [showAddNew, setShowAddNew] = useState(false);
@@ -217,8 +222,29 @@ export default function Services() {
   }, []);
 
   useEffect(() => {
-    fetchParties({ q: partyQuery }).catch(() => null);
-  }, [partyQuery]);
+    const search = partyQuery.trim();
+
+    if (!search || selectedParty) {
+      setPartySearchResults([]);
+      return;
+    }
+
+    let isActive = true;
+
+    api.listParties({ search, type: 'customer' })
+      .then((results) => {
+        if (!isActive) return;
+        setPartySearchResults(Array.isArray(results) ? results : []);
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setPartySearchResults([]);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [partyQuery, selectedParty]);
 
   useEffect(() => {
     api.listOrderAttributes({ entityType: 'service' }).then(setAttributeDefs).catch(() => null);
@@ -403,16 +429,9 @@ export default function Services() {
 
   // ── Party helpers ──
   const filteredParties = useMemo(() => {
-    const q = partyQuery.trim().toLowerCase();
-    if (!q) return [];
-    return parties
-      .filter(
-        (p) =>
-          String(p.name || '').toLowerCase().includes(q) ||
-          String(p.phone || '').toLowerCase().includes(q)
-      )
-      .slice(0, 6);
-  }, [partyQuery, parties]);
+    return partySearchResults.slice(0, 6);
+  }, [partySearchResults]);
+  const selectedPartyBalanceMeta = getPartyBalanceMeta(selectedParty?.currentAmount, t);
 
   const selectParty = (party) => {
     setSelectedParty(party);
@@ -421,6 +440,7 @@ export default function Services() {
     setPartyDropdownOpen(false);
     setShowAddNew(false);
     setNewPartyPhone('');
+    setPartySearchResults([]);
   };
 
   const clearParty = () => {
@@ -430,6 +450,7 @@ export default function Services() {
     setPartyDropdownOpen(false);
     setShowAddNew(false);
     setNewPartyPhone('');
+    setPartySearchResults([]);
   };
 
   const handlePartySearch = (e) => {
@@ -1001,7 +1022,15 @@ export default function Services() {
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{selectedParty.name}</p>
                           {selectedParty.phone && <p className="text-xs text-slate-500">{selectedParty.phone}</p>}
-                          {selectedParty.currentAmount && <p className="text-xs text-slate-500">{selectedParty.currentAmount}</p>}
+                          {selectedParty.currentAmount !== undefined && selectedParty.currentAmount !== null && (
+                            <p className={`text-xs ${selectedPartyBalanceMeta.textClass}`}>
+                              {selectedPartyBalanceMeta.label}:{' '}
+                              {t('currency.formatted', {
+                                symbol: t('currency.symbol'),
+                                amount: selectedPartyBalanceMeta.absoluteAmount.toFixed(2),
+                              })}
+                            </p>
+                          )}
                         </div>
                         <button type="button" onClick={clearParty} className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600 dark:hover:bg-slate-800">
                           <X size={16} />

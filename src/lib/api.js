@@ -91,6 +91,16 @@ export const api = {
     return request(`/api/reports/low-stock${suffix}`);
   },
   inventorySummary: () => request('/api/reports/inventory-summary'),
+  partyReport: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const suffix = query ? `?${query}` : '';
+    return request(`/api/reports/party-report${suffix}`);
+  },
+  partyStatement: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    const suffix = query ? `?${query}` : '';
+    return request(`/api/reports/party-statement${suffix}`);
+  },
   listParties: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const suffix = query ? `?${query}` : '';

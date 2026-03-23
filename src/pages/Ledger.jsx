@@ -1,9 +1,15 @@
+<<<<<<< Updated upstream
 import { useEffect, useMemo, useRef, useState } from 'react';
+=======
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+>>>>>>> Stashed changes
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import { API_BASE, api } from '../lib/api';
 import { useBusinessSettings } from '../lib/businessSettings';
 import { useI18n } from '../lib/i18n.jsx';
+<<<<<<< Updated upstream
 import dayjs, { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { Download, Printer } from 'lucide-react';
 
@@ -11,6 +17,19 @@ function normalizeId(value) {
   if (value === null || value === undefined || value === '') return null;
   return String(value);
 }
+=======
+import {
+  getPartyBalanceMeta,
+  getStatementTypeLabel,
+  normalizePartyReportRows,
+  normalizePartyStatementResponse,
+  toAmount,
+} from '../lib/partyBalances.js';
+import { Download, Printer, Search } from 'lucide-react';
+
+const STATEMENT_PAGE_SIZE = 20;
+const statementTypes = ['all', 'sale', 'service', 'purchase', 'payment_in', 'payment_out', 'transaction'];
+>>>>>>> Stashed changes
 
 function formatStatementDate(value) {
   if (!value) return '-';
@@ -22,6 +41,7 @@ function formatRangeDate(value) {
   return formatMaybeDate(value, 'D MMM YYYY');
 }
 
+<<<<<<< Updated upstream
 function buildRange(period) {
   const now = dayjs();
   if (period === 'month') {
@@ -31,10 +51,27 @@ function buildRange(period) {
     return { from: now.startOf('year'), to: now };
   }
   return { from: null, to: null };
+=======
+function getStatementBadgeClass(type) {
+  const classes = {
+    sale: 'bg-emerald-100 text-emerald-700',
+    service: 'bg-sky-100 text-sky-700',
+    purchase: 'bg-amber-100 text-amber-700',
+    payment_in: 'bg-teal-100 text-teal-700',
+    payment_out: 'bg-indigo-100 text-indigo-700',
+  };
+
+  return classes[type] || 'bg-slate-100 text-slate-600';
+}
+
+function getStatementReference(row) {
+  return row.referenceNo || row.id?.slice(0, 8) || '-';
+>>>>>>> Stashed changes
 }
 
 export default function Ledger() {
   const { t } = useI18n();
+<<<<<<< Updated upstream
   const { settings: biz } = useBusinessSettings();
   const [sales, setSales] = useState([]);
   const [purchases, setPurchases] = useState([]);
@@ -44,23 +81,30 @@ export default function Ledger() {
   const [selectedPartyId, setSelectedPartyId] = useState('all');
   const [period, setPeriod] = useState('month');
   const printRef = useRef(null);
+=======
+  const [searchParams] = useSearchParams();
+
+  const initialPartyId = searchParams.get('partyId') || '';
+  const [reportQuery, setReportQuery] = useState(searchParams.get('partyName') || '');
+  const [partyTypeFilter, setPartyTypeFilter] = useState('all');
+  const [reportRows, setReportRows] = useState([]);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState('');
+
+  const [selectedPartyId, setSelectedPartyId] = useState(initialPartyId);
+  const [statementType, setStatementType] = useState('all');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [page, setPage] = useState(1);
+  const [statementData, setStatementData] = useState(() => normalizePartyStatementResponse());
+  const [statementLoading, setStatementLoading] = useState(false);
+  const [statementError, setStatementError] = useState('');
+>>>>>>> Stashed changes
 
   useEffect(() => {
-    Promise.all([
-      api.listSales({ limit: 200 }),
-      api.listPurchases({ limit: 200 }),
-      api.listServices({ limit: 200 }),
-      api.listParties(),
-    ])
-      .then(([salesData, purchaseData, serviceData, partyData]) => {
-        setSales(salesData || []);
-        setPurchases(purchaseData || []);
-        setServices(serviceData || []);
-        setParties(partyData || []);
-      })
-      .catch((err) => setStatus(err.message));
-  }, []);
+    let isActive = true;
 
+<<<<<<< Updated upstream
   const partyNameById = useMemo(() => {
     const map = new Map();
     parties.forEach((party) => {
@@ -146,9 +190,19 @@ export default function Ledger() {
     });
     return [...normalizedSales, ...normalizedPurchases, ...normalizedServices];
   }, [partyNameById, purchases, sales, services, t]);
+=======
+    async function loadPartyReport() {
+      setReportLoading(true);
+      setReportError('');
+>>>>>>> Stashed changes
 
-  const { from, to } = useMemo(() => buildRange(period), [period]);
+      try {
+        const data = await api.partyReport({
+          ...(reportQuery.trim() ? { partyName: reportQuery.trim() } : {}),
+          ...(partyTypeFilter !== 'all' ? { type: partyTypeFilter } : {}),
+        });
 
+<<<<<<< Updated upstream
   const filteredTransactions = useMemo(() => {
     return transactions
       .filter((tx) => {
@@ -179,31 +233,98 @@ export default function Ledger() {
       } else {
         // sales and services are both credit (income)
         totalCredit += tx.grandTotal;
+=======
+        if (!isActive) return;
+        setReportRows(normalizePartyReportRows(data));
+      } catch (err) {
+        if (!isActive) return;
+        setReportError(err.message);
+        setReportRows([]);
+      } finally {
+        if (isActive) setReportLoading(false);
+>>>>>>> Stashed changes
       }
-    });
-    const netBalance = totalCredit - totalDebit;
-    return { totalDebit, totalCredit, netBalance, entries: filteredTransactions.length };
-  }, [filteredTransactions]);
+    }
 
-  const statementRows = useMemo(() => {
-    let runningBalance = 0;
-    return filteredTransactions.map((tx) => {
-      const debit = tx.type === 'purchase' ? tx.grandTotal : 0;
-      const credit = tx.type !== 'purchase' ? tx.grandTotal : 0;
-      runningBalance += credit - debit;
-      return {
-        ...tx,
-        debit,
-        credit,
-        runningBalance,
-        label: tx.type === 'sale'
-          ? `${t('ledger.salesInvoice')} ${tx.invoiceNo}`
-          : tx.type === 'purchase'
-          ? `${t('ledger.purchaseInvoice')} ${tx.invoiceNo}`
-          : `${t('parties.serviceOrder')} ${tx.invoiceNo}`,
-      };
-    });
-  }, [filteredTransactions, t]);
+    loadPartyReport();
+    return () => {
+      isActive = false;
+    };
+  }, [partyTypeFilter, reportQuery]);
+
+  useEffect(() => {
+    if (!reportRows.length) return;
+
+    if (initialPartyId && reportRows.find((party) => party.id === initialPartyId)) {
+      setSelectedPartyId(initialPartyId);
+      return;
+    }
+
+    if (!selectedPartyId || !reportRows.find((party) => party.id === selectedPartyId)) {
+      setSelectedPartyId(reportRows[0].id);
+    }
+  }, [initialPartyId, reportRows, selectedPartyId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedPartyId, statementType, from, to]);
+
+  useEffect(() => {
+    if (!selectedPartyId) {
+      setStatementData(normalizePartyStatementResponse());
+      setStatementError('');
+      return;
+    }
+
+    let isActive = true;
+    setStatementLoading(true);
+    setStatementError('');
+    setStatementData(normalizePartyStatementResponse());
+
+    async function loadStatement() {
+      try {
+        const data = await api.partyStatement({
+          partyId: selectedPartyId,
+          ...(statementType !== 'all' ? { type: statementType } : {}),
+          ...(from ? { from } : {}),
+          ...(to ? { to } : {}),
+          limit: STATEMENT_PAGE_SIZE,
+          offset: (page - 1) * STATEMENT_PAGE_SIZE,
+        });
+
+        if (!isActive) return;
+        setStatementData(normalizePartyStatementResponse(data));
+      } catch (err) {
+        if (!isActive) return;
+        setStatementError(err.message);
+      } finally {
+        if (isActive) setStatementLoading(false);
+      }
+    }
+
+    loadStatement();
+    return () => {
+      isActive = false;
+    };
+  }, [from, page, selectedPartyId, statementType, to]);
+
+  const selectedParty = useMemo(() => {
+    const reportParty = reportRows.find((party) => party.id === selectedPartyId) || null;
+    if (!reportParty && !statementData.party) return null;
+    return { ...(reportParty || {}), ...(statementData.party || {}) };
+  }, [reportRows, selectedPartyId, statementData.party]);
+
+  const selectedBalanceMeta = getPartyBalanceMeta(selectedParty?.currentAmount ?? statementData.summary.currentAmount, t);
+  const totalPages = Math.max(1, Math.ceil(statementData.summary.totalRows / STATEMENT_PAGE_SIZE));
+
+  const summaryCards = [
+    { label: t('ledger.currentBalance'), value: selectedBalanceMeta.absoluteAmount, tone: selectedBalanceMeta.textClass },
+    { label: t('ledger.totalSales'), value: statementData.summary.totalSales, tone: 'text-emerald-600' },
+    { label: t('ledger.totalServices'), value: statementData.summary.totalServices, tone: 'text-sky-600' },
+    { label: t('ledger.totalPurchases'), value: statementData.summary.totalPurchases, tone: 'text-amber-600' },
+    { label: t('ledger.totalPaymentIn'), value: statementData.summary.totalPaymentIn, tone: 'text-teal-600' },
+    { label: t('ledger.totalPaymentOut'), value: statementData.summary.totalPaymentOut, tone: 'text-indigo-600' },
+  ];
 
   const selectedParty = useMemo(() => {
     if (selectedPartyId === 'all') return null;
@@ -319,8 +440,11 @@ export default function Ledger() {
           </div>
         )}
       />
-      {status ? <Notice title={status} tone="error" /> : null}
 
+      {reportError ? <Notice title={reportError} tone="error" /> : null}
+      {statementError ? <Notice title={statementError} tone="error" /> : null}
+
+<<<<<<< Updated upstream
       <div ref={printRef} className="space-y-6">
         {/* Print-only PDF layout (professional) */}
         <div className="hidden print:block">
@@ -628,6 +752,280 @@ export default function Ledger() {
                 </tbody>
               </table>
             </div>
+=======
+      <div className="card space-y-5">
+        <div className="grid gap-3 lg:grid-cols-[1.3fr_0.7fr_0.6fr_0.6fr]">
+          <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-white px-3 py-2.5 dark:border-slate-700/60 dark:bg-slate-900/60">
+            <Search size={16} className="text-slate-400" />
+            <input
+              className="w-full bg-transparent text-sm outline-none placeholder:text-slate-400"
+              placeholder={t('ledger.searchPlaceholder')}
+              value={reportQuery}
+              onChange={(event) => setReportQuery(event.target.value)}
+            />
+          </div>
+          <select
+            className="input"
+            value={partyTypeFilter}
+            onChange={(event) => setPartyTypeFilter(event.target.value)}
+          >
+            <option value="all">{t('parties.types.all')}</option>
+            <option value="customer">{t('parties.types.customer')}</option>
+            <option value="supplier">{t('parties.types.supplier')}</option>
+          </select>
+          <input
+            type="date"
+            className="input"
+            value={from}
+            onChange={(event) => setFrom(event.target.value)}
+          />
+          <input
+            type="date"
+            className="input"
+            value={to}
+            onChange={(event) => setTo(event.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {statementTypes.map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setStatementType(type)}
+              className={
+                statementType === type
+                  ? 'rounded-xl bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white dark:bg-white dark:text-slate-900'
+                  : 'rounded-xl bg-slate-100 px-3 py-1.5 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+              }
+            >
+              {getStatementTypeLabel(type, t)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="card space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
+              {t('parties.listTitle', { count: reportRows.length })}
+            </h3>
+            {reportLoading ? <span className="text-sm text-slate-400">{t('common.loading')}</span> : null}
+          </div>
+
+          <div className="space-y-2">
+            {reportLoading && reportRows.length === 0 ? (
+              <p className="text-sm text-slate-500">{t('common.loading')}</p>
+            ) : reportRows.length === 0 ? (
+              <p className="text-sm text-slate-500">{t('parties.noParties')}</p>
+            ) : (
+              reportRows.map((party) => {
+                const balanceMeta = getPartyBalanceMeta(party.currentAmount, t);
+
+                return (
+                  <button
+                    key={party.id}
+                    type="button"
+                    onClick={() => setSelectedPartyId(party.id)}
+                    className={
+                      selectedPartyId === party.id
+                        ? 'w-full rounded-2xl border border-slate-900 bg-slate-50 p-3 text-left dark:border-slate-300 dark:bg-slate-900/70'
+                        : 'w-full rounded-2xl border border-slate-200 bg-white p-3 text-left dark:border-slate-800 dark:bg-slate-950'
+                    }
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 text-sm font-semibold text-white dark:bg-slate-200 dark:text-slate-900">
+                        {party.name?.slice(0, 2).toUpperCase() || 'P'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold text-slate-900 dark:text-slate-100">{party.name}</p>
+                        <p className="text-xs text-slate-500">{party.phone || t(`parties.types.${party.type || 'customer'}`)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-semibold ${balanceMeta.textClass}`}>
+                          {t('currency.formatted', {
+                            symbol: t('currency.symbol'),
+                            amount: balanceMeta.absoluteAmount.toFixed(2),
+                          })}
+                        </p>
+                        <p className="text-xs text-slate-500">{balanceMeta.label}</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="card space-y-5">
+            {selectedParty ? (
+              <>
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-2xl font-semibold text-slate-900 dark:text-white">{selectedParty.name}</p>
+                    <p className="text-sm text-slate-500">
+                      {[selectedParty.phone, selectedParty.email].filter(Boolean).join(' · ') || '-'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs uppercase text-slate-400">{selectedBalanceMeta.label}</p>
+                    <p className={`text-3xl font-semibold ${selectedBalanceMeta.textClass}`}>
+                      {t('currency.formatted', {
+                        symbol: t('currency.symbol'),
+                        amount: selectedBalanceMeta.absoluteAmount.toFixed(2),
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  {summaryCards.map((card) => (
+                    <div key={card.label} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60">
+                      <p className="text-xs uppercase text-slate-400">{card.label}</p>
+                      <p className={`mt-2 text-lg font-semibold ${card.tone}`}>
+                        {t('currency.formatted', {
+                          symbol: t('currency.symbol'),
+                          amount: toAmount(card.value).toFixed(2),
+                        })}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-slate-500">{t('parties.noParties')}</p>
+            )}
+          </div>
+
+          <div className="card">
+            {statementLoading ? (
+              <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+            ) : statementData.rows.length === 0 ? (
+              <p className="py-3 text-sm text-slate-500">{t('ledger.noTransactions')}</p>
+            ) : (
+              <>
+                <div className="md:hidden space-y-3">
+                  {statementData.rows.map((row) => (
+                    <div key={`${row.type}-${row.id}`} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold capitalize ${getStatementBadgeClass(row.type)}`}>
+                              {getStatementTypeLabel(row.type, t)}
+                            </span>
+                            <p className="truncate font-semibold text-slate-800 dark:text-slate-100">
+                              {getStatementReference(row)}
+                            </p>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">{formatDate(row.date || row.createdAt)}</p>
+                          {row.note ? <p className="mt-1 text-xs text-slate-500">{row.note}</p> : null}
+                        </div>
+                        <div className="text-right text-xs">
+                          {(row.type === 'payment_in' || row.type === 'payment_out') ? (
+                            <p className="font-semibold text-slate-900 dark:text-slate-100">
+                              {t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(row.amount).toFixed(2) })}
+                            </p>
+                          ) : (
+                            <>
+                              <p className="font-semibold text-slate-900 dark:text-slate-100">
+                                {t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(row.totalAmount).toFixed(2) })}
+                              </p>
+                              <p className="text-slate-500">
+                                {t('common.paid')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(row.paidAmount).toFixed(2) })}
+                              </p>
+                              <p className="text-rose-500">
+                                {t('common.due')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(row.dueAmount).toFixed(2) })}
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full text-sm text-slate-600">
+                    <thead className="text-xs uppercase text-slate-400">
+                      <tr>
+                        <th className="py-2 text-left">{t('common.date')}</th>
+                        <th className="py-2 text-left">{t('ledger.type')}</th>
+                        <th className="py-2 text-left">{t('ledger.reference')}</th>
+                        <th className="py-2 text-right">{t('common.total')}</th>
+                        <th className="py-2 text-right">{t('ledger.totalReceived')}</th>
+                        <th className="py-2 text-right">{t('common.due')}</th>
+                        <th className="py-2 text-right">{t('ledger.amount')}</th>
+                        <th className="py-2 text-left">{t('common.notes')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {statementData.rows.map((row) => (
+                        <tr key={`${row.type}-${row.id}`} className="border-t border-slate-200/70 dark:border-slate-800/60">
+                          <td className="py-3">{formatDate(row.date || row.createdAt)}</td>
+                          <td className="py-3">
+                            <span className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold capitalize ${getStatementBadgeClass(row.type)}`}>
+                              {getStatementTypeLabel(row.type, t)}
+                            </span>
+                          </td>
+                          <td className="py-3">{getStatementReference(row)}</td>
+                          <td className="py-3 text-right">
+                            {(row.type === 'payment_in' || row.type === 'payment_out')
+                              ? '--'
+                              : t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(row.totalAmount).toFixed(2) })}
+                          </td>
+                          <td className="py-3 text-right">
+                            {(row.type === 'payment_in' || row.type === 'payment_out')
+                              ? '--'
+                              : t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(row.paidAmount).toFixed(2) })}
+                          </td>
+                          <td className="py-3 text-right">
+                            {(row.type === 'payment_in' || row.type === 'payment_out')
+                              ? '--'
+                              : t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(row.dueAmount).toFixed(2) })}
+                          </td>
+                          <td className="py-3 text-right">
+                            {(row.type === 'payment_in' || row.type === 'payment_out')
+                              ? t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(row.amount).toFixed(2) })
+                              : '--'}
+                          </td>
+                          <td className="py-3">{row.note || '--'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="mt-4 flex items-center justify-between pt-2 text-sm text-slate-500">
+                    <span>
+                      {statementData.summary.totalRows} transactions · page {page} of {totalPages}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={page === 1}
+                        onClick={() => setPage((prev) => prev - 1)}
+                        className="rounded-lg border border-slate-200 px-3 py-1 text-xs disabled:opacity-40"
+                      >
+                        Prev
+                      </button>
+                      <button
+                        type="button"
+                        disabled={page === totalPages}
+                        onClick={() => setPage((prev) => prev + 1)}
+                        className="rounded-lg border border-slate-200 px-3 py-1 text-xs disabled:opacity-40"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+>>>>>>> Stashed changes
           </div>
         </div>
       </div>
