@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api } from './api';
 import { getBusinessId } from './storage';
+import { useAuth } from './auth';
 
 const CACHE_KEY = 'mms_biz_settings';
 
@@ -28,6 +29,7 @@ function writeCache(businessId, data) {
 const BusinessSettingsContext = createContext(null);
 
 export function BusinessSettingsProvider({ children }) {
+  const { businessId } = useAuth();
   // Start from cache so invoices render instantly on first paint
   const [settings, setSettings] = useState(() => readCache(getBusinessId()));
   const [loading, setLoading] = useState(false);
@@ -53,10 +55,11 @@ export function BusinessSettingsProvider({ children }) {
     }
   }, [applySettings]);
 
-  // Load on mount
   useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
+    const bid = businessId || getBusinessId();
+    setSettings(readCache(bid));
+    fetchSettings(bid);
+  }, [businessId, fetchSettings]);
 
   // Save to API, then update cache + state
   const saveSettings = useCallback(async (data, businessId) => {
@@ -66,10 +69,11 @@ export function BusinessSettingsProvider({ children }) {
   }, [applySettings]);
 
   // Call this when businessId changes (user switches business in Topbar)
-  const reloadSettings = useCallback((businessId) => {
-    setSettings(readCache(businessId || getBusinessId()));
-    fetchSettings(businessId);
-  }, [fetchSettings]);
+  const reloadSettings = useCallback((nextBusinessId) => {
+    const bid = nextBusinessId || businessId || getBusinessId();
+    setSettings(readCache(bid));
+    fetchSettings(bid);
+  }, [businessId, fetchSettings]);
 
   return (
     <BusinessSettingsContext.Provider value={{ settings, loading, saveSettings, reloadSettings }}>

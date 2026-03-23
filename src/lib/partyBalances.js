@@ -39,6 +39,12 @@ export function getPartyBalanceMeta(currentAmount, t) {
 }
 
 export function normalizePartyStatementResponse(payload) {
+  const items = Array.isArray(payload?.items)
+    ? payload.items
+    : Array.isArray(payload?.rows)
+    ? payload.rows
+    : [];
+
   return {
     party: payload?.party || null,
     filters: {
@@ -49,7 +55,7 @@ export function normalizePartyStatementResponse(payload) {
       to: payload?.filters?.to ?? null,
     },
     summary: {
-      totalRows: Number(payload?.summary?.totalRows || 0),
+      totalRows: Number(payload?.summary?.totalRows ?? payload?.total ?? items.length ?? 0),
       totalSales: toAmount(payload?.summary?.totalSales),
       totalServices: toAmount(payload?.summary?.totalServices),
       totalPurchases: toAmount(payload?.summary?.totalPurchases),
@@ -60,10 +66,10 @@ export function normalizePartyStatementResponse(payload) {
       totalPaymentOut: toAmount(payload?.summary?.totalPaymentOut),
       currentAmount: toAmount(payload?.summary?.currentAmount),
     },
-    rows: Array.isArray(payload?.rows) ? payload.rows : [],
+    rows: items,
     pagination: {
-      limit: Number(payload?.pagination?.limit || 100),
-      offset: Number(payload?.pagination?.offset || 0),
+      limit: Number(payload?.limit ?? payload?.pagination?.limit ?? 100),
+      offset: Number(payload?.offset ?? payload?.pagination?.offset ?? 0),
     },
   };
 }
@@ -71,6 +77,8 @@ export function normalizePartyStatementResponse(payload) {
 export function normalizePartyReportRows(payload) {
   const rows = Array.isArray(payload)
     ? payload
+    : Array.isArray(payload?.items)
+    ? payload.items
     : Array.isArray(payload?.rows)
     ? payload.rows
     : Array.isArray(payload?.parties)

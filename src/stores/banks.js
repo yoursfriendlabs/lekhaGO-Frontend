@@ -2,21 +2,21 @@ import { create } from 'zustand';
 import { api } from '../lib/api';
 import { createScopedListStoreSlice } from './createScopedListStore';
 
-export const usePartyStore = create((set, get) => ({
+export const useBankStore = create((set, get) => ({
   ...createScopedListStoreSlice(set, get, {
-    resourceKey: 'parties',
-    allowParams: false,
-    fetcher: () => api.listParties(),
+    resourceKey: 'banks',
+    allowParams: true,
+    fetcher: (params) => api.listBanks(params),
   }),
 
-  upsert: (party) =>
+  upsert: (bank) =>
     get().replaceCurrent((items) => {
-      const exists = items.some((item) => item.id === party.id);
+      const exists = items.some((item) => item.id === bank.id);
       if (exists) {
-        return items.map((item) => (item.id === party.id ? { ...item, ...party } : item));
+        return items.map((item) => (item.id === bank.id ? { ...item, ...bank } : item));
       }
 
-      return [party, ...items];
+      return [bank, ...items];
     }),
 
   remove: (id) =>

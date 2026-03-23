@@ -71,6 +71,17 @@ body {
   @apply btn border border-secondary-200 text-secondary-700 hover:bg-secondary-50;
 }
 
+.mobile-sticky-actions {
+  @apply sticky bottom-0 z-10 -mx-4 border-t border-slate-200/70 bg-white/95 px-4 pt-4 backdrop-blur;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+}
+
+@media (min-width: 768px) {
+  .mobile-sticky-actions {
+    @apply static mx-0 border-0 bg-transparent p-0 backdrop-blur-0;
+  }
+}
+
 /* Custom Utilities */
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {

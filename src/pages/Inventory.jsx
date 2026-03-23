@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
+import FormSectionCard from '../components/FormSectionCard.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
@@ -11,6 +12,7 @@ import { Plus, Upload, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
 const makeEmptyItem = () => ({
   name: '',
   category: '',
+  itemCode: '',
   itemType: 'goods',
   openingStock: '',
   primaryUnit: '',
@@ -22,7 +24,7 @@ const makeEmptyItem = () => ({
   mrpPrice: '0',
   wholesalePrice: '0',
   minWholesaleQuantity: '',
-  lowStockAlert: false,
+  lowStockAlert: true,
 });
 
 const parseNumber = (value) => {
@@ -37,7 +39,7 @@ const parseNumber = (value) => {
 
 export default function Inventory() {
   const { t } = useI18n();
-  const { products, loading: productsLoading, error: productsError, fetch: fetchProducts, addProduct, invalidate } = useProductStore();
+  const { products, loading: productsLoading, error: productsError, fetch: fetchProducts, addProduct } = useProductStore();
 
   const unitOptions = useMemo(() => ([
     t('products.units.piece'),
@@ -98,7 +100,7 @@ export default function Inventory() {
       name: product.name,
       itemType: product.itemType || 'goods',
       category: product.category || product.companyName || '-',
-      sku: product.sku || '-',
+      itemCode: product.sku || '-',
       salePrice: Number(product.salePrice ?? 0),
       purchasePrice: Number(product.purchasePrice ?? 0),
       quantity: Number(product.stockOnHand ?? product.openingStock ?? 0),
@@ -120,7 +122,7 @@ export default function Inventory() {
       if (stockFilter === 'out' && item.quantity > 0) return false;
       if (stockFilter === 'low' && item.quantity > 5) return false;
       if (!normalizedQuery) return true;
-      return [item.name, item.sku, item.category]
+      return [item.name, item.itemCode, item.category]
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(normalizedQuery));
     });
@@ -165,6 +167,7 @@ export default function Inventory() {
       const product = await api.createProduct({
         name: form.name,
         companyName: form.category,
+        sku: form.itemCode.trim(),
         itemType: form.itemType,
         primaryUnit: form.primaryUnit,
         secondaryUnit: form.secondaryUnit,
@@ -196,10 +199,10 @@ export default function Inventory() {
         subtitle={t('inventory.itemsSubtitle')}
         action={(
           <div className="flex flex-wrap gap-2">
-            <button className="btn-secondary" type="button">
+            <button className="btn-secondary w-full sm:w-auto" type="button">
               <Upload size={16} /> {t('inventory.importItems')}
             </button>
-            <button className="btn-primary" type="button" onClick={() => setIsOpen(true)}>
+            <button className="btn-primary w-full sm:w-auto" type="button" onClick={() => setIsOpen(true)}>
               <Plus size={16} /> {t('inventory.addNewItem')}
             </button>
           </div>
@@ -218,8 +221,8 @@ export default function Inventory() {
           </button>
         </div>
 
-        <div className="mt-4 flex  items-center gap-3">
-          <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm focus-within:border-emerald-300 dark:border-slate-800 dark:bg-slate-950">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.8fr)_repeat(4,minmax(0,1fr))]">
+          <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm focus-within:border-emerald-300 dark:border-slate-800 dark:bg-slate-950 sm:col-span-2 xl:col-span-1">
             <span className="text-slate-400">🔍</span>
             <input
               className="w-full bg-transparent outline-none"
@@ -259,7 +262,7 @@ export default function Inventory() {
             <option value="part">{t('products.part')}</option>
           </select>
           <button
-            className="btn-ghost min-w-[120px]"
+            className="btn-ghost w-full justify-center xl:w-auto"
             type="button"
             onClick={() => setSortKey((prev) => (prev === 'name' ? 'quantity' : 'name'))}
           >
@@ -343,7 +346,7 @@ export default function Inventory() {
                           : t('products.goods')}
                     </td>
                     <td className="py-3">{item.category}</td>
-                    <td className="py-3">{item.sku}</td>
+                    <td className="py-3">{item.itemCode}</td>
                     <td className="py-3 text-right">
                       {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.salePrice.toFixed(2) })}
                     </td>
@@ -379,128 +382,152 @@ export default function Inventory() {
           ))}
         </datalist>
         <form className="space-y-5" onSubmit={handleSubmit}>
-          <div>
-            <label className="label">{t('inventory.itemName')}</label>
-            <input
-              className="input mt-1"
-              name="name"
-              value={form.name}
-              onChange={handleFormChange}
-              placeholder={t('inventory.itemNamePlaceholder')}
-              required
-            />
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <div>
-              <label className="label">{t('inventory.itemCategory')}</label>
-              <input
-                className="input mt-1"
-                name="category"
-                value={form.category}
-                onChange={handleFormChange}
-                placeholder={t('inventory.itemCategoryPlaceholder')}
-              />
-            </div>
-            <div>
-              <label className="label">{t('inventory.itemType')}</label>
-              <div className="mt-1 flex gap-2">
-                {['goods', 'service'].map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setForm((prev) => ({ ...prev, itemType: type }))}
-                    className={form.itemType === type ? 'btn-primary' : 'btn-ghost'}
-                  >
-                    {type === 'goods' ? t('products.goods') : t('products.service')}
-                  </button>
-                ))}
+          <FormSectionCard hint={t('inventory.help')}>
+            <div className="space-y-4">
+              <div>
+                <label className="label">{t('inventory.itemName')}</label>
+                <input
+                  className="input mt-1"
+                  name="name"
+                  value={form.name}
+                  onChange={handleFormChange}
+                  placeholder={t('inventory.itemNamePlaceholder')}
+                  required
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <label className="label">{t('inventory.itemCategory')}</label>
+                  <input
+                    className="input mt-1"
+                    name="category"
+                    value={form.category}
+                    onChange={handleFormChange}
+                    placeholder={t('inventory.itemCategoryPlaceholder')}
+                  />
+                </div>
+                <div>
+                  <label className="label">{t('inventory.itemCode')}</label>
+                  <input
+                    className="input mt-1"
+                    name="itemCode"
+                    value={form.itemCode}
+                    onChange={handleFormChange}
+                    placeholder={t('inventory.itemCodePlaceholder')}
+                  />
+                </div>
+                <div>
+                  <label className="label">{t('inventory.itemType')}</label>
+                  <div className="mt-1 grid grid-cols-2 gap-2">
+                    {['goods', 'service'].map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setForm((prev) => ({ ...prev, itemType: type }))}
+                        className={`${form.itemType === type ? 'btn-primary' : 'btn-ghost'} w-full justify-center`}
+                      >
+                        {type === 'goods' ? t('products.goods') : t('products.service')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </FormSectionCard>
 
-          <div className="flex items-center gap-4 border-b border-slate-200 pb-2 text-sm text-slate-500">
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setActiveTab('stock')}
-              className={activeTab === 'stock' ? 'border-b-2 border-emerald-500 pb-1 font-semibold text-emerald-600' : ''}
+              className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+                activeTab === 'stock'
+                  ? 'border-primary-300 bg-primary-50 text-primary-700'
+                  : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+              }`}
             >
               {t('inventory.stockDetails')}
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('other')}
-              className={activeTab === 'other' ? 'border-b-2 border-emerald-500 pb-1 font-semibold text-emerald-600' : ''}
+              className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+                activeTab === 'other'
+                  ? 'border-primary-300 bg-primary-50 text-primary-700'
+                  : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+              }`}
             >
               {t('inventory.otherDetails')}
             </button>
           </div>
 
-          {activeTab === 'stock' ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="label">{t('inventory.openingStock')}</label>
-                <input className="input mt-1" name="openingStock" type="number" step="0.01" value={form.openingStock} onChange={handleFormChange} />
+          <FormSectionCard title={activeTab === 'stock' ? t('inventory.stockDetails') : t('inventory.otherDetails')}>
+            {activeTab === 'stock' ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="label">{t('inventory.openingStock')}</label>
+                  <input className="input mt-1" name="openingStock" type="number" step="0.01" value={form.openingStock} onChange={handleFormChange} />
+                </div>
+                <div>
+                  <label className="label">{t('inventory.measuringUnit')}</label>
+                  <input className="input mt-1" name="primaryUnit" list={unitListId} value={form.primaryUnit} onChange={handleFormChange} />
+                </div>
+                <div>
+                  <label className="label">{t('products.salePrice')}</label>
+                  <input className="input mt-1" name="salePrice" type="number" step="0.01" value={form.salePrice} onChange={handleFormChange} />
+                </div>
+                <div>
+                  <label className="label">{t('products.purchasePrice')}</label>
+                  <input className="input mt-1" name="purchasePrice" type="number" step="0.01" value={form.purchasePrice} onChange={handleFormChange} />
+                </div>
+                <div>
+                  <label className="label">{t('inventory.mrpPrice')}</label>
+                  <input className="input mt-1" name="mrpPrice" type="number" step="0.01" value={form.mrpPrice} onChange={handleFormChange} />
+                </div>
+                <div>
+                  <label className="label">{t('inventory.wholesalePrice')}</label>
+                  <input className="input mt-1" name="wholesalePrice" type="number" step="0.01" value={form.wholesalePrice} onChange={handleFormChange} />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="label">{t('inventory.minWholesaleQty')}</label>
+                  <input className="input mt-1" name="minWholesaleQuantity" type="number" step="0.01" value={form.minWholesaleQuantity} onChange={handleFormChange} />
+                </div>
               </div>
-              <div>
-                <label className="label">{t('inventory.measuringUnit')}</label>
-                <input className="input mt-1" name="primaryUnit" list={unitListId} value={form.primaryUnit} onChange={handleFormChange} />
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="label">{t('products.secondaryUnit')}</label>
+                  <input className="input mt-1" name="secondaryUnit" list={unitListId} value={form.secondaryUnit} onChange={handleFormChange} />
+                </div>
+                <div>
+                  <label className="label">{t('products.conversionRate')}</label>
+                  <input className="input mt-1" name="conversionRate" type="number" step="0.0001" value={form.conversionRate} onChange={handleFormChange} />
+                </div>
+                <div>
+                  <label className="label">{t('products.secondaryPrice')}</label>
+                  <input className="input mt-1" name="secondarySalePrice" type="number" step="0.01" value={form.secondarySalePrice} onChange={handleFormChange} />
+                </div>
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-200/70 px-4 py-3">
+                  <input
+                    id="lowStockAlert"
+                    className="h-4 w-4 rounded border-slate-300"
+                    type="checkbox"
+                    name="lowStockAlert"
+                    checked={form.lowStockAlert}
+                    onChange={handleFormChange}
+                  />
+                  <label htmlFor="lowStockAlert" className="text-sm text-slate-600">
+                    {t('inventory.lowStockAlert')}
+                  </label>
+                </div>
               </div>
-              <div>
-                <label className="label">{t('products.salePrice')}</label>
-                <input className="input mt-1" name="salePrice" type="number" step="0.01" value={form.salePrice} onChange={handleFormChange} />
-              </div>
-              <div>
-                <label className="label">{t('products.purchasePrice')}</label>
-                <input className="input mt-1" name="purchasePrice" type="number" step="0.01" value={form.purchasePrice} onChange={handleFormChange} />
-              </div>
-              <div>
-                <label className="label">{t('inventory.mrpPrice')}</label>
-                <input className="input mt-1" name="mrpPrice" type="number" step="0.01" value={form.mrpPrice} onChange={handleFormChange} />
-              </div>
-              <div>
-                <label className="label">{t('inventory.wholesalePrice')}</label>
-                <input className="input mt-1" name="wholesalePrice" type="number" step="0.01" value={form.wholesalePrice} onChange={handleFormChange} />
-              </div>
-              <div>
-                <label className="label">{t('inventory.minWholesaleQty')}</label>
-                <input className="input mt-1" name="minWholesaleQuantity" type="number" step="0.01" value={form.minWholesaleQuantity} onChange={handleFormChange} />
-              </div>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="label">{t('products.secondaryUnit')}</label>
-                <input className="input mt-1" name="secondaryUnit" list={unitListId} value={form.secondaryUnit} onChange={handleFormChange} />
-              </div>
-              <div>
-                <label className="label">{t('products.conversionRate')}</label>
-                <input className="input mt-1" name="conversionRate" type="number" step="0.0001" value={form.conversionRate} onChange={handleFormChange} />
-              </div>
-              <div>
-                <label className="label">{t('products.secondaryPrice')}</label>
-                <input className="input mt-1" name="secondarySalePrice" type="number" step="0.01" value={form.secondarySalePrice} onChange={handleFormChange} />
-              </div>
-              <div className="flex items-center gap-3 pt-7">
-                <input
-                  id="lowStockAlert"
-                  className="h-4 w-4 rounded border-slate-300"
-                  type="checkbox"
-                  name="lowStockAlert"
-                  checked={form.lowStockAlert}
-                  onChange={handleFormChange}
-                />
-                <label htmlFor="lowStockAlert" className="text-sm text-slate-600">
-                  {t('inventory.lowStockAlert')}
-                </label>
-              </div>
-            </div>
-          )}
+            )}
+          </FormSectionCard>
 
-          <div className="flex flex-wrap justify-end gap-2">
-            <button className="btn-secondary" type="button" onClick={closeDialog}>
+          <div className="mobile-sticky-actions flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button className="btn-secondary w-full sm:w-auto" type="button" onClick={closeDialog}>
               {t('common.close')}
             </button>
-            <button className="btn-primary" type="submit" disabled={saving}>
+            <button className="btn-primary w-full sm:w-auto" type="submit" disabled={saving}>
               {saving ? t('common.loading') : t('inventory.addItem')}
             </button>
           </div>

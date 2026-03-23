@@ -8,13 +8,13 @@ export default function DynamicAttributes({ entityType, attributes, onChange }) 
   const [newKey, setNewKey] = useState('');
 
   useEffect(() => {
-    // Fetch all attributes and filter by entityType
-    api.listOrderAttributes().then(data => {
-      const filtered = (data || []).filter(attr =>
-        attr.entityType === 'all' || attr.entityType === entityType
-      );
-      setDefinedAttributes(filtered);
-    }).catch(() => null);
+    api.listOrderAttributes({ entityType })
+      .then((data) => {
+        setDefinedAttributes(
+          (data || []).filter((attr) => attr.entityType === 'all' || attr.entityType === entityType)
+        );
+      })
+      .catch(() => null);
   }, [entityType]);
 
   const handleChange = (key, value) => {
@@ -40,8 +40,8 @@ export default function DynamicAttributes({ entityType, attributes, onChange }) 
   };
 
   // Predefined ones from API first, then any extra manual ones in attributes
-  const definedKeys = definedAttributes.map(a => a.key);
-  const extraKeys = Object.keys(attributes).filter(k => !definedKeys.includes(k));
+  const definedKeys = definedAttributes.map((attribute) => attribute.key);
+  const extraKeys = Object.keys(attributes).filter((key) => !definedKeys.includes(key));
 
   return (
     <div className="space-y-4">

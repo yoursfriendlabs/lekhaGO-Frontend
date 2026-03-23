@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
@@ -13,7 +15,9 @@ import {
   toAmount,
 } from '../lib/partyBalances.js';
 import { usePartyStore } from '../stores/parties';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { Plus, Bell, Search, Filter, ChevronDown } from 'lucide-react';
+import { buildPaymentPayload, requiresBankSelection } from '../lib/payments';
 
 const emptyForm = {
   name: '',
@@ -32,6 +36,8 @@ const makeEmptyTx = () => ({
   amount: '',
   txDate: todayISODate(),
   note: '',
+  paymentMethod: 'cash',
+  bankId: '',
   serviceId: '',
 });
 
@@ -117,6 +123,7 @@ export default function Parties() {
   const [editingId, setEditingId] = useState(null);
   const [filterType, setFilterType] = useState('all');
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query, 300);
   const [selectedId, setSelectedId] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('credit');
@@ -137,12 +144,12 @@ export default function Parties() {
 
       try {
         const data = await api.listParties({
-          ...(query.trim() ? { search: query.trim() } : {}),
+          ...(debouncedQuery.trim() ? { search: debouncedQuery.trim() } : {}),
           ...(filterType !== 'all' ? { type: filterType } : {}),
         });
 
         if (!isActive) return;
-        setParties(Array.isArray(data) ? data : []);
+        setParties(data?.items || []);
       } catch (err) {
         if (!isActive) return;
         setListError(err.message);
@@ -156,7 +163,7 @@ export default function Parties() {
     return () => {
       isActive = false;
     };
-  }, [filterType, partyReloadKey, query]);
+  }, [debouncedQuery, filterType, partyReloadKey]);
 
   useEffect(() => {
     if (!parties.length) {
@@ -386,12 +393,23 @@ export default function Parties() {
 
     try {
       const amount = toAmount(txForm.amount);
+      if (requiresBankSelection(txForm, amount)) {
+        setTxStatus({ type: 'error', message: t('payments.bankRequired') });
+        return;
+      }
       const payload = {
         partyId: txForm.partyId,
         direction: txForm.direction,
         amount,
         txDate: txForm.txDate,
-        note: txForm.note,
+        ...buildPaymentPayload(
+          {
+            paymentMethod: txForm.paymentMethod,
+            bankId: txForm.bankId,
+            paymentNote: txForm.note,
+          },
+          { noteKey: 'note' }
+        ),
       };
 
       await api.createPartyTransaction(payload);
@@ -640,6 +658,12 @@ export default function Parties() {
                               {row.direction ? <span>{row.direction}</span> : null}
                               {row.note ? <span className="italic">{row.note}</span> : null}
                             </div>
+                            <PaymentTypeSummary
+                              source={row}
+                              className="mt-2"
+                              labelClassName="text-xs font-medium"
+                              metaClassName="text-[11px]"
+                            />
                           </div>
                           <div className="shrink-0 text-right text-sm">
                             <p className="font-semibold text-slate-900">
@@ -828,10 +852,20 @@ export default function Parties() {
               </select>
             </div>
           ) : null}
-          <div>
-            <label className="label">{t('parties.transactionNote')}</label>
-            <input className="input mt-1" name="note" value={txForm.note} onChange={handleTxChange} />
-          </div>
+          <PaymentMethodFields
+            value={{
+              paymentMethod: txForm.paymentMethod,
+              bankId: txForm.bankId,
+              paymentNote: txForm.note,
+            }}
+            onChange={(patch) => setTxForm((prev) => ({
+              ...prev,
+              paymentMethod: patch.paymentMethod,
+              bankId: patch.bankId,
+              note: patch.paymentNote,
+            }))}
+            noteLabel={t('parties.transactionNote')}
+          />
           {txStatus.message ? <Notice title={txStatus.message} tone={txStatus.type} /> : null}
           <div className="flex flex-wrap justify-end gap-2">
             <button className="btn-secondary" type="button" onClick={closeTxDialog}>{t('common.close')}</button>

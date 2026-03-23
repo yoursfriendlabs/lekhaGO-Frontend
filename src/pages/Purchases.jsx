@@ -3,17 +3,27 @@ import { Link } from 'react-router-dom';
 import { Pencil, FileText, Plus } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import FormSectionCard from '../components/FormSectionCard.jsx';
+import MobileFormStepper from '../components/MobileFormStepper.jsx';
+import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import Pagination from '../components/Pagination';
 import { useI18n } from '../lib/i18n.jsx';
-import SearchableSelect from '../components/SearchableSelect';
+import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
-import { useProductStore } from '../stores/products';
-import { usePartyStore } from '../stores/parties';
 import { usePurchaseStore } from '../stores/purchases';
-import { nextSequence } from '../lib/sequence';
+import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
+import { useIsMobile } from '../hooks/useIsMobile.js';
+import {
+  mergeLookupEntities,
+  normalizeLookupParty,
+  normalizeLookupProduct,
+  toPartyLookupOption,
+  toProductLookupOption,
+} from '../lib/lookups.js';
 
 // ── Status badge matching Sales/Services design ──
 function StatusBadge({ status }) {
@@ -73,20 +83,13 @@ const getEmptyItem = (entryType) => (entryType === 'expense' ? { ...emptyExpense
 export default function Purchases() {
   const { t } = useI18n();
   const { businessId } = useAuth();
+  const isMobile = useIsMobile();
 
   // ── Stores ──
-  const { products, fetch: fetchProducts } = useProductStore();
-  const { parties, fetch: fetchParties } = usePartyStore();
   const { purchases: purchaseList, loading: purchasesLoading, fetch: fetchPurchases, invalidate: invalidatePurchases } = usePurchaseStore();
-  const [invoiceSeedValues, setInvoiceSeedValues] = useState([]);
-
-  const supplierOptions = useMemo(
-    () =>
-      parties
-        .filter((p) => p.type === 'supplier')
-        .map((p) => ({ value: p.id, label: p.name || '—' })),
-    [parties]
-  );
+  const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState('');
+  const [productDirectory, setProductDirectory] = useState({});
+  const [supplierOption, setSupplierOption] = useState(null);
 
   // ── UI state ──
   const [statusFilter, setStatusFilter] = useState('all');
@@ -100,6 +103,9 @@ export default function Purchases() {
     status: 'received',
     notes: '',
     amountReceived: '0',
+    paymentMethod: 'cash',
+    bankId: '',
+    paymentNote: '',
   });
   const [items, setItems] = useState([getEmptyItem('purchase')]);
   const [status, setStatus] = useState({ type: 'info', message: '' });
@@ -109,33 +115,17 @@ export default function Purchases() {
   const [deletedItemIds, setDeletedItemIds] = useState([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [mobileStep, setMobileStep] = useState('details');
 
   const isExpense = header.entryType === 'expense';
-
-  // ── Load shared data (cached) ──
-  useEffect(() => {
-    if (!businessId) return;
-    fetchProducts(true);
-    fetchParties(true);
-  }, [businessId]);
-
-  useEffect(() => {
-    if (!businessId) return;
-    api.listPurchases({ limit: 500 })
-      .then((data) => {
-        const values = (data || []).map((p) => p?.invoiceNo).filter(Boolean);
-        setInvoiceSeedValues(values);
-      })
-      .catch(() => {});
-  }, [businessId]);
 
   // ── Load purchases list (page-specific) ──
   useEffect(() => {
     if (!businessId) return;
     const params = { limit: 50 };
     if (statusFilter !== 'all') params.status = statusFilter;
-    fetchPurchases(params, true);
-  }, [businessId, statusFilter]);
+    fetchPurchases(params);
+  }, [businessId, fetchPurchases, statusFilter]);
 
   useEffect(() => {
     setPage(1);
@@ -149,14 +139,6 @@ export default function Purchases() {
     );
     return { subTotal, taxTotal, grandTotal: subTotal + taxTotal };
   }, [items]);
-
-  const nextInvoiceNo = useMemo(() => {
-    const values = [
-      ...invoiceSeedValues,
-      ...purchaseList.map((p) => p?.invoiceNo).filter(Boolean),
-    ];
-    return String(nextSequence(values, 1));
-  }, [invoiceSeedValues, purchaseList]);
 
   const expenseTotals = useMemo(() => {
     return items.reduce(
@@ -177,6 +159,11 @@ export default function Purchases() {
       : Math.min(Number(header.amountReceived || 0), totals.grandTotal)
   ), [header.amountReceived, isPaid, totals.grandTotal]);
   const dueAmount = Math.max(totals.grandTotal - paidAmount, 0);
+  const purchaseSteps = useMemo(() => ([
+    { id: 'details', label: t('common.details') },
+    { id: 'items', label: t('purchases.items') },
+    { id: 'payment', label: t('common.payment') },
+  ]), [t]);
 
   useEffect(() => {
     if (!isPaid) return;
@@ -204,6 +191,9 @@ export default function Purchases() {
 
   const handleEntryTypeChange = (event) => {
     const value = event.target.value;
+    if (value === 'expense') {
+      setSupplierOption(null);
+    }
     setHeader((prev) => ({
       ...prev,
       entryType: value,
@@ -226,7 +216,46 @@ export default function Purchases() {
     );
   };
 
-  const getProductById = (id) => products.find((p) => p.id === id);
+  const getProductById = (id) => {
+    if (id === null || id === undefined || id === '') return null;
+    return productDirectory[String(id)] || null;
+  };
+
+  const cacheProducts = (entries) => {
+    setProductDirectory((previous) => mergeLookupEntities(previous, entries));
+  };
+
+  const loadSupplierOptions = async (search) => {
+    const data = await api.lookupParties({ search, type: 'supplier', limit: 10 });
+    return (data?.items || []).map(toPartyLookupOption);
+  };
+
+  const loadProductOptions = async (search) => {
+    const data = await api.lookupProducts({ search, limit: 10 });
+    const normalized = (data?.items || []).map(normalizeLookupProduct);
+    cacheProducts(normalized);
+    return normalized.map(toProductLookupOption);
+  };
+
+  const handleSupplierChange = (option) => {
+    setSupplierOption(option || null);
+    setHeader((previous) => ({ ...previous, partyId: option?.value || '' }));
+  };
+
+  const handleProductSelection = (index, option) => {
+    const product = option?.entity ? normalizeLookupProduct(option.entity) : null;
+
+    if (product?.id) {
+      cacheProducts([product]);
+    }
+
+    handleItemChange(index, 'productId', option?.value || '');
+
+    if (product) {
+      syncItemDefaults(index, product);
+    }
+  };
+
   const getUnitLabel = (product, unitType) => {
     if (!product) return '';
     if (unitType === 'secondary') return product.secondaryUnit || product.primaryUnit || '';
@@ -273,29 +302,48 @@ export default function Purchases() {
     return purchaseList.slice(start, start + pageSize);
   }, [page, pageSize, purchaseList]);
 
-  const resetForm = (invoiceNoOverride = null) => {
-    setHeader({ entryType: 'purchase', partyId: '', partyName: '', invoiceNo: invoiceNoOverride ?? nextInvoiceNo, purchaseDate: todayISODate(), status: 'received', notes: '', amountReceived: '0' });
+  const resetForm = () => {
+    setHeader({
+      entryType: 'purchase',
+      partyId: '',
+      partyName: '',
+      invoiceNo: '',
+      purchaseDate: todayISODate(),
+      status: 'received',
+      notes: '',
+      amountReceived: '0',
+      paymentMethod: 'cash',
+      bankId: '',
+      paymentNote: '',
+    });
     setItems([getEmptyItem('purchase')]);
     setDeletedItemIds([]);
     setEditingId(null);
     setFormMode('create');
     setIsPaid(false);
+    setSuggestedInvoiceNo('');
+    setMobileStep('details');
+    setProductDirectory({});
+    setSupplierOption(null);
+  };
+
+  const closeDialog = () => {
+    setIsOpen(false);
+    setMobileStep('details');
   };
 
   const openCreate = async () => {
-    let nextFromServer = null;
+    resetForm();
+    setIsOpen(true);
+
     if (businessId) {
       try {
-        const data = await api.listPurchases({ limit: 500 });
-        const values = (data || []).map((p) => p?.invoiceNo).filter(Boolean);
-        setInvoiceSeedValues(values);
-        nextFromServer = String(nextSequence(values, 1));
+        const data = await api.getNextSequences();
+        setSuggestedInvoiceNo(data?.nextPurchaseInvoiceNo || '');
       } catch {
-        nextFromServer = null;
+        setSuggestedInvoiceNo('');
       }
     }
-    resetForm(nextFromServer);
-    setIsOpen(true);
   };
 
   const openEdit = async (purchaseId) => {
@@ -303,6 +351,16 @@ export default function Purchases() {
       const purchase = await api.getPurchase(purchaseId);
       const purchaseItems = purchase?.PurchaseItems || [];
       const entryType = purchase.entryType || purchase.type || 'purchase';
+      const party = normalizeLookupParty({
+        id: purchase.partyId || purchase.supplierId || purchase.Party?.id || purchase.Supplier?.id,
+        partyName: purchase.partyName || purchase.supplierName || purchase.Party?.name || purchase.Supplier?.name,
+        phone: purchase.partyPhone || purchase.Party?.phone || purchase.Supplier?.phone,
+        currentAmount: purchase.Party?.currentAmount || purchase.Supplier?.currentAmount,
+        type: 'supplier',
+      });
+      const hydratedProducts = purchaseItems
+        .map((item) => normalizeLookupProduct(item))
+        .filter((product) => product.id);
       setHeader({
         entryType,
         partyId: purchase.partyId || purchase.supplierId || '',
@@ -312,7 +370,10 @@ export default function Purchases() {
         status: purchase.status || 'received',
         notes: purchase.notes || '',
         amountReceived: String(purchase.amountReceived ?? 0),
+        ...normalizePaymentFields(purchase),
       });
+      cacheProducts(hydratedProducts);
+      setSupplierOption(party.id ? toPartyLookupOption(party) : null);
       const mappedItems = purchaseItems.map((item) => ({
         id: item.id,
         productId: item.productId || '',
@@ -328,12 +389,31 @@ export default function Purchases() {
       setDeletedItemIds([]);
       setEditingId(purchaseId);
       setFormMode('edit');
+      setSuggestedInvoiceNo(purchase.invoiceNo || '');
       const computedDue = Number(purchase.dueAmount ?? Math.max(Number(purchase.grandTotal || 0) - Number(purchase.amountReceived || 0), 0));
       setIsPaid(computedDue <= 0 && String(purchase.status || '').toLowerCase() !== 'ordered');
+      setMobileStep('details');
       setIsOpen(true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     }
+  };
+
+  const currentStepIndex = purchaseSteps.findIndex((step) => step.id === mobileStep);
+  const showDetailsStep = !isMobile || mobileStep === 'details';
+  const showItemsStep = !isMobile || mobileStep === 'items';
+  const showPaymentStep = !isMobile || mobileStep === 'payment';
+
+  const goToNextMobileStep = () => {
+    if (!isMobile) return;
+    const nextStep = purchaseSteps[currentStepIndex + 1];
+    if (nextStep) setMobileStep(nextStep.id);
+  };
+
+  const goToPrevMobileStep = () => {
+    if (!isMobile) return;
+    const previousStep = purchaseSteps[currentStepIndex - 1];
+    if (previousStep) setMobileStep(previousStep.id);
   };
 
   const handleSubmit = async (event) => {
@@ -356,15 +436,20 @@ export default function Purchases() {
       return Number(getProductById(item.productId)?.conversionRate || 0) <= 0;
     });
     if (invalidConversion) { setStatus({ type: 'error', message: t('errors.conversionRequired') }); return; }
+    if (requiresBankSelection(header, paidAmount)) {
+      setStatus({ type: 'error', message: t('payments.bankRequired') });
+      return;
+    }
 
     try {
-      const invoiceNo = String(header.invoiceNo || '').trim() || nextInvoiceNo;
+      const manualInvoiceNo = String(header.invoiceNo || '').trim();
+      const { paymentMethod, bankId, paymentNote, ...headerFields } = header;
       const payload = {
-        ...header,
-        invoiceNo,
+        ...headerFields,
         partyId: header.partyId || null,
         partyName: header.entryType === 'expense' ? header.partyName || null : null,
         amountReceived: paidAmount,
+        ...(Number(paidAmount || 0) > 0 ? buildPaymentPayload({ paymentMethod, bankId, paymentNote }) : { paymentMethod: 'cash' }),
         ...totals,
         items: [
           ...items.map((item) => ({
@@ -381,15 +466,16 @@ export default function Purchases() {
           ...deletedItemIds.map((id) => ({ id, _delete: true })),
         ],
       };
+      if (manualInvoiceNo) {
+        payload.invoiceNo = manualInvoiceNo;
+      } else {
+        delete payload.invoiceNo;
+      }
       if (formMode === 'edit' && editingId) {
         await api.updatePurchase(editingId, payload);
         setStatus({ type: 'success', message: t('purchases.messages.updated') });
       } else {
-        const created = await api.createPurchase(payload);
-        const savedInvoice = created?.invoiceNo || invoiceNo;
-        if (savedInvoice) {
-          setInvoiceSeedValues((prev) => (prev.includes(savedInvoice) ? prev : [...prev, savedInvoice]));
-        }
+        await api.createPurchase(payload);
         setStatus({ type: 'success', message: t('purchases.messages.created') });
       }
       resetForm();
@@ -408,203 +494,297 @@ export default function Purchases() {
       <PageHeader
         title={t('purchases.title')}
         subtitle={t('purchases.subtitle')}
-        action={<button className="btn-primary" type="button" onClick={openCreate}>{t('purchases.newPurchase')}</button>}
+        action={<button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate}>{t('purchases.newPurchase')}</button>}
       />
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
-      <Dialog isOpen={isOpen} onClose={() => setIsOpen(false)} title={formMode === 'edit' ? t('purchases.editPurchase') : t('purchases.newPurchase')} size="full">
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label className="label">{t('purchases.entryType')}</label>
-              <select className="input mt-1" name="entryType" value={header.entryType} onChange={handleEntryTypeChange}>
-                <option value="purchase">{t('purchases.purchase')}</option>
-                <option value="expense">{t('purchases.expense')}</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">{t('purchases.supplier')}</label>
-              <div className="mt-1">
-                <SearchableSelect
-                  options={supplierOptions}
-                  value={header.partyId}
-                  onChange={(newValue) => setHeader((prev) => ({ ...prev, partyId: newValue }))}
-                  placeholder={t('purchases.selectSupplier')}
-                />
-              </div>
-              <p className="mt-1 text-xs text-slate-500">{t('purchases.supplierOptional')}</p>
-            </div>
-            <div>
-              <label className="label">{t('purchases.invoiceNo')}</label>
-              <input className="input mt-1" name="invoiceNo" value={header.invoiceNo} onChange={handleHeaderChange} />
-            </div>
-            <div>
-              <label className="label">{t('purchases.purchaseDate')}</label>
-              <input type="date" className="input mt-1" name="purchaseDate" value={header.purchaseDate} onChange={handleHeaderChange} />
-            </div>
-            <div>
-              <label className="label">{t('purchases.status')}</label>
-              <select className="input mt-1" name="status" value={header.status} onChange={handleHeaderChange}>
-                <option value="received">{t('purchases.received')}</option>
-                <option value="ordered">{t('purchases.ordered')}</option>
-                <option value="due">{t('purchases.due')}</option>
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label className="label">{t('purchases.notes')}</label>
-              <input className="input mt-1" name="notes" value={header.notes} onChange={handleHeaderChange} />
-            </div>
-            {isExpense ? (
-              <div className="md:col-span-2">
-                <label className="label">{t('purchases.supplier')}</label>
-                <input className="input mt-1" name="partyName" value={header.partyName} onChange={handleHeaderChange} placeholder={t('purchases.payeeHint')} />
-              </div>
-            ) : null}
-          </div>
-          <div className="flex items-center justify-between">
-            <h4 className="font-semibold text-slate-800 dark:text-slate-100">{t('purchases.items')}</h4>
-            <button className="btn-ghost" type="button" onClick={addItem}>{isExpense ? t('purchases.addExpenseLine') : t('common.addItem')}</button>
-          </div>
-          <div className="space-y-4">
-            {items.map((item, idx) => (
-              <div key={`item-${idx}`} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60">
-                {isExpense ? (
-                  <div className="grid gap-3 md:grid-cols-6">
-                    <div>
-                      <label className="label">{t('purchases.expenseCategory')}</label>
-                      <select className="input mt-1" value={item.itemType} onChange={(event) => handleItemChange(idx, 'itemType', event.target.value)}>
-                        <option value="expense">{t('purchases.normalExpense')}</option>
-                        <option value="labor">{t('purchases.labor')}</option>
-                        <option value="part">{t('purchases.part')}</option>
-                      </select>
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="label">{t('purchases.expenseDescription')}</label>
-                      <input className="input mt-1" value={item.description} onChange={(event) => handleItemChange(idx, 'description', event.target.value)} />
-                    </div>
-                    <div className="md:col-span-2">
-                      <label className="label">{t('purchases.product')}</label>
-                      <select className="input mt-1" value={item.productId} onChange={(event) => { handleItemChange(idx, 'productId', event.target.value); syncItemDefaults(idx, getProductById(event.target.value)); }} disabled={item.itemType !== 'part'}>
-                        <option value="">{t('purchases.selectProduct')}</option>
-                        {products.map((product) => (
-                          <option key={product.id} value={product.id}>{product.name}{product.companyName ? ` · ${product.companyName}` : ''}{product.primaryUnit ? ` · ${product.primaryUnit}` : ''}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="label">{t('purchases.qty')}</label>
-                      <input className="input mt-1" type="number" step="1" min="0" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
-                      <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(item.productId), item.unitType)}</p>
-                    </div>
-                    <div>
-                      <label className="label">{t('products.unitType')}</label>
-                      <select className="input mt-1" value={item.unitType} onChange={(event) => { handleItemChange(idx, 'unitType', event.target.value); syncItemDefaults(idx, getProductById(item.productId)); }} disabled={item.itemType !== 'part'}>
-                        <option value="primary">{t('products.primaryUnit')}</option>
-                        <option value="secondary">{t('products.secondaryUnit')}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="label">{t('purchases.unitPrice')}</label>
-                      <input className="input mt-1" type="number" step="0.01" value={item.unitPrice} onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)} />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid gap-3 md:grid-cols-6">
-                    <div className="md:col-span-2">
-                      <label className="label">{t('purchases.product')}</label>
-                      <select className="input mt-1" value={item.productId} onChange={(event) => { handleItemChange(idx, 'productId', event.target.value); syncItemDefaults(idx, getProductById(event.target.value)); }} required={!isExpense}>
-                        <option value="">{t('purchases.selectProduct')}</option>
-                        {products.map((product) => (
-                          <option key={product.id} value={product.id}>{product.name}{product.companyName ? ` · ${product.companyName}` : ''}{product.primaryUnit ? ` · ${product.primaryUnit}` : ''}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="label">{t('purchases.qty')}</label>
-                      <input className="input mt-1" type="number" step="1" min="0" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
-                      <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(item.productId), item.unitType)}</p>
-                    </div>
-                    <div>
-                      <label className="label">{t('products.unitType')}</label>
-                      <select className="input mt-1" value={item.unitType} onChange={(event) => { handleItemChange(idx, 'unitType', event.target.value); syncItemDefaults(idx, getProductById(item.productId)); }}>
-                        <option value="primary">{t('products.primaryUnit')}</option>
-                        <option value="secondary">{t('products.secondaryUnit')}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="label">{t('purchases.unitPrice')}</label>
-                      <input className="input mt-1" type="number" step="0.01" value={item.unitPrice} onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)} />
-                    </div>
-                    <div>
-                      <label className="label">{t('purchases.tax')}</label>
-                      <input className="input mt-1" type="number" step="0.01" value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
-                    </div>
-                  </div>
-                )}
-                <div className="mt-3 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
-                  <span>{t('common.lineTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.lineTotal })}</span>
-                  {items.length > 1 ? (
-                    <button className="btn-ghost" type="button" onClick={() => removeItem(idx)}>{t('common.remove')}</button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="md:static sticky -mx-5 bottom-0 border-t border-slate-200/70 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-0">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="text-sm text-slate-600 dark:text-slate-300">
-                {isExpense ? (
-                  <>
-                    <p>{t('purchases.normalExpense')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.expense.toFixed(2) })}</p>
-                    <p>{t('purchases.labor')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.labor.toFixed(2) })}</p>
-                    <p>{t('purchases.part')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.part.toFixed(2) })}</p>
-                    <p className="font-semibold">{t('purchases.grandTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</p>
-                  </>
-                ) : (
-                  <>
-                    <p>{t('purchases.subTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</p>
-                    <p>{t('purchases.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</p>
-                    <p className="font-semibold">{t('purchases.grandTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</p>
-                  </>
-                )}
-              </div>
+      <Dialog isOpen={isOpen} onClose={closeDialog} title={formMode === 'edit' ? t('purchases.editPurchase') : t('purchases.newPurchase')} size="full">
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          {isMobile ? (
+            <MobileFormStepper
+              steps={purchaseSteps}
+              currentStep={mobileStep}
+              onStepChange={setMobileStep}
+            />
+          ) : null}
 
-              <div className="flex flex-wrap items-end gap-3 w-full md:w-auto">
-                <div className="flex-1 min-w-[160px] md:min-w-[220px]">
-                  <label className="label">{t('purchases.totalPaid')}</label>
+          {showDetailsStep ? (
+            <FormSectionCard hint={t('purchases.supplierOptional')}>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <label className="label">{t('purchases.entryType')}</label>
+                  <select className="input mt-1" name="entryType" value={header.entryType} onChange={handleEntryTypeChange}>
+                    <option value="purchase">{t('purchases.purchase')}</option>
+                    <option value="expense">{t('purchases.expense')}</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="label">{t('purchases.supplier')}</label>
+                  <div className="mt-1">
+                    <AsyncSearchableSelect
+                      value={header.partyId}
+                      selectedOption={supplierOption}
+                      onChange={handleSupplierChange}
+                      loadOptions={loadSupplierOptions}
+                      placeholder={t('purchases.selectSupplier')}
+                      searchPlaceholder={t('purchases.selectSupplier')}
+                      noResultsLabel={t('common.noData')}
+                      loadingLabel={t('common.loading')}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="label">{t('purchases.invoiceNo')}</label>
                   <input
                     className="input mt-1"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={isPaid ? totals.grandTotal.toFixed(2) : header.amountReceived}
-                    disabled={isPaid}
-                    onChange={(e) => setHeader((prev) => ({ ...prev, amountReceived: e.target.value }))}
+                    name="invoiceNo"
+                    value={header.invoiceNo}
+                    onChange={handleHeaderChange}
+                    placeholder={formMode === 'create' ? suggestedInvoiceNo : ''}
                   />
                 </div>
-                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800/40">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded accent-primary-600"
-                    checked={isPaid}
-                    onChange={(e) => setIsPaid(e.target.checked)}
+                <div>
+                  <label className="label">{t('purchases.purchaseDate')}</label>
+                  <input type="date" className="input mt-1" name="purchaseDate" value={header.purchaseDate} onChange={handleHeaderChange} />
+                </div>
+                <div>
+                  <label className="label">{t('purchases.status')}</label>
+                  <select className="input mt-1" name="status" value={header.status} onChange={handleHeaderChange}>
+                    <option value="received">{t('purchases.received')}</option>
+                    <option value="ordered">{t('purchases.ordered')}</option>
+                    <option value="due">{t('purchases.due')}</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <label className="label">{t('purchases.notes')}</label>
+                  <input className="input mt-1" name="notes" value={header.notes} onChange={handleHeaderChange} />
+                </div>
+                {isExpense ? (
+                  <div className="sm:col-span-2 lg:col-span-2">
+                    <label className="label">{t('purchases.supplier')}</label>
+                    <input className="input mt-1" name="partyName" value={header.partyName} onChange={handleHeaderChange} placeholder={t('purchases.payeeHint')} />
+                  </div>
+                ) : null}
+              </div>
+            </FormSectionCard>
+          ) : null}
+
+          {showItemsStep ? (
+            <FormSectionCard
+              title={t('purchases.items')}
+              action={<button className="btn-ghost w-full sm:w-auto" type="button" onClick={addItem}>{isExpense ? t('purchases.addExpenseLine') : t('common.addItem')}</button>}
+            >
+              <div className="space-y-4">
+                {items.map((item, idx) => {
+                  const product = getProductById(item.productId);
+                  const itemHeading = isExpense
+                    ? item.description || `${t('purchases.expenseDescription')} ${idx + 1}`
+                    : product?.name || `${t('purchases.product')} ${idx + 1}`;
+
+                  return (
+                    <div key={`item-${idx}`} className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
+                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{itemHeading}</p>
+                          <p className="mt-1 text-sm text-slate-500">{t('common.lineTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.lineTotal })}</p>
+                        </div>
+                        {items.length > 1 ? (
+                          <button className="btn-ghost w-full justify-center sm:w-auto" type="button" onClick={() => removeItem(idx)}>{t('common.remove')}</button>
+                        ) : null}
+                      </div>
+
+                      {isExpense ? (
+                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+                          <div>
+                            <label className="label">{t('purchases.expenseCategory')}</label>
+                            <select className="input mt-1" value={item.itemType} onChange={(event) => handleItemChange(idx, 'itemType', event.target.value)}>
+                              <option value="expense">{t('purchases.normalExpense')}</option>
+                              <option value="labor">{t('purchases.labor')}</option>
+                              <option value="part">{t('purchases.part')}</option>
+                            </select>
+                          </div>
+                          <div className="sm:col-span-2 xl:col-span-2">
+                            <label className="label">{t('purchases.expenseDescription')}</label>
+                            <input className="input mt-1" value={item.description} onChange={(event) => handleItemChange(idx, 'description', event.target.value)} />
+                          </div>
+                          <div className="sm:col-span-2 xl:col-span-2">
+                            <label className="label">{t('purchases.product')}</label>
+                            <AsyncSearchableSelect
+                              className="mt-1"
+                              value={item.productId}
+                              selectedOption={product ? toProductLookupOption(product) : null}
+                              onChange={(option) => handleProductSelection(idx, option)}
+                              loadOptions={loadProductOptions}
+                              placeholder={t('purchases.selectProduct')}
+                              searchPlaceholder={t('purchases.selectProduct')}
+                              noResultsLabel={t('common.noData')}
+                              loadingLabel={t('common.loading')}
+                              disabled={item.itemType !== 'part'}
+                            />
+                          </div>
+                          <div>
+                            <label className="label">{t('purchases.qty')}</label>
+                            <input className="input mt-1" type="number" step="1" min="0" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
+                            <p className="mt-1 text-xs text-slate-500">{getUnitLabel(product, item.unitType)}</p>
+                          </div>
+                          <div>
+                            <label className="label">{t('products.unitType')}</label>
+                            <select className="input mt-1" value={item.unitType} onChange={(event) => { handleItemChange(idx, 'unitType', event.target.value); syncItemDefaults(idx, getProductById(item.productId)); }} disabled={item.itemType !== 'part'}>
+                              <option value="primary">{t('products.primaryUnit')}</option>
+                              <option value="secondary">{t('products.secondaryUnit')}</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="label">{t('purchases.unitPrice')}</label>
+                            <input className="input mt-1" type="number" step="0.01" value={item.unitPrice} onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)} />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+                          <div className="sm:col-span-2 xl:col-span-2">
+                            <label className="label">{t('purchases.product')}</label>
+                            <AsyncSearchableSelect
+                              className="mt-1"
+                              value={item.productId}
+                              selectedOption={product ? toProductLookupOption(product) : null}
+                              onChange={(option) => handleProductSelection(idx, option)}
+                              loadOptions={loadProductOptions}
+                              placeholder={t('purchases.selectProduct')}
+                              searchPlaceholder={t('purchases.selectProduct')}
+                              noResultsLabel={t('common.noData')}
+                              loadingLabel={t('common.loading')}
+                            />
+                          </div>
+                          <div>
+                            <label className="label">{t('purchases.qty')}</label>
+                            <input className="input mt-1" type="number" step="1" min="0" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
+                            <p className="mt-1 text-xs text-slate-500">{getUnitLabel(product, item.unitType)}</p>
+                          </div>
+                          <div>
+                            <label className="label">{t('products.unitType')}</label>
+                            <select className="input mt-1" value={item.unitType} onChange={(event) => { handleItemChange(idx, 'unitType', event.target.value); syncItemDefaults(idx, getProductById(item.productId)); }}>
+                              <option value="primary">{t('products.primaryUnit')}</option>
+                              <option value="secondary">{t('products.secondaryUnit')}</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="label">{t('purchases.unitPrice')}</label>
+                            <input className="input mt-1" type="number" step="0.01" value={item.unitPrice} onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)} />
+                          </div>
+                          <div>
+                            <label className="label">{t('purchases.tax')}</label>
+                            <input className="input mt-1" type="number" step="0.01" value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </FormSectionCard>
+          ) : null}
+
+          {showPaymentStep ? (
+            <FormSectionCard title={t('payments.summaryTitle')}>
+              <div className="grid gap-3 text-sm sm:grid-cols-3">
+                {isExpense ? (
+                  <>
+                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                      <span className="text-slate-500">{t('purchases.normalExpense')}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.expense.toFixed(2) })}</span>
+                    </div>
+                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                      <span className="text-slate-500">{t('purchases.labor')}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.labor.toFixed(2) })}</span>
+                    </div>
+                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                      <span className="text-slate-500">{t('purchases.part')}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.part.toFixed(2) })}</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                      <span className="text-slate-500">{t('purchases.subTotal')}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</span>
+                    </div>
+                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                      <span className="text-slate-500">{t('purchases.taxTotal')}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</span>
+                    </div>
+                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                      <span className="text-slate-500">{t('purchases.grandTotal')}</span>
+                      <span className="text-lg font-bold text-slate-900 dark:text-slate-100">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {isExpense ? (
+                <div className="mt-3 flex justify-between border-t border-slate-200/70 pt-3 text-sm dark:border-slate-700/60">
+                  <span className="font-medium text-slate-500">{t('purchases.grandTotal')}</span>
+                  <span className="text-lg font-bold text-slate-900 dark:text-slate-100">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</span>
+                </div>
+              ) : null}
+
+              <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-700/60">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex-1">
+                    <label className="label">{t('purchases.totalPaid')}</label>
+                    <input
+                      className="input mt-1"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={isPaid ? totals.grandTotal.toFixed(2) : header.amountReceived}
+                      disabled={isPaid}
+                      onChange={(e) => setHeader((prev) => ({ ...prev, amountReceived: e.target.value }))}
+                    />
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800/40">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded accent-primary-600"
+                      checked={isPaid}
+                      onChange={(e) => setIsPaid(e.target.checked)}
+                    />
+                    {t('services.fullyPaid')}
+                  </label>
+                </div>
+
+                {dueAmount > 0 && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-2.5 text-sm dark:border-rose-800/40 dark:bg-rose-900/20">
+                    <span className="text-rose-500 dark:text-rose-400">{t('services.dueAmount')}:</span>
+                    <span className="font-bold text-rose-700 dark:text-rose-300">
+                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}
+                    </span>
+                  </div>
+                )}
+
+                <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-700/60">
+                  <PaymentMethodFields
+                    value={header}
+                    onChange={(patch) => setHeader((prev) => ({ ...prev, ...patch }))}
                   />
-                  {t('services.fullyPaid')}
-                </label>
+                </div>
               </div>
+            </FormSectionCard>
+          ) : null}
 
-              <div className="flex gap-2 w-full justify-end md:w-auto">
-                <button className="btn-secondary" type="button" onClick={() => setIsOpen(false)}>{t('common.cancel')}</button>
-                <button className="btn-primary" type="submit">{formMode === 'edit' ? t('purchases.updatePurchase') : t('purchases.savePurchase')}</button>
-              </div>
-            </div>
+          <div className={`${isMobile ? 'mobile-sticky-actions' : ''} flex flex-col-reverse gap-2 sm:flex-row sm:justify-end`}>
+            {isMobile && mobileStep !== 'details' ? (
+              <button className="btn-secondary w-full sm:w-auto" type="button" onClick={goToPrevMobileStep}>
+                {t('common.back')}
+              </button>
+            ) : (
+              <button className="btn-secondary w-full sm:w-auto" type="button" onClick={closeDialog}>{t('common.cancel')}</button>
+            )}
 
-            {dueAmount > 0 && (
-              <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-2.5 text-sm dark:border-rose-800/40 dark:bg-rose-900/20">
-                <span className="text-rose-500 dark:text-rose-400">{t('services.dueAmount')}:</span>
-                <span className="font-bold text-rose-700 dark:text-rose-300">
-                  {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}
-                </span>
-              </div>
+            {isMobile && mobileStep !== 'payment' ? (
+              <button className="btn-primary w-full sm:w-auto" type="button" onClick={goToNextMobileStep}>
+                {t('common.continue')}
+              </button>
+            ) : (
+              <button className="btn-primary w-full sm:w-auto" type="submit">{formMode === 'edit' ? t('purchases.updatePurchase') : t('purchases.savePurchase')}</button>
             )}
           </div>
         </form>
@@ -616,7 +796,7 @@ export default function Purchases() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col items-start gap-2">
             <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('purchases.recentPurchases')}</h3>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setStatusFilter('all')}
@@ -676,6 +856,12 @@ export default function Purchases() {
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5">{formatDate(p.purchaseDate)}</p>
                       <p className="mt-1 text-xs text-slate-500 truncate">{supplierName || '—'}</p>
+                      <PaymentTypeSummary
+                        source={p}
+                        className="mt-1"
+                        labelClassName="text-xs font-medium"
+                        metaClassName="text-[11px]"
+                      />
                     </div>
                     <div className="text-right shrink-0">
                       <StatusBadge status={p.status} />
@@ -723,6 +909,7 @@ export default function Purchases() {
                 <th className="py-2 pr-4 text-left">{t('common.date')}</th>
                 <th className="py-2 pr-4 text-left">{t('common.status')}</th>
                 <th className="py-2 pr-4 text-left">{t('purchases.supplier')}</th>
+                <th className="py-2 pr-4 text-left">{t('common.payment')}</th>
                 <th className="py-2 pr-4 text-right">{t('common.total')}</th>
                 <th className="py-2 pr-4 text-right">{t('purchases.totalPaid')}</th>
                 <th className="py-2 pr-4 text-right">{t('purchases.dueLabel')}</th>
@@ -731,9 +918,9 @@ export default function Purchases() {
             </thead>
             <tbody>
               {purchasesLoading && purchaseList.length === 0 ? (
-                <tr><td colSpan={8} className="py-3 text-slate-500">{t('common.loading')}</td></tr>
+                <tr><td colSpan={9} className="py-3 text-slate-500">{t('common.loading')}</td></tr>
               ) : pagedPurchases.length === 0 ? (
-                <tr><td colSpan={8} className="py-3 text-slate-500">{t('purchases.noPurchases')}</td></tr>
+                <tr><td colSpan={9} className="py-3 text-slate-500">{t('purchases.noPurchases')}</td></tr>
               ) : (
                 pagedPurchases.map((purchase) => {
                   const supplierName = getSupplierName(purchase);
@@ -759,6 +946,10 @@ export default function Purchases() {
                       {/* Supplier */}
                       <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
                         {supplierName || <span className="text-slate-400">—</span>}
+                      </td>
+
+                      <td className="py-2.5 pr-4">
+                        <PaymentTypeSummary source={purchase} />
                       </td>
 
                       {/* Grand total */}

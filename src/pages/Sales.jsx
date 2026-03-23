@@ -3,6 +3,10 @@ import { Link } from 'react-router-dom';
 import { Pencil, FileText, Plus } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import FormSectionCard from '../components/FormSectionCard.jsx';
+import MobileFormStepper from '../components/MobileFormStepper.jsx';
+import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Dialog } from '../components/ui/Dialog.tsx';
@@ -10,13 +14,19 @@ import Pagination from '../components/Pagination';
 import { useI18n } from '../lib/i18n.jsx';
 import FileUpload from '../components/FileUpload';
 import DynamicAttributes from '../components/DynamicAttributes';
-import SearchableSelect from '../components/SearchableSelect';
+import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
-import { useProductStore } from '../stores/products';
-import { usePartyStore } from '../stores/parties';
 import { useSaleStore } from '../stores/sales';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
-import { nextSequence } from '../lib/sequence';
+import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
+import { useIsMobile } from '../hooks/useIsMobile.js';
+import {
+  mergeLookupEntities,
+  normalizeLookupParty,
+  normalizeLookupProduct,
+  toPartyLookupOption,
+  toProductLookupOption,
+} from '../lib/lookups.js';
 
 const emptyItem = {
   productId: '',
@@ -60,12 +70,13 @@ function getCustomerName(sale) {
 export default function Sales() {
   const { t } = useI18n();
   const { businessId, user } = useAuth();
+  const isMobile = useIsMobile();
 
   // ── Stores ──
-  const { products, fetch: fetchProducts } = useProductStore();
-  const { parties, fetch: fetchParties } = usePartyStore();
   const { sales: salesList, loading: salesLoading, fetch: fetchSales, invalidate: invalidateSales } = useSaleStore();
-  const [invoiceSeedValues, setInvoiceSeedValues] = useState([]);
+  const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState('');
+  const [productDirectory, setProductDirectory] = useState({});
+  const [customerOption, setCustomerOption] = useState(null);
 
   // ── UI state ──
   const [statusFilter, setStatusFilter] = useState('all');
@@ -77,6 +88,9 @@ export default function Sales() {
     status: 'paid',
     notes: '',
     amountReceived: '0',
+    paymentMethod: 'cash',
+    bankId: '',
+    paymentNote: '',
     attachment: '',
     attributes: {},
   });
@@ -88,55 +102,19 @@ export default function Sales() {
   const [deletedItemIds, setDeletedItemIds] = useState([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-
-  // ── Load shared data ──
-  useEffect(() => {
-    if (!businessId) return;
-    fetchProducts(true);
-    fetchParties(true);
-  }, [businessId]);
-
-  useEffect(() => {
-    if (!businessId) return;
-    api.listSales({ limit: 500 })
-      .then((data) => {
-        const values = (data || []).map((s) => s?.invoiceNo).filter(Boolean);
-        setInvoiceSeedValues(values);
-      })
-      .catch(() => {});
-  }, [businessId]);
+  const [mobileStep, setMobileStep] = useState('details');
 
   // ── Load sales list ──
   useEffect(() => {
     if (!businessId) return;
     const params = { limit: 50 };
     if (statusFilter !== 'all') params.status = statusFilter;
-    fetchSales(params, true);
-  }, [businessId, statusFilter]);
+    fetchSales(params);
+  }, [businessId, fetchSales, statusFilter]);
 
   useEffect(() => {
     setPage(1);
   }, [statusFilter]);
-
-  const customerOptions = useMemo(
-    () =>
-      parties
-        .filter((p) => p.type === 'customer')
-        .map((p) => ({
-          value: p.id,
-          label: `${p.name || '—'}${p.phone ? ` (${p.phone})` : ''}`,
-        })),
-    [parties]
-  );
-
-  const partyNameById = useMemo(() => {
-    const map = new Map();
-    parties.forEach((party) => {
-      if (party?.id === null || party?.id === undefined || party?.id === '') return;
-      map.set(String(party.id), party?.name || '—');
-    });
-    return map;
-  }, [parties]);
 
   const resolveCustomerName = (sale) => {
     const direct = getCustomerName(sale);
@@ -145,16 +123,8 @@ export default function Sales() {
     const id = sale?.partyId || sale?.customerId || sale?.Customer?.id || sale?.Party?.id || null;
     if (id === null || id === undefined || id === '') return t('sales.walkIn');
 
-    return partyNameById.get(String(id)) || '—';
+    return '—';
   };
-
-  const nextInvoiceNo = useMemo(() => {
-    const values = [
-      ...invoiceSeedValues,
-      ...salesList.map((s) => s?.invoiceNo).filter(Boolean),
-    ];
-    return String(nextSequence(values, 1));
-  }, [invoiceSeedValues, salesList]);
 
   // ── Totals ──
   const totals = useMemo(() => {
@@ -172,6 +142,11 @@ export default function Sales() {
       : Math.min(Number(header.amountReceived || 0), totals.grandTotal)
   ), [header.amountReceived, isPaid, totals.grandTotal]);
   const dueAmount = Math.max(totals.grandTotal - receivedAmount, 0);
+  const saleSteps = useMemo(() => ([
+    { id: 'details', label: t('common.details') },
+    { id: 'items', label: t('sales.items') },
+    { id: 'payment', label: t('common.payment') },
+  ]), [t]);
 
   useEffect(() => {
     if (!isPaid) return;
@@ -200,7 +175,45 @@ export default function Sales() {
     );
   };
 
-  const getProductById = (id) => products.find((p) => p.id === id);
+  const getProductById = (id) => {
+    if (id === null || id === undefined || id === '') return null;
+    return productDirectory[String(id)] || null;
+  };
+
+  const cacheProducts = (entries) => {
+    setProductDirectory((previous) => mergeLookupEntities(previous, entries));
+  };
+
+  const loadCustomerOptions = async (search) => {
+    const data = await api.lookupParties({ search, type: 'customer', limit: 10 });
+    return (data?.items || []).map(toPartyLookupOption);
+  };
+
+  const loadProductOptions = async (search) => {
+    const data = await api.lookupProducts({ search, limit: 10 });
+    const normalized = (data?.items || []).map(normalizeLookupProduct);
+    cacheProducts(normalized);
+    return normalized.map(toProductLookupOption);
+  };
+
+  const handleCustomerChange = (option) => {
+    setCustomerOption(option || null);
+    setHeader((previous) => ({ ...previous, partyId: option?.value || '' }));
+  };
+
+  const handleProductSelection = (index, option) => {
+    const product = option?.entity ? normalizeLookupProduct(option.entity) : null;
+
+    if (product?.id) {
+      cacheProducts([product]);
+    }
+
+    handleItemChange(index, 'productId', option?.value || '');
+
+    if (product) {
+      syncItemDefaults(index, product);
+    }
+  };
 
   const getUnitLabel = (product, unitType) => {
     if (!product) return '';
@@ -274,35 +287,64 @@ export default function Sales() {
     return salesList.slice(start, start + pageSize);
   }, [page, pageSize, salesList]);
 
-  const resetForm = (invoiceNoOverride = null) => {
-    setHeader({ partyId: '', invoiceNo: invoiceNoOverride ?? nextInvoiceNo, saleDate: todayISODate(), status: 'paid', notes: '', amountReceived: '0', attachment: '', attributes: {} });
+  const resetForm = () => {
+    setHeader({
+      partyId: '',
+      invoiceNo: '',
+      saleDate: todayISODate(),
+      status: 'paid',
+      notes: '',
+      amountReceived: '0',
+      paymentMethod: 'cash',
+      bankId: '',
+      paymentNote: '',
+      attachment: '',
+      attributes: {},
+    });
     setItems([{ ...emptyItem }]);
     setDeletedItemIds([]);
     setEditingId(null);
     setFormMode('create');
     setIsPaid(false);
+    setSuggestedInvoiceNo('');
+    setMobileStep('details');
+    setProductDirectory({});
+    setCustomerOption(null);
+  };
+
+  const closeDialog = () => {
+    setIsOpen(false);
+    setMobileStep('details');
   };
 
   const openCreate = async () => {
-    let nextFromServer = null;
+    resetForm();
+    setIsOpen(true);
+
     if (businessId) {
       try {
-        const data = await api.listSales({ limit: 500 });
-        const values = (data || []).map((s) => s?.invoiceNo).filter(Boolean);
-        setInvoiceSeedValues(values);
-        nextFromServer = String(nextSequence(values, 1));
+        const data = await api.getNextSequences();
+        setSuggestedInvoiceNo(data?.nextSaleInvoiceNo || '');
       } catch {
-        nextFromServer = null;
+        setSuggestedInvoiceNo('');
       }
     }
-    resetForm(nextFromServer);
-    setIsOpen(true);
   };
 
   const openEdit = async (saleId) => {
     try {
       const sale = await api.getSale(saleId);
       const saleItems = sale?.SaleItems || [];
+      const party = normalizeLookupParty({
+        id: sale.partyId || sale.customerId || sale.Customer?.id || sale.Party?.id,
+        partyName: sale.partyName || sale.customerName || sale.Customer?.name || sale.Party?.name,
+        phone: sale.partyPhone || sale.Customer?.phone || sale.Party?.phone,
+        currentAmount: sale.Party?.currentAmount || sale.Customer?.currentAmount,
+        type: 'customer',
+      });
+      const hydratedProducts = saleItems
+        .map((item) => normalizeLookupProduct(item))
+        .filter((product) => product.id);
       setHeader({
         partyId: sale.partyId || sale.customerId || '',
         invoiceNo: sale.invoiceNo || '',
@@ -310,9 +352,12 @@ export default function Sales() {
         status: sale.status || 'paid',
         notes: sale.notes || '',
         amountReceived: String(sale.amountReceived ?? 0),
+        ...normalizePaymentFields(sale),
         attachment: sale.attachment || '',
         attributes: sale.attributes || {},
       });
+      cacheProducts(hydratedProducts);
+      setCustomerOption(party.id ? toPartyLookupOption(party) : null);
       const mappedItems = saleItems.map((item) => ({
         id: item.id,
         productId: item.productId || '',
@@ -326,8 +371,10 @@ export default function Sales() {
       setDeletedItemIds([]);
       setEditingId(saleId);
       setFormMode('edit');
+      setSuggestedInvoiceNo(sale.invoiceNo || '');
       const computedDue = Number(sale.dueAmount ?? Math.max(Number(sale.grandTotal || 0) - Number(sale.amountReceived || 0), 0));
       setIsPaid((sale.status || '').toLowerCase() === 'paid' || computedDue <= 0);
+      setMobileStep('details');
       setIsOpen(true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
@@ -345,16 +392,21 @@ export default function Sales() {
       return Number(getProductById(item.productId)?.conversionRate || 0) <= 0;
     });
     if (invalidConversion) { setStatus({ type: 'error', message: t('errors.conversionRequired') }); return; }
+    if (requiresBankSelection(header, receivedAmount)) {
+      setStatus({ type: 'error', message: t('payments.bankRequired') });
+      return;
+    }
 
     try {
       const derivedStatus = dueAmount > 0 ? 'due' : 'paid';
-      const invoiceNo = String(header.invoiceNo || '').trim() || nextInvoiceNo;
+      const manualInvoiceNo = String(header.invoiceNo || '').trim();
+      const { paymentMethod, bankId, paymentNote, ...headerFields } = header;
       const payload = {
-        ...header,
-        invoiceNo,
+        ...headerFields,
         status: derivedStatus,
         partyId: header.partyId || null,
         amountReceived: receivedAmount,
+        ...(Number(receivedAmount || 0) > 0 ? buildPaymentPayload({ paymentMethod, bankId, paymentNote }) : { paymentMethod: 'cash' }),
         ...totals,
         items: [
           ...items.map((item) => ({
@@ -369,6 +421,11 @@ export default function Sales() {
           ...deletedItemIds.map((id) => ({ id, _delete: true })),
         ],
       };
+      if (manualInvoiceNo) {
+        payload.invoiceNo = manualInvoiceNo;
+      } else {
+        delete payload.invoiceNo;
+      }
       const creatorValue = getCurrentCreatorValue(user);
       const createPayload = creatorValue
         ? { ...payload, createdBy: creatorValue }
@@ -377,11 +434,7 @@ export default function Sales() {
         await api.updateSale(editingId, payload);
         setStatus({ type: 'success', message: t('sales.messages.updated') });
       } else {
-        const created = await api.createSale(createPayload);
-        const savedInvoice = created?.invoiceNo || invoiceNo;
-        if (savedInvoice) {
-          setInvoiceSeedValues((prev) => (prev.includes(savedInvoice) ? prev : [...prev, savedInvoice]));
-        }
+        await api.createSale(createPayload);
         setStatus({ type: 'success', message: t('sales.messages.created') });
       }
       resetForm();
@@ -395,13 +448,30 @@ export default function Sales() {
     }
   };
 
+  const currentStepIndex = saleSteps.findIndex((step) => step.id === mobileStep);
+  const showDetailsStep = !isMobile || mobileStep === 'details';
+  const showItemsStep = !isMobile || mobileStep === 'items';
+  const showPaymentStep = !isMobile || mobileStep === 'payment';
+
+  const goToNextMobileStep = () => {
+    if (!isMobile) return;
+    const nextStep = saleSteps[currentStepIndex + 1];
+    if (nextStep) setMobileStep(nextStep.id);
+  };
+
+  const goToPrevMobileStep = () => {
+    if (!isMobile) return;
+    const previousStep = saleSteps[currentStepIndex - 1];
+    if (previousStep) setMobileStep(previousStep.id);
+  };
+
   return (
     <div className="space-y-8">
       <PageHeader
         title={t('sales.title')}
         subtitle={t('sales.subtitle')}
         action={
-          <button className="btn-primary" type="button" onClick={openCreate}>
+          <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate}>
             <Plus size={16} className="mr-1.5 inline" />
             {t('sales.newSale')}
           </button>
@@ -411,164 +481,225 @@ export default function Sales() {
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
 
       {/* ── Form Dialog ── */}
-      <Dialog isOpen={isOpen} onClose={() => setIsOpen(false)} title={formMode === 'edit' ? t('sales.editSale') : t('sales.newSale')} size="full">
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          <div className="grid gap-4 md:grid-cols-3">
-            <div>
-              <label className="label">{t('sales.customer')}</label>
-              <div className="mt-1">
-                <SearchableSelect
-                  options={customerOptions}
-                  value={header.partyId}
-                  onChange={(newValue) => setHeader((prev) => ({ ...prev, partyId: newValue }))}
-                  placeholder={t('sales.walkIn')}
-                />
-              </div>
-              <p className="mt-1 text-xs text-slate-500">{t('sales.customerOptional')}</p>
-            </div>
-            <div>
-              <label className="label">{t('sales.invoiceNo')}</label>
-              <input className="input mt-1" name="invoiceNo" value={header.invoiceNo} onChange={handleHeaderChange} />
-            </div>
-            <div>
-              <label className="label">{t('sales.saleDate')}</label>
-              <input type="date" className="input mt-1" name="saleDate" value={header.saleDate} onChange={handleHeaderChange} />
-            </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <FileUpload
-              label={t('sales.attachment')}
-              initialUrl={header.attachment}
-              onUpload={(url) => setHeader((prev) => ({ ...prev, attachment: url }))}
+      <Dialog isOpen={isOpen} onClose={closeDialog} title={formMode === 'edit' ? t('sales.editSale') : t('sales.newSale')} size="full">
+        <form className="space-y-5" onSubmit={handleSubmit}>
+          {isMobile ? (
+            <MobileFormStepper
+              steps={saleSteps}
+              currentStep={mobileStep}
+              onStepChange={setMobileStep}
             />
-            <div className="md:col-span-1">
-              <label className="label">{t('sales.notes')}</label>
-              <textarea className="input mt-1 h-20 resize-none" name="notes" value={header.notes} onChange={handleHeaderChange} placeholder={t('sales.notesPlaceholder')} />
-            </div>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-            <h3 className="mb-4 text-sm font-medium text-slate-700">{t('services.orderInformation') || 'Order Information'}</h3>
-            <DynamicAttributes entityType="sale" attributes={header.attributes} onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))} />
-          </div>
-          <div className="flex items-center justify-between">
-            <h4 className="font-semibold text-slate-800 dark:text-slate-100">{t('sales.items')}</h4>
-            <button className="btn-ghost" type="button" onClick={addItem}>{t('sales.addItem')}</button>
-          </div>
-          <div className="space-y-4">
-            {items.map((item, idx) => (
-              <div key={`item-${idx}`} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60">
-                <div className="grid gap-3 md:grid-cols-6">
-                  <div className="md:col-span-2">
-                    <label className="label">{t('sales.product')}</label>
-                    <select
-                      className="input mt-1"
-                      value={item.productId}
-                      onChange={(event) => {
-                        handleItemChange(idx, 'productId', event.target.value);
-                        syncItemDefaults(idx, getProductById(event.target.value));
-                      }}
-                      required
-                    >
-                      <option value="">{t('purchases.selectProduct')}</option>
-                      {products.map((product) => (
-                        <option key={product.id} value={product.id}>
-                          {product.name}{product.companyName ? ` · ${product.companyName}` : ''}{product.primaryUnit ? ` · ${product.primaryUnit}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label">{t('sales.qty')}</label>
-                    <input className="input mt-1" type="number" step="1" min={0} value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
-                    <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(item.productId), item.unitType)}</p>
-                  </div>
-                  <div>
-                    <label className="label">{t('products.unitType')}</label>
-                    <select
-                      className="input mt-1"
-                      value={item.unitType}
-                      onChange={(event) => {
-                        handleItemChange(idx, 'unitType', event.target.value);
-                        syncItemDefaults(idx, getProductById(item.productId));
-                      }}
-                    >
-                      <option value="primary">{t('products.primaryUnit')}</option>
-                      <option value="secondary">{t('products.secondaryUnit')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label">{t('sales.unitPrice')}</label>
-                    <input className="input mt-1" type="number" step="0.01" value={item.unitPrice} onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)} />
-                  </div>
-                  <div>
-                    <label className="label">{t('sales.tax')}</label>
-                    <input className="input mt-1" type="number" step="0.01" value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
-                  </div>
-                </div>
-                <div className="mt-3 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
-                  <span>{t('sales.lineTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.lineTotal })}</span>
-                  {items.length > 1 ? (
-                    <button className="btn-ghost" type="button" onClick={() => removeItem(idx)}>{t('common.remove')}</button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4">
-            <div className="grid gap-2 text-sm sm:grid-cols-3">
-              <div className="flex justify-between sm:flex-col sm:gap-0.5">
-                <span className="text-slate-500">{t('sales.subTotal')}</span>
-                <span className="font-semibold text-slate-800">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</span>
-              </div>
-              <div className="flex justify-between sm:flex-col sm:gap-0.5">
-                <span className="text-slate-500">{t('sales.taxTotal')}</span>
-                <span className="font-semibold text-slate-800">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</span>
-              </div>
-              <div className="flex justify-between sm:flex-col sm:gap-0.5">
-                <span className="text-slate-500">{t('sales.grandTotal')}</span>
-                <span className="text-lg font-bold text-slate-900">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</span>
-              </div>
-            </div>
+          ) : null}
 
-            <div className="mt-4 border-t border-slate-200/70 pt-4">
-              <div className="flex flex-wrap items-end gap-3">
-                <div className="flex-1 min-w-[140px]">
-                  <label className="label">{t('services.amountReceived')}</label>
-                  <input
-                    className="input mt-1"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={isPaid ? totals.grandTotal.toFixed(2) : header.amountReceived}
-                    disabled={isPaid}
-                    onChange={(e) => setHeader((prev) => ({ ...prev, amountReceived: e.target.value }))}
+          {showDetailsStep ? (
+            <>
+              <FormSectionCard hint={t('sales.customerOptional')}>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="sm:col-span-2 lg:col-span-1">
+                    <label className="label">{t('sales.customer')}</label>
+                    <div className="mt-1">
+                      <AsyncSearchableSelect
+                        value={header.partyId}
+                        selectedOption={customerOption}
+                        onChange={handleCustomerChange}
+                        loadOptions={loadCustomerOptions}
+                        placeholder={t('sales.walkIn')}
+                        searchPlaceholder={t('services.customerSearch')}
+                        noResultsLabel={t('common.noData')}
+                        loadingLabel={t('common.loading')}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">{t('sales.invoiceNo')}</label>
+                    <input
+                      className="input mt-1"
+                      name="invoiceNo"
+                      value={header.invoiceNo}
+                      onChange={handleHeaderChange}
+                      placeholder={formMode === 'create' ? suggestedInvoiceNo : ''}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('sales.saleDate')}</label>
+                    <input type="date" className="input mt-1" name="saleDate" value={header.saleDate} onChange={handleHeaderChange} />
+                  </div>
+                </div>
+              </FormSectionCard>
+
+              <FormSectionCard>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="order-2 lg:order-1">
+                    <label className="label">{t('sales.notes')}</label>
+                    <textarea className="input mt-1 h-24 resize-none" name="notes" value={header.notes} onChange={handleHeaderChange} placeholder={t('sales.notesPlaceholder')} />
+                  </div>
+                  <div className="order-1 lg:order-2">
+                    <FileUpload
+                      label={t('sales.attachment')}
+                      initialUrl={header.attachment}
+                      onUpload={(url) => setHeader((prev) => ({ ...prev, attachment: url }))}
+                    />
+                  </div>
+                </div>
+              </FormSectionCard>
+
+              <FormSectionCard title={t('services.orderInformation')}>
+                <DynamicAttributes entityType="sale" attributes={header.attributes} onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))} />
+              </FormSectionCard>
+            </>
+          ) : null}
+
+          {showItemsStep ? (
+            <FormSectionCard
+              title={t('sales.items')}
+              action={<button className="btn-ghost w-full sm:w-auto" type="button" onClick={addItem}>{t('sales.addItem')}</button>}
+            >
+              <div className="space-y-4">
+                {items.map((item, idx) => {
+                  const product = getProductById(item.productId);
+                  const itemHeading = product?.name || `${t('sales.product')} ${idx + 1}`;
+
+                  return (
+                    <div key={`item-${idx}`} className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
+                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{itemHeading}</p>
+                          <p className="mt-1 text-sm text-slate-500">{t('sales.lineTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.lineTotal })}</p>
+                        </div>
+                        {items.length > 1 ? (
+                          <button className="btn-ghost w-full justify-center sm:w-auto" type="button" onClick={() => removeItem(idx)}>
+                            {t('common.remove')}
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+                        <div className="sm:col-span-2 xl:col-span-2">
+                          <label className="label">{t('sales.product')}</label>
+                          <AsyncSearchableSelect
+                            className="mt-1"
+                            value={item.productId}
+                            selectedOption={product ? toProductLookupOption(product) : null}
+                            onChange={(option) => handleProductSelection(idx, option)}
+                            loadOptions={loadProductOptions}
+                            placeholder={t('purchases.selectProduct')}
+                            searchPlaceholder={t('purchases.selectProduct')}
+                            noResultsLabel={t('common.noData')}
+                            loadingLabel={t('common.loading')}
+                          />
+                        </div>
+                        <div>
+                          <label className="label">{t('sales.qty')}</label>
+                          <input className="input mt-1" type="number" step="1" min={0} value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
+                          <p className="mt-1 text-xs text-slate-500">{getUnitLabel(product, item.unitType)}</p>
+                        </div>
+                        <div>
+                          <label className="label">{t('products.unitType')}</label>
+                          <select
+                            className="input mt-1"
+                            value={item.unitType}
+                            onChange={(event) => {
+                              handleItemChange(idx, 'unitType', event.target.value);
+                              syncItemDefaults(idx, getProductById(item.productId));
+                            }}
+                          >
+                            <option value="primary">{t('products.primaryUnit')}</option>
+                            <option value="secondary">{t('products.secondaryUnit')}</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="label">{t('sales.unitPrice')}</label>
+                          <input className="input mt-1" type="number" step="0.01" value={item.unitPrice} onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)} />
+                        </div>
+                        <div>
+                          <label className="label">{t('sales.tax')}</label>
+                          <input className="input mt-1" type="number" step="0.01" value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </FormSectionCard>
+          ) : null}
+
+          {showPaymentStep ? (
+            <FormSectionCard title={t('payments.summaryTitle')}>
+              <div className="grid gap-3 text-sm sm:grid-cols-3">
+                <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                  <span className="text-slate-500">{t('sales.subTotal')}</span>
+                  <span className="font-semibold text-slate-800">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</span>
+                </div>
+                <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                  <span className="text-slate-500">{t('sales.taxTotal')}</span>
+                  <span className="font-semibold text-slate-800">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</span>
+                </div>
+                <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                  <span className="text-slate-500">{t('sales.grandTotal')}</span>
+                  <span className="text-lg font-bold text-slate-900">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</span>
+                </div>
+              </div>
+
+              <div className="mt-4 border-t border-slate-200/70 pt-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <div className="flex-1">
+                    <label className="label">{t('services.amountReceived')}</label>
+                    <input
+                      className="input mt-1"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={isPaid ? totals.grandTotal.toFixed(2) : header.amountReceived}
+                      disabled={isPaid}
+                      onChange={(e) => setHeader((prev) => ({ ...prev, amountReceived: e.target.value }))}
+                    />
+                  </div>
+                  <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 sm:mb-0.5">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 rounded accent-primary-600"
+                      checked={isPaid}
+                      onChange={(e) => setIsPaid(e.target.checked)}
+                    />
+                    {t('services.fullyPaid')}
+                  </label>
+                </div>
+
+                {dueAmount > 0 && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-2.5 text-sm">
+                    <span className="text-rose-500">{t('services.dueAmount')}:</span>
+                    <span className="font-bold text-rose-700">
+                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}
+                    </span>
+                  </div>
+                )}
+
+                <div className="mt-4 border-t border-slate-200/70 pt-4">
+                  <PaymentMethodFields
+                    value={header}
+                    onChange={(patch) => setHeader((prev) => ({ ...prev, ...patch }))}
                   />
                 </div>
-                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded accent-primary-600"
-                    checked={isPaid}
-                    onChange={(e) => setIsPaid(e.target.checked)}
-                  />
-                  {t('services.fullyPaid')}
-                </label>
               </div>
+            </FormSectionCard>
+          ) : null}
 
-              {dueAmount > 0 && (
-                <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-2.5 text-sm">
-                  <span className="text-rose-500">{t('services.dueAmount')}:</span>
-                  <span className="font-bold text-rose-700">
-                    {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
+          <div className={`${isMobile ? 'mobile-sticky-actions' : ''} flex flex-col-reverse gap-2 sm:flex-row sm:justify-end`}>
+            {isMobile && mobileStep !== 'details' ? (
+              <button className="btn-secondary w-full sm:w-auto" type="button" onClick={goToPrevMobileStep}>
+                {t('common.back')}
+              </button>
+            ) : (
+              <button className="btn-secondary w-full sm:w-auto" type="button" onClick={closeDialog}>{t('common.cancel')}</button>
+            )}
 
-          <div className="flex justify-end gap-2">
-            <button className="btn-secondary" type="button" onClick={() => setIsOpen(false)}>{t('common.cancel')}</button>
-            <button className="btn-primary" type="submit">{formMode === 'edit' ? t('sales.updateSale') : t('sales.saveSale')}</button>
+            {isMobile && mobileStep !== 'payment' ? (
+              <button className="btn-primary w-full sm:w-auto" type="button" onClick={goToNextMobileStep}>
+                {t('common.continue')}
+              </button>
+            ) : (
+              <button className="btn-primary w-full sm:w-auto" type="submit">{formMode === 'edit' ? t('sales.updateSale') : t('sales.saveSale')}</button>
+            )}
           </div>
         </form>
       </Dialog>
@@ -580,7 +711,7 @@ export default function Sales() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-col items-start gap-2">
             <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('sales.recentSales')}</h3>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setStatusFilter('all')}
@@ -632,6 +763,12 @@ export default function Sales() {
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5">{formatDate(sale.saleDate)}</p>
                       <p className="mt-1 text-xs text-slate-500 truncate">{customerName || '—'}</p>
+                      <PaymentTypeSummary
+                        source={sale}
+                        className="mt-1"
+                        labelClassName="text-xs font-medium"
+                        metaClassName="text-[11px]"
+                      />
                       <p className="mt-1 text-xs text-slate-400 truncate">Created By: {getCreatorDisplayName(sale)}</p>
                     </div>
                     <div className="text-right shrink-0">
@@ -680,6 +817,7 @@ export default function Sales() {
                 <th className="py-2 pr-4 text-left">{t('common.date')}</th>
                 <th className="py-2 pr-4 text-left">{t('common.status')}</th>
                 <th className="py-2 pr-4 text-left">{t('sales.customer')}</th>
+                <th className="py-2 pr-4 text-left">{t('common.payment')}</th>
                 <th className="py-2 pr-4 text-right">{t('common.total')}</th>
                 <th className="py-2 pr-4 text-right">{t('sales.totalReceived')}</th>
                 <th className="py-2 pr-4 text-right">{t('sales.due')}</th>
@@ -688,9 +826,9 @@ export default function Sales() {
             </thead>
             <tbody>
               {salesLoading && salesList.length === 0 ? (
-                <tr><td colSpan={8} className="py-3 text-slate-500">{t('common.loading')}</td></tr>
+                <tr><td colSpan={9} className="py-3 text-slate-500">{t('common.loading')}</td></tr>
               ) : pagedSales.length === 0 ? (
-                <tr><td colSpan={8} className="py-3 text-slate-500">{t('sales.noSales')}</td></tr>
+                <tr><td colSpan={9} className="py-3 text-slate-500">{t('sales.noSales')}</td></tr>
               ) : (
                 pagedSales.map((sale) => {
                   const customerName = resolveCustomerName(sale);
@@ -717,6 +855,10 @@ export default function Sales() {
                       <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
                         <div>{customerName || <span className="text-slate-400">—</span>}</div>
                         <div className="text-xs text-slate-400">Created By: {getCreatorDisplayName(sale)}</div>
+                      </td>
+
+                      <td className="py-2.5 pr-4">
+                        <PaymentTypeSummary source={sale} />
                       </td>
 
                       {/* Grand total */}

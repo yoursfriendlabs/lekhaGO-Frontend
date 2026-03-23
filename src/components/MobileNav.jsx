@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Boxes, Users, ShoppingCart, UserCheck, Briefcase, FileText, BarChart3, Settings2, Building2 } from 'lucide-react';
+import { LayoutDashboard, Boxes, Users, ShoppingCart, UserCheck, Briefcase, FileText, BarChart3, Settings2 } from 'lucide-react';
 import { useI18n } from '../lib/i18n.jsx';
 
 const navItems = [
@@ -11,8 +11,7 @@ const navItems = [
   { to: '/app/services', key: 'nav.service', icon: Briefcase },
   { to: '/app/ledger', key: 'nav.ledger', icon: FileText },
   { to: '/app/analytics', key: 'nav.stats', icon: BarChart3 },
-  { to: '/app/order-attributes', key: 'nav.orderAttributes', icon: Settings2 },
-  { to: '/app/settings', label: 'Settings', icon: Building2 },
+  { to: '/app/settings', key: 'nav.settings', icon: Settings2 },
 ];
 
 export default function MobileNav() {
