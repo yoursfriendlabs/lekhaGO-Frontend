@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useMemo, useState } from 'react';
-import { clearSession, getBusinessId, getToken, getUser, setBusinessId, setToken, setUser } from './storage';
+import { clearSession, getBusinessId, getRole, getToken, getUser, setBusinessId, setRole, setToken, setUser } from './storage';
 
 const AuthContext = createContext(null);
 
@@ -7,14 +7,19 @@ export function AuthProvider({ children }) {
   const [token, setTokenState] = useState(getToken());
   const [user, setUserState] = useState(getUser());
   const [businessId, setBusinessIdState] = useState(getBusinessId());
+  const [role, setRoleState] = useState(getRole());
 
-  const setSession = (nextToken, nextUser, nextBusinessId) => {
+  const setSession = (nextToken, nextUser, nextBusinessId, nextRole) => {
+    const resolvedRole = nextRole || nextUser?.role || '';
+    const resolvedUser = nextUser ? { ...nextUser, role: resolvedRole || nextUser.role } : null;
     setToken(nextToken);
-    setUser(nextUser);
+    setUser(resolvedUser);
     setBusinessId(nextBusinessId || '');
+    setRole(resolvedRole);
     setTokenState(nextToken || '');
-    setUserState(nextUser || null);
+    setUserState(resolvedUser || null);
     setBusinessIdState(nextBusinessId || '');
+    setRoleState(resolvedRole);
   };
 
   const updateBusinessId = (id) => {
@@ -27,6 +32,7 @@ export function AuthProvider({ children }) {
     setTokenState('');
     setUserState(null);
     setBusinessIdState('');
+    setRoleState('');
   };
 
   const value = useMemo(
@@ -34,11 +40,12 @@ export function AuthProvider({ children }) {
       token,
       user,
       businessId,
+      role,
       setSession,
       updateBusinessId,
       logout,
     }),
-    [token, user, businessId]
+    [token, user, businessId, role]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

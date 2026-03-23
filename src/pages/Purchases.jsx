@@ -10,6 +10,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useProductStore } from '../stores/products';
 import { usePartyStore } from '../stores/parties';
 import { usePurchaseStore } from '../stores/purchases';
+import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
 
 const emptyPurchaseItem = {
   productId: '',
@@ -37,7 +38,7 @@ const getEmptyItem = (entryType) => (entryType === 'expense' ? { ...emptyExpense
 
 export default function Purchases() {
   const { t } = useI18n();
-  const { businessId } = useAuth();
+  const { businessId, user } = useAuth();
 
   // ── Stores ──
   const { products, fetch: fetchProducts } = useProductStore();
@@ -278,11 +279,15 @@ export default function Purchases() {
           ...deletedItemIds.map((id) => ({ id, _delete: true })),
         ],
       };
+      const creatorValue = getCurrentCreatorValue(user);
+      const createPayload = creatorValue
+        ? { ...payload, createdBy: creatorValue }
+        : payload;
       if (formMode === 'edit' && editingId) {
         await api.updatePurchase(editingId, payload);
         setStatus({ type: 'success', message: t('purchases.messages.updated') });
       } else {
-        await api.createPurchase(payload);
+        await api.createPurchase(createPayload);
         setStatus({ type: 'success', message: t('purchases.messages.created') });
       }
       resetForm();
@@ -493,6 +498,7 @@ export default function Purchases() {
                     <p className="font-semibold text-slate-800 dark:text-slate-100">{p.invoiceNo || p.id}</p>
                     <p className="text-xs text-slate-500">{p.purchaseDate || '-'}</p>
                     <p className="mt-1 text-xs text-slate-500">{t('purchases.supplier')}: {p.partyName || p.supplierName || p.Party?.name || p.partyId || p.supplierId || '-'}</p>
+                    <p className="mt-1 text-xs text-slate-400">Created By: {getCreatorDisplayName(p)}</p>
                   </div>
                   <div className="text-right">
                     <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${p.status === 'received' ? 'bg-emerald-100 text-emerald-700' : p.status === 'ordered' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>{p.status}</span>
@@ -533,7 +539,10 @@ export default function Purchases() {
                     <td className="py-2">{purchase.invoiceNo || purchase.id.slice(0, 6)}</td>
                     <td className="py-2">{purchase.purchaseDate}</td>
                     <td className="py-2 capitalize">{purchase.status}</td>
-                    <td className="py-2">{purchase.partyName || purchase.supplierName || purchase.Party?.name || purchase.partyId || purchase.supplierId || '—'}</td>
+                    <td className="py-2">
+                      <div>{purchase.partyName || purchase.supplierName || purchase.Party?.name || purchase.partyId || purchase.supplierId || '—'}</div>
+                      <div className="text-xs text-slate-400">Created By: {getCreatorDisplayName(purchase)}</div>
+                    </td>
                     <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.grandTotal || 0).toFixed(2) })}</td>
                     <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.amountReceived || 0).toFixed(2) })}</td>
                     <td className="py-2 text-right text-rose-600 dark:text-rose-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.dueAmount || 0).toFixed(2) })}</td>
