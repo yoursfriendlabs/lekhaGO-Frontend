@@ -31,7 +31,7 @@ export default function Sidebar() {
             className={({  isActive }) =>
               `rounded-xl px-3 py-2 text-sm font-semibold transition ${
                 isActive
-                  ? 'bg-[#d5781c] text-slate-950 dark:bg-ocean'
+                  ? 'bg-[#9c5f22] text-slate-950 dark:bg-ocean'
                   : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/70'
               }`
             }
