@@ -5,16 +5,13 @@ import Notice from '../components/Notice';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
-<<<<<<< Updated upstream
 import dayjs, { todayISODate } from '../lib/datetime';
-=======
 import {
   getPartyBalanceMeta,
   getStatementTypeLabel,
   normalizePartyStatementResponse,
   toAmount,
 } from '../lib/partyBalances.js';
->>>>>>> Stashed changes
 import { usePartyStore } from '../stores/parties';
 import { Plus, Bell, Search, Filter, ChevronDown } from 'lucide-react';
 
@@ -242,85 +239,11 @@ export default function Parties() {
     () => parties.find((party) => party.id === selectedId) || null,
     [parties, selectedId]
   );
-
-<<<<<<< Updated upstream
-      // negative = they owe us (we will receive)
-      // positive = we owe them (we will give)
-      if (bal < 0) totalReceive += Math.abs(bal);
-      else if (bal > 0) totalGive += bal;
-    });
-    return { totalReceive, totalGive };
-  }, [balanceByParty]);
-
-  const selectedParty = filteredParties.find((party) => party.id === selectedId) || null;
-  const selectedBalance = selectedParty ? balanceByParty.get(selectedParty.id) || 0 : 0;
-  // negative = they owe us → "To Receive" (rose)
-  // positive = we owe them → "To Give" (blue)
-  const balanceLabel = selectedParty?.currentAmount < 0 ? t('parties.toReceive') : selectedParty?.currentAmount > 0 ? t('parties.toGive') : 'Settled';
-  const balanceColor = selectedParty?.currentAmount < 0 ? 'text-rose-500' : selectedParty?.currentAmount > 0 ? 'text-blue-600' : 'text-slate-400';
-
-  const partyTransactions = useMemo(() => {
-    if (!selectedParty) return [];
-    const id = selectedParty.id;
-    const salesTx = sales
-      .filter((sale) => (sale.partyId || sale.customerId || sale.Customer?.id) === id)
-      .map((sale) => ({
-        id: sale.id, type: 'sale', date: sale.saleDate, total: Number(sale.grandTotal || 0),
-        status: sale.status || 'paid', balance: Number(sale.dueAmount ?? 0), remarks: sale.notes || '-',
-        label: `${t('parties.salesInvoice')} ${sale.invoiceNo || sale.id.slice(0, 6)}`,
-      }));
-    const purchaseTx = purchases
-      .filter((purchase) => (purchase.partyId || purchase.supplierId || purchase.Supplier?.id) === id)
-      .map((purchase) => ({
-        id: purchase.id, type: 'purchase', date: purchase.purchaseDate, total: Number(purchase.grandTotal || 0),
-        status: purchase.status || 'received', balance: Number(purchase.dueAmount ?? 0), remarks: purchase.notes || '-',
-        label: `${t('parties.purchaseBill')} ${purchase.invoiceNo || purchase.id.slice(0, 6)}`,
-      }));
-    const serviceTx = services
-      .filter((service) => service.partyId === id)
-      .map((service) => {
-        const due = Math.max(Number(service.grandTotal || 0) - Number(service.receivedTotal || 0), 0);
-        return {
-          id: service.id, type: 'service', date: service.deliveryDate || service.createdAt,
-          total: Number(service.grandTotal || 0), status: due > 0 ? 'unpaid' : 'paid', balance: due,
-          remarks: service.notes || '-',
-          label: `${t('parties.serviceOrder')} ${service.orderNo || service.id.slice(0, 6)}`,
-        };
-      });
-    const adjustments = manualTx
-      .filter((tx) => tx.partyId === id)
-      .map((tx) => ({
-        id: tx.id, type: 'adjustment', date: tx.txDate, total: Number(tx.amount || 0),
-        status: tx.direction, balance: 0, remarks: tx.note || '-',
-        label: tx.direction === 'give' ? t('parties.giveAdjustment') : t('parties.receiveAdjustment'),
-      }));
-    return [...salesTx, ...purchaseTx, ...serviceTx, ...adjustments]
-      .sort((a, b) => dayjs(b.date || 0).valueOf() - dayjs(a.date || 0).valueOf());
-  }, [selectedParty, sales, purchases, services, manualTx, t]);
-
-  const pagedTransactions = useMemo(() => {
-    const start = (txPage - 1) * TX_PAGE_SIZE;
-    return partyTransactions.slice(start, start + TX_PAGE_SIZE);
-  }, [partyTransactions, txPage]);
-
-  const totalTxPages = Math.ceil(partyTransactions.length / TX_PAGE_SIZE);
-
-  // Pending service orders for the selected party (unpaid, linkable in payment form)
-  const pendingServices = useMemo(() => {
-    if (!selectedParty) return [];
-    return services.filter((svc) => {
-      if (svc.partyId !== selectedParty.id) return false;
-      const due = Number(svc.grandTotal || 0) - Number(svc.receivedTotal || 0);
-      return due > 0;
-    });
-  }, [services, selectedParty]);
-=======
   const selectedPartyView = selectedParty || statementData.party
     ? { ...(selectedParty || {}), ...(statementData.party || {}) }
     : null;
   const selectedBalanceMeta = getPartyBalanceMeta(selectedPartyView?.currentAmount, t);
   const totalTxPages = Math.max(1, Math.ceil(statementData.summary.totalRows / TX_PAGE_SIZE));
->>>>>>> Stashed changes
 
   const handleChange = (event) => {
     const { name, value } = event.target;
