@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
 
 interface DialogProps {
     isOpen: boolean;
@@ -53,8 +54,8 @@ export const Dialog = ({
         sm: 'max-w-sm',
         md: 'max-w-md',
         lg: 'max-w-lg',
-        xl: 'max-w-xl',
-        full: 'max-w-full mx-4',
+        xl: 'max-w-2xl',
+        full: 'max-w-6xl',
     };
 
     const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -65,32 +66,32 @@ export const Dialog = ({
 
     return createPortal(
         <div
-            className="fixed inset-0 z-[999] flex items-center justify-center bg-black/30 backdrop-blur-[2px] p-4"
+            className="fixed inset-0 z-[999] flex items-end justify-center overflow-y-auto bg-black/50 backdrop-blur-sm md:items-center md:p-4"
             onClick={handleOverlayClick}
         >
             <div
                 ref={dialogRef}
-                className={`bg-white rounded-xl shadow-xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col`}
+                className={`relative w-full ${sizeClasses[size]} max-h-[90vh] rounded-t-3xl bg-white shadow-2xl md:rounded-3xl flex flex-col`}
             >
                 {(title || showCloseButton) && (
-                    <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                        {title && <h2 className="text-xl font-semibold text-gray-800">{title}</h2>}
+                    <div className="flex items-center justify-between border-b border-slate-200/70 px-5 py-4">
+                        {title && <h2 className="font-serif text-xl text-slate-900">{title}</h2>}
                         {showCloseButton && (
                             <button
                                 onClick={onClose}
-                                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+                                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"
                                 aria-label="Close dialog"
                             >
-                                ×
+                                <X size={20} />
                             </button>
                         )}
                     </div>
                 )}
 
-                <div className="p-4 overflow-y-auto flex-1">{children}</div>
+                <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
 
                 {footer && (
-                    <div className="p-4 border-t border-gray-200 flex gap-2 justify-end">{footer}</div>
+                    <div className="border-t border-slate-200/70 bg-white/95 p-4 backdrop-blur flex gap-2 justify-end">{footer}</div>
                 )}
             </div>
         </div>,

@@ -15,6 +15,7 @@ import { useProductStore } from '../stores/products';
 import { usePartyStore } from '../stores/parties';
 import { useServiceStore } from '../stores/services';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
+import dayjs, { formatMaybeDate, todayISODate, toDateInputValue } from '../lib/datetime';
 
 const emptyItem = {
   itemType: 'labor',
@@ -26,29 +27,28 @@ const emptyItem = {
   lineTotal: '0',
 };
 
-const emptyHeader = {
+const makeEmptyHeader = () => ({
   partyId: '',
-  orderNo: new Date().getHours() * 100 + new Date().getMinutes(),
+  orderNo: Number(dayjs().format('Hmm')),
   status: 'open',
   notes: '',
-  deliveryDate: new Date().toISOString().slice(0, 10),
+  deliveryDate: todayISODate(),
   attachment: '',
   attributes: {},
-};
+});
 
 function getDeliveryDaysLeft(deliveryDate) {
   if (!deliveryDate) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const d = new Date(deliveryDate);
-  d.setHours(0, 0, 0, 0);
-  return Math.ceil((d - today) / 86400000);
+  const today = dayjs().startOf('day');
+  const d = dayjs(deliveryDate).startOf('day');
+  if (!d.isValid()) return null;
+  return d.diff(today, 'day');
 }
 
 function DeliveryBadge({ date }) {
   if (!date) return <span className="text-slate-400">—</span>;
   const days = getDeliveryDaysLeft(date);
-  const label = new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const label = formatMaybeDate(date, 'D MMM');
   const base = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold';
   if (days < 0) {
     return (
@@ -171,7 +171,7 @@ export default function Services() {
   const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
   const [showAddNew, setShowAddNew] = useState(false);
   const [newPartyPhone, setNewPartyPhone] = useState('');
-  const [header, setHeader] = useState({ ...emptyHeader });
+  const [header, setHeader] = useState(() => makeEmptyHeader());
   const [items, setItems] = useState([{ ...emptyItem }]);
   const [amountReceived, setAmountReceived] = useState('0');
   const [isPaid, setIsPaid] = useState(false);
@@ -433,14 +433,19 @@ export default function Services() {
   const createAndSelectParty = async () => {
     const name = partyQuery.trim().replace(/\s*\(.*\)\s*$/, '').trim();
     if (!name) {
-      setFormNotice({ type: 'error', message: 'Enter a customer name.' });
+      setFormNotice({ type: 'error', message: t('errors.customerRequired') });
+      return;
+    }
+    const phoneDigits = newPartyPhone.trim().replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      setFormNotice({ type: 'error', message: t('errors.phoneMinDigits') });
       return;
     }
     try {
       const party = await api.createParty({ name, phone: newPartyPhone.trim(), type: 'customer' });
       upsertParty(party);
       selectParty(party);
-      setFormNotice({ type: 'success', message: 'Customer added.' });
+      setFormNotice({ type: 'success', message: t('parties.messages.created') });
     } catch (err) {
       setFormNotice({ type: 'error', message: err.message });
     }
@@ -448,7 +453,7 @@ export default function Services() {
 
   // ── Reset & open/close dialog ──
   const resetForm = () => {
-    setHeader({ ...emptyHeader });
+    setHeader(makeEmptyHeader());
     setItems([{ ...emptyItem }]);
     setPartyQuery('');
     setSelectedParty(null);
@@ -473,15 +478,15 @@ export default function Services() {
     try {
       const full = await api.getService(order.id);
       const rawItems = full.ServiceItems || full.items || [];
-      setHeader({
-        partyId: full.partyId || '',
-        orderNo: full.orderNo || '',
-        status: full.status || 'open',
-        notes: full.notes || '',
-        deliveryDate: full.deliveryDate ? full.deliveryDate.slice(0, 10) : new Date().toISOString().slice(0, 10),
-        attachment: full.attachment || '',
-        attributes: full.attributes || {},
-      });
+        setHeader({
+          partyId: full.partyId || '',
+          orderNo: full.orderNo || '',
+          status: full.status || 'open',
+          notes: full.notes || '',
+          deliveryDate: toDateInputValue(full.deliveryDate) || todayISODate(),
+          attachment: full.attachment || '',
+          attributes: full.attributes || {},
+        });
       setItems(rawItems.length > 0 ? rawItems.map((i) => ({
         itemType: i.itemType || 'labor',
         description: i.description || '',
@@ -640,7 +645,7 @@ export default function Services() {
           partyId: payDialog.partyId,
           direction: 'receive',
           amount,
-          txDate: new Date().toISOString().slice(0, 10),
+          txDate: todayISODate(),
           note: `${t('services.servicePaymentNote')} - ${payDialog.orderNo || payDialog.id.slice(0, 8)}${payNotes ? ` · ${payNotes}` : ''}`,
         });
       }
@@ -1016,7 +1021,9 @@ export default function Services() {
                                   <Phone size={13} className="text-slate-400 shrink-0" />
                                   <input
                                     className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-                                    placeholder="Phone (optional)"
+                                    type="tel"
+                                    inputMode="numeric"
+                                    placeholder={t('parties.phonePlaceholder')}
                                     value={newPartyPhone}
                                     onChange={(e) => setNewPartyPhone(e.target.value)}
                                   />
@@ -1355,14 +1362,14 @@ export default function Services() {
               <div ref={invoicePrintRef} className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950">
                 {/* ── Header ── */}
                 <div className="px-8 pt-0">
-                  <InvoiceHeader
-                    biz={bizSettings}
-                    invoiceType="Service Invoice"
-                    invoiceNo={invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)}
-                    date={invoiceOrder.deliveryDate ? new Date(invoiceOrder.deliveryDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : null}
-                    status={invoiceOrder.status}
-                    statusColor={
-                      invoiceOrder.status === 'closed'
+                    <InvoiceHeader
+                      biz={bizSettings}
+                      invoiceType="Service Invoice"
+                      invoiceNo={invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)}
+                      date={invoiceOrder.deliveryDate ? formatMaybeDate(invoiceOrder.deliveryDate, 'MMMM D, YYYY') : null}
+                      status={invoiceOrder.status}
+                      statusColor={
+                        invoiceOrder.status === 'closed'
                         ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
                         : invoiceOrder.status === 'in_progress'
                         ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
@@ -1492,7 +1499,7 @@ export default function Services() {
                 <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-8 py-4 dark:border-slate-800/70 dark:bg-slate-900/30">
                   <p className="text-xs text-slate-400">Thank you for your business!</p>
                   <p className="text-xs text-slate-400">
-                    Printed {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+                    Printed {dayjs().format('D MMM YYYY')}
                   </p>
                 </div>
               </div>

@@ -8,6 +8,8 @@ import { useAuth } from '../lib/auth';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import Pagination from '../components/Pagination';
 import { useI18n } from '../lib/i18n.jsx';
+import SearchableSelect from '../components/SearchableSelect';
+import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useProductStore } from '../stores/products';
 import { usePartyStore } from '../stores/parties';
 import { usePurchaseStore } from '../stores/purchases';
@@ -29,10 +31,7 @@ function StatusBadge({ status }) {
 
 // ── Format date like Sales: "22 Mar" ──
 function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (isNaN(d)) return dateStr;
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return formatMaybeDate(dateStr, 'D MMM');
 }
 
 // ── Resolve supplier name from purchase object ──
@@ -79,17 +78,23 @@ export default function Purchases() {
   const { parties, fetch: fetchParties } = usePartyStore();
   const { purchases: purchaseList, loading: purchasesLoading, fetch: fetchPurchases, invalidate: invalidatePurchases } = usePurchaseStore();
 
-  // ── Derived: suppliers ──
-  const suppliers = useMemo(() => parties.filter((p) => p.type === 'supplier'), [parties]);
+  const supplierOptions = useMemo(
+    () =>
+      parties
+        .filter((p) => p.type === 'supplier')
+        .map((p) => ({ value: p.id, label: p.name || '—' })),
+    [parties]
+  );
 
   // ── UI state ──
   const [statusFilter, setStatusFilter] = useState('all');
+  const [isPaid, setIsPaid] = useState(false);
   const [header, setHeader] = useState({
     entryType: 'purchase',
     partyId: '',
     partyName: '',
     invoiceNo: '',
-    purchaseDate: new Date().toISOString().slice(0, 10),
+    purchaseDate: todayISODate(),
     status: 'received',
     notes: '',
     amountReceived: '0',
@@ -145,8 +150,31 @@ export default function Purchases() {
     );
   }, [items]);
 
-  const totalPaid = Number(header.amountReceived || 0);
-  const dueAmount = Math.max(totals.grandTotal - totalPaid, 0);
+  const paidAmount = useMemo(() => (
+    isPaid
+      ? totals.grandTotal
+      : Math.min(Number(header.amountReceived || 0), totals.grandTotal)
+  ), [header.amountReceived, isPaid, totals.grandTotal]);
+  const dueAmount = Math.max(totals.grandTotal - paidAmount, 0);
+
+  useEffect(() => {
+    if (!isPaid) return;
+    setHeader((prev) => ({
+      ...prev,
+      amountReceived: totals.grandTotal.toFixed(2),
+      status: prev.status === 'due' ? 'received' : prev.status,
+    }));
+  }, [isPaid, totals.grandTotal]);
+
+  useEffect(() => {
+    if (isPaid) return;
+    if (header.status === 'ordered') return;
+    if (dueAmount > 0 && header.status === 'received') {
+      setHeader((prev) => ({ ...prev, status: 'due' }));
+    } else if (dueAmount === 0 && header.status === 'due') {
+      setHeader((prev) => ({ ...prev, status: 'received' }));
+    }
+  }, [dueAmount, header.status, isPaid]);
 
   const handleHeaderChange = (event) => {
     const { name, value } = event.target;
@@ -225,11 +253,12 @@ export default function Purchases() {
   }, [page, pageSize, purchaseList]);
 
   const resetForm = () => {
-    setHeader({ entryType: 'purchase', partyId: '', partyName: '', invoiceNo: '', purchaseDate: new Date().toISOString().slice(0, 10), status: 'received', notes: '', amountReceived: '0' });
+    setHeader({ entryType: 'purchase', partyId: '', partyName: '', invoiceNo: '', purchaseDate: todayISODate(), status: 'received', notes: '', amountReceived: '0' });
     setItems([getEmptyItem('purchase')]);
     setDeletedItemIds([]);
     setEditingId(null);
     setFormMode('create');
+    setIsPaid(false);
   };
 
   const openCreate = () => { resetForm(); setIsOpen(true); };
@@ -264,6 +293,8 @@ export default function Purchases() {
       setDeletedItemIds([]);
       setEditingId(purchaseId);
       setFormMode('edit');
+      const computedDue = Number(purchase.dueAmount ?? Math.max(Number(purchase.grandTotal || 0) - Number(purchase.amountReceived || 0), 0));
+      setIsPaid(computedDue <= 0 && String(purchase.status || '').toLowerCase() !== 'ordered');
       setIsOpen(true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
@@ -296,7 +327,7 @@ export default function Purchases() {
         ...header,
         partyId: header.partyId || null,
         partyName: header.entryType === 'expense' ? header.partyName || null : null,
-        amountReceived: totalPaid,
+        amountReceived: paidAmount,
         ...totals,
         items: [
           ...items.map((item) => ({
@@ -351,12 +382,14 @@ export default function Purchases() {
             </div>
             <div>
               <label className="label">{t('purchases.supplier')}</label>
-              <select className="input mt-1" name="partyId" value={header.partyId} onChange={handleHeaderChange}>
-                <option value="">{t('purchases.selectSupplier')}</option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-                ))}
-              </select>
+              <div className="mt-1">
+                <SearchableSelect
+                  options={supplierOptions}
+                  value={header.partyId}
+                  onChange={(newValue) => setHeader((prev) => ({ ...prev, partyId: newValue }))}
+                  placeholder={t('purchases.selectSupplier')}
+                />
+              </div>
               <p className="mt-1 text-xs text-slate-500">{t('purchases.supplierOptional')}</p>
             </div>
             <div>
@@ -479,7 +512,7 @@ export default function Purchases() {
               </div>
             ))}
           </div>
-          <div className="md:static sticky -mx-4 bottom-0 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200/70 bg-white/95 p-4 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-0">
+          <div className="md:static sticky -mx-5 bottom-0 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200/70 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-0">
             <div className="text-sm text-slate-600 dark:text-slate-300">
               {isExpense ? (
                 <>

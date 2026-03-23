@@ -5,21 +5,15 @@ import { api } from '../lib/api';
 import Pagination from '../components/Pagination';
 import BarGraph from '../components/BarGraph';
 import PieChart from '../components/PieChart';
-
-function toDateValue(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
+import dayjs, { todayISODate } from '../lib/datetime';
 
 function buildSeries(items, dateKey, days = 14) {
   const points = Array.from({ length: days }).map((_, idx) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (days - 1 - idx));
-    const key = date.toISOString().slice(0, 10);
+    const date = dayjs().subtract(days - 1 - idx, 'day');
+    const key = date.format('YYYY-MM-DD');
     return {
       key,
-      label: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      label: date.format('D MMM'),
       value: 0,
     };
   });
@@ -27,7 +21,9 @@ function buildSeries(items, dateKey, days = 14) {
   items.forEach((item) => {
     const raw = item[dateKey] || item.createdAt;
     if (!raw) return;
-    const key = new Date(raw).toISOString().slice(0, 10);
+    const d = dayjs(raw);
+    if (!d.isValid()) return;
+    const key = d.format('YYYY-MM-DD');
     if (map[key]) map[key].value += Number(item.grandTotal || 0);
   });
   return points;
@@ -43,8 +39,8 @@ export default function Analytics() {
   const [filters, setFilters] = useState({
     type: 'all',
     status: 'all',
-    fromDate: new Date().toISOString().slice(0, 10),
-    toDate: new Date().toISOString().slice(0, 10),
+    fromDate: todayISODate(),
+    toDate: todayISODate(),
     search: '',
   });
   const [page, setPage] = useState(1);
@@ -66,8 +62,8 @@ export default function Analytics() {
   };
 
   const filterByCommon = (records, type) => {
-    const fromDate = toDateValue(filters.fromDate);
-    const toDate = toDateValue(filters.toDate);
+    const fromDate = filters.fromDate ? dayjs(filters.fromDate).startOf('day') : null;
+    const toDate = filters.toDate ? dayjs(filters.toDate).endOf('day') : null;
     const search = filters.search.trim().toLowerCase();
 
     return records
@@ -78,14 +74,10 @@ export default function Analytics() {
         const rawDate = type === 'sale' ? record.saleDate
           : type === 'purchase' ? record.purchaseDate
           : (record.createdAt || record.deliveryDate);
-        const recordDate = toDateValue(rawDate);
-        if (!recordDate) return false;
-        if (fromDate && recordDate < fromDate) return false;
-        if (toDate) {
-          const dayEnd = new Date(toDate);
-          dayEnd.setHours(23, 59, 59, 999);
-          if (recordDate > dayEnd) return false;
-        }
+        const recordDate = dayjs(rawDate);
+        if (!recordDate.isValid()) return false;
+        if (fromDate && recordDate.isBefore(fromDate)) return false;
+        if (toDate && recordDate.isAfter(toDate)) return false;
         return true;
       })
       .filter((record) => {
@@ -180,7 +172,7 @@ export default function Analytics() {
         paid: Number(svc.receivedTotal || 0),
         due: Math.max(Number(svc.grandTotal || 0) - Number(svc.receivedTotal || 0), 0),
       })),
-    ].sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+    ].sort((a, b) => dayjs(b.date || 0).valueOf() - dayjs(a.date || 0).valueOf());
   }, [filteredSales, filteredPurchases, filteredServices]);
   const totalRows = tableRows.length;
   const pagedRows = useMemo(() => {

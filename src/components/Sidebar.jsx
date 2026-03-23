@@ -28,6 +28,7 @@ export default function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
+            end={item.to === '/app'}
             className={({  isActive }) =>
               `rounded-xl px-3 py-2 text-sm font-semibold transition ${
                 isActive

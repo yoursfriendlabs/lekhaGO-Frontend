@@ -4,6 +4,7 @@ import Notice from '../components/Notice';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
+import dayjs, { todayISODate } from '../lib/datetime';
 import { usePartyStore } from '../stores/parties';
 import { Plus, Bell, Search, Filter, ChevronDown } from 'lucide-react';
 
@@ -21,7 +22,7 @@ const makeEmptyTx = () => ({
   partyId: '',
   direction: 'give',
   amount: '',
-  txDate: new Date().toISOString().slice(0, 10),
+  txDate: todayISODate(),
   note: '',
   serviceId: '',
 });
@@ -166,7 +167,7 @@ export default function Parties() {
         label: tx.direction === 'give' ? t('parties.giveAdjustment') : t('parties.receiveAdjustment'),
       }));
     return [...salesTx, ...purchaseTx, ...serviceTx, ...adjustments]
-      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+      .sort((a, b) => dayjs(b.date || 0).valueOf() - dayjs(a.date || 0).valueOf());
   }, [selectedParty, sales, purchases, services, manualTx, t]);
 
   const pagedTransactions = useMemo(() => {
@@ -228,6 +229,17 @@ export default function Parties() {
   };
 
   const submitParty = async (keepOpen = false) => {
+    const phoneDigits = String(form.phone || '').replace(/\D/g, '');
+    if (!editingId) {
+      if (phoneDigits.length < 10) {
+        setStatus({ type: 'error', message: t('errors.phoneMinDigits') });
+        return;
+      }
+    } else if (form.phone && phoneDigits.length < 10) {
+      setStatus({ type: 'error', message: t('errors.phoneMinDigits') });
+      return;
+    }
+
     setLoading(true);
     setStatus({ type: 'info', message: '' });
     try {
@@ -518,6 +530,7 @@ export default function Parties() {
 
       <Dialog isOpen={isOpen} onClose={closeDialog} title={editingId ? t('parties.editParty') : t('parties.addParty')} size="lg">
         <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); submitParty(false); }}>
+          {status.message ? <Notice title={status.message} tone={status.type} /> : null}
           <div className="grid gap-3 md:grid-cols-2">
             <div>
               <label className="label">{t('parties.partyName')}</label>
@@ -525,7 +538,7 @@ export default function Parties() {
             </div>
             <div>
               <label className="label">{t('parties.phone')}</label>
-              <input className="input mt-1" name="phone" value={form.phone} onChange={handleChange} />
+              <input className="input mt-1" type="tel" inputMode="numeric" name="phone" value={form.phone} onChange={handleChange} placeholder={t('parties.phonePlaceholder')} required={!editingId} />
             </div>
           </div>
           <div>

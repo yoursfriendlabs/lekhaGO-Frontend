@@ -10,6 +10,8 @@ import Pagination from '../components/Pagination';
 import { useI18n } from '../lib/i18n.jsx';
 import FileUpload from '../components/FileUpload';
 import DynamicAttributes from '../components/DynamicAttributes';
+import SearchableSelect from '../components/SearchableSelect';
+import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useProductStore } from '../stores/products';
 import { usePartyStore } from '../stores/parties';
 import { useSaleStore } from '../stores/sales';
@@ -40,10 +42,7 @@ function StatusBadge({ status }) {
 
 // ── Format date like Services: "22 Mar" ──
 function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  const d = new Date(dateStr);
-  if (isNaN(d)) return dateStr;
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return formatMaybeDate(dateStr, 'D MMM');
 }
 
 // ── Resolve customer name from sale object ──
@@ -67,12 +66,12 @@ export default function Sales() {
   const { sales: salesList, loading: salesLoading, fetch: fetchSales, invalidate: invalidateSales } = useSaleStore();
 
   // ── UI state ──
-  const [customerQuery, setCustomerQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [isPaid, setIsPaid] = useState(false);
   const [header, setHeader] = useState({
     partyId: '',
     invoiceNo: '',
-    saleDate: new Date().toISOString().slice(0, 10),
+    saleDate: todayISODate(),
     status: 'paid',
     notes: '',
     amountReceived: '0',
@@ -106,18 +105,16 @@ export default function Sales() {
     setPage(1);
   }, [statusFilter]);
 
-  // ── Customer list ──
-  const customers = useMemo(() => {
-    const q = customerQuery.trim().toLowerCase();
-    return parties.filter((p) => {
-      if (p.type !== 'customer') return false;
-      if (!q) return true;
-      return (
-        String(p.name || '').toLowerCase().includes(q) ||
-        String(p.phone || '').toLowerCase().includes(q)
-      );
-    });
-  }, [parties, customerQuery]);
+  const customerOptions = useMemo(
+    () =>
+      parties
+        .filter((p) => p.type === 'customer')
+        .map((p) => ({
+          value: p.id,
+          label: `${p.name || '—'}${p.phone ? ` (${p.phone})` : ''}`,
+        })),
+    [parties]
+  );
 
   // ── Totals ──
   const totals = useMemo(() => {
@@ -129,8 +126,23 @@ export default function Sales() {
     return { subTotal, taxTotal, grandTotal: subTotal + taxTotal };
   }, [items]);
 
-  const totalReceived = Number(header.amountReceived || 0);
-  const dueAmount = Math.max(totals.grandTotal - totalReceived, 0);
+  const receivedAmount = useMemo(() => (
+    isPaid
+      ? totals.grandTotal
+      : Math.min(Number(header.amountReceived || 0), totals.grandTotal)
+  ), [header.amountReceived, isPaid, totals.grandTotal]);
+  const dueAmount = Math.max(totals.grandTotal - receivedAmount, 0);
+
+  useEffect(() => {
+    if (!isPaid) return;
+    setHeader((prev) => ({ ...prev, amountReceived: totals.grandTotal.toFixed(2), status: 'paid' }));
+  }, [isPaid, totals.grandTotal]);
+
+  useEffect(() => {
+    if (isPaid) return;
+    const derived = dueAmount > 0 ? 'due' : 'paid';
+    setHeader((prev) => (prev.status === derived ? prev : { ...prev, status: derived }));
+  }, [dueAmount, isPaid]);
 
   const handleHeaderChange = (event) => {
     const { name, value } = event.target;
@@ -223,12 +235,12 @@ export default function Sales() {
   }, [page, pageSize, salesList]);
 
   const resetForm = () => {
-    setHeader({ partyId: '', invoiceNo: '', saleDate: new Date().toISOString().slice(0, 10), status: 'paid', notes: '', amountReceived: '0', attachment: '', attributes: {} });
+    setHeader({ partyId: '', invoiceNo: '', saleDate: todayISODate(), status: 'paid', notes: '', amountReceived: '0', attachment: '', attributes: {} });
     setItems([{ ...emptyItem }]);
     setDeletedItemIds([]);
     setEditingId(null);
     setFormMode('create');
-    setCustomerQuery('');
+    setIsPaid(false);
   };
 
   const openCreate = () => { resetForm(); setIsOpen(true); };
@@ -260,6 +272,8 @@ export default function Sales() {
       setDeletedItemIds([]);
       setEditingId(saleId);
       setFormMode('edit');
+      const computedDue = Number(sale.dueAmount ?? Math.max(Number(sale.grandTotal || 0) - Number(sale.amountReceived || 0), 0));
+      setIsPaid((sale.status || '').toLowerCase() === 'paid' || computedDue <= 0);
       setIsOpen(true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
@@ -279,10 +293,12 @@ export default function Sales() {
     if (invalidConversion) { setStatus({ type: 'error', message: t('errors.conversionRequired') }); return; }
 
     try {
+      const derivedStatus = dueAmount > 0 ? 'due' : 'paid';
       const payload = {
         ...header,
+        status: derivedStatus,
         partyId: header.partyId || null,
-        amountReceived: totalReceived,
+        amountReceived: receivedAmount,
         ...totals,
         items: [
           ...items.map((item) => ({
@@ -340,20 +356,14 @@ export default function Sales() {
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label className="label">{t('sales.customer')}</label>
-              <select className="input mt-1" name="partyId" value={header.partyId} onChange={handleHeaderChange}>
-                <option value="">{t('sales.walkIn')}</option>
-                {customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name} {customer.phone ? `(${customer.phone})` : ''}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="input mt-1 text-xs"
-                placeholder={t('common.search') + '...'}
-                value={customerQuery}
-                onChange={(e) => setCustomerQuery(e.target.value)}
-              />
+              <div className="mt-1">
+                <SearchableSelect
+                  options={customerOptions}
+                  value={header.partyId}
+                  onChange={(newValue) => setHeader((prev) => ({ ...prev, partyId: newValue }))}
+                  placeholder={t('sales.walkIn')}
+                />
+              </div>
               <p className="mt-1 text-xs text-slate-500">{t('sales.customerOptional')}</p>
             </div>
             <div>
@@ -363,17 +373,6 @@ export default function Sales() {
             <div>
               <label className="label">{t('sales.saleDate')}</label>
               <input type="date" className="input mt-1" name="saleDate" value={header.saleDate} onChange={handleHeaderChange} />
-            </div>
-            <div>
-              <label className="label">{t('sales.status')}</label>
-              <select className="input mt-1" name="status" value={header.status} onChange={handleHeaderChange}>
-                <option value="paid">{t('sales.paid')}</option>
-                <option value="due">{t('sales.due')}</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">{t('sales.totalReceived')}</label>
-              <input className="input mt-1" type="number" step="1" min={0} name="amountReceived" value={header.amountReceived} onChange={handleHeaderChange} />
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -455,18 +454,61 @@ export default function Sales() {
               </div>
             ))}
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="text-sm text-slate-600 dark:text-slate-300">
-              <p>{t('sales.subTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</p>
-              <p>{t('sales.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</p>
-              <p className="font-semibold">{t('sales.grandTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</p>
-              <p>{t('sales.totalReceived')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totalReceived.toFixed(2) })}</p>
-              <p className="font-semibold text-rose-600 dark:text-rose-300">{t('sales.dueLabel')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}</p>
+          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4">
+            <div className="grid gap-2 text-sm sm:grid-cols-3">
+              <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                <span className="text-slate-500">{t('sales.subTotal')}</span>
+                <span className="font-semibold text-slate-800">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</span>
+              </div>
+              <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                <span className="text-slate-500">{t('sales.taxTotal')}</span>
+                <span className="font-semibold text-slate-800">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</span>
+              </div>
+              <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                <span className="text-slate-500">{t('sales.grandTotal')}</span>
+                <span className="text-lg font-bold text-slate-900">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</span>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <button className="btn-secondary" type="button" onClick={() => setIsOpen(false)}>{t('common.cancel')}</button>
-              <button className="btn-primary" type="submit">{formMode === 'edit' ? t('sales.updateSale') : t('sales.saveSale')}</button>
+
+            <div className="mt-4 border-t border-slate-200/70 pt-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex-1 min-w-[140px]">
+                  <label className="label">{t('services.amountReceived')}</label>
+                  <input
+                    className="input mt-1"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={isPaid ? totals.grandTotal.toFixed(2) : header.amountReceived}
+                    disabled={isPaid}
+                    onChange={(e) => setHeader((prev) => ({ ...prev, amountReceived: e.target.value }))}
+                  />
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded accent-primary-600"
+                    checked={isPaid}
+                    onChange={(e) => setIsPaid(e.target.checked)}
+                  />
+                  {t('services.fullyPaid')}
+                </label>
+              </div>
+
+              {dueAmount > 0 && (
+                <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-2.5 text-sm">
+                  <span className="text-rose-500">{t('services.dueAmount')}:</span>
+                  <span className="font-bold text-rose-700">
+                    {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}
+                  </span>
+                </div>
+              )}
             </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <button className="btn-secondary" type="button" onClick={() => setIsOpen(false)}>{t('common.cancel')}</button>
+            <button className="btn-primary" type="submit">{formMode === 'edit' ? t('sales.updateSale') : t('sales.saveSale')}</button>
           </div>
         </form>
       </Dialog>

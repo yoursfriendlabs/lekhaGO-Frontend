@@ -51,6 +51,7 @@ const dictionaries = {
       payeeRequired: 'Select a supplier or enter a payee name.',
       expenseLineRequired: 'Add at least one expense line with an amount.',
       conversionRequired: 'Set a conversion rate for the secondary unit.',
+      phoneMinDigits: 'Phone number must be at least 10 digits.',
     },
     currency: {
       symbol: 'Rs',
@@ -527,6 +528,7 @@ const dictionaries = {
       partyName: 'Party name',
       partyType: 'Party type',
       phone: 'Phone',
+      phonePlaceholder: 'Phone (min 10 digits)',
       email: 'Email',
       address: 'Address',
       creditInfo: 'Credit info',
@@ -1184,6 +1186,7 @@ const dictionaries = {
       partyName: 'पार्टीको नाम',
       partyType: 'पार्टीको प्रकार',
       phone: 'फोन',
+      phonePlaceholder: 'फोन (कम्तीमा १० अंक)',
       email: 'इमेल',
       address: 'ठेगाना',
       creditInfo: 'क्रेडिट जानकारी',

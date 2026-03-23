@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { Link } from 'react-router-dom';
 import { ShoppingCart, UserCheck, Briefcase, Boxes, Package, BarChart3, Clock } from 'lucide-react';
 import { useI18n } from '../lib/i18n.jsx';
+import dayjs, { formatMaybeDate } from '../lib/datetime';
 import { useProductStore } from '../stores/products';
 import { useSaleStore } from '../stores/sales';
 import { usePurchaseStore } from '../stores/purchases';
@@ -12,17 +13,16 @@ import { useServiceStore } from '../stores/services';
 
 function getDeliveryDaysLeft(deliveryDate) {
   if (!deliveryDate) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const delivery = new Date(deliveryDate);
-  delivery.setHours(0, 0, 0, 0);
-  return Math.ceil((delivery - today) / (1000 * 60 * 60 * 24));
+  const today = dayjs().startOf('day');
+  const delivery = dayjs(deliveryDate).startOf('day');
+  if (!delivery.isValid()) return null;
+  return delivery.diff(today, 'day');
 }
 
 function DeliveryTag({ date }) {
   if (!date) return <span className="text-xs text-slate-400">—</span>;
   const days = getDeliveryDaysLeft(date);
-  const label = new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const label = formatMaybeDate(date, 'D MMM');
   if (days < 0) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">
@@ -49,36 +49,22 @@ function DeliveryTag({ date }) {
 
 function formatDate(dateStr) {
   if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString();
-}
-
-function parseDate(value) {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value === 'string') {
-    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (match) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  }
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return formatMaybeDate(dateStr, 'D MMM YYYY');
 }
 
 function getRangeStart(range) {
-  const now = new Date();
-  if (range === 'today') return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  if (range === 'week') {
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    start.setDate(start.getDate() - start.getDay());
-    return start;
-  }
-  if (range === 'month') return new Date(now.getFullYear(), now.getMonth(), 1);
-  return new Date(now.getFullYear(), 0, 1);
+  const now = dayjs();
+  if (range === 'today') return now.startOf('day');
+  if (range === 'week') return now.startOf('week');
+  if (range === 'month') return now.startOf('month');
+  return now.startOf('year');
 }
 
 function isWithinRange(value, rangeStart, rangeEnd) {
-  const date = parseDate(value);
-  if (!date) return false;
-  return date >= rangeStart && date <= rangeEnd;
+  const date = dayjs(value);
+  if (!date.isValid()) return false;
+  const ts = date.valueOf();
+  return ts >= rangeStart.valueOf() && ts <= rangeEnd.valueOf();
 }
 
 export default function Dashboard() {
@@ -117,7 +103,7 @@ export default function Dashboard() {
   }, []);
 
   const rangeStart = useMemo(() => getRangeStart(dateRange), [dateRange]);
-  const rangeEnd = useMemo(() => new Date(), [dateRange]);
+  const rangeEnd = useMemo(() => dayjs(), [dateRange]);
 
   const filterByRange = useCallback(
     (items, dateKey) =>
@@ -150,7 +136,7 @@ export default function Dashboard() {
   const upcomingDeliveries = useMemo(() => {
     return [...services]
       .filter((s) => s.status !== 'closed' && s.deliveryDate)
-      .sort((a, b) => new Date(a.deliveryDate) - new Date(b.deliveryDate))
+      .sort((a, b) => dayjs(a.deliveryDate).valueOf() - dayjs(b.deliveryDate).valueOf())
       .slice(0, 6);
   }, [services]);
 

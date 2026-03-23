@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Notice from './Notice';
 import { Dialog } from './ui/Dialog.tsx';
 import { api } from '../lib/api';
+import { formatMaybeDate } from '../lib/datetime';
 
 const EMPTY_SUMMARY = {
   maxUsers: 5,
@@ -27,11 +28,7 @@ const EMPTY_EDIT_FORM = {
 
 function formatDate(value) {
   if (!value) return '-';
-  return new Date(value).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  return formatMaybeDate(value, 'MMM D, YYYY');
 }
 
 function StatusBadge({ active }) {

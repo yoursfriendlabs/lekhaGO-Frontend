@@ -4,6 +4,7 @@ import Notice from '../components/Notice';
 import { API_BASE, api } from '../lib/api';
 import { useBusinessSettings } from '../lib/businessSettings';
 import { useI18n } from '../lib/i18n.jsx';
+import dayjs, { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { Download, Printer } from 'lucide-react';
 
 function normalizeId(value) {
@@ -11,25 +12,23 @@ function normalizeId(value) {
   return String(value);
 }
 
-function toDateValue(value) {
-  if (!value) return null;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
+function formatStatementDate(value) {
+  if (!value) return '-';
+  return formatMaybeDate(value, 'MMMM,D');
 }
 
-function formatDate(value) {
+function formatRangeDate(value) {
   if (!value) return '-';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+  return formatMaybeDate(value, 'D MMM YYYY');
 }
 
 function buildRange(period) {
-  const now = new Date();
+  const now = dayjs();
   if (period === 'month') {
-    return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: now };
+    return { from: now.startOf('month'), to: now };
   }
   if (period === 'year') {
-    return { from: new Date(now.getFullYear(), 0, 1), to: now };
+    return { from: now.startOf('year'), to: now };
   }
   return { from: null, to: null };
 }
@@ -159,17 +158,16 @@ export default function Ledger() {
       })
       .filter((tx) => {
         if (!from && !to) return true;
-        const txDate = toDateValue(tx.date);
-        if (!txDate) return false;
-        if (from && txDate < from) return false;
+        const txDate = dayjs(tx.date);
+        if (!txDate.isValid()) return false;
+        if (from && txDate.isBefore(from, 'day')) return false;
         if (to) {
-          const dayEnd = new Date(to);
-          dayEnd.setHours(23, 59, 59, 999);
-          if (txDate > dayEnd) return false;
+          const dayEnd = dayjs(to).endOf('day');
+          if (txDate.isAfter(dayEnd)) return false;
         }
         return true;
       })
-      .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+      .sort((a, b) => dayjs(a.date || 0).valueOf() - dayjs(b.date || 0).valueOf());
   }, [transactions, selectedPartyId, from, to]);
 
   const summary = useMemo(() => {
@@ -214,7 +212,7 @@ export default function Ledger() {
 
   const timeSpanLabel = useMemo(() => {
     if (!from && !to) return t('ledger.allTime');
-    return `${t('ledger.from')}: ${formatDate(from)}  ·  ${t('ledger.to')}: ${formatDate(to)}`;
+    return `${t('ledger.from')}: ${formatRangeDate(from)}  ·  ${t('ledger.to')}: ${formatRangeDate(to)}`;
   }, [from, to, t]);
 
   const selectedPartyLabel = useMemo(() => (
@@ -238,12 +236,12 @@ export default function Ledger() {
     // Ensure inline styles don't hide it on screen before print fires
     clone.style.cssText = '';
 
-    const now = new Date();
+    const now = dayjs();
     clone.querySelectorAll('[data-printed-at]').forEach((node) => {
-      node.textContent = now.toLocaleString();
+      node.textContent = now.format('D MMM YYYY, HH:mm');
     });
     clone.querySelectorAll('[data-printed-date]').forEach((node) => {
-      node.textContent = now.toLocaleDateString();
+      node.textContent = now.format('D MMM YYYY');
     });
 
     document.body.appendChild(clone);
@@ -267,7 +265,7 @@ export default function Ledger() {
         t('ledger.runningBalance'),
       ],
       ...statementRows.map((row) => ([
-        formatDate(row.date),
+        formatStatementDate(row.date),
         ...(selectedPartyId === 'all' ? [row.party || '—'] : []),
         row.label,
         row.debit > 0 ? row.debit.toFixed(2) : '',
@@ -286,7 +284,7 @@ export default function Ledger() {
     const partySlug = selectedPartyId === 'all'
       ? 'all'
       : String(selectedParty?.name || selectedPartyId).replace(/\s+/g, '-').toLowerCase();
-    link.download = `ledger-${partySlug}-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `ledger-${partySlug}-${period}-${todayISODate()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -357,7 +355,7 @@ export default function Ledger() {
                   </p>
                   <p className="mt-1 text-sm font-semibold text-slate-900">{selectedPartyLabel}</p>
                   <p className="mt-1 text-xs text-slate-500">{timeSpanLabel}</p>
-                  <p className="mt-2 text-xs text-slate-400" data-printed-at>{new Date().toLocaleString()}</p>
+                  <p className="mt-2 text-xs text-slate-400" data-printed-at>{dayjs().format('D MMM YYYY, HH:mm')}</p>
                 </div>
               </div>
             </div>
@@ -419,7 +417,7 @@ export default function Ledger() {
                   ) : (
                     statementRows.map((row) => (
                       <tr key={`print-${row.type}-${row.id}`}>
-                        <td className="py-3">{formatDate(row.date)}</td>
+                        <td className="py-3">{formatStatementDate(row.date)}</td>
                         {selectedPartyId === 'all' ? <td className="py-3">{row.party || '—'}</td> : null}
                         <td className="py-3">{row.label}</td>
                         <td className="py-3 text-right">
@@ -446,7 +444,7 @@ export default function Ledger() {
             <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-8 py-4">
               <p className="text-xs text-slate-400">{t('ledger.totalEntries')}: {summary.entries}</p>
               <p className="text-xs text-slate-400">
-                Printed on <span data-printed-date>{new Date().toLocaleDateString()}</span>
+                Printed on <span data-printed-date>{dayjs().format('D MMM YYYY')}</span>
               </p>
             </div>
           </div>
@@ -520,7 +518,7 @@ export default function Ledger() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{row.label}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{formatDate(row.date)}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{formatStatementDate(row.date)}</p>
                         {selectedPartyId === 'all' && row.party && row.party !== '—' && (
                           <p className="text-xs text-slate-500 truncate">{row.party}</p>
                         )}
@@ -574,7 +572,7 @@ export default function Ledger() {
                   ) : (
                     statementRows.map((row) => (
                       <tr key={`${row.type}-${row.id}`} className="border-t border-slate-200/70">
-                        <td className="py-2">{formatDate(row.date)}</td>
+                        <td className="py-2">{formatStatementDate(row.date)}</td>
                         {selectedPartyId === 'all' ? <td className="py-2">{row.party || '—'}</td> : null}
                         <td className="py-2">{row.label}</td>
                         <td className="py-2 text-right">

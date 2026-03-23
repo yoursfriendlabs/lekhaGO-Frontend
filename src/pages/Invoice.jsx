@@ -5,10 +5,10 @@ import { useBusinessSettings } from '../lib/businessSettings';
 import InvoiceHeader from '../components/InvoiceHeader';
 import Notice from '../components/Notice';
 import { getCreatorDisplayName } from '../lib/records';
+import dayjs, { formatMaybeDate } from '../lib/datetime';
 
 function fmt(dateStr) {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  return formatMaybeDate(dateStr, 'MMMM D, YYYY');
 }
 
 function money(val) {
@@ -195,7 +195,7 @@ export default function Invoice() {
           <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-8 py-4 dark:border-slate-800/70 dark:bg-slate-900/30">
             <p className="text-xs text-slate-400">Thank you for your business!</p>
             <p className="text-xs text-slate-400">
-              Printed {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+              Printed {dayjs().format('D MMM YYYY')}
             </p>
           </div>
         </div>
