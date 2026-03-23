@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Pencil, FileText, Plus } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import Pagination from '../components/Pagination';
@@ -10,6 +11,40 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useProductStore } from '../stores/products';
 import { usePartyStore } from '../stores/parties';
 import { usePurchaseStore } from '../stores/purchases';
+
+// ── Status badge matching Sales/Services design ──
+function StatusBadge({ status }) {
+  const map = {
+    received: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+    ordered:  'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+    due:      'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+  };
+  const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : '—';
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[status] || 'bg-slate-100 text-slate-600'}`}>
+      {label}
+    </span>
+  );
+}
+
+// ── Format date like Sales: "22 Mar" ──
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+// ── Resolve supplier name from purchase object ──
+function getSupplierName(purchase) {
+  return (
+    purchase.partyName ||
+    purchase.supplierName ||
+    purchase.Party?.name ||
+    purchase.Supplier?.name ||
+    null
+  );
+}
 
 const emptyPurchaseItem = {
   productId: '',
@@ -472,54 +507,122 @@ export default function Purchases() {
       </Dialog>
 
       <div className="card">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('purchases.recentPurchases')}</h3>
-          <div className="flex flex-wrap items-center gap-3">
-            <select className="input max-w-[200px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="all">{t('purchases.allStatuses')}</option>
-              <option value="received">{t('purchases.received')}</option>
-              <option value="ordered">{t('purchases.ordered')}</option>
-              <option value="due">{t('purchases.due')}</option>
-            </select>
+
+        {/* Header: title + pill filters on left */}
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-col items-start gap-2">
+            <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('purchases.recentPurchases')}</h3>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStatusFilter('all')}
+                className={statusFilter === 'all'
+                  ? 'bg-blue-50 border border-blue-500 text-blue-500 px-2 py-0.5 rounded text-sm'
+                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
+              >
+                {t('purchases.allStatuses')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('received')}
+                className={statusFilter === 'received'
+                  ? 'bg-emerald-50 border border-emerald-500 text-emerald-600 px-2 py-0.5 rounded text-sm'
+                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
+              >
+                {t('purchases.received')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('ordered')}
+                className={statusFilter === 'ordered'
+                  ? 'bg-amber-50 border border-amber-500 text-amber-600 px-2 py-0.5 rounded text-sm'
+                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
+              >
+                {t('purchases.ordered')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('due')}
+                className={statusFilter === 'due'
+                  ? 'bg-rose-50 border border-rose-500 text-rose-600 px-2 py-0.5 rounded text-sm'
+                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
+              >
+                {t('purchases.due')}
+              </button>
+            </div>
           </div>
         </div>
-        {/* Card list on small screens */}
-        <div className="mt-4 md:hidden">
-          <div className="space-y-3">
-            {pagedPurchases.map((p) => (
-              <div key={p.id} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-slate-800 dark:text-slate-100">{p.invoiceNo || p.id}</p>
-                    <p className="text-xs text-slate-500">{p.purchaseDate || '-'}</p>
-                    <p className="mt-1 text-xs text-slate-500">{t('purchases.supplier')}: {p.partyName || p.supplierName || p.Party?.name || p.partyId || p.supplierId || '-'}</p>
+
+        {/* ── Mobile card view ── */}
+        <div className="mt-4 md:hidden space-y-3">
+          {purchasesLoading && purchaseList.length === 0 ? (
+            <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+          ) : pagedPurchases.length === 0 ? (
+            <p className="py-3 text-sm text-slate-500">{t('purchases.noPurchases')}</p>
+          ) : (
+            pagedPurchases.map((p) => {
+              const supplierName = getSupplierName(p);
+              const due = Number(p.dueAmount || 0);
+              return (
+                <div key={p.id} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
+                        {p.invoiceNo || p.id.slice(0, 8)}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">{formatDate(p.purchaseDate)}</p>
+                      <p className="mt-1 text-xs text-slate-500 truncate">{supplierName || '—'}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <StatusBadge status={p.status} />
+                      <p className="mt-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                        {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(p.grandTotal || 0).toFixed(2) })}
+                      </p>
+                      {due > 0 ? (
+                        <span className="mt-0.5 inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                          {t('currency.formatted', { symbol: t('currency.symbol'), amount: due.toFixed(2) })} due
+                        </span>
+                      ) : (
+                        <p className="mt-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">Paid</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${p.status === 'received' ? 'bg-emerald-100 text-emerald-700' : p.status === 'ordered' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>{p.status}</span>
-                    <p className="mt-2 font-semibold">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(p.grandTotal || 0).toFixed(2) })}</p>
+                  <div className="mt-3 flex items-center justify-end gap-1 border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
+                    <button
+                      type="button"
+                      title={t('common.edit')}
+                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+                      onClick={() => openEdit(p.id)}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <Link
+                      title={t('common.view')}
+                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800"
+                      to={`/app/invoice/purchases/${p.id}`}
+                    >
+                      <FileText size={14} />
+                    </Link>
                   </div>
                 </div>
-                <div className="mt-3 flex items-center justify-end gap-2">
-                  <Link className="btn-ghost" to={`/app/invoice/purchases/${p.id}`}>{t('common.invoice')}</Link>
-                  <button className="btn-ghost" type="button" onClick={() => openEdit(p.id)}>{t('common.edit')}</button>
-                </div>
-              </div>
-            ))}
-          </div>
+              );
+            })
+          )}
         </div>
-        {/* Table on md+ */}
+
+        {/* ── Desktop table ── */}
         <div className="mt-4 overflow-x-auto hidden md:block">
-          <table className="w-full text-sm text-slate-600 dark:text-slate-300">
+          <table className="w-full text-sm">
             <thead className="text-xs uppercase text-slate-400">
               <tr>
-                <th className="py-2 text-left">{t('common.invoice')}</th>
-                <th className="py-2 text-left">{t('common.date')}</th>
-                <th className="py-2 text-left">{t('common.status')}</th>
-                <th className="py-2 text-left">{t('purchases.supplier')}</th>
-                <th className="py-2 text-right">{t('common.total')}</th>
-                <th className="py-2 text-right">{t('purchases.totalPaid')}</th>
-                <th className="py-2 text-right">{t('purchases.dueLabel')}</th>
-                <th className="py-2 text-right">{t('common.invoice')}</th>
+                <th className="py-2 pr-4 text-left">{t('common.invoice')}</th>
+                <th className="py-2 pr-4 text-left">{t('common.date')}</th>
+                <th className="py-2 pr-4 text-left">{t('common.status')}</th>
+                <th className="py-2 pr-4 text-left">{t('purchases.supplier')}</th>
+                <th className="py-2 pr-4 text-right">{t('common.total')}</th>
+                <th className="py-2 pr-4 text-right">{t('purchases.totalPaid')}</th>
+                <th className="py-2 pr-4 text-right">{t('purchases.dueLabel')}</th>
+                <th className="py-2 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -528,28 +631,88 @@ export default function Purchases() {
               ) : pagedPurchases.length === 0 ? (
                 <tr><td colSpan={8} className="py-3 text-slate-500">{t('purchases.noPurchases')}</td></tr>
               ) : (
-                pagedPurchases.map((purchase) => (
-                  <tr key={purchase.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                    <td className="py-2">{purchase.invoiceNo || purchase.id.slice(0, 6)}</td>
-                    <td className="py-2">{purchase.purchaseDate}</td>
-                    <td className="py-2 capitalize">{purchase.status}</td>
-                    <td className="py-2">{purchase.partyName || purchase.supplierName || purchase.Party?.name || purchase.partyId || purchase.supplierId || '—'}</td>
-                    <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.grandTotal || 0).toFixed(2) })}</td>
-                    <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.amountReceived || 0).toFixed(2) })}</td>
-                    <td className="py-2 text-right text-rose-600 dark:text-rose-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.dueAmount || 0).toFixed(2) })}</td>
-                    <td className="py-2 text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        <button className="text-slate-600 hover:text-slate-900" type="button" onClick={() => openEdit(purchase.id)}>{t('common.edit')}</button>
-                        <Link className="text-emerald-600 hover:text-emerald-500 dark:text-ocean dark:hover:text-teal-300" to={`/app/invoice/purchases/${purchase.id}`}>{t('common.view')}</Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                pagedPurchases.map((purchase) => {
+                  const supplierName = getSupplierName(purchase);
+                  const due = Number(purchase.dueAmount || 0);
+                  return (
+                    <tr key={purchase.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
+
+                      {/* Invoice No */}
+                      <td className="py-2.5 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                        {purchase.invoiceNo || purchase.id.slice(0, 8)}
+                      </td>
+
+                      {/* Date — formatted like Sales "22 Mar" */}
+                      <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
+                        {formatDate(purchase.purchaseDate)}
+                      </td>
+
+                      {/* Status — colored badge */}
+                      <td className="py-2.5 pr-4">
+                        <StatusBadge status={purchase.status} />
+                      </td>
+
+                      {/* Supplier */}
+                      <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
+                        {supplierName || <span className="text-slate-400">—</span>}
+                      </td>
+
+                      {/* Grand total */}
+                      <td className="py-2.5 pr-4 text-right font-semibold text-slate-800 dark:text-slate-200">
+                        {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.grandTotal || 0).toFixed(2) })}
+                      </td>
+
+                      {/* Amount received */}
+                      <td className="py-2.5 pr-4 text-right text-emerald-700 dark:text-emerald-400">
+                        {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.amountReceived || 0).toFixed(2) })}
+                      </td>
+
+                      {/* Due — rose pill or green "Paid" exactly like Sales */}
+                      <td className="py-2.5 pr-4 text-right">
+                        {due > 0 ? (
+                          <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                            {t('currency.formatted', { symbol: t('currency.symbol'), amount: due.toFixed(2) })} due
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Paid</span>
+                        )}
+                      </td>
+
+                      {/* Actions — icon buttons matching Sales exactly */}
+                      <td className="py-2.5 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            title={t('common.edit')}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+                            onClick={() => openEdit(purchase.id)}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <Link
+                            title={t('common.view')}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800"
+                            to={`/app/invoice/purchases/${purchase.id}`}
+                          >
+                            <FileText size={14} />
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
-        <Pagination page={page} pageSize={pageSize} total={totalPurchases} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
+
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={totalPurchases}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+        />
       </div>
     </div>
   );
