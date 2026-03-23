@@ -3,6 +3,8 @@ import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
 import Pagination from '../components/Pagination';
+import BarGraph from '../components/BarGraph';
+import PieChart from '../components/PieChart';
 
 function toDateValue(value) {
   if (!value) return null;
@@ -31,31 +33,7 @@ function buildSeries(items, dateKey, days = 14) {
   return points;
 }
 
-function BarChart({ title, series, tone }) {
-  const max = Math.max(...series.map((point) => point.value), 1);
-  return (
-    <div className="card">
-      <div className="flex items-center justify-between">
-        <h3 className="font-serif text-xl text-slate-900 dark:text-white">{title}</h3>
-        <span className="text-xs text-slate-500">Last {series.length} days</span>
-      </div>
-      <div className="mt-4 grid grid-cols-7 gap-2 items-end">
-        {series.map((point) => (
-          <div key={point.key} className="flex flex-col items-center gap-2">
-            <div className="h-24 w-full rounded-full bg-slate-200 dark:bg-slate-800 flex items-end">
-              <div
-                className={`w-full rounded-full ${tone}`}
-                style={{ height: `${(point.value / max) * 100}%` }}
-                title={`Rs ${point.value.toFixed(2)}`}
-              />
-            </div>
-            <span className="text-[10px] text-slate-500">{point.label}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+
 
 export default function Analytics() {
   const [sales, setSales] = useState([]);
@@ -300,11 +278,48 @@ export default function Analytics() {
           <p className="mt-2 text-sm text-slate-500">Cash flow: Rs {(totals.receivedTotal + totals.serviceReceivedTotal - totals.paidTotal).toFixed(2)}</p>
         </div>
       </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <BarChart title="Sales trend" series={salesSeries} tone="bg-emerald-300 dark:bg-ocean" />
-        <BarChart title="Services trend" series={servicesSeries} tone="bg-blue-300 dark:bg-blue-400" />
-        <BarChart title="Purchase trend" series={purchaseSeries} tone="bg-amber-300 dark:bg-amber-400" />
+      {/* Row 1: Sales & Services trends */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <BarGraph
+          title="Sales trend"
+          data={salesSeries}
+          dataKey="value"
+          nameKey="label"
+          color="#10b981"
+        />
+        <BarGraph
+          title="Services trend"
+          data={servicesSeries}
+          dataKey="value"
+          nameKey="label"
+          color="#3b82f6"
+        />
       </div>
+
+      {/* Row 2: Purchase trend & Overall trend pie chart */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <BarGraph
+          title="Purchase trend"
+          data={purchaseSeries}
+          dataKey="value"
+          nameKey="label"
+          color="#f59e0b"
+        />
+        <div className="card">
+          <h3 className="font-serif text-xl text-slate-900 dark:text-white mb-4">Overall trend</h3>
+          <div className="h-[350px]">
+            <PieChart
+              data={[
+                { name: 'Sales', value: totals.salesTotal },
+                { name: 'Services', value: totals.servicesTotal },
+                { name: 'Purchases', value: totals.purchasesTotal },
+              ]}
+              height={350}
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="card">
         <h3 className="font-serif text-2xl text-slate-900 dark:text-white">Filtered transactions</h3>
         {/* Mobile card view */}
