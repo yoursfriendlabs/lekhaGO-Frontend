@@ -408,10 +408,6 @@ export default function Purchases() {
                 <option value="due">{t('purchases.due')}</option>
               </select>
             </div>
-            <div>
-              <label className="label">{t('purchases.totalPaid')}</label>
-              <input className="input mt-1" type="number" step="1" min="0" name="amountReceived" value={header.amountReceived} onChange={handleHeaderChange} />
-            </div>
             <div className="md:col-span-2">
               <label className="label">{t('purchases.notes')}</label>
               <input className="input mt-1" name="notes" value={header.notes} onChange={handleHeaderChange} />
@@ -512,29 +508,63 @@ export default function Purchases() {
               </div>
             ))}
           </div>
-          <div className="md:static sticky -mx-5 bottom-0 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200/70 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-0">
-            <div className="text-sm text-slate-600 dark:text-slate-300">
-              {isExpense ? (
-                <>
-                  <p>{t('purchases.normalExpense')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.expense.toFixed(2) })}</p>
-                  <p>{t('purchases.labor')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.labor.toFixed(2) })}</p>
-                  <p>{t('purchases.part')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.part.toFixed(2) })}</p>
-                  <p className="font-semibold">{t('purchases.grandTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</p>
-                </>
-              ) : (
-                <>
-                  <p>{t('purchases.subTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</p>
-                  <p>{t('purchases.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</p>
-                  <p className="font-semibold">{t('purchases.grandTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</p>
-                </>
-              )}
-              <p>{t('purchases.totalPaidLabel')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totalPaid.toFixed(2) })}</p>
-              <p className="font-semibold text-rose-600 dark:text-rose-300">{t('purchases.dueLabel')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}</p>
+          <div className="md:static sticky -mx-5 bottom-0 border-t border-slate-200/70 bg-white/95 px-5 py-4 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-0">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div className="text-sm text-slate-600 dark:text-slate-300">
+                {isExpense ? (
+                  <>
+                    <p>{t('purchases.normalExpense')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.expense.toFixed(2) })}</p>
+                    <p>{t('purchases.labor')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.labor.toFixed(2) })}</p>
+                    <p>{t('purchases.part')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.part.toFixed(2) })}</p>
+                    <p className="font-semibold">{t('purchases.grandTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</p>
+                  </>
+                ) : (
+                  <>
+                    <p>{t('purchases.subTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</p>
+                    <p>{t('purchases.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</p>
+                    <p className="font-semibold">{t('purchases.grandTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</p>
+                  </>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-end gap-3 w-full md:w-auto">
+                <div className="flex-1 min-w-[160px] md:min-w-[220px]">
+                  <label className="label">{t('purchases.totalPaid')}</label>
+                  <input
+                    className="input mt-1"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={isPaid ? totals.grandTotal.toFixed(2) : header.amountReceived}
+                    disabled={isPaid}
+                    onChange={(e) => setHeader((prev) => ({ ...prev, amountReceived: e.target.value }))}
+                  />
+                </div>
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800/40">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded accent-primary-600"
+                    checked={isPaid}
+                    onChange={(e) => setIsPaid(e.target.checked)}
+                  />
+                  {t('services.fullyPaid')}
+                </label>
+              </div>
+
+              <div className="flex gap-2 w-full justify-end md:w-auto">
+                <button className="btn-secondary" type="button" onClick={() => setIsOpen(false)}>{t('common.cancel')}</button>
+                <button className="btn-primary" type="submit">{formMode === 'edit' ? t('purchases.updatePurchase') : t('purchases.savePurchase')}</button>
+              </div>
             </div>
-            <div className="flex gap-2 w-full justify-end md:w-auto">
-              <button className="btn-secondary" type="button" onClick={() => setIsOpen(false)}>{t('common.cancel')}</button>
-              <button className="btn-primary" type="submit">{formMode === 'edit' ? t('purchases.updatePurchase') : t('purchases.savePurchase')}</button>
-            </div>
+
+            {dueAmount > 0 && (
+              <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-2.5 text-sm dark:border-rose-800/40 dark:bg-rose-900/20">
+                <span className="text-rose-500 dark:text-rose-400">{t('services.dueAmount')}:</span>
+                <span className="font-bold text-rose-700 dark:text-rose-300">
+                  {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}
+                </span>
+              </div>
+            )}
           </div>
         </form>
       </Dialog>
