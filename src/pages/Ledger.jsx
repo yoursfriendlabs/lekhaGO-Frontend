@@ -428,6 +428,7 @@ export default function Ledger() {
                   searchPlaceholder={t('ledger.searchPlaceholder')}
                   noResultsLabel={t('common.noData')}
                   loadingLabel={t('common.loading')}
+                  minQueryLength={0}
                 />
                 {selectedPartyId ? (
                   <button type="button" className="mt-2 text-xs font-medium text-primary-700 hover:text-primary-600" onClick={() => handlePartyFilterChange(null)}>
