@@ -478,11 +478,10 @@ export default function Sales() {
         }
       />
 
-      {status.message ? <Notice title={status.message} tone={status.type} /> : null}
-
       {/* ── Form Dialog ── */}
       <Dialog isOpen={isOpen} onClose={closeDialog} title={formMode === 'edit' ? t('sales.editSale') : t('sales.newSale')} size="full">
         <form className="space-y-5" onSubmit={handleSubmit}>
+          {status.message ? <Notice title={status.message} tone={status.type} /> : null}
           {isMobile ? (
             <MobileFormStepper
               steps={saleSteps}

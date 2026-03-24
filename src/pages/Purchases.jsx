@@ -496,9 +496,9 @@ export default function Purchases() {
         subtitle={t('purchases.subtitle')}
         action={<button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate}>{t('purchases.newPurchase')}</button>}
       />
-      {status.message ? <Notice title={status.message} tone={status.type} /> : null}
       <Dialog isOpen={isOpen} onClose={closeDialog} title={formMode === 'edit' ? t('purchases.editPurchase') : t('purchases.newPurchase')} size="full">
         <form className="space-y-5" onSubmit={handleSubmit}>
+          {status.message ? <Notice title={status.message} tone={status.type} /> : null}
           {isMobile ? (
             <MobileFormStepper
               steps={purchaseSteps}
