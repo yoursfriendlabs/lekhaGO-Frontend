@@ -6,6 +6,10 @@ function getScopeKey() {
   return getBusinessId() || 'default';
 }
 
+function ensureArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 function normalizeFetchArgs(paramsOrForce, maybeForce, allowParams) {
   if (!allowParams) {
     return {
@@ -60,27 +64,29 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
 
       if (cachedEntry?.loaded && !force) {
         if (state.currentKey !== key || scopeChanged) {
+          const cachedItems = ensureArray(cachedEntry.items);
           set({
             currentScope: scopeKey,
             currentKey: key,
-            [resourceKey]: cachedEntry.items,
-            total: cachedEntry.total ?? cachedEntry.items.length,
+            [resourceKey]: cachedItems,
+            total: cachedEntry.total ?? cachedItems.length,
             loaded: true,
             loading: false,
             error: null,
           });
         }
 
-        return cachedEntry.items;
+        return ensureArray(cachedEntry.items);
       }
 
       if (cachedEntry?.loading && cachedEntry.promise) {
         if (state.currentKey !== key || scopeChanged) {
+          const cachedItems = ensureArray(cachedEntry.items);
           set({
             currentScope: scopeKey,
             currentKey: key,
-            [resourceKey]: cachedEntry.items || [],
-            total: cachedEntry.total ?? cachedEntry.items?.length ?? 0,
+            [resourceKey]: cachedItems,
+            total: cachedEntry.total ?? cachedItems.length,
             loaded: Boolean(cachedEntry.loaded),
             loading: true,
             error: null,
@@ -92,7 +98,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
 
       const request = Promise.resolve(fetcher(params, { force }))
         .then((data) => {
-          const items = getCollectionItems(data);
+          const items = ensureArray(getCollectionItems(data));
           const total = Number(data?.total ?? items.length);
           const limit = Number(data?.limit ?? items.length);
           const offset = Number(data?.offset ?? 0);
@@ -125,11 +131,12 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
           return items;
         })
         .catch((error) => {
+          const cachedItems = ensureArray(cachedEntry?.items);
           set((currentState) => ({
             lists: {
               ...currentState.lists,
               [key]: {
-                items: cachedEntry?.items || [],
+                items: cachedItems,
                 total: cachedEntry?.total ?? 0,
                 limit: cachedEntry?.limit ?? 0,
                 offset: cachedEntry?.offset ?? 0,
@@ -143,7 +150,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
             },
             currentScope: scopeKey,
             currentKey: key,
-            [resourceKey]: cachedEntry?.items || [],
+            [resourceKey]: cachedItems,
             total: cachedEntry?.total ?? 0,
             loaded: Boolean(cachedEntry?.loaded),
             loading: false,
@@ -153,30 +160,34 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
           throw error;
         });
 
-      set((currentState) => ({
-        lists: {
-          ...currentState.lists,
-          [key]: {
-            items: cachedEntry?.items || [],
-            total: cachedEntry?.total ?? 0,
-            limit: cachedEntry?.limit ?? 0,
-            offset: cachedEntry?.offset ?? 0,
-            params,
-            loaded: Boolean(cachedEntry?.loaded),
-            loading: true,
-            error: null,
-            promise: request,
-            lastFetchedAt: cachedEntry?.lastFetchedAt || 0,
+      set((currentState) => {
+        const cachedItems = ensureArray(cachedEntry?.items);
+
+        return {
+          lists: {
+            ...currentState.lists,
+            [key]: {
+              items: cachedItems,
+              total: cachedEntry?.total ?? 0,
+              limit: cachedEntry?.limit ?? 0,
+              offset: cachedEntry?.offset ?? 0,
+              params,
+              loaded: Boolean(cachedEntry?.loaded),
+              loading: true,
+              error: null,
+              promise: request,
+              lastFetchedAt: cachedEntry?.lastFetchedAt || 0,
+            },
           },
-        },
-        currentScope: scopeKey,
-        currentKey: key,
-        [resourceKey]: cachedEntry?.items || [],
-        total: cachedEntry?.total ?? 0,
-        loaded: Boolean(cachedEntry?.loaded),
-        loading: true,
-        error: null,
-      }));
+          currentScope: scopeKey,
+          currentKey: key,
+          [resourceKey]: cachedItems,
+          total: cachedEntry?.total ?? 0,
+          loaded: Boolean(cachedEntry?.loaded),
+          loading: true,
+          error: null,
+        };
+      });
 
       return request;
     },
@@ -187,8 +198,8 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
 
       set((state) => {
         const currentEntry = state.lists[currentKey];
-        const currentItems = currentEntry?.items || state[resourceKey];
-        const nextItems = updater(currentItems);
+        const currentItems = ensureArray(currentEntry?.items ?? state[resourceKey]);
+        const nextItems = ensureArray(updater(currentItems));
 
         return {
           lists: {

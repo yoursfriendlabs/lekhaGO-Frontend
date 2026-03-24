@@ -15,6 +15,10 @@ function mergeOptions(selectedOption, options = []) {
   return merged;
 }
 
+function ensureArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 export default function AsyncSearchableSelect({
   value = '',
   selectedOption = null,
@@ -43,13 +47,15 @@ export default function AsyncSearchableSelect({
     loadOptionsRef.current = loadOptions;
   }, [loadOptions]);
 
+  const safeOptions = ensureArray(options);
+
   const selected = useMemo(() => {
     if (selectedOption && String(selectedOption.value) === String(value) && value !== '') {
       return selectedOption;
     }
 
-    return options.find((option) => String(option.value) === String(value) && option.value !== '') || selectedOption;
-  }, [options, selectedOption, value]);
+    return safeOptions.find((option) => String(option.value) === String(value) && option.value !== '') || selectedOption;
+  }, [safeOptions, selectedOption, value]);
 
   useEffect(() => {
     if (!selected) return;
@@ -79,7 +85,13 @@ export default function AsyncSearchableSelect({
 
     const search = debouncedQuery.trim();
     if (search.length < minQueryLength) {
-      setOptions((previous) => mergeOptions(selected, previous.filter((option) => String(option.value) === String(selected?.value))));
+      setOptions((previous) => {
+        const safePrevious = ensureArray(previous);
+        return mergeOptions(
+          selected,
+          safePrevious.filter((option) => String(option.value) === String(selected?.value))
+        );
+      });
       setLoading(false);
       return undefined;
     }
@@ -106,7 +118,7 @@ export default function AsyncSearchableSelect({
   }, [debouncedQuery, minQueryLength, open, selected]);
 
   const handleSelect = (option) => {
-    setOptions((previous) => mergeOptions(option, previous));
+    setOptions((previous) => mergeOptions(option, ensureArray(previous)));
     onChange?.(option);
     setOpen(false);
     setQuery('');
@@ -180,10 +192,10 @@ export default function AsyncSearchableSelect({
               <li className="px-3 py-2.5 text-sm text-slate-400">{loadingLabel}</li>
             ) : showPrompt ? (
               <li className="px-3 py-2.5 text-sm text-slate-400">{searchPlaceholder}</li>
-            ) : options.length === 0 ? (
+            ) : safeOptions.length === 0 ? (
               <li className="px-3 py-2.5 text-sm text-slate-400">{noResultsLabel}</li>
             ) : (
-              options.map((option) => (
+              safeOptions.map((option) => (
                 <li
                   key={option.value}
                   className={`cursor-pointer px-3 py-2 text-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 ${

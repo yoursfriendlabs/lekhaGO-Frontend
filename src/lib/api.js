@@ -401,7 +401,7 @@ export const api = {
   deleteBank: (id) =>
     request(`/api/banks/${id}`, { method: 'DELETE' }, mutationConfig([detailTags('bank', id), 'banks'])),
 
-  listOrderAttributes: (params = {}) => listRequest('/api/order-attributes', params, listCache(['order-attributes'], CACHE_TTL.settings)),
+  listOrderAttributes: (params = {}) => collectionRequest('/api/order-attributes', params, listCache(['order-attributes'], CACHE_TTL.settings)),
   createOrderAttribute: (data) =>
     request('/api/order-attributes', { method: 'POST', body: JSON.stringify(data) }, mutationConfig(['order-attributes'])),
   getOrderAttribute: (id) => request(`/api/order-attributes/${id}`, {}, listCache(detailTags('order-attribute', id), CACHE_TTL.settings)),

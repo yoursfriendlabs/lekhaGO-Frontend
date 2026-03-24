@@ -2,16 +2,24 @@ import { useEffect, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { api } from '../lib/api';
 
+function getAttributeItems(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.rows)) return payload.rows;
+  return [];
+}
+
 export default function DynamicAttributes({ entityType, attributes, onChange }) {
   const { t } = useI18n();
   const [definedAttributes, setDefinedAttributes] = useState([]);
   const [newKey, setNewKey] = useState('');
+  const safeAttributes = attributes && typeof attributes === 'object' ? attributes : {};
 
   useEffect(() => {
     api.listOrderAttributes({ entityType })
       .then((data) => {
         setDefinedAttributes(
-          (data || []).filter((attr) => attr.entityType === 'all' || attr.entityType === entityType)
+          getAttributeItems(data).filter((attr) => attr.entityType === 'all' || attr.entityType === entityType)
         );
       })
       .catch(() => null);
@@ -19,7 +27,7 @@ export default function DynamicAttributes({ entityType, attributes, onChange }) 
 
   const handleChange = (key, value) => {
     onChange({
-      ...attributes,
+      ...safeAttributes,
       [key]: value,
     });
   };
@@ -27,21 +35,21 @@ export default function DynamicAttributes({ entityType, attributes, onChange }) 
   const handleAdd = () => {
     if (!newKey.trim()) return;
     const cleanKey = newKey.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-    if (!attributes[cleanKey]) {
+    if (!safeAttributes[cleanKey]) {
       handleChange(cleanKey, '');
     }
     setNewKey('');
   };
 
   const handleRemove = (key) => {
-    const next = { ...attributes };
+    const next = { ...safeAttributes };
     delete next[key];
     onChange(next);
   };
 
   // Predefined ones from API first, then any extra manual ones in attributes
   const definedKeys = definedAttributes.map((attribute) => attribute.key);
-  const extraKeys = Object.keys(attributes).filter((key) => !definedKeys.includes(key));
+  const extraKeys = Object.keys(safeAttributes).filter((key) => !definedKeys.includes(key));
 
   return (
     <div className="space-y-4">
@@ -52,7 +60,7 @@ export default function DynamicAttributes({ entityType, attributes, onChange }) 
             <input
               type={attr.type === 'number' ? 'number' : attr.type === 'date' ? 'date' : 'text'}
               className="input mt-1"
-              value={attributes[attr.key] || ''}
+              value={safeAttributes[attr.key] || ''}
               onChange={(e) => handleChange(attr.key, e.target.value)}
               placeholder={attr.name}
             />
@@ -67,7 +75,7 @@ export default function DynamicAttributes({ entityType, attributes, onChange }) 
             <div className="flex gap-2">
               <input
                 className="input mt-1"
-                value={attributes[key] || ''}
+                value={safeAttributes[key] || ''}
                 onChange={(e) => handleChange(key, e.target.value)}
               />
               <button

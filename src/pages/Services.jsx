@@ -184,6 +184,8 @@ export default function Services() {
 
   // ── Attribute definitions for invoice display ──
   const [attributeDefs, setAttributeDefs] = useState([]);
+  const safeServiceList = Array.isArray(serviceList) ? serviceList : [];
+  const safeAttributeDefs = Array.isArray(attributeDefs) ? attributeDefs : [];
 
   // ── Form data ──
   const [partyQuery, setPartyQuery] = useState('');
@@ -248,7 +250,12 @@ export default function Services() {
   }, [debouncedPartyQuery, selectedParty]);
 
   useEffect(() => {
-    api.listOrderAttributes({ entityType: 'service' }).then(setAttributeDefs).catch(() => null);
+    api.listOrderAttributes({ entityType: 'service' })
+      .then((response) => {
+        const items = Array.isArray(response) ? response : Array.isArray(response?.items) ? response.items : [];
+        setAttributeDefs(items);
+      })
+      .catch(() => null);
   }, []);
 
   // ── Totals ──
@@ -664,20 +671,20 @@ export default function Services() {
   const serviceParties = useMemo(() => {
     const seen = new Set();
     const result = [];
-    serviceList.forEach((order) => {
+    safeServiceList.forEach((order) => {
       const id = order.partyId;
       if (!id || seen.has(id)) return;
       seen.add(id);
       result.push({ id, name: order.partyName || order.Party?.name || id });
     });
     return result.sort((a, b) => a.name.localeCompare(b.name));
-  }, [serviceList]);
+  }, [safeServiceList]);
 
   // ── Filtered + paged service list ──
   const filteredServiceList = useMemo(() => {
-    if (!partyFilterId) return serviceList;
-    return serviceList.filter((order) => order.partyId === partyFilterId);
-  }, [serviceList, partyFilterId]);
+    if (!partyFilterId) return safeServiceList;
+    return safeServiceList.filter((order) => order.partyId === partyFilterId);
+  }, [safeServiceList, partyFilterId]);
 
   const pagedServices = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -835,7 +842,7 @@ export default function Services() {
 
         {/* Mobile card view */}
         <div className="mt-4 md:hidden space-y-3">
-          {listLoading && serviceList.length === 0 ? (
+          {listLoading && safeServiceList.length === 0 ? (
             <p className="py-4 text-sm text-slate-500">{t('common.loading')}</p>
           ) : pagedServices.length === 0 ? (
             <p className="py-4 text-sm text-slate-500">{t('services.noOrders')}</p>
@@ -944,7 +951,7 @@ export default function Services() {
               </tr>
             </thead>
             <tbody>
-              {listLoading && serviceList.length === 0 ? (
+              {listLoading && safeServiceList.length === 0 ? (
                 <tr><td colSpan={10} className="py-4 text-slate-500">{t('common.loading')}</td></tr>
               ) : pagedServices.length === 0 ? (
                 <tr><td colSpan={10} className="py-4 text-slate-500">{t('services.noOrders')}</td></tr>
@@ -1545,7 +1552,7 @@ export default function Services() {
                   {invoiceOrder.attributes && Object.keys(invoiceOrder.attributes).length > 0 && (
                     <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5">
                       {Object.entries(invoiceOrder.attributes).map(([key, val]) => {
-                        const def = attributeDefs.find((d) => d.key === key);
+                        const def = safeAttributeDefs.find((d) => d.key === key);
                         const attrLabel = def?.name || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
                         return (
                           <div key={key} className="text-sm">
