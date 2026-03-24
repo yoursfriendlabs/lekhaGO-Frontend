@@ -16,7 +16,7 @@ export const useSaleStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const data = await api.listSales(params);
-      set({ sales: data || [], loaded: true, loading: false });
+      set({ sales: Array.isArray(data) ? data : [], loaded: true, loading: false });
     } catch (err) {
       set({ error: err.message, loading: false });
     }

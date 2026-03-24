@@ -17,7 +17,7 @@ export const useProductStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const data = await api.listProducts();
-      set({ products: data || [], loaded: true, loading: false });
+      set({ products: Array.isArray(data) ? data : [], loaded: true, loading: false });
     } catch (err) {
       set({ error: err.message, loading: false });
     }

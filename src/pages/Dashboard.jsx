@@ -107,7 +107,7 @@ export default function Dashboard() {
 
   const filterByRange = useCallback(
     (items, dateKey) =>
-      items.filter((item) => {
+      (Array.isArray(items) ? items : []).filter((item) => {
         const raw = item?.[dateKey] || item?.createdAt || item?.updatedAt;
         return isWithinRange(raw, rangeStart, rangeEnd);
       }),

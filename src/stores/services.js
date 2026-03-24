@@ -12,7 +12,7 @@ export const useServiceStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const data = await api.listServices(params);
-      set({ services: data || [], loaded: true, loading: false });
+      set({ services: Array.isArray(data) ? data : [], loaded: true, loading: false });
     } catch (err) {
       set({ error: err.message, loading: false });
     }

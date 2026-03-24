@@ -50,22 +50,59 @@ async function request(path, options = {}) {
   return payload;
 }
 
+function unwrapList(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== 'object') return [];
+
+  const keys = [
+    'data',
+    'items',
+    'results',
+    'rows',
+    'list',
+    'records',
+    'docs',
+    'products',
+    'sales',
+    'purchases',
+    'services',
+    'parties',
+    'staff',
+    'transactions',
+    'orderAttributes',
+    'order_attributes',
+  ];
+
+  const findArray = (value, depth) => {
+    if (Array.isArray(value)) return value;
+    if (!value || typeof value !== 'object') return null;
+    if (depth >= 3) return null;
+    for (const key of keys) {
+      const found = findArray(value[key], depth + 1);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  return findArray(payload, 0) || [];
+}
+
 export const api = {
   register: (data) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   login: (data) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   requestEmailOtp: (data) => request('/api/auth/request-email-otp', { method: 'POST', body: JSON.stringify(data) }),
   verifyEmailOtp: (data) => request('/api/auth/verify-email-otp', { method: 'POST', body: JSON.stringify(data) }),
-  listStaff: () => request('/api/staff'),
+  listStaff: () => request('/api/staff').then(unwrapList),
   createStaff: (data) => request('/api/staff', { method: 'POST', body: JSON.stringify(data) }),
   updateStaff: (membershipId, data) => request(`/api/staff/${membershipId}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteStaff: (membershipId) => request(`/api/staff/${membershipId}`, { method: 'DELETE' }),
-  listProducts: () => request('/api/products'),
+  listProducts: () => request('/api/products').then(unwrapList),
   createProduct: (data) => request('/api/products', { method: 'POST', body: JSON.stringify(data) }),
   createPurchase: (data) => request('/api/purchases', { method: 'POST', body: JSON.stringify(data) }),
   listPurchases: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const suffix = query ? `?${query}` : '';
-    return request(`/api/purchases${suffix}`);
+    return request(`/api/purchases${suffix}`).then(unwrapList);
   },
   getPurchase: (id) => request(`/api/purchases/${id}`),
   updatePurchase: (id, data) => request(`/api/purchases/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
@@ -73,7 +110,7 @@ export const api = {
   listSales: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const suffix = query ? `?${query}` : '';
-    return request(`/api/sales${suffix}`);
+    return request(`/api/sales${suffix}`).then(unwrapList);
   },
   getSale: (id) => request(`/api/sales/${id}`),
   updateSale: (id, data) => request(`/api/sales/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
@@ -83,18 +120,18 @@ export const api = {
   listServices: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const suffix = query ? `?${query}` : '';
-    return request(`/api/services${suffix}`);
+    return request(`/api/services${suffix}`).then(unwrapList);
   },
   lowStock: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const suffix = query ? `?${query}` : '';
-    return request(`/api/reports/low-stock${suffix}`);
+    return request(`/api/reports/low-stock${suffix}`).then(unwrapList);
   },
   inventorySummary: () => request('/api/reports/inventory-summary'),
   listParties: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const suffix = query ? `?${query}` : '';
-    return request(`/api/parties${suffix}`);
+    return request(`/api/parties${suffix}`).then(unwrapList);
   },
   createParty: (data) => request('/api/parties', { method: 'POST', body: JSON.stringify(data) }),
   getParty: (id) => request(`/api/parties/${id}`),
@@ -103,13 +140,13 @@ export const api = {
   listPartyTransactions: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const suffix = query ? `?${query}` : '';
-    return request(`/api/party-transactions${suffix}`);
+    return request(`/api/party-transactions${suffix}`).then(unwrapList);
   },
   createPartyTransaction: (data) => request('/api/party-transactions', { method: 'POST', body: JSON.stringify(data) }),
   listOrderAttributes: (params = {}) => {
     const query = new URLSearchParams(params).toString();
     const suffix = query ? `?${query}` : '';
-    return request(`/api/order-attributes${suffix}`);
+    return request(`/api/order-attributes${suffix}`).then(unwrapList);
   },
   createOrderAttribute: (data) => request('/api/order-attributes', { method: 'POST', body: JSON.stringify(data) }),
   getOrderAttribute: (id) => request(`/api/order-attributes/${id}`),

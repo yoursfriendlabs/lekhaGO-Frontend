@@ -16,7 +16,7 @@ export const usePartyStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const data = await api.listParties();
-      set({ parties: data || [], loaded: true, loading: false });
+      set({ parties: Array.isArray(data) ? data : [], loaded: true, loading: false });
     } catch (err) {
       set({ error: err.message, loading: false });
     }
