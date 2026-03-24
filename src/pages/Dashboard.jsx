@@ -145,16 +145,6 @@ export default function Dashboard() {
     setLoading(true);
     setLoadError('');
 
-<<<<<<< HEAD
-  const filterByRange = useCallback(
-    (items, dateKey) =>
-      (Array.isArray(items) ? items : []).filter((item) => {
-        const raw = item?.[dateKey] || item?.createdAt || item?.updatedAt;
-        return isWithinRange(raw, rangeStart, rangeEnd);
-      }),
-    [rangeStart, rangeEnd],
-  );
-=======
     api.getDashboardSummary({
       from: rangeStart.format('YYYY-MM-DD'),
       to: rangeEnd.format('YYYY-MM-DD'),
@@ -172,7 +162,6 @@ export default function Dashboard() {
         if (!isActive) return;
         setLoading(false);
       });
->>>>>>> f55843f25a5884d9ce49cd3ca06047dbc9732af7
 
     return () => {
       isActive = false;

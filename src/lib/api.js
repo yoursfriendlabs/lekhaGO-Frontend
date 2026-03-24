@@ -364,70 +364,6 @@ export const api = {
   login: (data) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   requestEmailOtp: (data) => request('/api/auth/request-email-otp', { method: 'POST', body: JSON.stringify(data) }),
   verifyEmailOtp: (data) => request('/api/auth/verify-email-otp', { method: 'POST', body: JSON.stringify(data) }),
-<<<<<<< HEAD
-  listStaff: () => request('/api/staff').then(unwrapList),
-  createStaff: (data) => request('/api/staff', { method: 'POST', body: JSON.stringify(data) }),
-  updateStaff: (membershipId, data) => request(`/api/staff/${membershipId}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  deleteStaff: (membershipId) => request(`/api/staff/${membershipId}`, { method: 'DELETE' }),
-  listProducts: () => request('/api/products').then(unwrapList),
-  createProduct: (data) => request('/api/products', { method: 'POST', body: JSON.stringify(data) }),
-  createPurchase: (data) => request('/api/purchases', { method: 'POST', body: JSON.stringify(data) }),
-  listPurchases: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    const suffix = query ? `?${query}` : '';
-    return request(`/api/purchases${suffix}`).then(unwrapList);
-  },
-  getPurchase: (id) => request(`/api/purchases/${id}`),
-  updatePurchase: (id, data) => request(`/api/purchases/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  createSale: (data) => request('/api/sales', { method: 'POST', body: JSON.stringify(data) }),
-  listSales: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    const suffix = query ? `?${query}` : '';
-    return request(`/api/sales${suffix}`).then(unwrapList);
-  },
-  getSale: (id) => request(`/api/sales/${id}`),
-  updateSale: (id, data) => request(`/api/sales/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  createService: (data) => request('/api/services', { method: 'POST', body: JSON.stringify(data) }),
-  getService: (id) => request(`/api/services/${id}`),
-  updateService: (id, data) => request(`/api/services/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  listServices: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    const suffix = query ? `?${query}` : '';
-    return request(`/api/services${suffix}`).then(unwrapList);
-  },
-  lowStock: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    const suffix = query ? `?${query}` : '';
-    return request(`/api/reports/low-stock${suffix}`).then(unwrapList);
-  },
-  inventorySummary: () => request('/api/reports/inventory-summary'),
-  listParties: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    const suffix = query ? `?${query}` : '';
-    return request(`/api/parties${suffix}`).then(unwrapList);
-  },
-  createParty: (data) => request('/api/parties', { method: 'POST', body: JSON.stringify(data) }),
-  getParty: (id) => request(`/api/parties/${id}`),
-  updateParty: (id, data) => request(`/api/parties/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  deleteParty: (id) => request(`/api/parties/${id}`, { method: 'DELETE' }),
-  listPartyTransactions: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    const suffix = query ? `?${query}` : '';
-    return request(`/api/party-transactions${suffix}`).then(unwrapList);
-  },
-  createPartyTransaction: (data) => request('/api/party-transactions', { method: 'POST', body: JSON.stringify(data) }),
-  listOrderAttributes: (params = {}) => {
-    const query = new URLSearchParams(params).toString();
-    const suffix = query ? `?${query}` : '';
-    return request(`/api/order-attributes${suffix}`).then(unwrapList);
-  },
-  createOrderAttribute: (data) => request('/api/order-attributes', { method: 'POST', body: JSON.stringify(data) }),
-  getOrderAttribute: (id) => request(`/api/order-attributes/${id}`),
-  updateOrderAttribute: (id, data) => request(`/api/order-attributes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  deleteOrderAttribute: (id) => request(`/api/order-attributes/${id}`, { method: 'DELETE' }),
-  getBusinessSettings: () => request('/api/business-settings'),
-  updateBusinessSettings: (data) => request('/api/business-settings', { method: 'PUT', body: JSON.stringify(data) }),
-=======
 
   listStaff: () => request('/api/staff', {}, listCache(['staff'], CACHE_TTL.short)),
   createStaff: (data) =>
@@ -519,7 +455,6 @@ export const api = {
   getDashboardSummary: (params = {}) => listRequest('/api/dashboard/summary', params, listCache(['dashboard'], CACHE_TTL.short)),
   getAnalyticsSummary: (params = {}) => listRequest('/api/analytics/summary', params, listCache(['analytics'], CACHE_TTL.short)),
 
->>>>>>> f55843f25a5884d9ce49cd3ca06047dbc9732af7
   uploadAttachment: (file) => {
     const formData = new FormData();
     formData.append('file', file);
