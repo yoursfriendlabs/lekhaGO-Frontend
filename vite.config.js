@@ -16,7 +16,7 @@ export default defineConfig({
         short_name: 'MyShop',
         description: 'Business management for inventory, sales, purchases, services, and parties.',
         lang: 'en',
-        start_url: '/',
+        start_url: '/app',
         scope: '/',
         display: 'standalone',
         orientation: 'portrait',

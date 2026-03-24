@@ -287,7 +287,7 @@ export default function Services() {
   };
 
   const loadProductOptions = async (search) => {
-    const data = await api.lookupProducts({ search, limit: 10, type: 'part' });
+    const data = await api.lookupProducts({ search, limit: 10 });
     const normalized = (data?.items || []).map(normalizeLookupProduct);
     cacheProducts(normalized);
     return normalized.map(toProductLookupOption);

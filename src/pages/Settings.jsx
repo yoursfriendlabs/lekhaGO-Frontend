@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import StaffManagement from '../components/StaffManagement';
 import BanksSettingsPanel from '../components/settings/BanksSettingsPanel.jsx';
+import CategoriesSettingsPanel from '../components/settings/CategoriesSettingsPanel.jsx';
 import OrderAttributesSettingsPanel from '../components/settings/OrderAttributesSettingsPanel.jsx';
 import { api, API_BASE } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -12,6 +13,7 @@ import { useBusinessSettings } from '../lib/businessSettings';
 import { useI18n } from '../lib/i18n.jsx';
 import {
   BANKS_SETTINGS_TAB,
+  CATEGORIES_SETTINGS_TAB,
   GENERAL_SETTINGS_TAB,
   ORDER_ATTRIBUTES_SETTINGS_TAB,
   STAFF_SETTINGS_TAB,
@@ -57,6 +59,11 @@ export default function Settings() {
     }
 
     nextTabs.push(
+      {
+        key: CATEGORIES_SETTINGS_TAB,
+        label: t('settingsPage.tabs.categories'),
+        description: t('settingsPage.descriptions.categories'),
+      },
       {
         key: BANKS_SETTINGS_TAB,
         label: t('settingsPage.tabs.banks'),
@@ -147,7 +154,7 @@ export default function Settings() {
     : null;
 
   return (
-    <div className="max-w-6xl space-y-6">
+    <div className="min-w-0 max-w-6xl space-y-6 overflow-x-hidden">
       <PageHeader title={t('settingsPage.title')} subtitle={activeTabMeta?.description || t('settingsPage.subtitle')} />
 
       <div className="card space-y-4">
@@ -155,11 +162,11 @@ export default function Settings() {
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
             {t('settingsPage.title')}
           </p>
-          <h2 className="font-serif text-xl text-slate-900 dark:text-white">{activeTabMeta.label}</h2>
+          <h2 className="break-words font-serif text-xl text-slate-900 dark:text-white">{activeTabMeta.label}</h2>
         </div>
 
-        <div className="-mx-4 overflow-x-auto px-4 pb-1">
-          <div className="flex min-w-max gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap">
+          <div className="contents lg:flex lg:flex-wrap lg:gap-2">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.key;
 
@@ -168,7 +175,7 @@ export default function Settings() {
                   key={tab.key}
                   type="button"
                   onClick={() => handleTabChange(tab.key)}
-                  className={`whitespace-nowrap rounded-2xl px-4 py-2.5 text-sm font-semibold transition ${
+                  className={`min-w-0 rounded-2xl px-3 py-3 text-center text-sm font-semibold leading-tight transition lg:w-auto lg:px-4 lg:py-2.5 lg:text-left ${
                     isActive
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
@@ -332,6 +339,7 @@ export default function Settings() {
       ) : null}
 
       {activeTab === STAFF_SETTINGS_TAB ? <StaffManagement businessId={businessId} /> : null}
+      {activeTab === CATEGORIES_SETTINGS_TAB ? <CategoriesSettingsPanel /> : null}
       {activeTab === BANKS_SETTINGS_TAB ? <BanksSettingsPanel /> : null}
       {activeTab === ORDER_ATTRIBUTES_SETTINGS_TAB ? <OrderAttributesSettingsPanel /> : null}
     </div>

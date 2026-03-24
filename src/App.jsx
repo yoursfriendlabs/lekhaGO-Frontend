@@ -33,6 +33,17 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function PublicOnlyRoute({ children }) {
+  const { token } = useAuth();
+  if (token) return <Navigate to="/app" replace />;
+  return children;
+}
+
+function IndexRoute() {
+  const { token } = useAuth();
+  return token ? <Navigate to="/app" replace /> : <Landing />;
+}
+
 function AppShell() {
   const { businessId } = useAuth();
   const { t } = useI18n();
@@ -103,10 +114,31 @@ export default function App() {
               )}
             >
               <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route path="/verify-email" element={<VerifyEmail />} />
+                <Route path="/" element={<IndexRoute />} />
+                <Route
+                  path="/login"
+                  element={(
+                    <PublicOnlyRoute>
+                      <Login />
+                    </PublicOnlyRoute>
+                  )}
+                />
+                <Route
+                  path="/register"
+                  element={(
+                    <PublicOnlyRoute>
+                      <Register />
+                    </PublicOnlyRoute>
+                  )}
+                />
+                <Route
+                  path="/verify-email"
+                  element={(
+                    <PublicOnlyRoute>
+                      <VerifyEmail />
+                    </PublicOnlyRoute>
+                  )}
+                />
                 <Route
                   path="/app/*"
                   element={(
