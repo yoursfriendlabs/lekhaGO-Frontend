@@ -31,7 +31,7 @@ export default function AsyncSearchableSelect({
   clearable = true,
   noResultsLabel = 'No results',
   loadingLabel = 'Loading...',
-  minQueryLength = 1,
+  minQueryLength = 0,
   renderOption,
 }) {
   const [open, setOpen] = useState(false);
@@ -84,7 +84,9 @@ export default function AsyncSearchableSelect({
     if (!open || typeof loadOptionsRef.current !== 'function') return undefined;
 
     const search = debouncedQuery.trim();
-    if (search.length < minQueryLength) {
+    
+    // Load options when opened, even with empty query (for browsing all options)
+    if (search.length < minQueryLength && minQueryLength > 0) {
       setOptions((previous) => {
         const safePrevious = ensureArray(previous);
         return mergeOptions(
@@ -131,7 +133,7 @@ export default function AsyncSearchableSelect({
     setOpen(false);
   };
 
-  const showPrompt = query.trim().length < minQueryLength;
+  const showPrompt = minQueryLength > 0 && query.trim().length < minQueryLength;
 
   return (
     <div ref={containerRef} className={`relative ${className}`}>
@@ -162,7 +164,7 @@ export default function AsyncSearchableSelect({
       </button>
 
       {open ? (
-        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[200px] rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+        <div className="absolute left-0 top-full z-[100] mt-1 w-full min-w-[200px] max-h-[300px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900 md:max-h-56">
           <div className="border-b border-slate-100 p-2 dark:border-slate-800">
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-800">
               <Search size={13} className="shrink-0 text-slate-400" />
@@ -187,7 +189,7 @@ export default function AsyncSearchableSelect({
             </div>
           </div>
 
-          <ul className="max-h-56 overflow-y-auto py-1">
+          <ul className="max-h-[200px] overflow-y-auto py-1 md:max-h-56">
             {loading ? (
               <li className="px-3 py-2.5 text-sm text-slate-400">{loadingLabel}</li>
             ) : showPrompt ? (
@@ -198,9 +200,9 @@ export default function AsyncSearchableSelect({
               safeOptions.map((option) => (
                 <li
                   key={option.value}
-                  className={`cursor-pointer px-3 py-2 text-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                  className={`cursor-pointer px-3 py-3 text-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 ${
                     String(option.value) === String(value)
-                      ? 'font-semibold text-primary-700 dark:text-primary-400'
+                      ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
                       : 'text-slate-700 dark:text-slate-300'
                   }`}
                   onClick={() => handleSelect(option)}

@@ -568,6 +568,16 @@ export default function Services() {
       const hydratedProducts = rawItems
         .map((item) => normalizeLookupProduct(item))
         .filter((product) => product.id);
+      
+      // Build party object from all possible sources
+      const partyData = {
+        id: full.partyId || '',
+        partyName: full.partyName || full.Customer?.name || '',
+        phone: full.partyPhone || full.Customer?.phone || '',
+        currentAmount: full.Party?.currentAmount || full.Customer?.currentAmount,
+        type: 'customer',
+      };
+      
       setHeader({
         partyId: full.partyId || '',
         orderNo: full.orderNo || '',
@@ -581,7 +591,8 @@ export default function Services() {
       cacheProducts(hydratedProducts);
       setSuggestedOrderNo(full.orderNo || '');
       setAmountReceived(String(full.receivedTotal ?? 0));
-      setIsPaid(Math.max(Number(full.grandTotal || 0) - Number(full.receivedTotal || 0), 0) <= 0);
+      const computedIsPaid = Math.max(Number(full.grandTotal || 0) - Number(full.receivedTotal || 0), 0) <= 0;
+      setIsPaid(computedIsPaid);
       setItems(rawItems.length > 0 ? rawItems.map((i) => ({
         itemType: i.itemType || 'labor',
         description: i.description || '',
@@ -591,16 +602,12 @@ export default function Services() {
         unitPrice: String(i.unitPrice ?? '0'),
         lineTotal: String(i.lineTotal ?? '0'),
       })) : [{ ...emptyItem }]);
-      if (full.partyId && full.partyName) {
-        const party = normalizeLookupParty({
-          id: full.partyId,
-          partyName: full.partyName,
-          phone: full.partyPhone || '',
-          currentAmount: full.Party?.currentAmount,
-          type: 'customer',
-        });
+      
+      // Set selected party if we have party data
+      if (partyData.id && partyData.partyName) {
+        const party = normalizeLookupParty(partyData);
         setSelectedParty(party);
-        setPartyQuery(`${full.partyName}${full.partyPhone ? ` (${full.partyPhone})` : ''}`);
+        setPartyQuery(`${partyData.partyName}${partyData.phone ? ` (${partyData.phone})` : ''}`);
       }
     } catch (err) {
       setFormNotice({ type: 'error', message: err.message });

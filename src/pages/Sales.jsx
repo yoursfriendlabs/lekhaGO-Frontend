@@ -448,8 +448,18 @@ export default function Sales() {
   const showItemsStep = !isMobile || mobileStep === 'items';
   const showPaymentStep = !isMobile || mobileStep === 'payment';
 
+  // Validation for proceeding to next step
+  const canProceedToItems = header.saleDate && (!header.partyId || true); // Customer is optional (walk-in)
+  const hasValidItems = items.length > 0 && items.every((item) => item.productId && Number(item.lineTotal || 0) > 0);
+  const canProceedToPayment = mobileStep === 'details' ? canProceedToItems : true;
+
   const goToNextMobileStep = () => {
     if (!isMobile) return;
+    // Validate before proceeding
+    if (mobileStep === 'items' && !hasValidItems) {
+      setStatus({ type: 'error', message: t('errors.selectProductSale') });
+      return;
+    }
     const nextStep = saleSteps[currentStepIndex + 1];
     if (nextStep) setMobileStep(nextStep.id);
   };
@@ -482,6 +492,11 @@ export default function Sales() {
               steps={saleSteps}
               currentStep={mobileStep}
               onStepChange={setMobileStep}
+              onNext={goToNextMobileStep}
+              onBack={goToPrevMobileStep}
+              canProceed={mobileStep === 'items' ? hasValidItems : canProceedToItems}
+              nextLabel={mobileStep === 'items' ? t('common.continueToPayment') || 'Continue to Payment' : t('common.continue') || 'Continue'}
+              backLabel={t('common.back') || 'Back'}
             />
           ) : null}
 
