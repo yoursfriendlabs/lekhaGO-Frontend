@@ -10,8 +10,7 @@ const navItems = [
   { to: '/app/services', key: 'nav.services' },
   { to: '/app/ledger', key: 'nav.ledger' },
   { to: '/app/analytics', key: 'nav.analytics' },
-  { to: '/app/order-attributes', key: 'nav.orderAttributes' },
-  { to: '/app/settings', label: 'Settings' },
+  { to: '/app/settings', key: 'nav.settings' },
 ];
 
 export default function Sidebar() {

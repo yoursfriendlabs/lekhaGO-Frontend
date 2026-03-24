@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
-import { clearSession, getBusinessId, getRole, getToken, getUser, setBusinessId, setRole, setToken, setUser } from './storage';
+import { createContext, useContext, useMemo, useState } from 'react';
+import { clearPendingEmailVerification, clearSession, getBusinessId, getRole, getToken, getUser, setBusinessId, setRole, setToken, setUser } from './storage';
+import { clearApiCache } from './api';
 
 const AuthContext = createContext(null);
 
@@ -10,6 +11,8 @@ export function AuthProvider({ children }) {
   const [role, setRoleState] = useState(getRole());
 
   const setSession = (nextToken, nextUser, nextBusinessId, nextRole) => {
+    clearApiCache();
+    clearPendingEmailVerification();
     const resolvedRole = nextRole || nextUser?.role || '';
     const resolvedUser = nextUser ? { ...nextUser, role: resolvedRole || nextUser.role } : null;
     setToken(nextToken);
@@ -23,11 +26,13 @@ export function AuthProvider({ children }) {
   };
 
   const updateBusinessId = (id) => {
+    clearApiCache();
     setBusinessId(id);
     setBusinessIdState(id);
   };
 
   const logout = () => {
+    clearApiCache();
     clearSession();
     setTokenState('');
     setUserState(null);

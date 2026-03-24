@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { getVerificationEmail, isEmailVerificationRequiredError } from '../lib/emailVerification';
 import { useI18n } from '../lib/i18n.jsx';
-import { consumeSessionNotice } from '../lib/storage';
+import { consumeSessionNotice, setPendingEmailVerification } from '../lib/storage';
 
 function SpinIcon() {
   return (
@@ -37,17 +38,16 @@ const BRAND_STATS = [
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { setSession } = useAuth();
   const { t } = useI18n();
   const [form, setForm] = useState({ email: '', password: '', businessId: '' });
   const [status, setStatus] = useState(() => {
+    const routedNotice = location.state?.notice;
+    if (routedNotice?.message) return routedNotice;
     const message = consumeSessionNotice();
     return { type: message ? 'error' : 'info', message };
   });
-  const [step, setStep] = useState('login');
-  const [pendingEmail, setPendingEmail] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [otpStatus, setOtpStatus] = useState({ type: 'info', message: '' });
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
 
@@ -66,6 +66,24 @@ export default function Login() {
       setSession(data.token, data.user, resolvedBusinessId);
       navigate('/app');
     } catch (err) {
+      if (isEmailVerificationRequiredError(err)) {
+        const email = getVerificationEmail(err, form.email);
+        setPendingEmailVerification({
+          email,
+          source: 'login',
+          requestOtpOnOpen: true,
+          resendAvailableAt: 0,
+        });
+        navigate('/verify-email', {
+          state: {
+            email,
+            source: 'login',
+            requestOtpOnOpen: true,
+            resendAvailableAt: 0,
+          },
+        });
+        return;
+      }
       setStatus({ type: 'error', message: err.message || 'Request failed' });
     } finally {
       setLoading(false);

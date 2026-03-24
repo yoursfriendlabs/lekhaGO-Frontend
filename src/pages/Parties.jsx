@@ -1,12 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 import dayjs, { todayISODate } from '../lib/datetime';
+import {
+  getPartyBalanceMeta,
+  getStatementTypeLabel,
+  normalizePartyStatementResponse,
+  toAmount,
+} from '../lib/partyBalances.js';
 import { usePartyStore } from '../stores/parties';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { Plus, Bell, Search, Filter, ChevronDown } from 'lucide-react';
+import { buildPaymentPayload, requiresBankSelection } from '../lib/payments';
 
 const emptyForm = {
   name: '',
@@ -18,28 +29,93 @@ const emptyForm = {
   asOfDate: '',
   balanceType: 'receive',
 };
+
 const makeEmptyTx = () => ({
   partyId: '',
   direction: 'give',
   amount: '',
   txDate: todayISODate(),
   note: '',
+  paymentMethod: 'cash',
+  bankId: '',
   serviceId: '',
 });
 
-const computeDue = (total, paid) => Math.max(Number(total || 0) - Number(paid || 0), 0);
+const TX_PAGE_SIZE = 10;
+
+function formatDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+}
+
+function getStatementBadgeClass(type) {
+  const classes = {
+    sale: 'bg-emerald-100 text-emerald-700',
+    service: 'bg-sky-100 text-sky-700',
+    purchase: 'bg-amber-100 text-amber-700',
+    payment_in: 'bg-teal-100 text-teal-700',
+    payment_out: 'bg-indigo-100 text-indigo-700',
+  };
+
+  return classes[type] || 'bg-slate-100 text-slate-600';
+}
+
+function getStatementRowTitle(row, t) {
+  const reference = row.referenceNo || row.id?.slice(0, 8) || '-';
+
+  switch (row.type) {
+    case 'sale':
+      return `${t('parties.salesInvoice')} ${reference}`;
+    case 'service':
+      return `${t('parties.serviceOrder')} ${reference}`;
+    case 'purchase':
+      return `${t('parties.purchaseBill')} ${reference}`;
+    case 'payment_in':
+      return `${t('parties.paymentIn')} ${reference}`;
+    case 'payment_out':
+      return `${t('parties.paymentOut')} ${reference}`;
+    default:
+      return reference;
+  }
+}
+
+function getStatementAmountFields(row, t) {
+  if (row.type === 'payment_in' || row.type === 'payment_out') {
+    return {
+      primaryLabel: t('ledger.amount'),
+      primaryValue: toAmount(row.amount),
+      secondaryLabel: null,
+      secondaryValue: null,
+      tertiaryLabel: null,
+      tertiaryValue: null,
+    };
+  }
+
+  return {
+    primaryLabel: t('common.total'),
+    primaryValue: toAmount(row.totalAmount),
+    secondaryLabel: t('common.paid'),
+    secondaryValue: toAmount(row.paidAmount),
+    tertiaryLabel: t('common.due'),
+    tertiaryValue: toAmount(row.dueAmount),
+  };
+}
 
 export default function Parties() {
   const { t } = useI18n();
+  const navigate = useNavigate();
+  const { upsert: upsertParty, remove: removeParty, invalidate: invalidateParties } = usePartyStore();
 
-  // ── Party store (cached) ──
-  const { parties, fetch: fetchParties, upsert: upsertParty, remove: removeParty } = usePartyStore();
+  const [parties, setParties] = useState([]);
+  const [loadingParties, setLoadingParties] = useState(false);
+  const [listError, setListError] = useState('');
+  const [partyReloadKey, setPartyReloadKey] = useState(0);
 
-  // ── Balance-calculation data (loaded once here, not cached globally since limit:200) ──
-  const [sales, setSales] = useState([]);
-  const [purchases, setPurchases] = useState([]);
-  const [services, setServices] = useState([]);
-  const [manualTx, setManualTx] = useState([]);
+  const [statementData, setStatementData] = useState(() => normalizePartyStatementResponse());
+  const [statementLoading, setStatementLoading] = useState(false);
+  const [statementError, setStatementError] = useState('');
+  const [statementReloadKey, setStatementReloadKey] = useState(0);
 
   const [form, setForm] = useState(emptyForm);
   const [status, setStatus] = useState({ type: 'info', message: '' });
@@ -47,6 +123,7 @@ export default function Parties() {
   const [editingId, setEditingId] = useState(null);
   const [filterType, setFilterType] = useState('all');
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query, 300);
   const [selectedId, setSelectedId] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('credit');
@@ -54,163 +131,195 @@ export default function Parties() {
   const [txForm, setTxForm] = useState(makeEmptyTx());
   const [txStatus, setTxStatus] = useState({ type: 'info', message: '' });
   const [txLoading, setTxLoading] = useState(false);
+  const [pendingServices, setPendingServices] = useState([]);
+  const [pendingServicesLoading, setPendingServicesLoading] = useState(false);
   const [txPage, setTxPage] = useState(1);
-  const TX_PAGE_SIZE = 10;
-
-  // ── Load parties (cached) + transaction data ──
-  useEffect(() => {
-    fetchParties();
-    Promise.all([
-      api.listSales({ limit: 200 }),
-      api.listPurchases({ limit: 200 }),
-      api.listServices({ limit: 200 }),
-      api.listPartyTransactions(),
-    ])
-      .then(([salesData, purchaseData, serviceData, txData]) => {
-        setSales(salesData || []);
-        setPurchases(purchaseData || []);
-        setServices(serviceData || []);
-        setManualTx(txData || []);
-      })
-      .catch(() => null);
-  }, []);
-
-  const filteredParties = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return parties.filter((party) => {
-      if (filterType !== 'all' && party.type !== filterType) return false;
-      if (!normalizedQuery) return true;
-      return [party.name, party.phone, party.email]
-        .filter(Boolean)
-        .some((field) => String(field).toLowerCase().includes(normalizedQuery));
-    });
-  }, [parties, filterType, query]);
 
   useEffect(() => {
-    if (!filteredParties.length) { setSelectedId(null); return; }
-    if (!selectedId || !filteredParties.find((party) => party.id === selectedId)) {
-      setSelectedId(filteredParties[0].id);
+    let isActive = true;
+
+    async function loadParties() {
+      setLoadingParties(true);
+      setListError('');
+
+      try {
+        const data = await api.listParties({
+          ...(debouncedQuery.trim() ? { search: debouncedQuery.trim() } : {}),
+          ...(filterType !== 'all' ? { type: filterType } : {}),
+        });
+
+        if (!isActive) return;
+        setParties(data?.items || []);
+      } catch (err) {
+        if (!isActive) return;
+        setListError(err.message);
+        setParties([]);
+      } finally {
+        if (isActive) setLoadingParties(false);
+      }
     }
-  }, [filteredParties, selectedId]);
 
-  useEffect(() => { setTxPage(1); }, [selectedId]);
+    loadParties();
+    return () => {
+      isActive = false;
+    };
+  }, [debouncedQuery, filterType, partyReloadKey]);
 
-  const balanceByParty = useMemo(() => {
-    // Convention: negative = party owes us (we will receive)
-    //             positive = we owe party (they have credit / purchase due)
-    const map = new Map();
-    parties.forEach((party) => {
-      const opening = Number(party.currentAmount || 0);
-      // balanceType 'receive' = they owe us → negative
-      // balanceType 'give'    = we owe them  → positive
-      const signed = party.balanceType === 'give' ? Math.abs(opening) : -Math.abs(opening);
-      map.set(party.id, signed);
-    });
-    return map;
-  }, [parties]);
+  useEffect(() => {
+    if (!parties.length) {
+      setSelectedId(null);
+      return;
+    }
 
+    if (!selectedId || !parties.find((party) => party.id === selectedId)) {
+      setSelectedId(parties[0].id);
+    }
+  }, [parties, selectedId]);
+
+  useEffect(() => {
+    setTxPage(1);
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setStatementData(normalizePartyStatementResponse());
+      setStatementError('');
+      return;
+    }
+
+    let isActive = true;
+
+    async function loadStatement() {
+      setStatementData(normalizePartyStatementResponse());
+      setStatementLoading(true);
+      setStatementError('');
+
+      try {
+        const data = await api.partyStatement({
+          partyId: selectedId,
+          limit: TX_PAGE_SIZE,
+          offset: (txPage - 1) * TX_PAGE_SIZE,
+        });
+        const normalized = normalizePartyStatementResponse(data);
+
+        if (!isActive) return;
+        setStatementData(normalized);
+
+        if (normalized.party?.id) {
+          upsertParty(normalized.party);
+          setParties((prev) =>
+            prev.map((party) => (
+              party.id === normalized.party.id
+                ? { ...party, ...normalized.party }
+                : party
+            ))
+          );
+        }
+      } catch (err) {
+        if (!isActive) return;
+        setStatementError(err.message);
+        setStatementData(normalizePartyStatementResponse());
+      } finally {
+        if (isActive) setStatementLoading(false);
+      }
+    }
+
+    loadStatement();
+    return () => {
+      isActive = false;
+    };
+  }, [selectedId, statementReloadKey, txPage, upsertParty]);
 
   const totalsummary = useMemo(() => {
-    let totalReceive = 0;
-    let totalGive = 0;
+    return parties.reduce(
+      (totals, party) => {
+        const amount = toAmount(party.currentAmount);
+        if (amount < 0) totals.totalReceive += Math.abs(amount);
+        else if (amount > 0) totals.totalGive += amount;
+        return totals;
+      },
+      { totalReceive: 0, totalGive: 0 }
+    );
+  }, [parties]);
 
-    balanceByParty.forEach((bal) => {
-
-      // negative = they owe us (we will receive)
-      // positive = we owe them (we will give)
-      if (bal < 0) totalReceive += Math.abs(bal);
-      else if (bal > 0) totalGive += bal;
-    });
-    return { totalReceive, totalGive };
-  }, [balanceByParty]);
-
-  const selectedParty = filteredParties.find((party) => party.id === selectedId) || null;
-  const selectedBalance = selectedParty ? balanceByParty.get(selectedParty.id) || 0 : 0;
-  // negative = they owe us → "To Receive" (rose)
-  // positive = we owe them → "To Give" (blue)
-  const balanceLabel = selectedParty?.currentAmount < 0 ? t('parties.toReceive') : selectedParty?.currentAmount > 0 ? t('parties.toGive') : 'Settled';
-  const balanceColor = selectedParty?.currentAmount < 0 ? 'text-rose-500' : selectedParty?.currentAmount > 0 ? 'text-blue-600' : 'text-slate-400';
-
-  const partyTransactions = useMemo(() => {
-    if (!selectedParty) return [];
-    const id = selectedParty.id;
-    const salesTx = sales
-      .filter((sale) => (sale.partyId || sale.customerId || sale.Customer?.id) === id)
-      .map((sale) => ({
-        id: sale.id, type: 'sale', date: sale.saleDate, total: Number(sale.grandTotal || 0),
-        status: sale.status || 'paid', balance: Number(sale.dueAmount ?? 0), remarks: sale.notes || '-',
-        label: `${t('parties.salesInvoice')} ${sale.invoiceNo || sale.id.slice(0, 6)}`,
-      }));
-    const purchaseTx = purchases
-      .filter((purchase) => (purchase.partyId || purchase.supplierId || purchase.Supplier?.id) === id)
-      .map((purchase) => ({
-        id: purchase.id, type: 'purchase', date: purchase.purchaseDate, total: Number(purchase.grandTotal || 0),
-        status: purchase.status || 'received', balance: Number(purchase.dueAmount ?? 0), remarks: purchase.notes || '-',
-        label: `${t('parties.purchaseBill')} ${purchase.invoiceNo || purchase.id.slice(0, 6)}`,
-      }));
-    const serviceTx = services
-      .filter((service) => service.partyId === id)
-      .map((service) => {
-        const due = Math.max(Number(service.grandTotal || 0) - Number(service.receivedTotal || 0), 0);
-        return {
-          id: service.id, type: 'service', date: service.deliveryDate || service.createdAt,
-          total: Number(service.grandTotal || 0), status: due > 0 ? 'unpaid' : 'paid', balance: due,
-          remarks: service.notes || '-',
-          label: `${t('parties.serviceOrder')} ${service.orderNo || service.id.slice(0, 6)}`,
-        };
-      });
-    const adjustments = manualTx
-      .filter((tx) => tx.partyId === id)
-      .map((tx) => ({
-        id: tx.id, type: 'adjustment', date: tx.txDate, total: Number(tx.amount || 0),
-        status: tx.direction, balance: 0, remarks: tx.note || '-',
-        label: tx.direction === 'give' ? t('parties.giveAdjustment') : t('parties.receiveAdjustment'),
-      }));
-    return [...salesTx, ...purchaseTx, ...serviceTx, ...adjustments]
-      .sort((a, b) => dayjs(b.date || 0).valueOf() - dayjs(a.date || 0).valueOf());
-  }, [selectedParty, sales, purchases, services, manualTx, t]);
-
-  const pagedTransactions = useMemo(() => {
-    const start = (txPage - 1) * TX_PAGE_SIZE;
-    return partyTransactions.slice(start, start + TX_PAGE_SIZE);
-  }, [partyTransactions, txPage]);
-
-  const totalTxPages = Math.ceil(partyTransactions.length / TX_PAGE_SIZE);
-
-  // Pending service orders for the selected party (unpaid, linkable in payment form)
-  const pendingServices = useMemo(() => {
-    if (!selectedParty) return [];
-    return services.filter((svc) => {
-      if (svc.partyId !== selectedParty.id) return false;
-      const due = Number(svc.grandTotal || 0) - Number(svc.receivedTotal || 0);
-      return due > 0;
-    });
-  }, [services, selectedParty]);
+  const selectedParty = useMemo(
+    () => parties.find((party) => party.id === selectedId) || null,
+    [parties, selectedId]
+  );
+  const selectedPartyView = selectedParty || statementData.party
+    ? { ...(selectedParty || {}), ...(statementData.party || {}) }
+    : null;
+  const selectedBalanceMeta = getPartyBalanceMeta(selectedPartyView?.currentAmount, t);
+  const totalTxPages = Math.max(1, Math.ceil(statementData.summary.totalRows / TX_PAGE_SIZE));
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const openCreate = () => { setEditingId(null); setForm(emptyForm); setActiveTab('credit'); setIsOpen(true); };
-
-  const openEdit = (party) => {
-    setEditingId(party.id);
-    setForm({ name: party.name || '', phone: party.phone || '', email: party.email || '', address: party.address || '', type: party.type || 'customer', openingBalance: party.openingBalance || '', asOfDate: party.asOfDate || '', balanceType: party.balanceType || 'receive' });
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(emptyForm);
     setActiveTab('credit');
     setIsOpen(true);
   };
 
-  const closeDialog = () => { setIsOpen(false); setEditingId(null); setForm(emptyForm); };
-
-  const openTxDialog = () => {
-    if (!selectedParty) return;
-    setTxForm({ ...makeEmptyTx(), partyId: selectedParty.id });
-    setTxStatus({ type: 'info', message: '' });
-    setTxOpen(true);
+  const openEdit = (party) => {
+    setEditingId(party.id);
+    setForm({
+      name: party.name || '',
+      phone: party.phone || '',
+      email: party.email || '',
+      address: party.address || '',
+      type: party.type || 'customer',
+      openingBalance: party.openingBalance || '',
+      asOfDate: party.asOfDate || '',
+      balanceType: party.balanceType || 'receive',
+    });
+    setActiveTab('credit');
+    setIsOpen(true);
   };
 
-  const closeTxDialog = () => { setTxOpen(false); setTxStatus({ type: 'info', message: '' }); setTxForm(makeEmptyTx()); };
+  const closeDialog = () => {
+    setIsOpen(false);
+    setEditingId(null);
+    setForm(emptyForm);
+  };
+
+  const openTxDialog = async () => {
+    if (!selectedParty) return;
+
+    setTxForm({ ...makeEmptyTx(), partyId: selectedParty.id });
+    setTxStatus({ type: 'info', message: '' });
+    setPendingServices([]);
+    setPendingServicesLoading(true);
+    setTxOpen(true);
+
+    try {
+      const data = await api.partyStatement({
+        partyId: selectedParty.id,
+        type: 'service',
+        limit: 100,
+        offset: 0,
+      });
+      const normalized = normalizePartyStatementResponse(data);
+      setPendingServices(
+        normalized.rows.filter((row) => row.type === 'service' && toAmount(row.dueAmount) > 0)
+      );
+    } catch (err) {
+      setTxStatus({ type: 'error', message: err.message });
+    } finally {
+      setPendingServicesLoading(false);
+    }
+  };
+
+  const closeTxDialog = () => {
+    setTxOpen(false);
+    setTxStatus({ type: 'info', message: '' });
+    setTxForm(makeEmptyTx());
+    setPendingServices([]);
+    setPendingServicesLoading(false);
+  };
 
   const handleTxChange = (event) => {
     const { name, value } = event.target;
@@ -219,10 +328,13 @@ export default function Parties() {
 
   const handleDelete = async (id) => {
     if (!window.confirm(t('parties.confirmDelete'))) return;
+
     try {
       await api.deleteParty(id);
       removeParty(id);
+      invalidateParties();
       setStatus({ type: 'success', message: t('parties.messages.deleted') });
+      setPartyReloadKey((prev) => prev + 1);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     }
@@ -242,17 +354,29 @@ export default function Parties() {
 
     setLoading(true);
     setStatus({ type: 'info', message: '' });
+
     try {
-      if (editingId) {
-        const updated = await api.updateParty(editingId, form);
-        upsertParty(updated || { ...form, id: editingId });
-        setStatus({ type: 'success', message: t('parties.messages.updated') });
-      } else {
-        const created = await api.createParty(form);
-        upsertParty(created);
-        setStatus({ type: 'success', message: t('parties.messages.created') });
+      const saved = editingId
+        ? await api.updateParty(editingId, form)
+        : await api.createParty(form);
+
+      if (saved?.id) {
+        upsertParty(saved);
+        setSelectedId(saved.id);
       }
-      if (keepOpen) { setForm(emptyForm); } else { closeDialog(); }
+
+      invalidateParties();
+      setPartyReloadKey((prev) => prev + 1);
+      setStatus({
+        type: 'success',
+        message: editingId ? t('parties.messages.updated') : t('parties.messages.created'),
+      });
+
+      if (keepOpen) {
+        setForm(emptyForm);
+      } else {
+        closeDialog();
+      }
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     } finally {
@@ -263,31 +387,59 @@ export default function Parties() {
   const submitTransaction = async (event) => {
     event.preventDefault();
     if (!txForm.partyId) return;
+
     setTxLoading(true);
     setTxStatus({ type: 'info', message: '' });
-    try {
-      const amount = Number(txForm.amount || 0);
-      const payload = { partyId: txForm.partyId, direction: txForm.direction, amount, txDate: txForm.txDate, note: txForm.note };
-      const created = await api.createPartyTransaction(payload);
-      setManualTx((prev) => [created, ...prev]);
 
-      // If a service is linked, apply the payment to its receivedTotal
+    try {
+      const amount = toAmount(txForm.amount);
+      if (requiresBankSelection(txForm, amount)) {
+        setTxStatus({ type: 'error', message: t('payments.bankRequired') });
+        return;
+      }
+      const payload = {
+        partyId: txForm.partyId,
+        direction: txForm.direction,
+        amount,
+        txDate: txForm.txDate,
+        ...buildPaymentPayload(
+          {
+            paymentMethod: txForm.paymentMethod,
+            bankId: txForm.bankId,
+            paymentNote: txForm.note,
+          },
+          { noteKey: 'note' }
+        ),
+      };
+
+      await api.createPartyTransaction(payload);
+
       if (txForm.serviceId) {
-        const svc = services.find((s) => s.id === txForm.serviceId);
-        if (svc) {
-          const newReceived = Math.min(Number(svc.grandTotal || 0), Number(svc.receivedTotal || 0) + amount);
-          const updated = await api.updateService(txForm.serviceId, { receivedTotal: newReceived });
-          setServices((prev) => prev.map((s) => s.id === txForm.serviceId ? { ...s, ...(updated || { receivedTotal: newReceived }) } : s));
+        const selectedService = pendingServices.find((service) => service.id === txForm.serviceId);
+        if (selectedService) {
+          const nextPaidAmount = Math.min(
+            toAmount(selectedService.totalAmount),
+            toAmount(selectedService.paidAmount) + amount
+          );
+          await api.updateService(txForm.serviceId, { receivedTotal: nextPaidAmount });
         }
       }
 
-      setTxStatus({ type: 'success', message: t('parties.messages.transactionSaved') });
+      invalidateParties();
+      setPartyReloadKey((prev) => prev + 1);
+      setStatementReloadKey((prev) => prev + 1);
+      setStatus({ type: 'success', message: t('parties.messages.transactionSaved') });
       closeTxDialog();
     } catch (err) {
       setTxStatus({ type: 'error', message: err.message });
     } finally {
       setTxLoading(false);
     }
+  };
+
+  const goToStatement = () => {
+    if (!selectedParty) return;
+    navigate(`/app/ledger?partyId=${selectedParty.id}`);
   };
 
   return (
@@ -303,12 +455,12 @@ export default function Parties() {
       />
 
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
+      {listError ? <Notice title={listError} tone="error" /> : null}
 
-      {/* ── Summary Bar ── */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex items-center gap-4 rounded-2xl border border-emerald-200/70 bg-emerald-50/60 px-5 py-4 dark:border-emerald-800/40 dark:bg-emerald-900/10">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
           </div>
           <div>
             <p className="text-xs uppercase text-emerald-600 dark:text-emerald-400">{t('parties.totalToReceive')}</p>
@@ -319,7 +471,7 @@ export default function Parties() {
         </div>
         <div className="flex items-center gap-4 rounded-2xl border border-rose-200/70 bg-rose-50/60 px-5 py-4 dark:border-rose-800/40 dark:bg-rose-900/10">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-900/40">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
           </div>
           <div>
             <p className="text-xs uppercase text-rose-600 dark:text-rose-400">{t('parties.totalToGive')}</p>
@@ -334,7 +486,7 @@ export default function Parties() {
         <div className="card space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
-              {t('parties.listTitle', { count: filteredParties.length })}
+              {t('parties.listTitle', { count: parties.length })}
             </h3>
             <button className="btn-ghost" type="button" onClick={openCreate}>
               <ChevronDown size={16} /> {t('parties.addParty')}
@@ -344,15 +496,29 @@ export default function Parties() {
           <div className="flex items-center gap-2">
             <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm focus-within:border-emerald-300 dark:border-slate-800 dark:bg-slate-950">
               <Search size={16} className="text-slate-400" />
-              <input className="w-full bg-transparent outline-none" placeholder={t('parties.searchPlaceholder')} value={query} onChange={(event) => setQuery(event.target.value)} />
+              <input
+                className="w-full bg-transparent outline-none"
+                placeholder={t('parties.searchPlaceholder')}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
             </div>
-            <button className="btn-ghost" type="button"><Filter size={16} /></button>
+            <button className="btn-ghost" type="button">
+              <Filter size={16} />
+            </button>
           </div>
 
           <div className="flex flex-wrap gap-2">
             {['customer', 'supplier', 'all'].map((type) => (
-              <button key={type} type="button" onClick={() => setFilterType(type)}
-                className={filterType === type ? 'rounded-xl bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700' : 'rounded-xl bg-slate-100 px-3 py-1 text-sm text-slate-600'}
+              <button
+                key={type}
+                type="button"
+                onClick={() => setFilterType(type)}
+                className={
+                  filterType === type
+                    ? 'rounded-xl bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700'
+                    : 'rounded-xl bg-slate-100 px-3 py-1 text-sm text-slate-600'
+                }
               >
                 {t(`parties.types.${type}`)}
               </button>
@@ -360,15 +526,24 @@ export default function Parties() {
           </div>
 
           <div className="space-y-2">
-            {filteredParties.length === 0 ? (
+            {loadingParties && parties.length === 0 ? (
+              <p className="text-sm text-slate-500">{t('common.loading')}</p>
+            ) : parties.length === 0 ? (
               <p className="text-sm text-slate-500">{t('parties.noParties')}</p>
             ) : (
-              filteredParties.map((party) => {
-                const balance = balanceByParty.get(party.id) || 0;
-                const isReceive = balance >= 0;
+              parties.map((party) => {
+                const balanceMeta = getPartyBalanceMeta(party.currentAmount, t);
+
                 return (
-                  <button key={party.id} type="button" onClick={() => setSelectedId(party.id)}
-                    className={selectedId === party.id ? 'w-full rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-left' : 'w-full rounded-2xl border border-slate-200 bg-white p-3 text-left'}
+                  <button
+                    key={party.id}
+                    type="button"
+                    onClick={() => setSelectedId(party.id)}
+                    className={
+                      selectedId === party.id
+                        ? 'w-full rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-left'
+                        : 'w-full rounded-2xl border border-slate-200 bg-white p-3 text-left'
+                    }
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-white">
@@ -377,22 +552,22 @@ export default function Parties() {
                       <div className="flex-1">
                         <p className="flex items-center gap-1.5 font-semibold text-slate-900">
                           {party.name}
-                          {party.currentAmount < 0 && (
-                            <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-600">Due</span>
-                          )}
-                          {party.currentAmount > 0 && (
-                            <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-600">Credit</span>
+                          {balanceMeta.tone !== 'settled' && (
+                            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${balanceMeta.badgeClass}`}>
+                              {balanceMeta.label}
+                            </span>
                           )}
                         </p>
                         <p className="text-xs text-slate-500">{party.phone || '-'}</p>
                       </div>
                       <div className="text-right">
-                        <p className={party.currentAmount < 0 ? 'font-semibold text-rose-500' : party.currentAmount > 0 ? 'font-semibold text-blue-600' : 'font-semibold text-slate-400'}>
-                          {t('currency.formatted', { symbol: t('currency.symbol'), amount: Math.abs(party?.currentAmount).toFixed(2) })}
+                        <p className={`font-semibold ${balanceMeta.textClass}`}>
+                          {t('currency.formatted', {
+                            symbol: t('currency.symbol'),
+                            amount: balanceMeta.absoluteAmount.toFixed(2),
+                          })}
                         </p>
-                        <p className="text-xs text-slate-500">
-                          {party.currentAmount < 0 ? t('parties.toReceive') : party.currentAmount > 0 ? t('parties.toGive') : 'Settled'}
-                        </p>
+                        <p className="text-xs text-slate-500">{balanceMeta.label}</p>
                       </div>
                     </div>
                   </button>
@@ -403,94 +578,120 @@ export default function Parties() {
         </div>
 
         <div className="card space-y-4">
-          {selectedParty ? (
+          {selectedPartyView ? (
             <>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-semibold text-emerald-700">
-                    {selectedParty.name?.slice(0, 1).toUpperCase() || 'P'}
+                    {selectedPartyView.name?.slice(0, 1).toUpperCase() || 'P'}
                   </div>
                   <div>
-                    <p className="text-xl font-semibold text-slate-900">{selectedParty.name}</p>
-                    <p className="text-sm text-slate-500">{selectedParty.phone || '-'}</p>
+                    <p className="text-xl font-semibold text-slate-900">{selectedPartyView.name}</p>
+                    <p className="text-sm text-slate-500">{selectedPartyView.phone || '-'}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs uppercase text-slate-400">{balanceLabel}</p>
-                  <p className={`text-2xl font-semibold ${balanceColor}`}>
-                    {t('currency.formatted', { symbol: t('currency.symbol'), amount: Math.abs(selectedParty.currentAmount).toFixed(2) })}
+                  <p className="text-xs uppercase text-slate-400">{selectedBalanceMeta.label}</p>
+                  <p className={`text-2xl font-semibold ${selectedBalanceMeta.textClass}`}>
+                    {t('currency.formatted', {
+                      symbol: t('currency.symbol'),
+                      amount: selectedBalanceMeta.absoluteAmount.toFixed(2),
+                    })}
                   </p>
-                  {selectedParty.currentAmount > 0 && (
-                    <p className="mt-0.5 text-xs text-blue-500">Party has advance credit</p>
-                  )}
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex gap-2">
-                  <button className="btn-ghost" type="button" onClick={() => openEdit(selectedParty)}>{t('parties.manageParty')}</button>
-                  <button className="btn-ghost" type="button">{t('parties.statement')}</button>
+                  <button className="btn-ghost" type="button" onClick={() => openEdit(selectedPartyView)}>
+                    {t('parties.manageParty')}
+                  </button>
+                  <button className="btn-ghost" type="button" onClick={goToStatement}>
+                    {t('parties.statement')}
+                  </button>
                 </div>
-                <button className="btn-secondary" type="button"><Bell size={16} /> {t('parties.sendReminder')}</button>
+                <div className="flex gap-2">
+                  <button className="btn-secondary" type="button">
+                    <Bell size={16} /> {t('parties.sendReminder')}
+                  </button>
+                  <button className="btn-ghost text-rose-600" type="button" onClick={() => handleDelete(selectedPartyView.id)}>
+                    {t('common.delete')}
+                  </button>
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <h4 className="text-lg font-semibold text-slate-900">{t('parties.transactions', { count: partyTransactions.length })}</h4>
-                <button className="btn-primary" type="button" onClick={openTxDialog}><Plus size={16} /> {t('parties.addTransaction')}</button>
+                <h4 className="text-lg font-semibold text-slate-900">
+                  {t('parties.transactions', { count: statementData.summary.totalRows })}
+                </h4>
+                <button className="btn-primary" type="button" onClick={openTxDialog}>
+                  <Plus size={16} /> {t('parties.addTransaction')}
+                </button>
               </div>
 
+              {statementError ? <Notice title={statementError} tone="error" /> : null}
+
               <div className="space-y-2">
-                {partyTransactions.length === 0 ? (
+                {statementLoading ? (
+                  <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+                ) : statementData.rows.length === 0 ? (
                   <p className="py-3 text-sm text-slate-500">{t('parties.noTransactions')}</p>
                 ) : (
-                  pagedTransactions.map((tx) => {
-                    const typeColors = {
-                      sale: 'bg-emerald-100 text-emerald-700',
-                      purchase: 'bg-amber-100 text-amber-700',
-                      service: 'bg-blue-100 text-blue-700',
-                      adjustment: 'bg-slate-100 text-slate-600',
-                    };
-                    // A transaction-level due is "covered" when the party's net balance
-                    // is positive (we owe them / they have overpaid), meaning their
-                    // individual outstanding dues are absorbed by that credit.
-                    const coveredByCredit = tx.balance > 0 && selectedBalance > 0;
+                  statementData.rows.map((row) => {
+                    const amountFields = getStatementAmountFields(row, t);
+
                     return (
-                      <div key={tx.id} className="rounded-2xl border border-slate-200 bg-white p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className={`shrink-0 rounded-lg px-2 py-0.5 text-[11px] font-semibold capitalize ${typeColors[tx.type] || typeColors.adjustment}`}>
-                              {tx.type}
-                            </span>
-                            <span className="truncate text-sm font-medium text-slate-800">{tx.label}</span>
+                      <div key={`${row.type}-${row.id}`} className="rounded-2xl border border-slate-200 bg-white p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold capitalize ${getStatementBadgeClass(row.type)}`}>
+                                {getStatementTypeLabel(row.type, t)}
+                              </span>
+                              <span className="truncate text-sm font-medium text-slate-800">
+                                {getStatementRowTitle(row, t)}
+                              </span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                              <span>{formatDate(row.date || row.createdAt)}</span>
+                              {row.status ? <span>{row.status}</span> : null}
+                              {row.direction ? <span>{row.direction}</span> : null}
+                              {row.note ? <span className="italic">{row.note}</span> : null}
+                            </div>
+                            <PaymentTypeSummary
+                              source={row}
+                              className="mt-2"
+                              labelClassName="text-xs font-medium"
+                              metaClassName="text-[11px]"
+                            />
                           </div>
-                          <div className="shrink-0 text-right">
-                            <p className="text-sm font-semibold text-slate-900">
-                              {t('currency.formatted', { symbol: t('currency.symbol'), amount: tx.total.toFixed(2) })}
+                          <div className="shrink-0 text-right text-sm">
+                            <p className="font-semibold text-slate-900">
+                              {amountFields.primaryLabel}:{' '}
+                              {t('currency.formatted', {
+                                symbol: t('currency.symbol'),
+                                amount: amountFields.primaryValue.toFixed(2),
+                              })}
                             </p>
-                            {tx.balance > 0 && !coveredByCredit && (
-                              <p className="text-xs font-medium text-rose-500">
-                                {t('currency.formatted', { symbol: t('currency.symbol'), amount: tx.balance.toFixed(2) })} due
+                            {amountFields.secondaryLabel ? (
+                              <p className="text-slate-500">
+                                {amountFields.secondaryLabel}:{' '}
+                                {t('currency.formatted', {
+                                  symbol: t('currency.symbol'),
+                                  amount: amountFields.secondaryValue.toFixed(2),
+                                })}
                               </p>
-                            )}
-                            {coveredByCredit && (
-                              <p className="text-xs font-medium text-blue-500">covered by credit</p>
-                            )}
+                            ) : null}
+                            {amountFields.tertiaryLabel ? (
+                              <p className="text-rose-500">
+                                {amountFields.tertiaryLabel}:{' '}
+                                {t('currency.formatted', {
+                                  symbol: t('currency.symbol'),
+                                  amount: amountFields.tertiaryValue.toFixed(2),
+                                })}
+                              </p>
+                            ) : null}
                           </div>
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                          <span className="text-xs text-slate-400">{tx.date || '-'}</span>
-                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                            coveredByCredit
-                              ? 'bg-blue-50 text-blue-600'
-                              : tx.balance > 0
-                              ? 'bg-rose-50 text-rose-600'
-                              : 'bg-emerald-50 text-emerald-600'
-                          }`}>
-                            {coveredByCredit ? 'covered' : tx.balance > 0 ? t('parties.unpaid') : t('parties.paid')}
-                          </span>
-                          {tx.remarks && tx.remarks !== '-' && (
-                            <span className="text-xs text-slate-400 italic">{tx.remarks}</span>
-                          )}
                         </div>
                       </div>
                     );
@@ -500,12 +701,14 @@ export default function Parties() {
 
               {totalTxPages > 1 && (
                 <div className="flex items-center justify-between pt-2 text-sm text-slate-500">
-                  <span>{partyTransactions.length} transactions · page {txPage} of {totalTxPages}</span>
+                  <span>
+                    {statementData.summary.totalRows} transactions · page {txPage} of {totalTxPages}
+                  </span>
                   <div className="flex gap-2">
                     <button
                       type="button"
                       disabled={txPage === 1}
-                      onClick={() => setTxPage((p) => p - 1)}
+                      onClick={() => setTxPage((prev) => prev - 1)}
                       className="rounded-lg border border-slate-200 px-3 py-1 text-xs disabled:opacity-40"
                     >
                       Prev
@@ -513,7 +716,7 @@ export default function Parties() {
                     <button
                       type="button"
                       disabled={txPage === totalTxPages}
-                      onClick={() => setTxPage((p) => p + 1)}
+                      onClick={() => setTxPage((prev) => prev + 1)}
                       className="rounded-lg border border-slate-200 px-3 py-1 text-xs disabled:opacity-40"
                     >
                       Next
@@ -609,7 +812,10 @@ export default function Parties() {
                 { value: 'receive', label: t('parties.paymentIn') },
                 { value: 'give', label: t('parties.paymentOut') },
               ].map((opt) => (
-                <button key={opt.value} type="button" onClick={() => setTxForm((prev) => ({ ...prev, direction: opt.value }))}
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setTxForm((prev) => ({ ...prev, direction: opt.value }))}
                   className={
                     txForm.direction === opt.value
                       ? opt.value === 'give'
@@ -631,26 +837,35 @@ export default function Parties() {
             <label className="label">{t('parties.transactionDate')}</label>
             <input className="input mt-1" name="txDate" type="date" value={txForm.txDate} onChange={handleTxChange} />
           </div>
-          {pendingServices.length > 0 && (
+          {pendingServicesLoading ? (
+            <p className="text-xs text-slate-500">{t('common.loading')}</p>
+          ) : pendingServices.length > 0 ? (
             <div>
               <label className="label">Apply to service order <span className="text-slate-400">(optional)</span></label>
               <select className="input mt-1" name="serviceId" value={txForm.serviceId} onChange={handleTxChange}>
                 <option value="">— none —</option>
-                {pendingServices.map((svc) => {
-                  const due = Number(svc.grandTotal || 0) - Number(svc.receivedTotal || 0);
-                  return (
-                    <option key={svc.id} value={svc.id}>
-                      {svc.orderNo || svc.id.slice(0, 8)} — Rs {due.toFixed(2)} due
-                    </option>
-                  );
-                })}
+                {pendingServices.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {(service.referenceNo || service.id.slice(0, 8))} — Rs {toAmount(service.dueAmount).toFixed(2)} due
+                  </option>
+                ))}
               </select>
             </div>
-          )}
-          <div>
-            <label className="label">{t('parties.transactionNote')}</label>
-            <input className="input mt-1" name="note" value={txForm.note} onChange={handleTxChange} />
-          </div>
+          ) : null}
+          <PaymentMethodFields
+            value={{
+              paymentMethod: txForm.paymentMethod,
+              bankId: txForm.bankId,
+              paymentNote: txForm.note,
+            }}
+            onChange={(patch) => setTxForm((prev) => ({
+              ...prev,
+              paymentMethod: patch.paymentMethod,
+              bankId: patch.bankId,
+              note: patch.paymentNote,
+            }))}
+            noteLabel={t('parties.transactionNote')}
+          />
           {txStatus.message ? <Notice title={txStatus.message} tone={txStatus.type} /> : null}
           <div className="flex flex-wrap justify-end gap-2">
             <button className="btn-secondary" type="button" onClick={closeTxDialog}>{t('common.close')}</button>

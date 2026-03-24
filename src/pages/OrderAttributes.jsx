@@ -11,6 +11,13 @@ const emptyForm = {
   entityType: 'all',
 };
 
+function getAttributeItems(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.rows)) return payload.rows;
+  return [];
+}
+
 export default function OrderAttributes() {
   const { t } = useI18n();
   const [attributes, setAttributes] = useState([]);
@@ -22,7 +29,7 @@ export default function OrderAttributes() {
   const loadAttributes = async () => {
     try {
       const data = await api.listOrderAttributes();
-      setAttributes(data || []);
+      setAttributes(getAttributeItems(data));
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     }

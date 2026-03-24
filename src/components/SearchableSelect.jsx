@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Search, X, ChevronDown } from 'lucide-react';
 
+function ensureArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 /**
  * SearchableSelect - a filterable dropdown select.
  *
@@ -22,12 +26,13 @@ export default function SearchableSelect({
   const [query, setQuery] = useState('');
   const containerRef = useRef(null);
   const searchRef = useRef(null);
+  const safeOptions = ensureArray(options);
 
-  const selected = options.find((o) => o.value === value && o.value !== '');
+  const selected = safeOptions.find((o) => o.value === value && o.value !== '');
 
   const filtered = query.trim()
-    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase().trim()))
-    : options;
+    ? safeOptions.filter((o) => o.label.toLowerCase().includes(query.toLowerCase().trim()))
+    : safeOptions;
 
   // Close on outside click
   useEffect(() => {

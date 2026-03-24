@@ -1,196 +1,211 @@
 import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
-import { api } from '../lib/api';
-import Pagination from '../components/Pagination';
 import BarGraph from '../components/BarGraph';
 import PieChart from '../components/PieChart';
+import { api } from '../lib/api';
+import { useI18n } from '../lib/i18n.jsx';
 import dayjs, { todayISODate } from '../lib/datetime';
 
-function buildSeries(items, dateKey, days = 14) {
-  const points = Array.from({ length: days }).map((_, idx) => {
-    const date = dayjs().subtract(days - 1 - idx, 'day');
-    const key = date.format('YYYY-MM-DD');
-    return {
-      key,
-      label: date.format('D MMM'),
-      value: 0,
-    };
-  });
-  const map = Object.fromEntries(points.map((point) => [point.key, point]));
-  items.forEach((item) => {
-    const raw = item[dateKey] || item.createdAt;
-    if (!raw) return;
-    const d = dayjs(raw);
-    if (!d.isValid()) return;
-    const key = d.format('YYYY-MM-DD');
-    if (map[key]) map[key].value += Number(item.grandTotal || 0);
-  });
-  return points;
+const EMPTY_SUMMARY = Object.freeze({
+  totals: {
+    sales: 0,
+    purchases: 0,
+    services: 0,
+    combined: 0,
+  },
+  series: {
+    sales: [],
+    purchases: [],
+    services: [],
+    timeline: [],
+  },
+});
+
+function asNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function firstNumber(source, keys = []) {
+  for (const key of keys) {
+    const parsed = Number(source?.[key]);
+    if (Number.isFinite(parsed)) return parsed;
+  }
 
+  return null;
+}
+
+function formatSeriesLabel(rawLabel, fallbackLabel) {
+  const label = rawLabel ? String(rawLabel) : fallbackLabel;
+
+  if (/^\d{4}-\d{2}$/.test(label)) {
+    const parsedMonth = dayjs(`${label}-01`);
+    return parsedMonth.isValid() ? parsedMonth.format('MMM YYYY') : label;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(label) || label.includes('T')) {
+    const parsedDate = dayjs(label);
+    return parsedDate.isValid() ? parsedDate.format('D MMM') : label;
+  }
+
+  return label;
+}
+
+function normalizeMetricSeries(items, valueKeys) {
+  if (!Array.isArray(items)) return [];
+
+  return items.map((item, index) => {
+    const rawLabel = item?.label || item?.periodLabel || item?.period || item?.date || item?.key;
+    const value = firstNumber(item, valueKeys) ?? 0;
+
+    return {
+      key: String(item?.key || item?.period || item?.date || index),
+      label: formatSeriesLabel(rawLabel, `#${index + 1}`),
+      value,
+    };
+  });
+}
+
+function normalizeTimelineSeries(items) {
+  if (!Array.isArray(items)) return [];
+
+  return items.map((item, index) => {
+    const sales = firstNumber(item, ['sales', 'salesTotal', 'salesAmount']) ?? 0;
+    const purchases = firstNumber(item, ['purchases', 'purchaseTotal', 'purchaseAmount']) ?? 0;
+    const services = firstNumber(item, ['services', 'serviceTotal', 'serviceAmount']) ?? 0;
+    const combined = firstNumber(item, ['combined', 'combinedTotal', 'total']) ?? (sales + purchases + services);
+    const rawLabel = item?.label || item?.periodLabel || item?.period || item?.date || item?.key;
+
+    return {
+      key: String(item?.key || item?.period || item?.date || index),
+      label: formatSeriesLabel(rawLabel, `#${index + 1}`),
+      sales,
+      purchases,
+      services,
+      combined,
+    };
+  });
+}
+
+function normalizeAnalyticsSummary(payload = {}) {
+  const summary = payload && typeof payload === 'object' ? payload : {};
+  const totals = summary?.totals || {};
+  const series = summary?.series || {};
+  const timeline = normalizeTimelineSeries(series.timeline);
+  const salesSeries = normalizeMetricSeries(series.sales, ['value', 'sales', 'total', 'amount']);
+  const purchaseSeries = normalizeMetricSeries(series.purchases, ['value', 'purchases', 'total', 'amount']);
+  const serviceSeries = normalizeMetricSeries(series.services, ['value', 'services', 'total', 'amount']);
+
+  const fallbackSales = timeline.map((point) => ({ key: point.key, label: point.label, value: point.sales }));
+  const fallbackPurchases = timeline.map((point) => ({ key: point.key, label: point.label, value: point.purchases }));
+  const fallbackServices = timeline.map((point) => ({ key: point.key, label: point.label, value: point.services }));
+
+  return {
+    totals: {
+      sales: asNumber(totals.sales),
+      purchases: asNumber(totals.purchases),
+      services: asNumber(totals.services),
+      combined: asNumber(totals.combined ?? (asNumber(totals.sales) + asNumber(totals.purchases) + asNumber(totals.services))),
+    },
+    series: {
+      sales: salesSeries.length > 0 ? salesSeries : fallbackSales,
+      purchases: purchaseSeries.length > 0 ? purchaseSeries : fallbackPurchases,
+      services: serviceSeries.length > 0 ? serviceSeries : fallbackServices,
+      timeline,
+    },
+  };
+}
 
 export default function Analytics() {
-  const [sales, setSales] = useState([]);
-  const [purchases, setPurchases] = useState([]);
-  const [services, setServices] = useState([]);
+  const { t } = useI18n();
+  const [summary, setSummary] = useState(() => EMPTY_SUMMARY);
   const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
-    type: 'all',
-    status: 'all',
-    fromDate: todayISODate(),
+    fromDate: dayjs().startOf('month').format('YYYY-MM-DD'),
     toDate: todayISODate(),
-    search: '',
+    groupBy: 'auto',
   });
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
-    Promise.all([api.listSales({ limit: 200 }), api.listPurchases({ limit: 200 }), api.listServices({ limit: 200 })])
-      .then(([salesData, purchaseData, serviceData]) => {
-        setSales(salesData || []);
-        setPurchases(purchaseData || []);
-        setServices(serviceData || []);
+    let isActive = true;
+
+    setLoading(true);
+    setStatus('');
+
+    api.getAnalyticsSummary({
+      from: filters.fromDate || undefined,
+      to: filters.toDate || undefined,
+      groupBy: filters.groupBy || 'auto',
+    })
+      .then((data) => {
+        if (!isActive) return;
+        setSummary(normalizeAnalyticsSummary(data));
       })
-      .catch((err) => setStatus(err.message));
-  }, []);
+      .catch((err) => {
+        if (!isActive) return;
+        setSummary(EMPTY_SUMMARY);
+        setStatus(err.message);
+      })
+      .finally(() => {
+        if (!isActive) return;
+        setLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [filters.fromDate, filters.groupBy, filters.toDate]);
 
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
-  const filterByCommon = (records, type) => {
-    const fromDate = filters.fromDate ? dayjs(filters.fromDate).startOf('day') : null;
-    const toDate = filters.toDate ? dayjs(filters.toDate).endOf('day') : null;
-    const search = filters.search.trim().toLowerCase();
+  const formatMoney = (value) => {
+    const amount = asNumber(value);
+    const formatted = amount.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
 
-    return records
-      .filter((record) => (filters.type === 'all' ? true : filters.type === type))
-      .filter((record) => (filters.status === 'all' ? true : record.status === filters.status))
-      .filter((record) => {
-        if (!fromDate && !toDate) return true;
-        const rawDate = type === 'sale' ? record.saleDate
-          : type === 'purchase' ? record.purchaseDate
-          : (record.createdAt || record.deliveryDate);
-        const recordDate = dayjs(rawDate);
-        if (!recordDate.isValid()) return false;
-        if (fromDate && recordDate.isBefore(fromDate)) return false;
-        if (toDate && recordDate.isAfter(toDate)) return false;
-        return true;
-      })
-      .filter((record) => {
-        if (!search) return true;
-        const invoice = (record.invoiceNo || record.orderNo || record.id || '').toLowerCase();
-        const party = type === 'sale'
-          ? (record.partyName || record.customerName || record.Customer?.name || record.partyId || record.customerId || 'walk-in')
-          : type === 'purchase'
-          ? (record.partyName || record.supplierName || record.Party?.name || record.partyId || record.supplierId || '')
-          : (record.partyName || record.Party?.name || record.partyId || '');
-        return invoice.includes(search) || party.toLowerCase().includes(search);
-      });
+    return t('currency.formatted', {
+      symbol: t('currency.symbol'),
+      amount: formatted,
+    });
   };
 
-  const filteredSales = useMemo(() => filterByCommon(sales, 'sale'), [sales, filters]);
-  const filteredPurchases = useMemo(() => filterByCommon(purchases, 'purchase'), [purchases, filters]);
-  const filteredServices = useMemo(() => filterByCommon(services, 'service'), [services, filters]);
+  const pieData = useMemo(() => ([
+    { name: t('nav.sales'), value: summary.totals.sales },
+    { name: t('nav.services'), value: summary.totals.services },
+    { name: t('nav.purchases'), value: summary.totals.purchases },
+  ]), [summary.totals.purchases, summary.totals.sales, summary.totals.services, t]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [filters]);
+  const seriesCaption = useMemo(() => {
+    const labelMap = {
+      auto: t('analytics.filters.auto'),
+      day: t('analytics.filters.day'),
+      week: t('analytics.filters.week'),
+      month: t('analytics.filters.month'),
+    };
 
-  const totals = useMemo(() => {
-    const salesTotal = filteredSales.reduce((sum, sale) => sum + Number(sale.grandTotal || 0), 0);
-    const servicesTotal = filteredServices.reduce((sum, svc) => sum + Number(svc.grandTotal || 0), 0);
-    const purchasesTotal = filteredPurchases.reduce((sum, purchase) => sum + Number(purchase.grandTotal || 0), 0);
-    const receivedTotal = filteredSales.reduce((sum, sale) => {
-      const grand = Number(sale.grandTotal || 0);
-      const received = Number(sale.amountReceived ?? (sale.status === 'paid' ? grand : 0) ?? 0);
-      return sum + received;
-    }, 0);
-    const serviceReceivedTotal = filteredServices.reduce((sum, svc) => sum + Number(svc.receivedTotal || 0), 0);
-    const paidTotal = filteredPurchases.reduce((sum, purchase) => {
-      const grand = Number(purchase.grandTotal || 0);
-      const paid = Number(purchase.amountReceived ?? (purchase.status === 'received' ? grand : 0) ?? 0);
-      return sum + paid;
-    }, 0);
-    const salesDue = filteredSales.reduce((sum, sale) => {
-      const grand = Number(sale.grandTotal || 0);
-      const received = Number(sale.amountReceived ?? (sale.status === 'paid' ? grand : 0) ?? 0);
-      const due = Number(sale.dueAmount ?? Math.max(grand - received, 0));
-      return sum + due;
-    }, 0);
-    const serviceDue = filteredServices.reduce((sum, svc) => {
-      return sum + Math.max(Number(svc.grandTotal || 0) - Number(svc.receivedTotal || 0), 0);
-    }, 0);
-    const purchaseDue = filteredPurchases.reduce((sum, purchase) => {
-      const grand = Number(purchase.grandTotal || 0);
-      const paid = Number(purchase.amountReceived ?? (purchase.status === 'received' ? grand : 0) ?? 0);
-      const due = Number(purchase.dueAmount ?? Math.max(grand - paid, 0));
-      return sum + due;
-    }, 0);
-    return { salesTotal, servicesTotal, purchasesTotal, receivedTotal, serviceReceivedTotal, paidTotal, salesDue, serviceDue, purchaseDue };
-  }, [filteredSales, filteredPurchases, filteredServices]);
-
-  const salesSeries = useMemo(() => buildSeries(filteredSales, 'saleDate', 14), [filteredSales]);
-  const purchaseSeries = useMemo(() => buildSeries(filteredPurchases, 'purchaseDate', 14), [filteredPurchases]);
-  const servicesSeries = useMemo(() => buildSeries(filteredServices, 'createdAt', 14), [filteredServices]);
-  const tableRows = useMemo(() => {
-    return [
-      ...filteredSales.map((sale) => ({
-        key: `sale-${sale.id}`,
-        type: 'Sale',
-        invoice: sale.invoiceNo || sale.id.slice(0, 6),
-        date: sale.saleDate,
-        party: sale.partyName || sale.customerName || sale.Customer?.name || sale.partyId || sale.customerId || 'Walk-in',
-        total: Number(sale.grandTotal || 0),
-        paid: Number(sale.amountReceived ?? (sale.status === 'paid' ? sale.grandTotal : 0) ?? 0),
-        due: Number(
-          sale.dueAmount ?? Math.max(Number(sale.grandTotal || 0) - Number(sale.amountReceived || 0), 0)
-        ),
-      })),
-      ...filteredPurchases.map((purchase) => ({
-        key: `purchase-${purchase.id}`,
-        type: 'Purchase',
-        invoice: purchase.invoiceNo || purchase.id.slice(0, 6),
-        date: purchase.purchaseDate,
-        party: purchase.partyName || purchase.supplierName || purchase.Party?.name || purchase.partyId || purchase.supplierId || '—',
-        total: Number(purchase.grandTotal || 0),
-        paid: Number(purchase.amountReceived ?? (purchase.status === 'received' ? purchase.grandTotal : 0) ?? 0),
-        due: Number(
-          purchase.dueAmount ?? Math.max(Number(purchase.grandTotal || 0) - Number(purchase.amountReceived || 0), 0)
-        ),
-      })),
-      ...filteredServices.map((svc) => ({
-        key: `service-${svc.id}`,
-        type: 'Service',
-        invoice: svc.orderNo || svc.id.slice(0, 6),
-        date: svc.createdAt,
-        party: svc.partyName || svc.Party?.name || svc.partyId || '—',
-        total: Number(svc.grandTotal || 0),
-        paid: Number(svc.receivedTotal || 0),
-        due: Math.max(Number(svc.grandTotal || 0) - Number(svc.receivedTotal || 0), 0),
-      })),
-    ].sort((a, b) => dayjs(b.date || 0).valueOf() - dayjs(a.date || 0).valueOf());
-  }, [filteredSales, filteredPurchases, filteredServices]);
-  const totalRows = tableRows.length;
-  const pagedRows = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return tableRows.slice(start, start + pageSize);
-  }, [page, pageSize, tableRows]);
+    return `${labelMap[filters.groupBy] || labelMap.auto} | ${filters.fromDate || '-'} to ${filters.toDate || '-'}`;
+  }, [filters.fromDate, filters.groupBy, filters.toDate, t]);
 
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Analytics"
-        subtitle="Filter sales and purchases to understand cash flow, due amounts, and trends."
+        title={t('analytics.title')}
+        subtitle={t('analytics.subtitle')}
       />
+
       {status ? <Notice title={status} tone="error" /> : null}
+
       <div className="card space-y-4">
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <div>
-            <label className="label">From</label>
+            <label className="label">{t('common.from')}</label>
             <input
               type="date"
               className="input mt-1"
@@ -200,7 +215,7 @@ export default function Analytics() {
             />
           </div>
           <div>
-            <label className="label">To</label>
+            <label className="label">{t('common.to')}</label>
             <input
               type="date"
               className="input mt-1"
@@ -210,184 +225,107 @@ export default function Analytics() {
             />
           </div>
           <div>
-            <label className="label">Type</label>
-            <select className="input mt-1" name="type" value={filters.type} onChange={handleFilterChange}>
-              <option value="all">All</option>
-              <option value="sale">Sales</option>
-              <option value="purchase">Purchases</option>
-              <option value="service">Services</option>
+            <label className="label">{t('analytics.filters.groupBy')}</label>
+            <select className="input mt-1" name="groupBy" value={filters.groupBy} onChange={handleFilterChange}>
+              <option value="auto">{t('analytics.filters.auto')}</option>
+              <option value="day">{t('analytics.filters.day')}</option>
+              <option value="week">{t('analytics.filters.week')}</option>
+              <option value="month">{t('analytics.filters.month')}</option>
             </select>
-          </div>
-          <div>
-            <label className="label">Status</label>
-            <select className="input mt-1" name="status" value={filters.status} onChange={handleFilterChange}>
-              <option value="all">All</option>
-              <option value="paid">Paid (sales)</option>
-              <option value="unpaid">Unpaid (sales)</option>
-              <option value="received">Received (purchases)</option>
-              <option value="ordered">Ordered (purchases)</option>
-              <option value="open">Open (services)</option>
-              <option value="in_progress">In Progress (services)</option>
-              <option value="closed">Closed (services)</option>
-            </select>
-          </div>
-          <div className="md:col-span-4">
-            <label className="label">Search</label>
-            <input
-              className="input mt-1"
-              name="search"
-              value={filters.search}
-              onChange={handleFilterChange}
-              placeholder="Invoice number, customer, or supplier"
-            />
           </div>
         </div>
+        <p className="text-xs text-slate-500">{loading ? t('common.loading') : seriesCaption}</p>
       </div>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className="card">
-          <p className="text-xs uppercase text-slate-400">Sales Revenue</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">Rs {totals.salesTotal.toFixed(2)}</p>
-          <p className="mt-2 text-sm text-slate-500">Received: Rs {totals.receivedTotal.toFixed(2)}</p>
-          <p className="text-sm text-slate-500">Due: Rs {totals.salesDue.toFixed(2)}</p>
+          <p className="text-xs uppercase text-slate-400">{t('analytics.salesRevenue')}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.sales)}</p>
         </div>
         <div className="card">
-          <p className="text-xs uppercase text-slate-400">Services Revenue</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">Rs {totals.servicesTotal.toFixed(2)}</p>
-          <p className="mt-2 text-sm text-slate-500">Received: Rs {totals.serviceReceivedTotal.toFixed(2)}</p>
-          <p className="text-sm text-slate-500">Due: Rs {totals.serviceDue.toFixed(2)}</p>
+          <p className="text-xs uppercase text-slate-400">{t('analytics.servicesRevenue')}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.services)}</p>
         </div>
         <div className="card">
-          <p className="text-xs uppercase text-slate-400">Purchases</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">Rs {totals.purchasesTotal.toFixed(2)}</p>
-          <p className="mt-2 text-sm text-slate-500">Paid: Rs {totals.paidTotal.toFixed(2)}</p>
-          <p className="text-sm text-slate-500">Due: Rs {totals.purchaseDue.toFixed(2)}</p>
+          <p className="text-xs uppercase text-slate-400">{t('analytics.purchaseSpend')}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.purchases)}</p>
         </div>
         <div className="card">
-          <p className="text-xs uppercase text-slate-400">Net</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-            Rs {(totals.salesTotal + totals.servicesTotal - totals.purchasesTotal).toFixed(2)}
-          </p>
-          <p className="mt-2 text-sm text-slate-500">Cash flow: Rs {(totals.receivedTotal + totals.serviceReceivedTotal - totals.paidTotal).toFixed(2)}</p>
+          <p className="text-xs uppercase text-slate-400">{t('analytics.combinedRevenue')}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.combined)}</p>
         </div>
       </div>
-      {/* Row 1: Sales & Services trends */}
+
       <div className="grid gap-4 md:grid-cols-2">
         <BarGraph
-          title="Sales trend"
-          data={salesSeries}
+          title={t('analytics.salesTrend')}
+          caption={seriesCaption}
+          data={summary.series.sales}
           dataKey="value"
           nameKey="label"
           color="#10b981"
         />
         <BarGraph
-          title="Services trend"
-          data={servicesSeries}
+          title={t('analytics.servicesTrend')}
+          caption={seriesCaption}
+          data={summary.series.services}
           dataKey="value"
           nameKey="label"
           color="#3b82f6"
         />
       </div>
 
-      {/* Row 2: Purchase trend & Overall trend pie chart */}
       <div className="grid gap-4 md:grid-cols-2">
         <BarGraph
-          title="Purchase trend"
-          data={purchaseSeries}
+          title={t('analytics.purchaseTrend')}
+          caption={seriesCaption}
+          data={summary.series.purchases}
           dataKey="value"
           nameKey="label"
           color="#f59e0b"
         />
         <div className="card">
-          <h3 className="font-serif text-xl text-slate-900 dark:text-white mb-4">Overall trend</h3>
+          <h3 className="mb-4 font-serif text-xl text-slate-900 dark:text-white">{t('analytics.overallMix')}</h3>
           <div className="h-[350px]">
-            <PieChart
-              data={[
-                { name: 'Sales', value: totals.salesTotal },
-                { name: 'Services', value: totals.servicesTotal },
-                { name: 'Purchases', value: totals.purchasesTotal },
-              ]}
-              height={350}
-            />
+            <PieChart data={pieData} height={350} />
           </div>
         </div>
       </div>
 
       <div className="card">
-        <h3 className="font-serif text-2xl text-slate-900 dark:text-white">Filtered transactions</h3>
-        {/* Mobile card view */}
-        <div className="mt-4 md:hidden space-y-3">
-          {pagedRows.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">No transactions found.</p>
-          ) : (
-            pagedRows.map((row) => (
-              <div key={row.key} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${
-                        row.type === 'sale' ? 'bg-emerald-100 text-emerald-700' :
-                        row.type === 'purchase' ? 'bg-amber-100 text-amber-700' :
-                        'bg-blue-100 text-blue-700'
-                      }`}>{row.type}</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-100 truncate">{row.invoice}</span>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-1">{row.date}</p>
-                    {row.party && <p className="text-xs text-slate-500 truncate">{row.party}</p>}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="font-semibold text-slate-800 dark:text-slate-200">Rs {row.total.toFixed(2)}</p>
-                    {row.due > 0 && <p className="text-xs text-rose-600 dark:text-rose-300">Rs {row.due.toFixed(2)} due</p>}
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('analytics.timelineSummary')}</h3>
+          <span className="text-xs text-slate-500">{summary.series.timeline.length} {t('analytics.points')}</span>
         </div>
-        {/* Desktop table */}
-        <div className="mt-4 overflow-x-auto hidden md:block">
-          <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-            <thead className="text-xs uppercase text-slate-400">
-              <tr>
-                <th className="py-2 text-left">Type</th>
-                <th className="py-2 text-left">Invoice</th>
-                <th className="py-2 text-left">Date</th>
-                <th className="py-2 text-left">Party</th>
-                <th className="py-2 text-right">Total</th>
-                <th className="py-2 text-right">Paid/Received</th>
-                <th className="py-2 text-right">Due</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pagedRows.length === 0 ? (
+
+        {summary.series.timeline.length === 0 ? (
+          <p className="mt-4 text-sm text-slate-500">{t('analytics.noSeries')}</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-sm text-slate-600 dark:text-slate-300">
+              <thead className="text-xs uppercase text-slate-400">
                 <tr>
-                  <td colSpan={7} className="py-3 text-slate-500">No transactions found.</td>
+                  <th className="py-2 text-left">{t('analytics.period')}</th>
+                  <th className="py-2 text-right">{t('nav.sales')}</th>
+                  <th className="py-2 text-right">{t('nav.purchases')}</th>
+                  <th className="py-2 text-right">{t('nav.services')}</th>
+                  <th className="py-2 text-right">{t('analytics.combined')}</th>
                 </tr>
-              ) : (
-                pagedRows.map((row) => (
+              </thead>
+              <tbody>
+                {summary.series.timeline.map((row) => (
                   <tr key={row.key} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                    <td className="py-2">{row.type}</td>
-                    <td className="py-2">{row.invoice}</td>
-                    <td className="py-2">{row.date}</td>
-                    <td className="py-2">{row.party}</td>
-                    <td className="py-2 text-right">Rs {row.total.toFixed(2)}</td>
-                    <td className="py-2 text-right">Rs {row.paid.toFixed(2)}</td>
-                    <td className="py-2 text-right text-rose-600 dark:text-rose-300">Rs {row.due.toFixed(2)}</td>
+                    <td className="py-2">{row.label}</td>
+                    <td className="py-2 text-right">{formatMoney(row.sales)}</td>
+                    <td className="py-2 text-right">{formatMoney(row.purchases)}</td>
+                    <td className="py-2 text-right">{formatMoney(row.services)}</td>
+                    <td className="py-2 text-right font-semibold text-slate-900 dark:text-white">{formatMoney(row.combined)}</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={totalRows}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
-        />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

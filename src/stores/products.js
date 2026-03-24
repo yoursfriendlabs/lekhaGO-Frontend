@@ -1,16 +1,15 @@
 import { create } from 'zustand';
 import { api } from '../lib/api';
+import { createScopedListStoreSlice } from './createScopedListStore';
 
-/**
- * Global product cache. Fetches once per session; call invalidate() to force
- * a fresh load (e.g. after bulk import from the Products page).
- */
 export const useProductStore = create((set, get) => ({
-  products: [],
-  loading: false,
-  loaded: false,
-  error: null,
+  ...createScopedListStoreSlice(set, get, {
+    resourceKey: 'products',
+    allowParams: false,
+    fetcher: () => api.listProducts(),
+  }),
 
+<<<<<<< HEAD
   /** Load products. Skips the network call if already loaded unless force=true. */
   fetch: async (force = false) => {
     if (get().loaded && !force) return;
@@ -24,9 +23,8 @@ export const useProductStore = create((set, get) => ({
   },
 
   /** Prepend a newly created product without re-fetching. */
+=======
+>>>>>>> f55843f25a5884d9ce49cd3ca06047dbc9732af7
   addProduct: (product) =>
-    set((state) => ({ products: [product, ...state.products] })),
-
-  /** Mark cache stale so the next fetch() hits the server. */
-  invalidate: () => set({ loaded: false }),
+    get().replaceCurrent((items) => [product, ...items]),
 }));

@@ -1,16 +1,15 @@
 import { create } from 'zustand';
 import { api } from '../lib/api';
+import { createScopedListStoreSlice } from './createScopedListStore';
 
-/**
- * Global party cache. Fetches all parties once per session.
- * Pages filter by type / query client-side — suitable for small/medium shops.
- */
 export const usePartyStore = create((set, get) => ({
-  parties: [],
-  loading: false,
-  loaded: false,
-  error: null,
+  ...createScopedListStoreSlice(set, get, {
+    resourceKey: 'parties',
+    allowParams: false,
+    fetcher: () => api.listParties(),
+  }),
 
+<<<<<<< HEAD
   fetch: async (force = false) => {
     if (get().loaded && !force) return;
     set({ loading: true, error: null });
@@ -23,18 +22,18 @@ export const usePartyStore = create((set, get) => ({
   },
 
   /** Add a new party or replace an existing one by id. */
+=======
+>>>>>>> f55843f25a5884d9ce49cd3ca06047dbc9732af7
   upsert: (party) =>
-    set((state) => {
-      const exists = state.parties.some((p) => p.id === party.id);
-      return {
-        parties: exists
-          ? state.parties.map((p) => (p.id === party.id ? { ...p, ...party } : p))
-          : [party, ...state.parties],
-      };
+    get().replaceCurrent((items) => {
+      const exists = items.some((item) => item.id === party.id);
+      if (exists) {
+        return items.map((item) => (item.id === party.id ? { ...item, ...party } : item));
+      }
+
+      return [party, ...items];
     }),
 
   remove: (id) =>
-    set((state) => ({ parties: state.parties.filter((p) => p.id !== id) })),
-
-  invalidate: () => set({ loaded: false }),
+    get().replaceCurrent((items) => items.filter((item) => item.id !== id)),
 }));

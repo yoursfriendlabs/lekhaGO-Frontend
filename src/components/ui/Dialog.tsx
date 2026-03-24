@@ -71,10 +71,10 @@ export const Dialog = ({
         >
             <div
                 ref={dialogRef}
-                className={`relative w-full ${sizeClasses[size]} max-h-[90vh] rounded-t-3xl bg-white shadow-2xl md:rounded-3xl flex flex-col`}
+                className={`relative flex max-h-[100dvh] w-full flex-col bg-white shadow-2xl md:max-h-[90vh] ${sizeClasses[size]} rounded-t-3xl md:rounded-3xl`}
             >
                 {(title || showCloseButton) && (
-                    <div className="flex items-center justify-between border-b border-slate-200/70 px-5 py-4">
+                    <div className="flex items-center justify-between border-b border-slate-200/70 px-4 py-4 md:px-5">
                         {title && <h2 className="font-serif text-xl text-slate-900">{title}</h2>}
                         {showCloseButton && (
                             <button
@@ -88,10 +88,14 @@ export const Dialog = ({
                     </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
+                <div className="flex-1 overflow-y-auto px-4 py-4 md:px-5 md:py-5">{children}</div>
 
                 {footer && (
-                    <div className="border-t border-slate-200/70 bg-white/95 p-4 backdrop-blur flex gap-2 justify-end">{footer}</div>
+                    <div className="flex justify-end gap-2 border-t border-slate-200/70 bg-white/95 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] backdrop-blur md:pb-4">{footer}</div>
+                )}
+
+                {!footer && (
+                    <div className="h-[env(safe-area-inset-bottom)] shrink-0 bg-transparent md:hidden" />
                 )}
             </div>
         </div>,

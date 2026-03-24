@@ -204,7 +204,7 @@ export default function Products() {
   const loadProducts = async () => {
     try {
       const data = await api.listProducts();
-      setProducts(data || []);
+      setProducts(data?.items || []);
       setListStatus({ type: 'info', message: '' });
     } catch (err) {
       setListStatus({ type: 'error', message: err.message });

@@ -3,6 +3,15 @@ const USER_KEY = 'mms_user';
 const BUSINESS_KEY = 'mms_business_id';
 const ROLE_KEY = 'mms_role';
 const SESSION_NOTICE_KEY = 'mms_session_notice';
+const PENDING_EMAIL_VERIFICATION_KEY = 'mms_pending_email_verification';
+
+function getSessionStorage() {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -52,9 +61,40 @@ export function consumeSessionNotice() {
   return message;
 }
 
+export function getPendingEmailVerification() {
+  const storage = getSessionStorage();
+  if (!storage) return null;
+
+  try {
+    const raw = storage.getItem(PENDING_EMAIL_VERIFICATION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setPendingEmailVerification(data) {
+  const storage = getSessionStorage();
+  if (!storage) return;
+
+  if (!data) {
+    storage.removeItem(PENDING_EMAIL_VERIFICATION_KEY);
+    return;
+  }
+
+  storage.setItem(PENDING_EMAIL_VERIFICATION_KEY, JSON.stringify(data));
+}
+
+export function clearPendingEmailVerification() {
+  const storage = getSessionStorage();
+  if (!storage) return;
+  storage.removeItem(PENDING_EMAIL_VERIFICATION_KEY);
+}
+
 export function clearSession() {
   setToken('');
   setUser(null);
   setBusinessId('');
   setRole('');
+  clearPendingEmailVerification();
 }

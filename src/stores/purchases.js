@@ -1,7 +1,9 @@
-  import { create } from 'zustand';
+import { create } from 'zustand';
 import { api } from '../lib/api';
+import { createScopedListStoreSlice } from './createScopedListStore';
 
 export const usePurchaseStore = create((set, get) => ({
+<<<<<<< HEAD
   purchases: [],
   loading: false,
   loaded: false,
@@ -17,14 +19,18 @@ export const usePurchaseStore = create((set, get) => ({
       set({ error: err.message, loading: false });
     }
   },
+=======
+  ...createScopedListStoreSlice(set, get, {
+    resourceKey: 'purchases',
+    fetcher: (params) => api.listPurchases(params),
+  }),
+>>>>>>> f55843f25a5884d9ce49cd3ca06047dbc9732af7
 
   prepend: (purchase) =>
-    set((state) => ({ purchases: [purchase, ...state.purchases] })),
+    get().replaceCurrent((items) => [purchase, ...items]),
 
   patch: (id, data) =>
-    set((state) => ({
-      purchases: state.purchases.map((p) => (p.id === id ? { ...p, ...data } : p)),
-    })),
-
-  invalidate: () => set({ loaded: false }),
+    get().replaceCurrent((items) =>
+      items.map((item) => (item.id === id ? { ...item, ...data } : item))
+    ),
 }));

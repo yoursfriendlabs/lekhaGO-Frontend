@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
+import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import FormSectionCard from '../components/FormSectionCard.jsx';
+import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import SearchableSelect from '../components/SearchableSelect';
+import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import InvoiceHeader from '../components/InvoiceHeader';
 import { api, API_BASE } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -11,12 +15,21 @@ import { useI18n } from '../lib/i18n.jsx';
 import FileUpload from '../components/FileUpload';
 import DynamicAttributes from '../components/DynamicAttributes';
 import { X, Plus, Clock, Check, Search, Pencil, FileText, ChevronDown, Phone } from 'lucide-react';
-import { useProductStore } from '../stores/products';
 import { usePartyStore } from '../stores/parties';
 import { useServiceStore } from '../stores/services';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
+import {
+  mergeLookupEntities,
+  normalizeLookupParty,
+  normalizeLookupProduct,
+  toProductLookupOption,
+} from '../lib/lookups.js';
+
 import dayjs, { formatMaybeDate, todayISODate, toDateInputValue } from '../lib/datetime';
-import { nextSequence } from '../lib/sequence';
+import { getPartyBalanceMeta } from '../lib/partyBalances.js';
+
 
 const emptyItem = {
   itemType: 'labor',
@@ -34,6 +47,9 @@ const makeEmptyHeader = () => ({
   status: 'open',
   notes: '',
   deliveryDate: todayISODate(),
+  paymentMethod: 'cash',
+  bankId: '',
+  paymentNote: '',
   attachment: '',
   attributes: {},
 });
@@ -124,10 +140,10 @@ export default function Services() {
   const { businessId, user } = useAuth();
   const { settings: bizSettings } = useBusinessSettings();
 
-  const { products, fetch: fetchProducts } = useProductStore();
-  const { parties, fetch: fetchParties, upsert: upsertParty } = usePartyStore();
-  const { services: serviceList, loading: listLoading, error: serviceError, fetch: fetchServices, patch: patchService, invalidate: invalidateServices } = useServiceStore();
-  const [orderNoSeedValues, setOrderNoSeedValues] = useState([]);
+  const { upsert: upsertParty } = usePartyStore();
+  const { services: serviceList, loading: listLoading, fetch: fetchServices, invalidate: invalidateServices } = useServiceStore();
+  const [suggestedOrderNo, setSuggestedOrderNo] = useState('');
+  const [productDirectory, setProductDirectory] = useState({});
 
   // ── List state ──
   const [statusFilter, setStatusFilter] = useState('all');
@@ -143,6 +159,8 @@ export default function Services() {
   const [payDialog, setPayDialog] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [payNotes, setPayNotes] = useState('');
+  const [payPaymentMethod, setPayPaymentMethod] = useState('cash');
+  const [payBankId, setPayBankId] = useState('');
   const [payError, setPayError] = useState('');
 
   // ── Status dialog ──
@@ -166,9 +184,13 @@ export default function Services() {
 
   // ── Attribute definitions for invoice display ──
   const [attributeDefs, setAttributeDefs] = useState([]);
+  const safeServiceList = Array.isArray(serviceList) ? serviceList : [];
+  const safeAttributeDefs = Array.isArray(attributeDefs) ? attributeDefs : [];
 
   // ── Form data ──
   const [partyQuery, setPartyQuery] = useState('');
+  const debouncedPartyQuery = useDebouncedValue(partyQuery, 250);
+  const [partySearchResults, setPartySearchResults] = useState([]);
   const [selectedParty, setSelectedParty] = useState(null);
   const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
   const [showAddNew, setShowAddNew] = useState(false);
@@ -185,9 +207,9 @@ export default function Services() {
 
   // ── Load services list ──
   const loadServices = () => {
-    invalidateServices();
     const params = { limit: 50 };
     if (statusFilter !== 'all') params.status = statusFilter;
+    invalidateServices(params);
     fetchServices(params, true).catch((err) => setListError(err.message));
   };
 
@@ -195,33 +217,45 @@ export default function Services() {
     if (!businessId) return;
     const params = { limit: 50 };
     if (statusFilter !== 'all') params.status = statusFilter;
-    fetchServices(params, true).catch((err) => setListError(err.message));
-  }, [businessId, statusFilter]);
-
-  useEffect(() => {
-    if (!businessId) return;
-    api.listServices({ limit: 500 })
-      .then((data) => {
-        const values = (data || []).map((s) => s?.orderNo).filter(Boolean);
-        setOrderNoSeedValues(values);
-      })
-      .catch(() => {});
-  }, [businessId]);
+    fetchServices(params).catch((err) => setListError(err.message));
+  }, [businessId, fetchServices, statusFilter]);
 
   useEffect(() => {
     setPage(1);
   }, [statusFilter, partyFilterId]);
 
   useEffect(() => {
-    fetchProducts().catch(() => null);
-  }, []);
+    const search = debouncedPartyQuery.trim();
+
+    if (!search || selectedParty) {
+      setPartySearchResults([]);
+      return;
+    }
+
+    let isActive = true;
+
+    api.lookupParties({ search, type: 'customer', limit: 10 })
+      .then((results) => {
+        if (!isActive) return;
+        setPartySearchResults((results?.items || []).map(normalizeLookupParty));
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setPartySearchResults([]);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [debouncedPartyQuery, selectedParty]);
 
   useEffect(() => {
-    fetchParties({ q: partyQuery }).catch(() => null);
-  }, [partyQuery]);
-
-  useEffect(() => {
-    api.listOrderAttributes({ entityType: 'service' }).then(setAttributeDefs).catch(() => null);
+    api.listOrderAttributes({ entityType: 'service' })
+      .then((response) => {
+        const items = Array.isArray(response) ? response : Array.isArray(response?.items) ? response.items : [];
+        setAttributeDefs(items);
+      })
+      .catch(() => null);
   }, []);
 
   // ── Totals ──
@@ -243,7 +277,21 @@ export default function Services() {
   }, [isPaid, totals.grandTotal]);
 
   // ── Product helpers ──
-  const getProductById = (id) => products.find((p) => p.id === id);
+  const getProductById = (id) => {
+    if (id === null || id === undefined || id === '') return null;
+    return productDirectory[String(id)] || null;
+  };
+
+  const cacheProducts = (entries) => {
+    setProductDirectory((previous) => mergeLookupEntities(previous, entries));
+  };
+
+  const loadProductOptions = async (search) => {
+    const data = await api.lookupProducts({ search, limit: 10, type: 'part' });
+    const normalized = (data?.items || []).map(normalizeLookupProduct);
+    cacheProducts(normalized);
+    return normalized.map(toProductLookupOption);
+  };
 
   const getUnitLabel = (product, unitType) => {
     if (!product) return '';
@@ -326,6 +374,24 @@ export default function Services() {
 
   const removeItem = (index) => setItems((prev) => prev.filter((_, i) => i !== index));
 
+  const handleDraftProductSelection = (option) => {
+    const product = option?.entity ? normalizeLookupProduct(option.entity) : null;
+
+    if (product?.id) {
+      cacheProducts([product]);
+    }
+
+    setItemDraft((previous) => ({
+      ...previous,
+      productId: option?.value || '',
+      actualUnit: '',
+    }));
+
+    if (product) {
+      syncItemDefaults(null, product, true);
+    }
+  };
+
   // ── Item draft helpers ──
   const handleDraftChange = (field, value, actualUnit) => {
     // unitType change needs to re-price from product immediately
@@ -347,7 +413,7 @@ export default function Services() {
             next.unitPrice = String(product.salePrice);
           }
         }
-        next.actualUnit = actualUnit
+        next.actualUnit = actualUnit;
         next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
         return next;
       });
@@ -387,7 +453,6 @@ export default function Services() {
   };
 
   const confirmItem = () => {
-    console.log(itemDraft)
     const draft = {
       ...itemDraft,
       lineTotal: (Number(itemDraft.quantity || 0) * Number(itemDraft.unitPrice || 0)).toFixed(2),
@@ -403,16 +468,9 @@ export default function Services() {
 
   // ── Party helpers ──
   const filteredParties = useMemo(() => {
-    const q = partyQuery.trim().toLowerCase();
-    if (!q) return [];
-    return parties
-      .filter(
-        (p) =>
-          String(p.name || '').toLowerCase().includes(q) ||
-          String(p.phone || '').toLowerCase().includes(q)
-      )
-      .slice(0, 6);
-  }, [partyQuery, parties]);
+    return partySearchResults.slice(0, 6);
+  }, [partySearchResults]);
+  const selectedPartyBalanceMeta = getPartyBalanceMeta(selectedParty?.currentAmount, t);
 
   const selectParty = (party) => {
     setSelectedParty(party);
@@ -421,6 +479,7 @@ export default function Services() {
     setPartyDropdownOpen(false);
     setShowAddNew(false);
     setNewPartyPhone('');
+    setPartySearchResults([]);
   };
 
   const clearParty = () => {
@@ -430,6 +489,7 @@ export default function Services() {
     setPartyDropdownOpen(false);
     setShowAddNew(false);
     setNewPartyPhone('');
+    setPartySearchResults([]);
   };
 
   const handlePartySearch = (e) => {
@@ -454,7 +514,8 @@ export default function Services() {
       return;
     }
     try {
-      const party = await api.createParty({ name, phone: newPartyPhone.trim(), type: 'customer' });
+      const createdParty = await api.createParty({ name, phone: newPartyPhone.trim(), type: 'customer' });
+      const party = normalizeLookupParty(createdParty);
       upsertParty(party);
       selectParty(party);
       setFormNotice({ type: 'success', message: t('parties.messages.created') });
@@ -463,17 +524,9 @@ export default function Services() {
     }
   };
 
-  const nextOrderNo = useMemo(() => {
-    const values = [
-      ...orderNoSeedValues,
-      ...serviceList.map((s) => s?.orderNo).filter(Boolean),
-    ];
-    return String(nextSequence(values, 1));
-  }, [orderNoSeedValues, serviceList]);
-
   // ── Reset & open/close dialog ──
-  const resetForm = (orderNoOverride = null) => {
-    setHeader({ ...makeEmptyHeader(), orderNo: orderNoOverride ?? nextOrderNo });
+  const resetForm = () => {
+    setHeader({ ...makeEmptyHeader(), orderNo: '' });
     setItems([{ ...emptyItem }]);
     setPartyQuery('');
     setSelectedParty(null);
@@ -487,22 +540,22 @@ export default function Services() {
     setShowItemForm(false);
     setItemDraft({ ...emptyItem });
     setEditingItemIdx(null);
+    setSuggestedOrderNo('');
+    setProductDirectory({});
   };
 
   const openDialog = async () => {
-    let nextFromServer = null;
+    resetForm();
+    setDialogOpen(true);
+
     if (businessId) {
       try {
-        const data = await api.listServices({ limit: 500 });
-        const values = (data || []).map((s) => s?.orderNo).filter(Boolean);
-        setOrderNoSeedValues(values);
-        nextFromServer = String(nextSequence(values, 1));
+        const data = await api.getNextSequences();
+        setSuggestedOrderNo(data?.nextServiceOrderNo || '');
       } catch {
-        nextFromServer = null;
+        setSuggestedOrderNo('');
       }
     }
-    resetForm(nextFromServer);
-    setDialogOpen(true);
   };
   const openEditDialog = async (order) => {
     resetForm();
@@ -512,15 +565,23 @@ export default function Services() {
     try {
       const full = await api.getService(order.id);
       const rawItems = full.ServiceItems || full.items || [];
-        setHeader({
-          partyId: full.partyId || '',
-          orderNo: full.orderNo || '',
-          status: full.status || 'open',
-          notes: full.notes || '',
-          deliveryDate: toDateInputValue(full.deliveryDate) || todayISODate(),
-          attachment: full.attachment || '',
-          attributes: full.attributes || {},
-        });
+      const hydratedProducts = rawItems
+        .map((item) => normalizeLookupProduct(item))
+        .filter((product) => product.id);
+      setHeader({
+        partyId: full.partyId || '',
+        orderNo: full.orderNo || '',
+        status: full.status || 'open',
+        notes: full.notes || '',
+        deliveryDate: toDateInputValue(full.deliveryDate) || todayISODate(),
+        ...normalizePaymentFields(full),
+        attachment: full.attachment || '',
+        attributes: full.attributes || {},
+      });
+      cacheProducts(hydratedProducts);
+      setSuggestedOrderNo(full.orderNo || '');
+      setAmountReceived(String(full.receivedTotal ?? 0));
+      setIsPaid(Math.max(Number(full.grandTotal || 0) - Number(full.receivedTotal || 0), 0) <= 0);
       setItems(rawItems.length > 0 ? rawItems.map((i) => ({
         itemType: i.itemType || 'labor',
         description: i.description || '',
@@ -531,8 +592,14 @@ export default function Services() {
         lineTotal: String(i.lineTotal ?? '0'),
       })) : [{ ...emptyItem }]);
       if (full.partyId && full.partyName) {
-        const fakeParty = { id: full.partyId, name: full.partyName, phone: full.partyPhone || '' };
-        setSelectedParty(fakeParty);
+        const party = normalizeLookupParty({
+          id: full.partyId,
+          partyName: full.partyName,
+          phone: full.partyPhone || '',
+          currentAmount: full.Party?.currentAmount,
+          type: 'customer',
+        });
+        setSelectedParty(party);
         setPartyQuery(`${full.partyName}${full.partyPhone ? ` (${full.partyPhone})` : ''}`);
       }
     } catch (err) {
@@ -555,51 +622,43 @@ export default function Services() {
       return Number(getProductById(i.productId)?.conversionRate || 0) <= 0;
     });
     if (invalidConversion) { setFormNotice({ type: 'error', message: t('errors.conversionRequired') }); return; }
+    if (requiresBankSelection(header, totals.received)) {
+      setFormNotice({ type: 'error', message: t('payments.bankRequired') });
+      return;
+    }
     try {
-      const orderNo = String(header.orderNo || '').trim() || nextOrderNo;
-      if (editingId) {
-        await api.updateService(editingId, {
-          ...header,
-          orderNo,
-          laborTotal: totals.laborTotal,
-          partsTotal: totals.partsTotal,
-          grandTotal: totals.grandTotal,
-          receivedTotal: totals.received,
-          items: items.map((item) => ({
-            ...item,
-            quantity: Number(item.quantity),
-            unitType: item.unitType || 'primary',
-            conversionRate: Number(getProductById(item.productId)?.conversionRate || 0),
-            unitPrice: Number(item.unitPrice),
-            lineTotal: Number(item.lineTotal),
-          })),
-        });
+      const manualOrderNo = String(header.orderNo || '').trim();
+      const { paymentMethod, bankId, paymentNote, ...headerFields } = header;
+      const payload = {
+        ...headerFields,
+        laborTotal: totals.laborTotal,
+        partsTotal: totals.partsTotal,
+        grandTotal: totals.grandTotal,
+        receivedTotal: totals.received,
+        ...(Number(totals.received || 0) > 0 ? buildPaymentPayload({ paymentMethod, bankId, paymentNote }) : { paymentMethod: 'cash' }),
+        items: items.map((item) => ({
+          ...item,
+          quantity: Number(item.quantity),
+          unitType: item.unitType || 'primary',
+          conversionRate: Number(getProductById(item.productId)?.conversionRate || 0),
+          unitPrice: Number(item.unitPrice),
+          lineTotal: Number(item.lineTotal),
+        })),
+      };
+      if (manualOrderNo) {
+        payload.orderNo = manualOrderNo;
       } else {
-        const createPayload = {
-          ...header,
-          orderNo,
-          laborTotal: totals.laborTotal,
-          partsTotal: totals.partsTotal,
-          grandTotal: totals.grandTotal,
-          receivedTotal: totals.received,
-          items: items.map((item) => ({
-            ...item,
-            quantity: Number(item.quantity),
-            unitType: item.unitType || 'primary',
-            conversionRate: Number(getProductById(item.productId)?.conversionRate || 0),
-            unitPrice: Number(item.unitPrice),
-            lineTotal: Number(item.lineTotal),
-          })),
-        };
+        delete payload.orderNo;
+      }
+      if (editingId) {
+        await api.updateService(editingId, payload);
+      } else {
         const creatorValue = getCurrentCreatorValue(user);
         const created = await api.createService({
-          ...createPayload,
+          ...payload,
           ...(creatorValue ? { createdBy: creatorValue } : {}),
         });
-        const savedOrderNo = created?.orderNo || orderNo;
-        if (savedOrderNo) {
-          setOrderNoSeedValues((prev) => (prev.includes(savedOrderNo) ? prev : [...prev, savedOrderNo]));
-        }
+        setSuggestedOrderNo(created?.orderNo || '');
       }
       closeDialog();
       loadServices();
@@ -612,20 +671,20 @@ export default function Services() {
   const serviceParties = useMemo(() => {
     const seen = new Set();
     const result = [];
-    serviceList.forEach((order) => {
+    safeServiceList.forEach((order) => {
       const id = order.partyId;
       if (!id || seen.has(id)) return;
       seen.add(id);
       result.push({ id, name: order.partyName || order.Party?.name || id });
     });
     return result.sort((a, b) => a.name.localeCompare(b.name));
-  }, [serviceList]);
+  }, [safeServiceList]);
 
   // ── Filtered + paged service list ──
   const filteredServiceList = useMemo(() => {
-    if (!partyFilterId) return serviceList;
-    return serviceList.filter((order) => order.partyId === partyFilterId);
-  }, [serviceList, partyFilterId]);
+    if (!partyFilterId) return safeServiceList;
+    return safeServiceList.filter((order) => order.partyId === partyFilterId);
+  }, [safeServiceList, partyFilterId]);
 
   const pagedServices = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -669,6 +728,8 @@ export default function Services() {
     setPayDialog(order);
     setPayAmount('');
     setPayNotes('');
+    setPayPaymentMethod('cash');
+    setPayBankId('');
     setPayError('');
   };
 
@@ -676,6 +737,10 @@ export default function Services() {
     e.preventDefault();
     const amount = Number(payAmount || 0);
     if (!amount || amount <= 0) { setPayError('Enter a valid amount.'); return; }
+    if (requiresBankSelection({ paymentMethod: payPaymentMethod, bankId: payBankId }, amount)) {
+      setPayError(t('payments.bankRequired'));
+      return;
+    }
     const currentDue = Math.max(Number(payDialog.grandTotal || 0) - Number(payDialog.receivedTotal || 0), 0);
     if (amount > currentDue) { setPayError(`Amount cannot exceed due of ${currentDue.toFixed(2)}.`); return; }
     try {
@@ -687,7 +752,14 @@ export default function Services() {
           direction: 'receive',
           amount,
           txDate: todayISODate(),
-          note: `${t('services.servicePaymentNote')} - ${payDialog.orderNo || payDialog.id.slice(0, 8)}${payNotes ? ` · ${payNotes}` : ''}`,
+          ...buildPaymentPayload(
+            {
+              paymentMethod: payPaymentMethod,
+              bankId: payBankId,
+              paymentNote: `${t('services.servicePaymentNote')} - ${payDialog.orderNo || payDialog.id.slice(0, 8)}${payNotes ? ` · ${payNotes}` : ''}`,
+            },
+            { noteKey: 'note' }
+          ),
         });
       }
       setPayDialog(null);
@@ -725,7 +797,7 @@ export default function Services() {
         title={t('services.title')}
         subtitle={t('services.subtitle')}
         action={
-          <button className="btn-primary" type="button" onClick={openDialog}>
+          <button className="btn-primary w-full sm:w-auto" type="button" onClick={openDialog}>
             <Plus size={16} className="mr-1.5 inline" />
             {t('services.newOrder')}
           </button>
@@ -739,7 +811,7 @@ export default function Services() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-col items-start gap-2">
             <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('services.recentOrders')}</h3>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button onClick={() => setStatusFilter('all')} className={statusFilter === 'all' ? "bg-blue-50 border  border-blue-500 text-blue-500 px-2 rounded" : "border rounded px-2 border-gray-300"}>
                 All
               </button>
@@ -754,9 +826,9 @@ export default function Services() {
               </button>
             </div>
           </div>
-          <div className="flex  items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
             <SearchableSelect
-              className="min-w-[180px]"
+              className="w-full sm:min-w-[180px]"
               options={[
                 { value: '', label: t('services.filterByParty') },
                 ...serviceParties.map((p) => ({ value: p.id, label: p.name })),
@@ -770,7 +842,7 @@ export default function Services() {
 
         {/* Mobile card view */}
         <div className="mt-4 md:hidden space-y-3">
-          {listLoading && serviceList.length === 0 ? (
+          {listLoading && safeServiceList.length === 0 ? (
             <p className="py-4 text-sm text-slate-500">{t('common.loading')}</p>
           ) : pagedServices.length === 0 ? (
             <p className="py-4 text-sm text-slate-500">{t('services.noOrders')}</p>
@@ -794,6 +866,12 @@ export default function Services() {
                         {order.orderNo || order.id.slice(0, 8)}
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5">{order.Party?.name || order.partyName || '—'}</p>
+                      <PaymentTypeSummary
+                        source={order}
+                        className="mt-1"
+                        labelClassName="text-xs font-medium"
+                        metaClassName="text-[11px]"
+                      />
                       <p className="mt-1 text-xs text-slate-400">Created By: {getCreatorDisplayName(order)}</p>
                       <div className="mt-1">
                         <DeliveryBadge date={order.deliveryDate} />
@@ -864,6 +942,7 @@ export default function Services() {
                 <th className="py-2 pr-4 text-left">{t('services.customer')}</th>
                 <th className="py-2 pr-4 text-left">{t('services.deliveryDate')}</th>
                 <th className="py-2 pr-4 text-left">{t('services.status')}</th>
+                <th className="py-2 pr-4 text-left">{t('common.payment')}</th>
                 <th className="py-2 pr-2 text-left text-xs">Attach.</th>
                 <th className="py-2 pr-4 text-right">{t('services.grandTotal')}</th>
                 <th className="py-2 pr-4 text-right">{t('services.amountReceived')}</th>
@@ -872,10 +951,10 @@ export default function Services() {
               </tr>
             </thead>
             <tbody>
-              {listLoading && serviceList.length === 0 ? (
-                <tr><td colSpan={9} className="py-4 text-slate-500">{t('common.loading')}</td></tr>
+              {listLoading && safeServiceList.length === 0 ? (
+                <tr><td colSpan={10} className="py-4 text-slate-500">{t('common.loading')}</td></tr>
               ) : pagedServices.length === 0 ? (
-                <tr><td colSpan={9} className="py-4 text-slate-500">{t('services.noOrders')}</td></tr>
+                <tr><td colSpan={10} className="py-4 text-slate-500">{t('services.noOrders')}</td></tr>
               ) : (
                 pagedServices.map((order) => {
                   const days = getDeliveryDaysLeft(order.deliveryDate);
@@ -901,6 +980,9 @@ export default function Services() {
                         <button type="button" className="transition hover:opacity-75" onClick={() => openStatusDialog(order)}>
                           <StatusBadge status={order.status} />
                         </button>
+                      </td>
+                      <td className="py-2.5 pr-4">
+                        <PaymentTypeSummary source={order} />
                       </td>
                       <td className="py-2.5 pr-2">
                         {order.attachment ? (
@@ -964,9 +1046,9 @@ export default function Services() {
           className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/50 backdrop-blur-sm md:items-center md:p-4"
           onClick={(e) => { if (e.target === e.currentTarget) closeDialog(); }}
         >
-          <div className="relative w-full max-w-2xl rounded-t-3xl bg-white shadow-2xl dark:bg-slate-950 md:rounded-3xl">
+          <div className="relative flex max-h-[100dvh] w-full max-w-2xl flex-col rounded-t-3xl bg-white shadow-2xl dark:bg-slate-950 md:max-h-[90vh] md:rounded-3xl">
             {/* Dialog header */}
-            <div className="flex items-center justify-between border-b border-slate-200/70 px-5 py-4 dark:border-slate-800/70">
+            <div className="flex items-center justify-between border-b border-slate-200/70 px-4 py-4 dark:border-slate-800/70 md:px-5">
               <h2 className="font-serif text-xl text-slate-900 dark:text-white">
                 {editingId ? 'Edit Service Order' : t('services.newOrder')}
               </h2>
@@ -976,7 +1058,7 @@ export default function Services() {
             </div>
 
             <form onSubmit={handleSubmit}>
-              <div className="max-h-[80vh] overflow-y-auto px-5 py-5 space-y-5">
+              <div className="max-h-[calc(100dvh-8rem)] space-y-5 overflow-y-auto px-4 py-4 md:max-h-[80vh] md:px-5 md:py-5">
                 {formNotice.message ? (
                   <Notice title={formNotice.message} tone={formNotice.type} />
                 ) : null}
@@ -988,7 +1070,7 @@ export default function Services() {
                 )}
 
                 {/* ── Customer Autocomplete ── */}
-                <div>
+                <FormSectionCard hint={t('services.customerRequired')}>
                   <label className="label">
                     {t('services.customer')} <span className="ml-1 text-rose-500">*</span>
                   </label>
@@ -1001,7 +1083,15 @@ export default function Services() {
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{selectedParty.name}</p>
                           {selectedParty.phone && <p className="text-xs text-slate-500">{selectedParty.phone}</p>}
-                          {selectedParty.currentAmount && <p className="text-xs text-slate-500">{selectedParty.currentAmount}</p>}
+                          {selectedParty.currentAmount !== undefined && selectedParty.currentAmount !== null && (
+                            <p className={`text-xs ${selectedPartyBalanceMeta.textClass}`}>
+                              {selectedPartyBalanceMeta.label}:{' '}
+                              {t('currency.formatted', {
+                                symbol: t('currency.symbol'),
+                                amount: selectedPartyBalanceMeta.absoluteAmount.toFixed(2),
+                              })}
+                            </p>
+                          )}
                         </div>
                         <button type="button" onClick={clearParty} className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600 dark:hover:bg-slate-800">
                           <X size={16} />
@@ -1069,7 +1159,7 @@ export default function Services() {
                                     onChange={(e) => setNewPartyPhone(e.target.value)}
                                   />
                                 </div>
-                                <div className="mt-2 flex gap-2">
+                                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                                   <button type="button" className="btn-ghost text-xs" onClick={() => setShowAddNew(false)}>Cancel</button>
                                   <button type="button" className="btn-primary text-xs" onClick={createAndSelectParty}>Create & Select</button>
                                 </div>
@@ -1080,64 +1170,71 @@ export default function Services() {
                       </div>
                     )}
                   </div>
-                </div>
+                </FormSectionCard>
 
                 {/* ── Meta fields ── */}
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <label className="label">{t('services.orderNo')}</label>
-                    <input className="input mt-1" name="orderNo" value={header.orderNo} onChange={handleHeaderChange} />
+                <FormSectionCard>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="label">{t('services.orderNo')}</label>
+                      <input
+                        className="input mt-1"
+                        name="orderNo"
+                        value={header.orderNo}
+                        onChange={handleHeaderChange}
+                        placeholder={!editingId ? suggestedOrderNo : ''}
+                      />
+                    </div>
+                    <div>
+                      <label className="label">{t('services.status')}</label>
+                      <select className="input mt-1" name="status" value={header.status} onChange={handleHeaderChange}>
+                        <option value="open">{t('services.open')}</option>
+                        <option value="in_progress">{t('services.inProgress')}</option>
+                        <option value="closed">{t('services.closed')}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label">{t('services.deliveryDate')}</label>
+                      <input type="date" className="input mt-1" name="deliveryDate" value={header.deliveryDate} onChange={handleHeaderChange} />
+                    </div>
                   </div>
-                  <div>
-                    <label className="label">{t('services.status')}</label>
-                    <select className="input mt-1" name="status" value={header.status} onChange={handleHeaderChange}>
-                      <option value="open">{t('services.open')}</option>
-                      <option value="in_progress">{t('services.inProgress')}</option>
-                      <option value="closed">{t('services.closed')}</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label">{t('services.deliveryDate')}</label>
-                    <input type="date" className="input mt-1" name="deliveryDate" value={header.deliveryDate} onChange={handleHeaderChange} />
-                  </div>
-                </div>
+                </FormSectionCard>
 
                 {/* ── Notes + Attachment ── */}
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="label">{t('services.notes')}</label>
-                    <textarea
-                      className="input mt-1 h-20 resize-none"
-                      name="notes"
-                      value={header.notes}
-                      onChange={handleHeaderChange}
-                      placeholder={t('services.notesPlaceholder')}
+                <FormSectionCard>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="label">{t('services.notes')}</label>
+                      <textarea
+                        className="input mt-1 h-20 resize-none"
+                        name="notes"
+                        value={header.notes}
+                        onChange={handleHeaderChange}
+                        placeholder={t('services.notesPlaceholder')}
+                      />
+                    </div>
+                    <FileUpload
+                      label={t('services.attachment')}
+                      initialUrl={header.attachment}
+                      onUpload={(url) => setHeader((prev) => ({ ...prev, attachment: url }))}
                     />
                   </div>
-                  <FileUpload
-                    label={t('services.attachment')}
-                    initialUrl={header.attachment}
-                    onUpload={(url) => setHeader((prev) => ({ ...prev, attachment: url }))}
-                  />
-                </div>
+                </FormSectionCard>
 
                 {/* ── Dynamic Attributes ── */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 dark:border-slate-700/60 dark:bg-slate-900/30">
-                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">{t('services.orderInformation')}</h3>
+                <FormSectionCard title={t('services.orderInformation')} className="bg-slate-50/50 dark:bg-slate-900/30">
                   <DynamicAttributes
                     entityType="service"
                     attributes={header.attributes}
                     onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))}
                   />
-                </div>
+                </FormSectionCard>
 
                 {/* ── Items Section ── */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t('services.items')}</h3>
-                    <span className="text-xs text-slate-400">{items.length} item{items.length !== 1 ? 's' : ''}</span>
-                  </div>
-
+                <FormSectionCard
+                  title={t('services.items')}
+                  action={<span className="text-xs text-slate-400">{items.length} item{items.length !== 1 ? 's' : ''}</span>}
+                >
                   {/* Existing items as compact rows */}
                   {items.length > 0 && (
                     <div className="space-y-2 mb-3">
@@ -1147,32 +1244,40 @@ export default function Services() {
                         return editingItemIdx === idx && showItemForm ? null : (
                           <div
                             key={`item-row-${idx}`}
-                            className="flex items-center gap-2 rounded-xl border border-slate-200/70 bg-white/80 px-3 py-2.5 text-sm dark:border-slate-800/60 dark:bg-slate-900/60"
+                            className="flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-white/80 px-3 py-3 text-sm dark:border-slate-800/60 dark:bg-slate-900/60 sm:flex-row sm:items-center"
                           >
-                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                              item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                            }`}>
-                              {item.itemType === 'labor' ? 'Service' : 'Product'}
-                            </span>
-                            <span className="flex-1 min-w-0 truncate text-slate-700 dark:text-slate-300">{displayName}</span>
-                            <span className="shrink-0 text-xs text-slate-400">{item.quantity} {item.actualUnit} × {money(item.unitPrice)}</span>
-                            <span className="shrink-0 font-semibold text-slate-800 dark:text-slate-200">{money(item.lineTotal)}</span>
-                            <button
-                              type="button"
-                              className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
-                              onClick={() => startEditItem(idx)}
-                            >
-                              <Pencil size={13} />
-                            </button>
-                            {items.length > 1 && (
-                              <button
-                                type="button"
-                                className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-900/20"
-                                onClick={() => removeItem(idx)}
-                              >
-                                <X size={13} />
-                              </button>
-                            )}
+                            <div className="flex min-w-0 flex-1 items-start gap-2">
+                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                              }`}>
+                                {item.itemType === 'labor' ? 'Service' : 'Product'}
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <span className="block truncate text-slate-700 dark:text-slate-300">{displayName}</span>
+                                <span className="mt-1 block text-xs text-slate-400">{item.quantity} {item.actualUnit} × {money(item.unitPrice)}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between gap-3 sm:justify-end">
+                              <span className="shrink-0 font-semibold text-slate-800 dark:text-slate-200">{money(item.lineTotal)}</span>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+                                  onClick={() => startEditItem(idx)}
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                                {items.length > 1 && (
+                                  <button
+                                    type="button"
+                                    className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-900/20"
+                                    onClick={() => removeItem(idx)}
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
@@ -1209,18 +1314,17 @@ export default function Services() {
                         {itemDraft.itemType === 'part' && (
                           <div className="sm:col-span-2">
                             <label className="label">{t('services.productParts')}</label>
-                            <select
-                              className="input mt-1"
+                            <AsyncSearchableSelect
+                              className="mt-1"
                               value={itemDraft.productId}
-                              onChange={(e) => handleDraftChange('productId', e.target.value)}
-                            >
-                              <option value="">{t('purchases.selectProduct')}</option>
-                              {products.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.name}{p.primaryUnit ? ` · ${p.primaryUnit}` : ''}{p.secondaryUnit ? ` / ${p.secondaryUnit}` : ''}
-                                </option>
-                              ))}
-                            </select>
+                              selectedOption={getProductById(itemDraft.productId) ? toProductLookupOption(getProductById(itemDraft.productId)) : null}
+                              onChange={handleDraftProductSelection}
+                              loadOptions={loadProductOptions}
+                              placeholder={t('purchases.selectProduct')}
+                              searchPlaceholder={t('purchases.selectProduct')}
+                              noResultsLabel={t('common.noData')}
+                              loadingLabel={t('common.loading')}
+                            />
                           </div>
                         )}
                         {/* Unit type selector — only when product has a secondary unit */}
@@ -1277,11 +1381,11 @@ export default function Services() {
                           />
                         </div>
                       </div>
-                      <div className="mt-3 flex items-center justify-between">
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <span className="text-sm text-slate-600 dark:text-slate-300">
                           Total: <strong className="text-slate-800 dark:text-slate-200">{money(itemDraft.lineTotal)}</strong>
                         </span>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col gap-2 sm:flex-row">
                           <button type="button" className="btn-ghost text-sm" onClick={cancelItemForm}>
                             Cancel
                           </button>
@@ -1303,7 +1407,7 @@ export default function Services() {
                       {t('services.addLine')}
                     </button>
                   )}
-                </div>
+                </FormSectionCard>
 
                 {/* ── Totals + Payment ── */}
                 <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
@@ -1353,16 +1457,23 @@ export default function Services() {
                         <span className="font-bold text-rose-700 dark:text-rose-300">{money(totals.due)}</span>
                       </div>
                     )}
+
+                    <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-700/60">
+                      <PaymentMethodFields
+                        value={header}
+                        onChange={(patch) => setHeader((prev) => ({ ...prev, ...patch }))}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Dialog footer */}
-              <div className="flex justify-end gap-3 border-t border-slate-200/70 px-5 py-4 dark:border-slate-800/70">
-                <button type="button" className="btn-ghost" onClick={closeDialog}>
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-200/70 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] dark:border-slate-800/70 md:flex-row md:justify-end md:px-5 md:pb-4">
+                <button type="button" className="btn-ghost w-full sm:w-auto" onClick={closeDialog}>
                   {t('common.cancel')}
                 </button>
-                <button type="submit" className="btn-primary" disabled={editLoading}>
+                <button type="submit" className="btn-primary w-full sm:w-auto" disabled={editLoading}>
                   {editingId ? t('common.update') : t('services.saveOrder')}
                 </button>
               </div>
@@ -1441,7 +1552,7 @@ export default function Services() {
                   {invoiceOrder.attributes && Object.keys(invoiceOrder.attributes).length > 0 && (
                     <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5">
                       {Object.entries(invoiceOrder.attributes).map(([key, val]) => {
-                        const def = attributeDefs.find((d) => d.key === key);
+                        const def = safeAttributeDefs.find((d) => d.key === key);
                         const attrLabel = def?.name || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
                         return (
                           <div key={key} className="text-sm">
@@ -1557,7 +1668,7 @@ export default function Services() {
               <h2 className="font-serif text-xl text-slate-900 dark:text-white">{t('services.updateStatus')}</h2>
               <button type="button" onClick={closeStatusDialog} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><X size={18} /></button>
             </div>
-            <div className="space-y-4 p-6">
+              <div className="space-y-4 p-6">
               {statusError ? <Notice title={statusError} tone="error" /> : null}
               <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-900/60">
                 <p className="font-semibold text-slate-800 dark:text-slate-200">{statusDialog.orderNo || statusDialog.id.slice(0, 8)}</p>
@@ -1583,7 +1694,7 @@ export default function Services() {
                   );
                 })}
               </div>
-              <div className="flex gap-3 pt-1">
+              <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row">
                 <button type="button" className="btn-ghost flex-1" onClick={closeStatusDialog}>{t('common.cancel')}</button>
                 <button type="button" className="btn-primary flex-1" onClick={handleUpdateStatus} disabled={newStatus === statusDialog.status}>{t('services.updateStatus')}</button>
               </div>
@@ -1626,10 +1737,21 @@ export default function Services() {
                 />
               </div>
               <div>
-                <label className="label">Notes (optional)</label>
-                <input className="input mt-1" value={payNotes} onChange={(e) => setPayNotes(e.target.value)} placeholder="e.g. Cash payment" />
+                <PaymentMethodFields
+                  value={{
+                    paymentMethod: payPaymentMethod,
+                    bankId: payBankId,
+                    paymentNote: payNotes,
+                  }}
+                  onChange={(patch) => {
+                    setPayPaymentMethod(patch.paymentMethod);
+                    setPayBankId(patch.bankId);
+                    setPayNotes(patch.paymentNote);
+                  }}
+                  noteLabel={t('payments.paymentNote')}
+                />
               </div>
-              <div className="flex gap-3 pt-1">
+              <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row">
                 <button type="button" className="btn-ghost flex-1" onClick={() => setPayDialog(null)}>{t('common.cancel')}</button>
                 <button type="submit" className="btn-primary flex-1">Record Payment</button>
               </div>
