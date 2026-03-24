@@ -2,11 +2,12 @@ import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 
 export default function Topbar() {
-  const { user, businessId, updateBusinessId, logout } = useAuth();
+  const { user, logout } = useAuth();
+
   const { locale, setLocale, t } = useI18n();
 
   return (
-    <header className="sticky top-0 z-10 flex flex-col gap-4 border-b border-secondary-200 bg-white/85 px-4 pt-4 backdrop-blur md:flex-row md:items-center md:justify-between md:px-6">
+    <header className="sticky top-0 z-10 flex flex-col gap-4 border-b border-secondary-200 bg-white/85 px-4 py-4 backdrop-blur md:flex-row md:items-center md:justify-between md:px-6">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-[10px] uppercase tracking-[0.2em] text-secondary-500">{t('topbar.workspace')}</p>

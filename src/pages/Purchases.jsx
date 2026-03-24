@@ -7,6 +7,7 @@ import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import MobileFormStepper from '../components/MobileFormStepper.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
+import PartySearchCreateField from '../components/PartySearchCreateField.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Dialog } from '../components/ui/Dialog.tsx';
@@ -21,7 +22,6 @@ import {
   mergeLookupEntities,
   normalizeLookupParty,
   normalizeLookupProduct,
-  toPartyLookupOption,
   toProductLookupOption,
 } from '../lib/lookups.js';
 
@@ -89,7 +89,7 @@ export default function Purchases() {
   const { purchases: purchaseList, loading: purchasesLoading, fetch: fetchPurchases, invalidate: invalidatePurchases } = usePurchaseStore();
   const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState('');
   const [productDirectory, setProductDirectory] = useState({});
-  const [supplierOption, setSupplierOption] = useState(null);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
 
   // ── UI state ──
   const [statusFilter, setStatusFilter] = useState('all');
@@ -192,7 +192,7 @@ export default function Purchases() {
   const handleEntryTypeChange = (event) => {
     const value = event.target.value;
     if (value === 'expense') {
-      setSupplierOption(null);
+      setSelectedSupplier(null);
     }
     setHeader((prev) => ({
       ...prev,
@@ -225,11 +225,6 @@ export default function Purchases() {
     setProductDirectory((previous) => mergeLookupEntities(previous, entries));
   };
 
-  const loadSupplierOptions = async (search) => {
-    const data = await api.lookupParties({ search, type: 'supplier', limit: 10 });
-    return (data?.items || []).map(toPartyLookupOption);
-  };
-
   const loadProductOptions = async (search) => {
     const data = await api.lookupProducts({ search, limit: 10 });
     const normalized = (data?.items || []).map(normalizeLookupProduct);
@@ -237,9 +232,13 @@ export default function Purchases() {
     return normalized.map(toProductLookupOption);
   };
 
-  const handleSupplierChange = (option) => {
-    setSupplierOption(option || null);
-    setHeader((previous) => ({ ...previous, partyId: option?.value || '' }));
+  const handleSupplierSelect = (party) => {
+    setSelectedSupplier(party || null);
+    setHeader((previous) => ({
+      ...previous,
+      partyId: party?.id || '',
+      partyName: party?.id ? '' : previous.partyName,
+    }));
   };
 
   const handleProductSelection = (index, option) => {
@@ -324,7 +323,7 @@ export default function Purchases() {
     setSuggestedInvoiceNo('');
     setMobileStep('details');
     setProductDirectory({});
-    setSupplierOption(null);
+    setSelectedSupplier(null);
   };
 
   const closeDialog = () => {
@@ -373,7 +372,7 @@ export default function Purchases() {
         ...normalizePaymentFields(purchase),
       });
       cacheProducts(hydratedProducts);
-      setSupplierOption(party.id ? toPartyLookupOption(party) : null);
+      setSelectedSupplier(party.id ? party : null);
       const mappedItems = purchaseItems.map((item) => ({
         id: item.id,
         productId: item.productId || '',
@@ -520,15 +519,13 @@ export default function Purchases() {
                 <div className="sm:col-span-2 lg:col-span-1">
                   <label className="label">{t('purchases.supplier')}</label>
                   <div className="mt-1">
-                    <AsyncSearchableSelect
-                      value={header.partyId}
-                      selectedOption={supplierOption}
-                      onChange={handleSupplierChange}
-                      loadOptions={loadSupplierOptions}
+                    <PartySearchCreateField
+                      type="supplier"
+                      selectedParty={selectedSupplier}
+                      onSelect={handleSupplierSelect}
                       placeholder={t('purchases.selectSupplier')}
                       searchPlaceholder={t('purchases.selectSupplier')}
-                      noResultsLabel={t('common.noData')}
-                      loadingLabel={t('common.loading')}
+                      entityLabel={t('purchases.supplier')}
                     />
                   </div>
                 </div>

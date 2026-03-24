@@ -1,5 +1,16 @@
 import { Component } from 'react';
 
+function isChunkOrCacheError(error) {
+  const message = String(error?.message || '').toLowerCase();
+
+  return (
+    message.includes('failed to fetch dynamically imported module')
+    || message.includes('loading chunk')
+    || message.includes('importing a module script failed')
+    || message.includes('a.filter is not a function')
+  );
+}
+
 export default class AppErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -18,10 +29,30 @@ export default class AppErrorBoundary extends Component {
     window.location.reload();
   };
 
+  handleHardReset = async () => {
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+
+      if ('caches' in window) {
+        const cacheKeys = await window.caches.keys();
+        await Promise.all(cacheKeys.map((key) => window.caches.delete(key)));
+      }
+    } catch (error) {
+      console.error('AppErrorBoundary hard reset failed', error);
+    } finally {
+      window.location.reload();
+    }
+  };
+
   render() {
     if (!this.state.error) {
       return this.props.children;
     }
+
+    const showHardReset = isChunkOrCacheError(this.state.error);
 
     return (
       <div className="flex min-h-screen items-center justify-center bg-mist px-6 py-12 text-ink">
@@ -40,6 +71,11 @@ export default class AppErrorBoundary extends Component {
             <button className="btn-primary" type="button" onClick={this.handleReload}>
               Reload app
             </button>
+            {showHardReset ? (
+              <button className="btn-secondary" type="button" onClick={this.handleHardReset}>
+                Clear cached app
+              </button>
+            ) : null}
           </div>
         </div>
       </div>

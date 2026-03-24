@@ -2,6 +2,7 @@ import { clearSession, getBusinessId, getToken, setSessionNotice } from './stora
 import { toQueryKey, toQueryString } from './queryKey';
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://api.yoursfriend.com';
+// export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 const INACTIVE_USER_REGEX = /user is inactive/i;
 const responseCache = new Map();

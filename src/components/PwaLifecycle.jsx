@@ -58,6 +58,42 @@ export default function PwaLifecycle() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return undefined;
+
+    const initialControllerUrl = navigator.serviceWorker.controller?.scriptURL || '';
+    let reloaded = false;
+
+    const refreshRegistration = () => {
+      navigator.serviceWorker.getRegistration().then((registration) => {
+        registration?.update().catch(() => null);
+      }).catch(() => null);
+    };
+
+    const handleControllerChange = () => {
+      const nextControllerUrl = navigator.serviceWorker.controller?.scriptURL || '';
+      if (reloaded || !nextControllerUrl || nextControllerUrl === initialControllerUrl) return;
+
+      reloaded = true;
+      window.location.reload();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshRegistration();
+      }
+    };
+
+    refreshRegistration();
+    navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const canPromptInstall = useMemo(
     () => Boolean(installPromptEvent) && !dismissedInstall && !isStandaloneMode(),
     [dismissedInstall, installPromptEvent]

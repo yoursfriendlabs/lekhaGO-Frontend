@@ -98,15 +98,20 @@ export default function Ledger() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [selectedPartyId, setSelectedPartyId] = useState(initialPartyId);
-  const [selectedPartyOption, setSelectedPartyOption] = useState(
-    initialPartyId ? { value: initialPartyId, label: t('ledger.party'), entity: { id: initialPartyId, name: t('ledger.party') } } : null
-  );
+  const [selectedPartyOption, setSelectedPartyOption] = useState(null);
   const [period, setPeriod] = useState('month');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const printRef = useRef(null);
 
   const { from, to } = useMemo(() => buildRange(period), [period]);
+
+  useEffect(() => {
+    setSelectedPartyId(initialPartyId);
+    if (!initialPartyId) {
+      setSelectedPartyOption(null);
+    }
+  }, [initialPartyId]);
 
   useEffect(() => {
     setPage(1);
@@ -135,10 +140,14 @@ export default function Ledger() {
           offset: Number(data?.offset || 0),
         });
 
-        if (selectedPartyId && !selectedPartyOption && data?.items?.[0]?.partyName) {
+        const matchedPartyRow = (Array.isArray(data?.items) ? data.items : []).find(
+          (row) => String(row.partyId || '') === String(selectedPartyId)
+        ) || data?.items?.[0];
+
+        if (selectedPartyId && !selectedPartyOption && matchedPartyRow?.partyName) {
           const party = normalizeLookupParty({
-            id: selectedPartyId,
-            partyName: data.items[0].partyName,
+            id: matchedPartyRow.partyId || selectedPartyId,
+            partyName: matchedPartyRow.partyName,
           });
           setSelectedPartyOption(toPartyLookupOption(party));
         }
@@ -155,7 +164,7 @@ export default function Ledger() {
     return () => {
       isActive = false;
     };
-  }, [from, page, pageSize, selectedPartyId, to]);
+  }, [from, page, pageSize, selectedPartyId, selectedPartyOption, to]);
 
   const statementRows = useMemo(
     () => ledger.items.map((row) => normalizeLedgerRow(row, t)),
@@ -191,8 +200,15 @@ export default function Ledger() {
   const balanceLabel = getBalanceLabel(summary.currentBalance, t);
 
   const loadPartyOptions = async (search) => {
-    const data = await api.lookupParties({ search, type: 'both', limit: 10 });
-    return (data?.items || []).map((party) => toPartyLookupOption(party));
+    const primary = await api.lookupParties({ search, limit: 10 });
+    const primaryItems = Array.isArray(primary?.items) ? primary.items : [];
+
+    if (primaryItems.length > 0) {
+      return primaryItems.map((party) => toPartyLookupOption(party));
+    }
+
+    const fallback = await api.lookupParties({ search, type: 'both', limit: 10 });
+    return (fallback?.items || []).map((party) => toPartyLookupOption(party));
   };
 
   const handlePartyFilterChange = (option) => {

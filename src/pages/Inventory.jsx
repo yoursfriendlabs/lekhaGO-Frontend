@@ -199,9 +199,9 @@ export default function Inventory() {
         subtitle={t('inventory.itemsSubtitle')}
         action={(
           <div className="flex flex-wrap gap-2">
-            <button className="btn-secondary w-full sm:w-auto" type="button">
-              <Upload size={16} /> {t('inventory.importItems')}
-            </button>
+            {/*<button className="btn-secondary w-full sm:w-auto" type="button">*/}
+            {/*  <Upload size={16} /> {t('inventory.importItems')}*/}
+            {/*</button>*/}
             <button className="btn-primary w-full sm:w-auto" type="button" onClick={() => setIsOpen(true)}>
               <Plus size={16} /> {t('inventory.addNewItem')}
             </button>
@@ -216,9 +216,7 @@ export default function Inventory() {
           <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
             {t('inventory.itemsList', { count: totalItems })}
           </h3>
-          <button className="btn-ghost" type="button">
-            <SlidersHorizontal size={16} /> {t('inventory.settings')}
-          </button>
+
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.8fr)_repeat(4,minmax(0,1fr))]">

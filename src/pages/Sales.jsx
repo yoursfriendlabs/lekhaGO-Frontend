@@ -7,6 +7,7 @@ import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import MobileFormStepper from '../components/MobileFormStepper.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
+import PartySearchCreateField from '../components/PartySearchCreateField.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Dialog } from '../components/ui/Dialog.tsx';
@@ -24,7 +25,6 @@ import {
   mergeLookupEntities,
   normalizeLookupParty,
   normalizeLookupProduct,
-  toPartyLookupOption,
   toProductLookupOption,
 } from '../lib/lookups.js';
 
@@ -76,7 +76,7 @@ export default function Sales() {
   const { sales: salesList, loading: salesLoading, fetch: fetchSales, invalidate: invalidateSales } = useSaleStore();
   const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState('');
   const [productDirectory, setProductDirectory] = useState({});
-  const [customerOption, setCustomerOption] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
 
   // ── UI state ──
   const [statusFilter, setStatusFilter] = useState('all');
@@ -184,11 +184,6 @@ export default function Sales() {
     setProductDirectory((previous) => mergeLookupEntities(previous, entries));
   };
 
-  const loadCustomerOptions = async (search) => {
-    const data = await api.lookupParties({ search, type: 'customer', limit: 10 });
-    return (data?.items || []).map(toPartyLookupOption);
-  };
-
   const loadProductOptions = async (search) => {
     const data = await api.lookupProducts({ search, limit: 10 });
     const normalized = (data?.items || []).map(normalizeLookupProduct);
@@ -196,9 +191,9 @@ export default function Sales() {
     return normalized.map(toProductLookupOption);
   };
 
-  const handleCustomerChange = (option) => {
-    setCustomerOption(option || null);
-    setHeader((previous) => ({ ...previous, partyId: option?.value || '' }));
+  const handleCustomerSelect = (party) => {
+    setSelectedCustomer(party || null);
+    setHeader((previous) => ({ ...previous, partyId: party?.id || '' }));
   };
 
   const handleProductSelection = (index, option) => {
@@ -309,7 +304,7 @@ export default function Sales() {
     setSuggestedInvoiceNo('');
     setMobileStep('details');
     setProductDirectory({});
-    setCustomerOption(null);
+    setSelectedCustomer(null);
   };
 
   const closeDialog = () => {
@@ -357,7 +352,7 @@ export default function Sales() {
         attributes: sale.attributes || {},
       });
       cacheProducts(hydratedProducts);
-      setCustomerOption(party.id ? toPartyLookupOption(party) : null);
+      setSelectedCustomer(party.id ? party : null);
       const mappedItems = saleItems.map((item) => ({
         id: item.id,
         productId: item.productId || '',
@@ -497,15 +492,13 @@ export default function Sales() {
                   <div className="sm:col-span-2 lg:col-span-1">
                     <label className="label">{t('sales.customer')}</label>
                     <div className="mt-1">
-                      <AsyncSearchableSelect
-                        value={header.partyId}
-                        selectedOption={customerOption}
-                        onChange={handleCustomerChange}
-                        loadOptions={loadCustomerOptions}
+                      <PartySearchCreateField
+                        type="customer"
+                        selectedParty={selectedCustomer}
+                        onSelect={handleCustomerSelect}
                         placeholder={t('sales.walkIn')}
                         searchPlaceholder={t('services.customerSearch')}
-                        noResultsLabel={t('common.noData')}
-                        loadingLabel={t('common.loading')}
+                        entityLabel={t('sales.customer')}
                       />
                     </div>
                   </div>

@@ -611,9 +611,7 @@ export default function Parties() {
                   </button>
                 </div>
                 <div className="flex gap-2">
-                  <button className="btn-secondary" type="button">
-                    <Bell size={16} /> {t('parties.sendReminder')}
-                  </button>
+
                   <button className="btn-ghost text-rose-600" type="button" onClick={() => handleDelete(selectedPartyView.id)}>
                     {t('common.delete')}
                   </button>
