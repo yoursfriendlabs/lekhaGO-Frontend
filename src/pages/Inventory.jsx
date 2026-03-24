@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
 import FormSectionCard from '../components/FormSectionCard.jsx';
+import CategorySearchCreateField from '../components/CategorySearchCreateField.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 import { useProductStore } from '../stores/products';
-import { Plus, Upload, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
+import { ArrowUpDown, Pencil, Plus } from 'lucide-react';
 
 const makeEmptyItem = () => ({
   name: '',
-  category: '',
+  categoryId: '',
   itemCode: '',
   itemType: 'goods',
   openingStock: '',
@@ -37,9 +38,64 @@ const parseNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const buildProductPayload = (form) => ({
+  name: form.name,
+  sku: form.itemCode.trim(),
+  itemType: form.itemType,
+  ...(form.categoryId ? { categoryId: form.categoryId } : {}),
+  primaryUnit: form.primaryUnit,
+  secondaryUnit: form.secondaryUnit,
+  conversionRate: parseNumber(form.conversionRate),
+  salePrice: parseNumber(form.salePrice),
+  purchasePrice: parseNumber(form.purchasePrice),
+  secondarySalePrice: parseNumber(form.secondarySalePrice),
+  mrpPrice: parseNumber(form.mrpPrice),
+  wholesalePrice: parseNumber(form.wholesalePrice),
+  minWholesaleQuantity: parseNumber(form.minWholesaleQuantity),
+  openingStock: parseNumber(form.openingStock),
+  lowStockAlert: form.lowStockAlert,
+});
+
+function getProductCategoryName(product = {}) {
+  if (typeof product.categoryName === 'string' && product.categoryName.trim()) return product.categoryName.trim();
+  if (product.category && typeof product.category === 'object' && typeof product.category.name === 'string' && product.category.name.trim()) {
+    return product.category.name.trim();
+  }
+  if (typeof product.category === 'string' && product.category.trim()) return product.category.trim();
+  if (typeof product.companyName === 'string' && product.companyName.trim()) return product.companyName.trim();
+  return '';
+}
+
+function productToForm(product = {}) {
+  return {
+    name: product.name || '',
+    categoryId: String(product.categoryId ?? product.category?.id ?? ''),
+    itemCode: product.sku || '',
+    itemType: product.itemType || 'goods',
+    openingStock: String(product.openingStock ?? product.stockOnHand ?? ''),
+    primaryUnit: product.primaryUnit || '',
+    secondaryUnit: product.secondaryUnit || '',
+    conversionRate: String(product.conversionRate ?? '0'),
+    salePrice: String(product.salePrice ?? '0'),
+    purchasePrice: String(product.purchasePrice ?? '0'),
+    secondarySalePrice: String(product.secondarySalePrice ?? '0'),
+    mrpPrice: String(product.mrpPrice ?? '0'),
+    wholesalePrice: String(product.wholesalePrice ?? '0'),
+    minWholesaleQuantity: String(product.minWholesaleQuantity ?? ''),
+    lowStockAlert: Boolean(product.lowStockAlert),
+  };
+}
+
 export default function Inventory() {
   const { t } = useI18n();
-  const { products, loading: productsLoading, error: productsError, fetch: fetchProducts, addProduct } = useProductStore();
+  const {
+    products,
+    loading: productsLoading,
+    error: productsError,
+    fetch: fetchProducts,
+    addProduct,
+    patchProduct,
+  } = useProductStore();
 
   const unitOptions = useMemo(() => ([
     t('products.units.piece'),
@@ -85,10 +141,42 @@ export default function Inventory() {
   const [activeTab, setActiveTab] = useState('stock');
   const [form, setForm] = useState(makeEmptyItem());
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [categoryOptions, setCategoryOptions] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [categoriesError, setCategoriesError] = useState('');
 
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  const loadCategories = useCallback(async () => {
+    setCategoriesLoading(true);
+
+    try {
+      const response = await api.listCategories({
+        type: 'product',
+        limit: 50,
+        offset: 0,
+      });
+
+      const nextCategories = (response.items || [])
+        .filter((category) => category?.id && category?.name)
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+
+      setCategoryOptions(nextCategories);
+      setCategoriesError('');
+    } catch (error) {
+      setCategoryOptions([]);
+      setCategoriesError(error.message);
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   useEffect(() => {
     if (productsError) setStatus({ type: 'error', message: productsError });
@@ -99,7 +187,7 @@ export default function Inventory() {
       id: product.id,
       name: product.name,
       itemType: product.itemType || 'goods',
-      category: product.category || product.companyName || '-',
+      category: getProductCategoryName(product) || '-',
       itemCode: product.sku || '-',
       salePrice: Number(product.salePrice ?? 0),
       purchasePrice: Number(product.purchasePrice ?? 0),
@@ -109,9 +197,17 @@ export default function Inventory() {
   }, [products]);
 
   const categories = useMemo(() => {
-    const unique = new Set(items.map((item) => item.category).filter(Boolean));
+    const unique = new Set([
+      ...categoryOptions.map((category) => category.name).filter(Boolean),
+      ...items.map((item) => item.category).filter((value) => value && value !== '-'),
+    ]);
     return Array.from(unique).sort();
-  }, [items]);
+  }, [categoryOptions, items]);
+
+  const selectedCategory = useMemo(
+    () => categoryOptions.find((category) => String(category.id) === String(form.categoryId)),
+    [categoryOptions, form.categoryId]
+  );
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -152,10 +248,31 @@ export default function Inventory() {
     setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
+  const openCreateDialog = () => {
+    setEditingId(null);
+    setForm(makeEmptyItem());
+    setActiveTab('stock');
+    setIsOpen(true);
+  };
+
+  const openEditDialog = (itemId) => {
+    const product = products.find((entry) => String(entry.id) === String(itemId));
+    if (!product) {
+      setStatus({ type: 'error', message: t('common.noData') });
+      return;
+    }
+
+    setEditingId(product.id);
+    setForm(productToForm(product));
+    setActiveTab('stock');
+    setIsOpen(true);
+  };
+
   const closeDialog = () => {
     setIsOpen(false);
     setForm(makeEmptyItem());
     setActiveTab('stock');
+    setEditingId(null);
   };
 
   const handleSubmit = async (event) => {
@@ -164,33 +281,66 @@ export default function Inventory() {
     setStatus({ type: 'info', message: '' });
 
     try {
-      const product = await api.createProduct({
-        name: form.name,
-        companyName: form.category,
-        sku: form.itemCode.trim(),
-        itemType: form.itemType,
-        primaryUnit: form.primaryUnit,
-        secondaryUnit: form.secondaryUnit,
-        conversionRate: parseNumber(form.conversionRate),
-        salePrice: parseNumber(form.salePrice),
-        purchasePrice: parseNumber(form.purchasePrice),
-        secondarySalePrice: parseNumber(form.secondarySalePrice),
-        mrpPrice: parseNumber(form.mrpPrice),
-        wholesalePrice: parseNumber(form.wholesalePrice),
-        minWholesaleQuantity: parseNumber(form.minWholesaleQuantity),
-        openingStock: parseNumber(form.openingStock),
-        lowStockAlert: form.lowStockAlert,
-      });
-      // Update cache instead of re-fetching
-      addProduct(product);
+      const payload = buildProductPayload(form);
+      const optimisticCategory = selectedCategory
+        ? {
+          id: selectedCategory.id,
+          name: selectedCategory.name,
+          type: selectedCategory.type || 'product',
+        }
+        : null;
+      const optimisticProduct = {
+        id: editingId,
+        ...payload,
+        categoryId: payload.categoryId || null,
+        category: optimisticCategory,
+        categoryName: optimisticCategory?.name || '',
+      };
+
+      if (editingId) {
+        const updatedProduct = await api.updateProduct(editingId, payload);
+        patchProduct(editingId, updatedProduct || optimisticProduct);
+        setStatus({ type: 'success', message: t('inventory.messages.itemUpdated') });
+      } else {
+        const product = await api.createProduct(payload);
+        addProduct(product || optimisticProduct);
+        setStatus({ type: 'success', message: t('inventory.messages.itemCreated') });
+      }
+
       closeDialog();
-      setStatus({ type: 'success', message: t('inventory.messages.itemCreated') });
     } catch (err) {
-      setStatus({ type: 'error', message: err.message });
+      const categoryMissing = err?.status === 404 && /categor/i.test(err?.message || err?.payload?.message || '');
+      if (categoryMissing) {
+        await loadCategories();
+        setForm((previous) => ({ ...previous, categoryId: '' }));
+        setStatus({ type: 'error', message: t('categories.messages.reselect') });
+      } else {
+        setStatus({ type: 'error', message: err.message });
+      }
     } finally {
       setSaving(false);
     }
   };
+
+  const handleCategorySelect = useCallback((category) => {
+    setForm((previous) => ({
+      ...previous,
+      categoryId: category?.id ? String(category.id) : '',
+    }));
+  }, []);
+
+  const handleCategoryCreated = useCallback((category) => {
+    if (!category?.id) return;
+
+    setCategoryOptions((previous) => {
+      const next = previous.filter((entry) => String(entry.id) !== String(category.id));
+      next.push(category);
+      next.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+      return next;
+    });
+
+    setForm((previous) => ({ ...previous, categoryId: String(category.id) }));
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -202,7 +352,7 @@ export default function Inventory() {
             {/*<button className="btn-secondary w-full sm:w-auto" type="button">*/}
             {/*  <Upload size={16} /> {t('inventory.importItems')}*/}
             {/*</button>*/}
-            <button className="btn-primary w-full sm:w-auto" type="button" onClick={() => setIsOpen(true)}>
+            <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreateDialog}>
               <Plus size={16} /> {t('inventory.addNewItem')}
             </button>
           </div>
@@ -295,6 +445,15 @@ export default function Inventory() {
                   <span>{t('products.salePrice')}: <strong className="text-slate-700 dark:text-slate-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.salePrice.toFixed(2) })}</strong></span>
                   <span>{t('products.purchasePrice')}: <strong className="text-slate-700 dark:text-slate-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.purchasePrice.toFixed(2) })}</strong></span>
                 </div>
+                <div className="mt-3 flex justify-end border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                  <button
+                    className="btn-ghost w-full justify-center sm:w-auto"
+                    type="button"
+                    onClick={() => openEditDialog(item.id)}
+                  >
+                    <Pencil size={16} /> {t('common.edit')}
+                  </button>
+                </div>
               </div>
             ))
           )}
@@ -311,16 +470,17 @@ export default function Inventory() {
                 <th className="py-2 text-right">{t('products.salePrice')}</th>
                 <th className="py-2 text-right">{t('products.purchasePrice')}</th>
                 <th className="py-2 text-right">{t('inventory.quantity')}</th>
+                <th className="py-2 text-right">{t('common.edit')}</th>
               </tr>
             </thead>
             <tbody>
               {productsLoading && products.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-3 text-slate-500">{t('common.loading')}</td>
+                  <td colSpan={8} className="py-3 text-slate-500">{t('common.loading')}</td>
                 </tr>
               ) : pagedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-3 text-slate-500">{t('inventory.noItems')}</td>
+                  <td colSpan={8} className="py-3 text-slate-500">{t('inventory.noItems')}</td>
                 </tr>
               ) : (
                 pagedItems.map((item) => (
@@ -354,6 +514,15 @@ export default function Inventory() {
                     <td className="py-3 text-right">
                       {item.quantity.toFixed(2)} {item.unit || ''}
                     </td>
+                    <td className="py-3 text-right">
+                      <button
+                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                        type="button"
+                        onClick={() => openEditDialog(item.id)}
+                      >
+                        <Pencil size={14} /> {t('common.edit')}
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -373,7 +542,12 @@ export default function Inventory() {
         />
       </div>
 
-      <Dialog isOpen={isOpen} onClose={closeDialog} title={t('inventory.addNewItem')} size="xl">
+      <Dialog
+        isOpen={isOpen}
+        onClose={closeDialog}
+        title={editingId ? `${t('common.edit')} ${t('inventory.itemName').toLowerCase()}` : t('inventory.addNewItem')}
+        size="xl"
+      >
         <datalist id={unitListId}>
           {unitOptions.map((option) => (
             <option key={option} value={option} />
@@ -396,13 +570,23 @@ export default function Inventory() {
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                   <label className="label">{t('inventory.itemCategory')}</label>
-                  <input
-                    className="input mt-1"
-                    name="category"
-                    value={form.category}
-                    onChange={handleFormChange}
-                    placeholder={t('inventory.itemCategoryPlaceholder')}
-                  />
+                  <div className="mt-1">
+                    <CategorySearchCreateField
+                      selectedCategory={selectedCategory}
+                      options={categoryOptions}
+                      onSelect={handleCategorySelect}
+                      onCreated={handleCategoryCreated}
+                      placeholder={t('categories.selectCategory')}
+                      searchPlaceholder={t('categories.searchPlaceholder')}
+                    />
+                  </div>
+                  {categoriesError ? (
+                    <p className="mt-2 text-xs text-rose-600">{categoriesError}</p>
+                  ) : categoriesLoading && !selectedCategory ? (
+                    <p className="mt-2 text-xs text-slate-500">{t('common.loading')}</p>
+                  ) : selectedCategory?.name ? (
+                    <p className="mt-2 text-xs text-slate-500">{selectedCategory.name}</p>
+                  ) : null}
                 </div>
                 <div>
                   <label className="label">{t('inventory.itemCode')}</label>
@@ -416,15 +600,19 @@ export default function Inventory() {
                 </div>
                 <div>
                   <label className="label">{t('inventory.itemType')}</label>
-                  <div className="mt-1 grid grid-cols-2 gap-2">
-                    {['goods', 'service'].map((type) => (
+                  <div className="mt-1 grid grid-cols-3 gap-2">
+                    {['goods', 'service', 'part'].map((type) => (
                       <button
                         key={type}
                         type="button"
                         onClick={() => setForm((prev) => ({ ...prev, itemType: type }))}
                         className={`${form.itemType === type ? 'btn-primary' : 'btn-ghost'} w-full justify-center`}
                       >
-                        {type === 'goods' ? t('products.goods') : t('products.service')}
+                        {type === 'goods'
+                          ? t('products.goods')
+                          : type === 'service'
+                            ? t('products.service')
+                            : t('products.part')}
                       </button>
                     ))}
                   </div>
@@ -526,7 +714,7 @@ export default function Inventory() {
               {t('common.close')}
             </button>
             <button className="btn-primary w-full sm:w-auto" type="submit" disabled={saving}>
-              {saving ? t('common.loading') : t('inventory.addItem')}
+              {saving ? t('common.loading') : editingId ? t('common.update') : t('inventory.addItem')}
             </button>
           </div>
         </form>

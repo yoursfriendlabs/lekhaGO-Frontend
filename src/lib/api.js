@@ -380,6 +380,20 @@ export const api = {
     collectionRequest('/api/products/lookup', params, listCache(['products'], CACHE_TTL.lookup)),
   createProduct: (data) =>
     request('/api/products', { method: 'POST', body: JSON.stringify(data) }, mutationConfig(['products', 'reports', 'dashboard'])),
+  updateProduct: (id, data) =>
+    request(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }, mutationConfig([detailTags('product', id), 'products', 'reports', 'dashboard'])),
+  listCategories: (params = {}) =>
+    collectionRequest('/api/categories', params, listCache(['categories'], CACHE_TTL.settings)),
+  createCategory: (data) =>
+    request('/api/categories', { method: 'POST', body: JSON.stringify(data) }, mutationConfig(['categories', 'products'])),
+  getCategory: (id) =>
+    request(`/api/categories/${id}`, {}, listCache(detailTags('category', id), CACHE_TTL.settings)),
+  updateCategory: (id, data) =>
+    request(`/api/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }, mutationConfig([detailTags('category', id), 'categories', 'products'])),
+  patchCategory: (id, data) =>
+    request(`/api/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }, mutationConfig([detailTags('category', id), 'categories', 'products'])),
+  deleteCategory: (id) =>
+    request(`/api/categories/${id}`, { method: 'DELETE' }, mutationConfig([detailTags('category', id), 'categories', 'products'])),
 
   createPurchase: (data) =>
     request('/api/purchases', { method: 'POST', body: JSON.stringify(data) }, mutationConfig(['purchases', 'products', 'reports', 'dashboard', 'parties', 'party-statements', 'banks'])),
