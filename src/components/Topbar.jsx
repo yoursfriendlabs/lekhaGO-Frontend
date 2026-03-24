@@ -15,11 +15,20 @@ export default function Topbar() {
         </div>
         <div className="flex gap-2 items-center md:hidden">
           <div className="">
-            <button onClick={() => setLocale(locale === 'en' ? 'ne' : 'en')} className="bg-amber-50 border rounded-xl px-2 border-amber-400">
+            <button 
+              onClick={() => setLocale(locale === 'en' ? 'ne' : 'en')} 
+              className="bg-amber-50 border rounded-xl px-3 py-2 min-h-[44px] min-w-[44px] flex items-center justify-center border-amber-400 active:scale-95 transition-transform"
+              aria-label="Toggle language"
+            >
               { locale === 'en' ? '🇳🇵' : '🇬🇧' }
             </button>
           </div>
-          <button className="rounded-full bg-secondary-100 p-2 text-rose-500" onClick={logout} type="button">
+          <button 
+            className="rounded-full bg-secondary-100 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-rose-500 active:scale-95 transition-transform" 
+            onClick={logout} 
+            type="button"
+            aria-label="Logout"
+          >
             🚪
           </button>
         </div>

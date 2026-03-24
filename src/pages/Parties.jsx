@@ -171,10 +171,15 @@ export default function Parties() {
       return;
     }
 
-    if (!selectedId || !parties.find((party) => party.id === selectedId)) {
+    // Only auto-select first party if no party is currently selected
+    // or if the currently selected party is not in the list
+    if (!selectedId) {
       setSelectedId(parties[0].id);
+    } else if (!parties.find((party) => party.id === selectedId)) {
+      // If selected party is not in list, keep the selectedId but don't auto-change
+      // This allows the statement to load for that party even if not in filtered list
     }
-  }, [parties, selectedId]);
+  }, [parties]);
 
   useEffect(() => {
     setTxPage(1);
@@ -533,20 +538,23 @@ export default function Parties() {
             ) : (
               parties.map((party) => {
                 const balanceMeta = getPartyBalanceMeta(party.currentAmount, t);
+                const isSelected = selectedId === party.id;
 
                 return (
                   <button
                     key={party.id}
                     type="button"
                     onClick={() => setSelectedId(party.id)}
-                    className={
-                      selectedId === party.id
-                        ? 'w-full rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-left'
-                        : 'w-full rounded-2xl border border-slate-200 bg-white p-3 text-left'
-                    }
+                    className={`w-full rounded-2xl border p-3 text-left transition-all ${
+                      isSelected
+                        ? 'border-emerald-300 bg-emerald-50 shadow-sm ring-1 ring-emerald-200 dark:border-emerald-700 dark:bg-emerald-900/20 dark:ring-emerald-800'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800'
+                    }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500 text-white">
+                      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white transition-colors ${
+                        isSelected ? 'bg-emerald-600' : 'bg-slate-400'
+                      }`}>
                         {party.name?.slice(0, 2).toUpperCase() || 'P'}
                       </div>
                       <div className="flex-1">
