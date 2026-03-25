@@ -172,10 +172,10 @@ export default function CategorySearchCreateField({
         </div>
       ) : (
         <div>
-          <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-white px-3 py-2.5 dark:border-slate-700/60 dark:bg-slate-900/60 focus-within:border-primary-300">
+          <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-white px-3 py-1 dark:border-slate-700/60 dark:bg-slate-900/60 focus-within:border-primary-300">
             <Search size={16} className="shrink-0 text-slate-400" />
             <input
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400 dark:text-slate-200"
+              className="flex-1 bg-transparent w-1/3 text-sm focus:border-none border-none focus:ring-0 outline-none placeholder:text-slate-400 dark:text-slate-200"
               placeholder={searchPlaceholder || placeholder || t('categories.selectCategory')}
               value={query}
               onChange={(event) => {
