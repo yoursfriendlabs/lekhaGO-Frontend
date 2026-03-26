@@ -3,15 +3,15 @@ import { LayoutDashboard, Boxes, Users, ShoppingCart, UserCheck, Briefcase, File
 import { useI18n } from '../lib/i18n.jsx';
 
 const navItems = [
-  { to: '/app', key: 'nav.home', icon: LayoutDashboard },
-  { to: '/app/inventory', key: 'nav.items', icon: Boxes },
-  { to: '/app/parties', key: 'nav.parties', icon: Users },
-  { to: '/app/purchases', key: 'nav.buy', icon: ShoppingCart },
-  { to: '/app/sales', key: 'nav.sell', icon: UserCheck },
-  { to: '/app/services', key: 'nav.service', icon: Briefcase },
-  { to: '/app/ledger', key: 'nav.ledger', icon: FileText },
-  { to: '/app/analytics', key: 'nav.stats', icon: BarChart3 },
-  { to: '/app/settings', key: 'nav.settings', icon: Settings2 },
+  { to: '/app', key: 'nav.home', icon: LayoutDashboard , role: ['owner','staff'] },
+  { to: '/app/inventory', key: 'nav.items', icon: Boxes , role: ['owner','staff']},
+  { to: '/app/services', key: 'nav.service', icon: Briefcase ,  role: ['owner','staff']},
+  { to: '/app/sales', key: 'nav.sell', icon: UserCheck, role: ['owner','staff'] },
+  { to: '/app/purchases', key: 'nav.buy', icon: ShoppingCart , role: ['owner']},
+  { to: '/app/parties', key: 'nav.parties', icon: Users  , role: ['owner']},
+  // { to: '/app/ledger', key: 'nav.ledger', icon: FileText },
+  // { to: '/app/analytics', key: 'nav.stats', icon: BarChart3 },
+  { to: '/app/settings', key: 'nav.settings', icon: Settings2 , role: ['owner'] }
 ];
 
 export default function MobileNav() {
