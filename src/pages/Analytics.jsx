@@ -9,10 +9,18 @@ import dayjs, { todayISODate } from '../lib/datetime';
 
 const EMPTY_SUMMARY = Object.freeze({
   totals: {
-    sales: 0,
-    purchases: 0,
-    services: 0,
-    combined: 0,
+    sales: { count: 0, total: 0, cashReceived: 0, pending: 0 },
+    purchases: { count: 0, total: 0, cashPaid: 0, pending: 0 },
+    services: { count: 0, total: 0, cashReceived: 0, pending: 0 },
+    combined: {
+      revenue: 0,
+      expenses: 0,
+      cashIn: 0,
+      cashOut: 0,
+      netCash: 0,
+      pendingReceivable: 0,
+      pendingPayable: 0,
+    },
   },
   series: {
     sales: [],
@@ -52,17 +60,48 @@ function formatSeriesLabel(rawLabel, fallbackLabel) {
   return label;
 }
 
-function normalizeMetricSeries(items, valueKeys) {
+function normalizeMetricTotals(source, receivedKey) {
+  const base = source && typeof source === 'object' && !Array.isArray(source) ? source : {};
+  const totalFallback = asNumber(source);
+
+  return {
+    count: asNumber(base.count),
+    total: firstNumber(base, ['total', 'amount']) ?? totalFallback,
+    [receivedKey]: firstNumber(base, [receivedKey]) ?? 0,
+    pending: asNumber(base.pending),
+  };
+}
+
+function normalizeCombinedTotals(source) {
+  const base = source && typeof source === 'object' && !Array.isArray(source) ? source : {};
+  const revenue = firstNumber(base, ['revenue', 'revenueTotal', 'total']) ?? asNumber(source);
+  const expenses = firstNumber(base, ['expenses', 'expenseTotal']) ?? 0;
+  const cashIn = firstNumber(base, ['cashIn', 'cashInTotal']) ?? 0;
+  const cashOut = firstNumber(base, ['cashOut', 'cashOutTotal']) ?? 0;
+
+  return {
+    revenue,
+    expenses,
+    cashIn,
+    cashOut,
+    netCash: firstNumber(base, ['netCash']) ?? (cashIn - cashOut),
+    pendingReceivable: firstNumber(base, ['pendingReceivable']) ?? 0,
+    pendingPayable: firstNumber(base, ['pendingPayable']) ?? 0,
+  };
+}
+
+function normalizeBreakdownSeries(items, { totalKeys, receivedKeys, pendingKeys, receivedField = 'received' }) {
   if (!Array.isArray(items)) return [];
 
   return items.map((item, index) => {
-    const rawLabel = item?.label || item?.periodLabel || item?.period || item?.date || item?.key;
-    const value = firstNumber(item, valueKeys) ?? 0;
+    const rawLabel = item?.label || item?.periodLabel || item?.period || item?.date || item?.bucketStart || item?.key;
 
     return {
-      key: String(item?.key || item?.period || item?.date || index),
+      key: String(item?.key || item?.period || item?.date || item?.bucketStart || index),
       label: formatSeriesLabel(rawLabel, `#${index + 1}`),
-      value,
+      total: firstNumber(item, totalKeys) ?? 0,
+      [receivedField]: firstNumber(item, receivedKeys) ?? 0,
+      pending: firstNumber(item, pendingKeys) ?? 0,
     };
   });
 }
@@ -71,19 +110,25 @@ function normalizeTimelineSeries(items) {
   if (!Array.isArray(items)) return [];
 
   return items.map((item, index) => {
-    const sales = firstNumber(item, ['sales', 'salesTotal', 'salesAmount']) ?? 0;
-    const purchases = firstNumber(item, ['purchases', 'purchaseTotal', 'purchaseAmount']) ?? 0;
-    const services = firstNumber(item, ['services', 'serviceTotal', 'serviceAmount']) ?? 0;
-    const combined = firstNumber(item, ['combined', 'combinedTotal', 'total']) ?? (sales + purchases + services);
-    const rawLabel = item?.label || item?.periodLabel || item?.period || item?.date || item?.key;
+    const rawLabel = item?.label || item?.periodLabel || item?.period || item?.date || item?.bucketStart || item?.key;
 
     return {
-      key: String(item?.key || item?.period || item?.date || index),
+      key: String(item?.key || item?.period || item?.date || item?.bucketStart || index),
       label: formatSeriesLabel(rawLabel, `#${index + 1}`),
-      sales,
-      purchases,
-      services,
-      combined,
+      salesTotal: firstNumber(item, ['salesTotal', 'sales', 'salesAmount']) ?? 0,
+      salesCashReceived: firstNumber(item, ['salesCashReceived']) ?? 0,
+      salesPending: firstNumber(item, ['salesPending']) ?? 0,
+      purchaseTotal: firstNumber(item, ['purchaseTotal', 'purchases', 'purchaseAmount']) ?? 0,
+      purchaseCashPaid: firstNumber(item, ['purchaseCashPaid']) ?? 0,
+      purchasePending: firstNumber(item, ['purchasePending']) ?? 0,
+      serviceTotal: firstNumber(item, ['serviceTotal', 'services', 'serviceAmount']) ?? 0,
+      serviceCashReceived: firstNumber(item, ['serviceCashReceived']) ?? 0,
+      servicePending: firstNumber(item, ['servicePending']) ?? 0,
+      revenueTotal: firstNumber(item, ['revenueTotal', 'combined', 'combinedTotal', 'total']) ?? 0,
+      expenseTotal: firstNumber(item, ['expenseTotal']) ?? 0,
+      cashInTotal: firstNumber(item, ['cashInTotal']) ?? 0,
+      cashOutTotal: firstNumber(item, ['cashOutTotal']) ?? 0,
+      netCash: firstNumber(item, ['netCash']) ?? 0,
     };
   });
 }
@@ -93,20 +138,53 @@ function normalizeAnalyticsSummary(payload = {}) {
   const totals = summary?.totals || {};
   const series = summary?.series || {};
   const timeline = normalizeTimelineSeries(series.timeline);
-  const salesSeries = normalizeMetricSeries(series.sales, ['value', 'sales', 'total', 'amount']);
-  const purchaseSeries = normalizeMetricSeries(series.purchases, ['value', 'purchases', 'total', 'amount']);
-  const serviceSeries = normalizeMetricSeries(series.services, ['value', 'services', 'total', 'amount']);
+  const salesSeries = normalizeBreakdownSeries(series.sales, {
+    totalKeys: ['total', 'salesTotal', 'amount', 'value'],
+    receivedKeys: ['cashReceived', 'salesCashReceived'],
+    pendingKeys: ['pending', 'salesPending'],
+    receivedField: 'received',
+  });
+  const purchaseSeries = normalizeBreakdownSeries(series.purchases, {
+    totalKeys: ['total', 'purchaseTotal', 'amount', 'value'],
+    receivedKeys: ['cashPaid', 'purchaseCashPaid'],
+    pendingKeys: ['pending', 'purchasePending'],
+    receivedField: 'paid',
+  });
+  const serviceSeries = normalizeBreakdownSeries(series.services, {
+    totalKeys: ['total', 'serviceTotal', 'amount', 'value'],
+    receivedKeys: ['cashReceived', 'serviceCashReceived'],
+    pendingKeys: ['pending', 'servicePending'],
+    receivedField: 'received',
+  });
 
-  const fallbackSales = timeline.map((point) => ({ key: point.key, label: point.label, value: point.sales }));
-  const fallbackPurchases = timeline.map((point) => ({ key: point.key, label: point.label, value: point.purchases }));
-  const fallbackServices = timeline.map((point) => ({ key: point.key, label: point.label, value: point.services }));
+  const fallbackSales = timeline.map((point) => ({
+    key: point.key,
+    label: point.label,
+    total: point.salesTotal,
+    received: point.salesCashReceived,
+    pending: point.salesPending,
+  }));
+  const fallbackPurchases = timeline.map((point) => ({
+    key: point.key,
+    label: point.label,
+    total: point.purchaseTotal,
+    paid: point.purchaseCashPaid,
+    pending: point.purchasePending,
+  }));
+  const fallbackServices = timeline.map((point) => ({
+    key: point.key,
+    label: point.label,
+    total: point.serviceTotal,
+    received: point.serviceCashReceived,
+    pending: point.servicePending,
+  }));
 
   return {
     totals: {
-      sales: asNumber(totals.sales),
-      purchases: asNumber(totals.purchases),
-      services: asNumber(totals.services),
-      combined: asNumber(totals.combined ?? (asNumber(totals.sales) + asNumber(totals.purchases) + asNumber(totals.services))),
+      sales: normalizeMetricTotals(totals.sales, 'cashReceived'),
+      purchases: normalizeMetricTotals(totals.purchases, 'cashPaid'),
+      services: normalizeMetricTotals(totals.services, 'cashReceived'),
+      combined: normalizeCombinedTotals(totals.combined),
     },
     series: {
       sales: salesSeries.length > 0 ? salesSeries : fallbackSales,
@@ -115,6 +193,18 @@ function normalizeAnalyticsSummary(payload = {}) {
       timeline,
     },
   };
+}
+
+function metricToneClasses(tone, value) {
+  if (tone === 'success') return 'text-emerald-600 dark:text-emerald-400';
+  if (tone === 'danger') return 'text-rose-600 dark:text-rose-400';
+  if (tone === 'net') {
+    return asNumber(value) < 0
+      ? 'text-rose-600 dark:text-rose-400'
+      : 'text-emerald-600 dark:text-emerald-400';
+  }
+
+  return 'text-slate-500 dark:text-slate-400';
 }
 
 export default function Analytics() {
@@ -142,7 +232,6 @@ export default function Analytics() {
       .then((data) => {
         if (!isActive) return;
         setSummary(normalizeAnalyticsSummary(data));
-        console.log(data)
       })
       .catch((err) => {
         if (!isActive) return;
@@ -177,11 +266,45 @@ export default function Analytics() {
     });
   };
 
+  const formatCompactMoney = (value) => {
+    const amount = asNumber(value);
+    return `${t('currency.symbol')} ${amount.toLocaleString(undefined, {
+      notation: 'compact',
+      maximumFractionDigits: 1,
+    })}`;
+  };
+
+  const renderSummaryLines = (items) => (
+    <div className="mt-3 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+      {items.map((item) => (
+        <p key={item.label} className={`flex items-center justify-between gap-3 ${metricToneClasses(item.tone, item.value)}`}>
+          <span>{item.label}</span>
+          <span className="font-medium">{formatMoney(item.value)}</span>
+        </p>
+      ))}
+    </div>
+  );
+
+  const renderTimelineCell = (primary, items, emphasize = false) => (
+    <td className="py-2 text-right">
+      <div className="flex min-w-[9rem] flex-col items-end gap-1">
+        <span className={emphasize ? 'font-semibold text-slate-900 dark:text-white' : 'font-medium text-slate-900 dark:text-white'}>
+          {formatMoney(primary)}
+        </span>
+        {items.map((item) => (
+          <span key={item.label} className={`text-xs ${metricToneClasses(item.tone, item.value)}`}>
+            {item.label}: {formatMoney(item.value)}
+          </span>
+        ))}
+      </div>
+    </td>
+  );
+
   const pieData = useMemo(() => ([
-    { name: t('nav.sales'), value: summary.totals.sales },
-    { name: t('nav.services'), value: summary.totals.services },
-    { name: t('nav.purchases'), value: summary.totals.purchases },
-  ]), [summary.totals.purchases, summary.totals.sales, summary.totals.services, t]);
+    { name: t('nav.sales'), value: summary.totals.sales.total },
+    { name: t('nav.services'), value: summary.totals.services.total },
+    { name: t('nav.purchases'), value: summary.totals.purchases.total },
+  ]), [summary.totals.purchases.total, summary.totals.sales.total, summary.totals.services.total, t]);
 
   const seriesCaption = useMemo(() => {
     const labelMap = {
@@ -241,19 +364,35 @@ export default function Analytics() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <div className="card">
           <p className="text-xs uppercase text-slate-400">{t('analytics.salesRevenue')}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.sales)}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.sales.total)}</p>
+          {renderSummaryLines([
+            { label: t('analytics.received'), value: summary.totals.sales.cashReceived, tone: 'success' },
+            { label: t('analytics.pending'), value: summary.totals.sales.pending, tone: 'danger' },
+          ])}
         </div>
         <div className="card">
           <p className="text-xs uppercase text-slate-400">{t('analytics.servicesRevenue')}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.services)}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.services.total)}</p>
+          {renderSummaryLines([
+            { label: t('analytics.received'), value: summary.totals.services.cashReceived, tone: 'success' },
+            { label: t('analytics.pending'), value: summary.totals.services.pending, tone: 'danger' },
+          ])}
         </div>
         <div className="card">
           <p className="text-xs uppercase text-slate-400">{t('analytics.purchaseSpend')}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.purchases)}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.purchases.total)}</p>
+          {renderSummaryLines([
+            { label: t('analytics.paid'), value: summary.totals.purchases.cashPaid, tone: 'success' },
+            { label: t('analytics.pending'), value: summary.totals.purchases.pending, tone: 'danger' },
+          ])}
         </div>
         <div className="card">
           <p className="text-xs uppercase text-slate-400">{t('analytics.combinedRevenue')}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.combined)}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.combined.revenue)}</p>
+          {renderSummaryLines([
+            { label: t('analytics.cashIn'), value: summary.totals.combined.cashIn, tone: 'success' },
+            { label: t('analytics.pendingReceivable'), value: summary.totals.combined.pendingReceivable, tone: 'danger' },
+          ])}
         </div>
       </div>
 
@@ -262,17 +401,25 @@ export default function Analytics() {
           title={t('analytics.salesTrend')}
           caption={seriesCaption}
           data={summary.series.sales}
-          dataKey="value"
           nameKey="label"
-          color="#10b981"
+          bars={[
+            { dataKey: 'received', label: t('analytics.received'), color: '#10b981' },
+            { dataKey: 'pending', label: t('analytics.pending'), color: '#facc15' },
+          ]}
+          valueFormatter={formatMoney}
+          axisFormatter={formatCompactMoney}
         />
         <BarGraph
           title={t('analytics.servicesTrend')}
           caption={seriesCaption}
           data={summary.series.services}
-          dataKey="value"
           nameKey="label"
-          color="#3b82f6"
+          bars={[
+            { dataKey: 'received', label: t('analytics.received'), color: '#3b82f6' },
+            { dataKey: 'pending', label: t('analytics.pending'), color: '#facc15' },
+          ]}
+          valueFormatter={formatMoney}
+          axisFormatter={formatCompactMoney}
         />
       </div>
 
@@ -281,9 +428,13 @@ export default function Analytics() {
           title={t('analytics.purchaseTrend')}
           caption={seriesCaption}
           data={summary.series.purchases}
-          dataKey="value"
           nameKey="label"
-          color="#f59e0b"
+          bars={[
+            { dataKey: 'paid', label: t('analytics.paid'), color: '#d97706' },
+            { dataKey: 'pending', label: t('analytics.pending'), color: '#facc15' },
+          ]}
+          valueFormatter={formatMoney}
+          axisFormatter={formatCompactMoney}
         />
         <div className="card">
           <h3 className="mb-4 font-serif text-xl text-slate-900 dark:text-white">{t('analytics.overallMix')}</h3>
@@ -317,10 +468,22 @@ export default function Analytics() {
                 {summary.series.timeline.map((row) => (
                   <tr key={row.key} className="border-t border-slate-200/70 dark:border-slate-800/70">
                     <td className="py-2">{row.label}</td>
-                    <td className="py-2 text-right">{formatMoney(row.sales)}</td>
-                    <td className="py-2 text-right">{formatMoney(row.purchases)}</td>
-                    <td className="py-2 text-right">{formatMoney(row.services)}</td>
-                    <td className="py-2 text-right font-semibold text-slate-900 dark:text-white">{formatMoney(row.combined)}</td>
+                    {renderTimelineCell(row.salesTotal, [
+                      { label: t('analytics.received'), value: row.salesCashReceived, tone: 'success' },
+                      { label: t('analytics.pending'), value: row.salesPending, tone: 'danger' },
+                    ])}
+                    {renderTimelineCell(row.purchaseTotal, [
+                      { label: t('analytics.paid'), value: row.purchaseCashPaid, tone: 'success' },
+                      { label: t('analytics.pending'), value: row.purchasePending, tone: 'danger' },
+                    ])}
+                    {renderTimelineCell(row.serviceTotal, [
+                      { label: t('analytics.received'), value: row.serviceCashReceived, tone: 'success' },
+                      { label: t('analytics.pending'), value: row.servicePending, tone: 'danger' },
+                    ])}
+                    {renderTimelineCell(row.revenueTotal, [
+                      { label: t('analytics.cashIn'), value: row.cashInTotal, tone: 'success' },
+                      { label: t('analytics.netCash'), value: row.netCash, tone: 'net' },
+                    ], true)}
                   </tr>
                 ))}
               </tbody>

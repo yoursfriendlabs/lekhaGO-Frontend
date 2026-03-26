@@ -11,7 +11,7 @@ const navItems = [
   { to: '/app/purchases', key: 'nav.purchases', role: ['owner'] },
   { to: '/app/parties', key: 'nav.parties', role: ['owner']  },
   { to: '/app/ledger', key: 'nav.ledger', role: ['owner','staff'] },
-  // { to: '/app/analytics', key: 'nav.analytics', role: ['owner'] },
+  { to: '/app/analytics', key: 'nav.analytics', role: ['owner'] },
   { to: '/app/settings', key: 'nav.settings', role: ['owner','staff'] },
 ];
 
