@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import BrandLogo from '../components/BrandLogo.jsx';
 
 const features = [
   { title: 'Inventory & Units', desc: 'Track stock with primary and secondary units.' },
@@ -13,8 +14,8 @@ export default function Landing() {
   return (
     <div className="min-h-screen gradient-bg bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <header className="flex flex-wrap items-center justify-between gap-4 px-6 py-6">
-        <div>
-          <h1 className="font-serif text-2xl text-slate-900 dark:text-white">ManageMyShop</h1>
+        <div className="space-y-3">
+          <BrandLogo className="h-10 w-full max-w-[240px]" />
           <p className="text-sm text-slate-500 dark:text-slate-400">Inventory, sales, purchases, service</p>
         </div>
         <div className="flex items-center gap-3">

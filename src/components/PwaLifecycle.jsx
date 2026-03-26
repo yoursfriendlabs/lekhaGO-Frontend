@@ -114,7 +114,7 @@ export default function PwaLifecycle() {
   if (canPromptInstall) {
     return (
       <FloatingPrompt
-        title="Install ManageMyShop"
+        title="Install PasalManager"
         description="Add the app to the home screen for faster launch, full-screen mode, and background updates."
         primaryAction={{ label: 'Install app', onClick: handleInstall }}
         secondaryAction={{ label: 'Not now', onClick: () => setDismissedInstall(true) }}

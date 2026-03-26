@@ -12,8 +12,8 @@ export default defineConfig(({ mode }) => ({
       includeAssets: ['favicon-32.png', 'apple-touch-icon.png'],
       manifest: {
         id: '/',
-        name: 'ManageMyShop',
-        short_name: 'MyShop',
+        name: 'PasalManager',
+        short_name: 'Pasal',
         description: 'Business management for inventory, sales, purchases, services, and parties.',
         lang: 'en',
         start_url: '/app',

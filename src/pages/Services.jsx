@@ -569,7 +569,7 @@ export default function Services() {
       const hydratedProducts = rawItems
         .map((item) => normalizeLookupProduct(item))
         .filter((product) => product.id);
-      
+
       // Build party object from all possible sources
       const partyData = {
         partyId: full.partyId || full.Party?.id || full.Customer?.id || '',
@@ -578,7 +578,7 @@ export default function Services() {
         currentAmount: full.Party?.currentAmount ?? full.Customer?.currentAmount ?? null,
         type: 'customer',
       };
-      
+
       setHeader({
         partyId: full.partyId || '',
         orderNo: full.orderNo || '',
@@ -603,7 +603,7 @@ export default function Services() {
         unitPrice: String(i.unitPrice ?? '0'),
         lineTotal: String(i.lineTotal ?? '0'),
       })) : [{ ...emptyItem }]);
-      
+
       // Set selected party if we have party data
       if (partyData.partyId && partyData.partyName) {
         const party = normalizeLookupParty(partyData);
@@ -915,7 +915,7 @@ export default function Services() {
                         <button
                           type="button"
                           className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          onClick={() => setLightboxUrl(order.attachment.startsWith('http') ? order.attachment : `${API_BASE}${order.attachment}`)}
+                          onClick={() => setLightboxUrl(order.attachment)}
                         >
                           <FileText size={14} />
                         </button>
@@ -995,9 +995,9 @@ export default function Services() {
                       </td>
                       <td className="py-2.5 pr-2">
                         {order.attachment ? (
-                          <button type="button" onClick={() => setLightboxUrl(`${API_BASE}${order.attachment}`)}>
+                          <button type="button" onClick={() => setLightboxUrl(order.attachment)}>
                             <img
-                              src={order.attachment.startsWith('http') ? order.attachment : `${API_BASE}${order.attachment}`}
+                              src={order.attachment}
                               alt="attach"
                               className="h-8 w-8 rounded object-cover border border-slate-200 hover:opacity-80 transition"
                               onError={(e) => { e.target.style.display = 'none'; }}
@@ -1650,7 +1650,7 @@ export default function Services() {
                       </a>
                     ) : (
                       <img
-                        src={`${API_BASE}${invoiceOrder.attachment}`}
+                        src={invoiceOrder.attachment}
                         alt="Attachment"
                         className="max-h-56 rounded-xl border border-slate-200 object-contain dark:border-slate-800"
                       />

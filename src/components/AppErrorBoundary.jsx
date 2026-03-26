@@ -1,20 +1,16 @@
 import { Component } from 'react';
-
-function isChunkOrCacheError(error) {
-  const message = String(error?.message || '').toLowerCase();
-
-  return (
-    message.includes('failed to fetch dynamically imported module')
-    || message.includes('loading chunk')
-    || message.includes('importing a module script failed')
-    || message.includes('a.filter is not a function')
-  );
-}
+import {
+  canAutoRecoverChunkError,
+  clearAppRuntime,
+  isChunkOrCacheError,
+  recoverFromChunkError,
+  reloadApp,
+} from '../lib/appRecovery.js';
 
 export default class AppErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { error: null };
+    this.state = { error: null, isRecovering: false };
   }
 
   static getDerivedStateFromError(error) {
@@ -23,57 +19,89 @@ export default class AppErrorBoundary extends Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('AppErrorBoundary', error, errorInfo);
+
+    if (isChunkOrCacheError(error) && canAutoRecoverChunkError()) {
+      this.setState({ isRecovering: true });
+      void recoverFromChunkError();
+    }
   }
 
   handleReload = () => {
-    window.location.reload();
+    reloadApp();
   };
 
   handleHardReset = async () => {
-    try {
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((registration) => registration.unregister()));
-      }
+    this.setState({ isRecovering: true });
 
-      if ('caches' in window) {
-        const cacheKeys = await window.caches.keys();
-        await Promise.all(cacheKeys.map((key) => window.caches.delete(key)));
-      }
-    } catch (error) {
-      console.error('AppErrorBoundary hard reset failed', error);
+    try {
+      await clearAppRuntime();
     } finally {
-      window.location.reload();
+      reloadApp();
     }
   };
 
   render() {
-    if (!this.state.error) {
+    const { error, isRecovering } = this.state;
+
+    if (!error) {
       return this.props.children;
     }
 
-    const showHardReset = isChunkOrCacheError(this.state.error);
+    if (isRecovering) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-mist px-6 py-12 text-ink">
+          <div className="w-full max-w-lg rounded-3xl border border-primary-100 bg-white p-8 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-600">Refreshing PasalManager</p>
+            <h1 className="mt-3 font-serif text-3xl text-slate-900">Loading the latest version.</h1>
+            <p className="mt-3 text-sm text-slate-600">
+              We&apos;re refreshing the app so your workspace opens on the newest release. Your saved business data is safe.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button className="btn-primary" type="button" onClick={this.handleReload}>
+                Refresh now
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    const showHardReset = isChunkOrCacheError(error);
+    const eyebrow = showHardReset ? 'Quick refresh needed' : 'We hit a snag';
+    const title = showHardReset ? 'PasalManager needs a quick refresh.' : 'We could not open this screen.';
+    const description = showHardReset
+      ? 'A new app version is available. Refresh once to continue working with the latest files.'
+      : 'Please refresh the app to continue. If this keeps happening, let us know what you were doing before this screen appeared.';
+    const reassurance = showHardReset
+      ? 'Your saved business data is safe. This only affects the app files stored in the browser.'
+      : 'Refreshing usually fixes temporary loading problems.';
 
     return (
       <div className="flex min-h-screen items-center justify-center bg-mist px-6 py-12 text-ink">
-        <div className="w-full max-w-lg rounded-3xl border border-rose-200/80 bg-white p-8 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-500">Application error</p>
-          <h1 className="mt-3 font-serif text-3xl text-slate-900">Something unexpected happened.</h1>
+        <div className="w-full max-w-lg rounded-3xl border border-secondary-200 bg-white p-8 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-600">{eyebrow}</p>
+          <h1 className="mt-3 font-serif text-3xl text-slate-900">{title}</h1>
           <p className="mt-3 text-sm text-slate-600">
-            The app hit an unrecoverable state. Reload to restore the latest working version.
+            {description}
           </p>
-          {this.state.error?.message ? (
-            <pre className="mt-4 overflow-x-auto rounded-2xl bg-slate-950 px-4 py-3 text-xs text-slate-100">
-              {this.state.error.message}
-            </pre>
+          <p className="mt-2 text-sm text-slate-500">{reassurance}</p>
+          {error?.message ? (
+            <details className="mt-4 rounded-2xl border border-secondary-200 bg-secondary-50/70" open={import.meta.env.DEV}>
+              <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-secondary-900">
+                Show technical details
+              </summary>
+              <pre className="overflow-x-auto border-t border-secondary-200 px-4 py-3 text-xs text-slate-700">
+                {error.message}
+              </pre>
+            </details>
           ) : null}
           <div className="mt-6 flex flex-wrap gap-3">
             <button className="btn-primary" type="button" onClick={this.handleReload}>
-              Reload app
+              Refresh now
             </button>
             {showHardReset ? (
               <button className="btn-secondary" type="button" onClick={this.handleHardReset}>
-                Clear cached app
+                Reset app and refresh
               </button>
             ) : null}
           </div>

@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../lib/i18n.jsx';
 import { useAuth } from '../lib/auth.jsx';
+import BrandLogo from './BrandLogo.jsx';
 
 const navItems = [
   { to: '/app', key: 'nav.dashboard' },
@@ -20,10 +21,9 @@ export default function Sidebar() {
   const visibleNavItems = navItems.filter((item) => !item.role || item.role.includes(role));
 
   return (
-    <aside className="hidden h-full w-64 flex-col gap-6 border-r border-slate-200/70 bg-white/80 p-6 dark:border-slate-800/70 dark:bg-slate-950/70 md:flex">
-      <div>
-        <h1 className="font-serif text-2xl text-slate-900 dark:text-white">ManageMyShop</h1>
-        <p className="text-sm text-slate-500 dark:text-slate-400">{t('app.tagline')}</p>
+    <aside className="hidden h-full w-64 flex-col gap-6 border-r border-slate-200/70 bg-white/80 p-6 dark:border-slate-800/70 dark:bg-slate-950/70 md:fixed md:inset-y-0 md:left-0 md:flex md:overflow-y-auto">
+      <div className="space-y-3">
+        <BrandLogo className="h-10 w-full" />
       </div>
       <nav className="flex flex-col gap-2">
         {visibleNavItems.map((item) => (

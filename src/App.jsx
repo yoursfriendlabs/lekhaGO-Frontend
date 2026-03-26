@@ -74,12 +74,12 @@ function AppShell() {
   const requiresActivation = isStaffActivationRequired(user, role);
 
   return (
-    <div className="min-h-screen gradient-bg bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <div className="flex min-h-screen">
+    <div className="min-h-screen gradient-bg bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 md:h-screen md:overflow-hidden">
+      <div className="flex min-h-screen md:h-screen">
         <Sidebar />
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen flex-1 flex-col md:ml-64 md:min-h-0 md:h-screen md:overflow-hidden">
           <Topbar />
-          <main className="flex-1 px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+88px)] md:px-6 md:py-8 md:pb-8">
+          <main className="flex-1 px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+88px)] md:min-h-0 md:overflow-y-auto md:px-6 md:py-8 md:pb-8">
             {!businessId ? (
               <div className="mb-6">
                 <Notice
@@ -154,7 +154,7 @@ export default function App() {
             <Suspense
               fallback={(
                 <RouteFallback
-                  title="Loading ManageMyShop"
+                  title="Loading PasalManager"
                   description="Booting the production shell and restoring your session."
                 />
               )}

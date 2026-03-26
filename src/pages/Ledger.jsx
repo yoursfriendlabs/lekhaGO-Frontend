@@ -324,7 +324,7 @@ export default function Ledger() {
                 ) : null}
                 <div className="min-w-0">
                   <h1 className={`font-serif font-bold leading-tight text-slate-900 ${logoSrc ? 'text-2xl' : 'text-3xl'}`}>
-                    {biz?.companyName || 'ManageMyShop'}
+                    {biz?.companyName || 'PasalManager'}
                   </h1>
                   {(biz?.address || biz?.phone || biz?.email || biz?.panVat) ? (
                     <div className="mt-1.5 space-y-0.5">
