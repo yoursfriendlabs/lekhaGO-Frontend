@@ -571,10 +571,10 @@ export default function Services() {
       
       // Build party object from all possible sources
       const partyData = {
-        id: full.partyId || '',
-        partyName: full.partyName || full.Customer?.name || '',
-        phone: full.partyPhone || full.Customer?.phone || '',
-        currentAmount: full.Party?.currentAmount || full.Customer?.currentAmount,
+        partyId: full.partyId || full.Party?.id || full.Customer?.id || '',
+        partyName: full.partyName || full.Party?.name || full.Customer?.name || '',
+        partyPhone: full.partyPhone || full.Party?.phone || full.Customer?.phone || '',
+        currentAmount: full.Party?.currentAmount ?? full.Customer?.currentAmount ?? null,
         type: 'customer',
       };
       
@@ -604,10 +604,10 @@ export default function Services() {
       })) : [{ ...emptyItem }]);
       
       // Set selected party if we have party data
-      if (partyData.id && partyData.partyName) {
+      if (partyData.partyId && partyData.partyName) {
         const party = normalizeLookupParty(partyData);
         setSelectedParty(party);
-        setPartyQuery(`${partyData.partyName}${partyData.phone ? ` (${partyData.phone})` : ''}`);
+        setPartyQuery(`${party.name}${party.phone ? ` (${party.phone})` : ''}`);
       }
     } catch (err) {
       setFormNotice({ type: 'error', message: err.message });
@@ -1369,7 +1369,8 @@ export default function Services() {
                           <input
                             className="input mt-1"
                             type="number"
-                            step="0.001"
+                            min="0"
+                            step="0.1"
                             value={itemDraft.quantity}
                             onChange={(e) => handleDraftChange('quantity', e.target.value)}
                           />
@@ -1382,7 +1383,8 @@ export default function Services() {
                           <input
                             className="input mt-1"
                             type="number"
-                            step="0.01"
+                            min="0"
+                            step="0.1"
                             value={itemDraft.unitPrice}
                             onChange={(e) => handleDraftChange('unitPrice', e.target.value)}
                           />
