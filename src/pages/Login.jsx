@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { api } from '../lib/api';
+import { hasUnverifiedEmail } from '../lib/authFlow';
 import { useAuth } from '../lib/auth';
 import { getVerificationEmail, isEmailVerificationRequiredError } from '../lib/emailVerification';
 import { useI18n } from '../lib/i18n.jsx';
@@ -63,7 +64,20 @@ export default function Login() {
     try {
       const data = await api.login({ email: form.email, password: form.password });
       const resolvedBusinessId = form.businessId || data.business?.id || '';
-      setSession(data.token, data.user, resolvedBusinessId);
+      const resolvedRole = data.role || data.user?.role || '';
+      setSession(data.token, data.user, resolvedBusinessId, resolvedRole);
+      if (hasUnverifiedEmail(data.user)) {
+        setPendingEmailVerification({
+          email: data.user?.email || form.email,
+          source: 'login',
+          requestOtpOnOpen: true,
+          resendAvailableAt: 0,
+        });
+        if (resolvedRole === 'staff') {
+          navigate('/app/activate-account');
+          return;
+        }
+      }
       navigate('/app');
     } catch (err) {
       if (isEmailVerificationRequiredError(err)) {
@@ -169,12 +183,12 @@ export default function Login() {
                   {t('auth.rememberMe')}
                 </span>
               </label>
-              <a
-                href="#"
+              <Link
+                to="/forgot-password"
                 className="text-sm font-medium text-[#9b6835] transition-colors hover:text-[#8a5d2f] hover:underline"
               >
                 {t('auth.forgotPassword')}
-              </a>
+              </Link>
             </div>
 
             <button type="submit" disabled={loading} className={btnPrimary}>

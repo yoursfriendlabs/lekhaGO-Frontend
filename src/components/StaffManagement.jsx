@@ -45,6 +45,30 @@ function StatusBadge({ active }) {
   );
 }
 
+function EmailVerificationBadge({ emailVerified }) {
+  if (emailVerified === false) {
+    return (
+      <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+        Verification pending
+      </span>
+    );
+  }
+
+  if (emailVerified === true) {
+    return (
+      <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+        Email verified
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+      Verification status unknown
+    </span>
+  );
+}
+
 export default function StaffManagement({ businessId }) {
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [members, setMembers] = useState([]);
@@ -123,7 +147,7 @@ export default function StaffManagement({ businessId }) {
       });
       closeCreate();
       await loadStaff();
-      setNotice({ type: 'success', message: 'Staff member created successfully.' });
+      setNotice({ type: 'success', message: 'Staff member created. They may be asked to verify email before full access.' });
     } catch (err) {
       setNotice({ type: 'error', message: err.message });
     } finally {
@@ -266,7 +290,12 @@ export default function StaffManagement({ businessId }) {
                   return (
                     <tr key={member.membershipId} className="border-t border-slate-200/70 dark:border-slate-800/70">
                       <td className="py-3 pr-4 font-medium text-slate-900 dark:text-white">{member.user?.name || '-'}</td>
-                      <td className="py-3 pr-4">{member.user?.email || '-'}</td>
+                      <td className="py-3 pr-4">
+                        <div className="space-y-1">
+                          <div>{member.user?.email || '-'}</div>
+                          <EmailVerificationBadge emailVerified={member.user?.emailVerified} />
+                        </div>
+                      </td>
                       <td className="py-3 pr-4">{member.user?.phone || '-'}</td>
                       <td className="py-3 pr-4 capitalize">{member.role || '-'}</td>
                       <td className="py-3 pr-4">
@@ -359,6 +388,7 @@ export default function StaffManagement({ businessId }) {
             />
           </div>
           <p className="text-xs text-slate-500">This business can have up to {summary.maxUsers} total users, including the owner.</p>
+          <p className="text-xs text-slate-500">Invited staff may need to verify their email before the rest of the workspace opens.</p>
           <div className="flex items-center justify-end gap-3 pt-2">
             <button type="button" className="btn-ghost" onClick={closeCreate} disabled={createSaving}>
               Cancel

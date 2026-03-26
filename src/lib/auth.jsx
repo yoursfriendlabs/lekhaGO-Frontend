@@ -31,6 +31,19 @@ export function AuthProvider({ children }) {
     setBusinessIdState(id);
   };
 
+  const updateUser = (updater) => {
+    setUserState((currentUser) => {
+      const nextUser = typeof updater === 'function' ? updater(currentUser) : updater;
+      const resolvedUser = nextUser ? { ...currentUser, ...nextUser } : null;
+      setUser(resolvedUser);
+      if (resolvedUser?.role) {
+        setRole(resolvedUser.role);
+        setRoleState(resolvedUser.role);
+      }
+      return resolvedUser;
+    });
+  };
+
   const logout = () => {
     clearApiCache();
     clearSession();
@@ -48,6 +61,7 @@ export function AuthProvider({ children }) {
       role,
       setSession,
       updateBusinessId,
+      updateUser,
       logout,
     }),
     [token, user, businessId, role]

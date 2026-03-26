@@ -142,6 +142,7 @@ export default function Analytics() {
       .then((data) => {
         if (!isActive) return;
         setSummary(normalizeAnalyticsSummary(data));
+        console.log(data)
       })
       .catch((err) => {
         if (!isActive) return;
