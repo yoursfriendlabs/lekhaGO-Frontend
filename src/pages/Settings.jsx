@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Building2, CheckCircle, Upload, X } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import AccountSecurityPanel from '../components/account/AccountSecurityPanel.jsx';
 import StaffManagement from '../components/StaffManagement';
 import BanksSettingsPanel from '../components/settings/BanksSettingsPanel.jsx';
 import CategoriesSettingsPanel from '../components/settings/CategoriesSettingsPanel.jsx';
@@ -12,6 +13,7 @@ import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
 import { useI18n } from '../lib/i18n.jsx';
 import {
+  ACCOUNT_SETTINGS_TAB,
   BANKS_SETTINGS_TAB,
   CATEGORIES_SETTINGS_TAB,
   GENERAL_SETTINGS_TAB,
@@ -42,13 +44,21 @@ export default function Settings() {
   const isOwner = role === 'owner';
 
   const tabs = useMemo(() => {
-    const nextTabs = [
-      {
+    const nextTabs = [];
+
+    if (isOwner) {
+      nextTabs.push({
         key: GENERAL_SETTINGS_TAB,
         label: t('settingsPage.tabs.general'),
         description: t('settingsPage.descriptions.general'),
-      },
-    ];
+      });
+    }
+
+    nextTabs.push({
+      key: ACCOUNT_SETTINGS_TAB,
+      label: t('settingsPage.tabs.account'),
+      description: t('settingsPage.descriptions.account'),
+    });
 
     if (isOwner) {
       nextTabs.push({
@@ -80,7 +90,8 @@ export default function Settings() {
   }, [isOwner, t]);
 
   const requestedTab = searchParams.get('tab');
-  const activeTab = tabs.some((tab) => tab.key === requestedTab) ? requestedTab : GENERAL_SETTINGS_TAB;
+  const defaultTab = tabs[0]?.key || ACCOUNT_SETTINGS_TAB;
+  const activeTab = tabs.some((tab) => tab.key === requestedTab) ? requestedTab : defaultTab;
   const activeTabMeta = tabs.find((tab) => tab.key === activeTab) || tabs[0];
 
   useEffect(() => {
@@ -138,7 +149,7 @@ export default function Settings() {
   const handleTabChange = (tab) => {
     const nextParams = new URLSearchParams(searchParams);
 
-    if (!tab || tab === GENERAL_SETTINGS_TAB) {
+    if (!tab || tab === defaultTab) {
       nextParams.delete('tab');
     } else {
       nextParams.set('tab', tab);
@@ -338,6 +349,7 @@ export default function Settings() {
         </>
       ) : null}
 
+      {activeTab === ACCOUNT_SETTINGS_TAB ? <AccountSecurityPanel /> : null}
       {activeTab === STAFF_SETTINGS_TAB ? <StaffManagement businessId={businessId} /> : null}
       {activeTab === CATEGORIES_SETTINGS_TAB ? <CategoriesSettingsPanel /> : null}
       {activeTab === BANKS_SETTINGS_TAB ? <BanksSettingsPanel /> : null}

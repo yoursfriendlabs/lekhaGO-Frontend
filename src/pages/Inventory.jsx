@@ -373,14 +373,14 @@ export default function Inventory() {
           <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm focus-within:border-emerald-300 dark:border-slate-800 dark:bg-slate-950 sm:col-span-2 xl:col-span-1">
             <span className="text-slate-400">🔍</span>
             <input
-              className="w-full bg-transparent outline-none"
+              className="w-full bg-transparent focus:border-none focus:ring-0 border-none"
               placeholder={t('inventory.searchItems')}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
           <select
-            className="input min-w-[160px]"
+            className="input border-none min-w-[160px]"
             value={categoryFilter}
             onChange={(event) => setCategoryFilter(event.target.value)}
           >
@@ -601,7 +601,7 @@ export default function Inventory() {
                 <div>
                   <label className="label">{t('inventory.itemType')}</label>
                   <div className="mt-1 grid grid-cols-3 gap-2">
-                    {['goods', 'service', 'part'].map((type) => (
+                    {['goods', 'service',].map((type) => (
                       <button
                         key={type}
                         type="button"
@@ -627,7 +627,7 @@ export default function Inventory() {
               onClick={() => setActiveTab('stock')}
               className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
                 activeTab === 'stock'
-                  ? 'border-primary-300 bg-primary-50 text-primary-700'
+                  ? 'border-primary-300 bg-primary-500 text-white'
                   : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
               }`}
             >
@@ -638,7 +638,7 @@ export default function Inventory() {
               onClick={() => setActiveTab('other')}
               className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
                 activeTab === 'other'
-                  ? 'border-primary-300 bg-primary-50 text-primary-700'
+                  ? 'border-primary-300 bg-primary-500 text-white'
                   : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
               }`}
             >
@@ -651,7 +651,7 @@ export default function Inventory() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="label">{t('inventory.openingStock')}</label>
-                  <input className="input mt-1" name="openingStock" type="number" step="0.01" value={form.openingStock} onChange={handleFormChange} />
+                  <input className="input mt-1" name="openingStock" type="number" step="0.1" value={form.openingStock} onChange={handleFormChange} />
                 </div>
                 <div>
                   <label className="label">{t('inventory.measuringUnit')}</label>
@@ -659,24 +659,24 @@ export default function Inventory() {
                 </div>
                 <div>
                   <label className="label">{t('products.salePrice')}</label>
-                  <input className="input mt-1" name="salePrice" type="number" step="0.01" value={form.salePrice} onChange={handleFormChange} />
+                  <input className="input mt-1" name="salePrice" type="number" step="0.1" value={form.salePrice} onChange={handleFormChange} />
                 </div>
                 <div>
                   <label className="label">{t('products.purchasePrice')}</label>
-                  <input className="input mt-1" name="purchasePrice" type="number" step="0.01" value={form.purchasePrice} onChange={handleFormChange} />
+                  <input className="input mt-1" name="purchasePrice" type="number" step="0.1" value={form.purchasePrice} onChange={handleFormChange} />
                 </div>
                 <div>
                   <label className="label">{t('inventory.mrpPrice')}</label>
-                  <input className="input mt-1" name="mrpPrice" type="number" step="0.01" value={form.mrpPrice} onChange={handleFormChange} />
+                  <input className="input mt-1" name="mrpPrice" type="number" step="0.1" value={form.mrpPrice} onChange={handleFormChange} />
                 </div>
-                <div>
+                {/* <div>
                   <label className="label">{t('inventory.wholesalePrice')}</label>
                   <input className="input mt-1" name="wholesalePrice" type="number" step="0.01" value={form.wholesalePrice} onChange={handleFormChange} />
                 </div>
                 <div className="sm:col-span-2">
                   <label className="label">{t('inventory.minWholesaleQty')}</label>
                   <input className="input mt-1" name="minWholesaleQuantity" type="number" step="0.01" value={form.minWholesaleQuantity} onChange={handleFormChange} />
-                </div>
+                </div> */}
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">

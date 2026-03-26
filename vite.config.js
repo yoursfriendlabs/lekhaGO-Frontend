@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { cloudflare } from '@cloudflare/vite-plugin';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     VitePWA({
@@ -88,9 +88,14 @@ export default defineConfig({
         enabled: false,
       },
     }),
-    cloudflare(),
-  ],
+    mode === 'test' ? null : cloudflare(),
+  ].filter(Boolean),
   server: {
     port: 5173,
   },
-});
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: './src/test/setup.js',
+  },
+}));

@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { ThemeProvider } from './lib/theme';
 import { I18nProvider, useI18n } from './lib/i18n.jsx';
@@ -10,6 +10,7 @@ import MobileNav from './components/MobileNav';
 import Notice from './components/Notice';
 import RouteFallback from './components/RouteFallback';
 import PwaLifecycle from './components/PwaLifecycle';
+import { hasUnverifiedEmail, isStaffActivationRequired } from './lib/authFlow';
 import { BANKS_SETTINGS_TAB, buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB } from './lib/settingsTabs';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -24,6 +25,10 @@ const Settings = lazy(() => import('./pages/Settings'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ForgotPasswordOtp = lazy(() => import('./pages/ForgotPasswordOtp'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const ActivateAccount = lazy(() => import('./pages/ActivateAccount'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Invoice = lazy(() => import('./pages/Invoice'));
 
@@ -44,9 +49,29 @@ function IndexRoute() {
   return token ? <Navigate to="/app" replace /> : <Landing />;
 }
 
+function EmailActivationRequiredRoute({ children }) {
+  const location = useLocation();
+  const { role, user } = useAuth();
+
+  if (isStaffActivationRequired(user, role)) {
+    return <Navigate to="/app/activate-account" replace state={{ from: `${location.pathname}${location.search}` }} />;
+  }
+
+  return children;
+}
+
+function ActivationOnlyRoute({ children }) {
+  const { user } = useAuth();
+
+  if (!hasUnverifiedEmail(user)) return <Navigate to="/app" replace />;
+  return children;
+}
+
 function AppShell() {
-  const { businessId } = useAuth();
+  const { businessId, role, user } = useAuth();
   const { t } = useI18n();
+  const showVerificationBanner = hasUnverifiedEmail(user);
+  const requiresActivation = isStaffActivationRequired(user, role);
 
   return (
     <div className="min-h-screen gradient-bg bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -64,6 +89,26 @@ function AppShell() {
                 />
               </div>
             ) : null}
+            {showVerificationBanner ? (
+              <div className="mb-6 rounded-3xl border border-amber-200 bg-amber-50/90 p-4 shadow-sm dark:border-amber-400/30 dark:bg-amber-500/10">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
+                      {t('auth.emailVerificationBannerEyebrow')}
+                    </p>
+                    <h2 className="mt-2 font-serif text-xl text-slate-900 dark:text-white">
+                      {requiresActivation ? t('auth.activationBannerStaffTitle') : t('auth.activationBannerTitle')}
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                      {requiresActivation ? t('auth.activationBannerStaffDescription') : t('auth.activationBannerDescription')}
+                    </p>
+                  </div>
+                  <Link className="btn-secondary justify-center whitespace-nowrap" to="/app/activate-account">
+                    {t('auth.verifyEmailCta')}
+                  </Link>
+                </div>
+              </div>
+            ) : null}
             <Suspense
               fallback={(
                 <RouteFallback
@@ -73,22 +118,23 @@ function AppShell() {
               )}
             >
               <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="products" element={<Navigate to="/app/inventory" replace />} />
-                <Route path="inventory" element={<Inventory />} />
-                <Route path="purchases" element={<Purchases />} />
-                <Route path="sales" element={<Sales />} />
-                <Route path="services" element={<Services />} />
-                <Route path="parties" element={<Parties />} />
-                <Route path="banks" element={<Navigate to={buildSettingsTabPath(BANKS_SETTINGS_TAB)} replace />} />
-                <Route path="ledger" element={<Ledger />} />
-                <Route path="analytics" element={<Analytics />} />
+                <Route path="/" element={<EmailActivationRequiredRoute><Dashboard /></EmailActivationRequiredRoute>} />
+                <Route path="products" element={<EmailActivationRequiredRoute><Navigate to="/app/inventory" replace /></EmailActivationRequiredRoute>} />
+                <Route path="inventory" element={<EmailActivationRequiredRoute><Inventory /></EmailActivationRequiredRoute>} />
+                <Route path="purchases" element={<EmailActivationRequiredRoute><Purchases /></EmailActivationRequiredRoute>} />
+                <Route path="sales" element={<EmailActivationRequiredRoute><Sales /></EmailActivationRequiredRoute>} />
+                <Route path="services" element={<EmailActivationRequiredRoute><Services /></EmailActivationRequiredRoute>} />
+                <Route path="parties" element={<EmailActivationRequiredRoute><Parties /></EmailActivationRequiredRoute>} />
+                <Route path="banks" element={<EmailActivationRequiredRoute><Navigate to={buildSettingsTabPath(BANKS_SETTINGS_TAB)} replace /></EmailActivationRequiredRoute>} />
+                <Route path="ledger" element={<EmailActivationRequiredRoute><Ledger /></EmailActivationRequiredRoute>} />
+                <Route path="analytics" element={<EmailActivationRequiredRoute><Analytics /></EmailActivationRequiredRoute>} />
                 <Route
                   path="order-attributes"
-                  element={<Navigate to={buildSettingsTabPath(ORDER_ATTRIBUTES_SETTINGS_TAB)} replace />}
+                  element={<EmailActivationRequiredRoute><Navigate to={buildSettingsTabPath(ORDER_ATTRIBUTES_SETTINGS_TAB)} replace /></EmailActivationRequiredRoute>}
                 />
-                <Route path="settings" element={<Settings />} />
-                <Route path="invoice/:type/:id" element={<Invoice />} />
+                <Route path="settings" element={<EmailActivationRequiredRoute><Settings /></EmailActivationRequiredRoute>} />
+                <Route path="invoice/:type/:id" element={<EmailActivationRequiredRoute><Invoice /></EmailActivationRequiredRoute>} />
+                <Route path="activate-account" element={<ActivationOnlyRoute><ActivateAccount /></ActivationOnlyRoute>} />
               </Routes>
             </Suspense>
           </main>
@@ -136,6 +182,30 @@ export default function App() {
                   element={(
                     <PublicOnlyRoute>
                       <VerifyEmail />
+                    </PublicOnlyRoute>
+                  )}
+                />
+                <Route
+                  path="/forgot-password"
+                  element={(
+                    <PublicOnlyRoute>
+                      <ForgotPassword />
+                    </PublicOnlyRoute>
+                  )}
+                />
+                <Route
+                  path="/forgot-password/otp"
+                  element={(
+                    <PublicOnlyRoute>
+                      <ForgotPasswordOtp />
+                    </PublicOnlyRoute>
+                  )}
+                />
+                <Route
+                  path="/forgot-password/reset"
+                  element={(
+                    <PublicOnlyRoute>
+                      <ResetPassword />
                     </PublicOnlyRoute>
                   )}
                 />

@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Boxes, Users, ShoppingCart, UserCheck, Briefcase, FileText, BarChart3, Settings2 } from 'lucide-react';
+import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 
 const navItems = [
@@ -16,11 +17,13 @@ const navItems = [
 
 export default function MobileNav() {
   const { t } = useI18n();
+  const { role } = useAuth();
+  const visibleNavItems = navItems.filter((item) => !item.role || item.role.includes(role));
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200/70 bg-white/95 px-2 py-3 shadow-lg backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/90 md:hidden">
       <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar scroll-smooth">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

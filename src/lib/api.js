@@ -2,7 +2,7 @@ import { clearSession, getBusinessId, getToken, setSessionNotice } from './stora
 import { toQueryKey, toQueryString } from './queryKey';
 
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://api.yoursfriend.com';
-// export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+// export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 const INACTIVE_USER_REGEX = /user is inactive/i;
 const responseCache = new Map();
@@ -365,6 +365,10 @@ export const api = {
   login: (data) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   requestEmailOtp: (data) => request('/api/auth/request-email-otp', { method: 'POST', body: JSON.stringify(data) }),
   verifyEmailOtp: (data) => request('/api/auth/verify-email-otp', { method: 'POST', body: JSON.stringify(data) }),
+  requestPasswordReset: (data) => request('/api/auth/request-password-reset', { method: 'POST', body: JSON.stringify(data) }),
+  verifyPasswordResetOtp: (data) => request('/api/auth/verify-password-reset-otp', { method: 'POST', body: JSON.stringify(data) }),
+  resetPassword: (data) => request('/api/auth/reset-password', { method: 'POST', body: JSON.stringify(data) }),
+  changePassword: (data) => request('/api/auth/change-password', { method: 'POST', body: JSON.stringify(data) }),
 
   listStaff: () => request('/api/staff', {}, listCache(['staff'], CACHE_TTL.short)),
   createStaff: (data) =>
