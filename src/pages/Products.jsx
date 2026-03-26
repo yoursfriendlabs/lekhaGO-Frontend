@@ -692,6 +692,7 @@ export default function Products() {
                   className="input mt-1"
                   name="openingStock"
                   type="number"
+                  min="0"
                   step="0.01"
                   value={form.openingStock}
                   onChange={handleChange}
@@ -901,6 +902,7 @@ export default function Products() {
                             className="input min-w-[110px] text-right"
                             name="openingStock"
                             type="number"
+                            min="0"
                             step="0.01"
                             value={row.openingStock}
                             onChange={(event) => handleBulkChange(idx, event)}

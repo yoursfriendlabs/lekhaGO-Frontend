@@ -651,7 +651,7 @@ export default function Inventory() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="label">{t('inventory.openingStock')}</label>
-                  <input className="input mt-1" name="openingStock" type="number" step="0.1" value={form.openingStock} onChange={handleFormChange} />
+                  <input className="input mt-1" name="openingStock" type="number" min="0" step="0.1" value={form.openingStock} onChange={handleFormChange} />
                 </div>
                 <div>
                   <label className="label">{t('inventory.measuringUnit')}</label>
