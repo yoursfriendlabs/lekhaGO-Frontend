@@ -18,6 +18,7 @@ import DynamicAttributes from '../components/DynamicAttributes';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useSaleStore } from '../stores/sales';
+import { useProductStore } from '../stores/products';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
 import { useIsMobile } from '../hooks/useIsMobile.js';
@@ -434,6 +435,7 @@ export default function Sales() {
       }
       resetForm();
       setIsOpen(false);
+      useProductStore.getState().invalidate();
       invalidateSales();
       const params = { limit: 50 };
       if (statusFilter !== 'all') params.status = statusFilter;

@@ -16,6 +16,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { usePurchaseStore } from '../stores/purchases';
+import { useProductStore } from '../stores/products';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import {
@@ -479,6 +480,7 @@ export default function Purchases() {
       }
       resetForm();
       setIsOpen(false);
+      useProductStore.getState().invalidate();
       invalidatePurchases();
       const params = { limit: 50 };
       if (statusFilter !== 'all') params.status = statusFilter;

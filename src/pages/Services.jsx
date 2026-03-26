@@ -17,6 +17,7 @@ import DynamicAttributes from '../components/DynamicAttributes';
 import { X, Plus, Clock, Check, Search, Pencil, FileText, ChevronDown, Phone } from 'lucide-react';
 import { usePartyStore } from '../stores/parties';
 import { useServiceStore } from '../stores/services';
+import { useProductStore } from '../stores/products';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
@@ -667,6 +668,7 @@ export default function Services() {
         });
         setSuggestedOrderNo(created?.orderNo || '');
       }
+      useProductStore.getState().invalidate();
       closeDialog();
       loadServices();
     } catch (err) {

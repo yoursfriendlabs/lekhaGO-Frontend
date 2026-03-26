@@ -414,10 +414,10 @@ export const api = {
     request(`/api/sales/${id}`, { method: 'PATCH', body: JSON.stringify(data) }, mutationConfig([detailTags('sale', id), 'sales', 'products', 'reports', 'dashboard', 'parties', 'party-statements', 'banks'])),
 
   createService: (data) =>
-    request('/api/services', { method: 'POST', body: JSON.stringify(data) }, mutationConfig(['services', 'reports', 'dashboard', 'parties', 'party-statements', 'banks'])),
+    request('/api/services', { method: 'POST', body: JSON.stringify(data) }, mutationConfig(['services', 'products', 'reports', 'dashboard', 'parties', 'party-statements', 'banks'])),
   getService: (id) => request(`/api/services/${id}`, {}, listCache(detailTags('service', id), CACHE_TTL.detail)),
   updateService: (id, data) =>
-    request(`/api/services/${id}`, { method: 'PATCH', body: JSON.stringify(data) }, mutationConfig([detailTags('service', id), 'services', 'reports', 'dashboard', 'parties', 'party-statements', 'banks'])),
+    request(`/api/services/${id}`, { method: 'PATCH', body: JSON.stringify(data) }, mutationConfig([detailTags('service', id), 'services', 'products', 'reports', 'dashboard', 'parties', 'party-statements', 'banks'])),
   listServices: (params = {}) => collectionRequest('/api/services', params, listCache(['services', 'reports', 'dashboard'])),
 
   lowStock: (params = {}) => collectionRequest('/api/reports/low-stock', params, listCache(['reports', 'dashboard'], CACHE_TTL.report)),
