@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { ThemeProvider } from './lib/theme';
 import { I18nProvider, useI18n } from './lib/i18n.jsx';
@@ -32,9 +32,22 @@ const ActivateAccount = lazy(() => import('./pages/ActivateAccount'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Invoice = lazy(() => import('./pages/Invoice'));
 
+const OWNER_AND_STAFF_ROLES = ['owner', 'staff'];
+const OWNER_ONLY_ROLES = ['owner'];
+
 function ProtectedRoute({ children }) {
   const { token } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function RoleGuard({ children, allowedRoles = OWNER_AND_STAFF_ROLES, redirectTo = '/app' }) {
+  const { role } = useAuth();
+
+  if (role && !allowedRoles.includes(role)) {
+    return <Navigate to={redirectTo} replace />;
+  }
+
   return children;
 }
 
@@ -65,6 +78,17 @@ function ActivationOnlyRoute({ children }) {
 
   if (!hasUnverifiedEmail(user)) return <Navigate to="/app" replace />;
   return children;
+}
+
+function InvoiceAccessRoute({ children }) {
+  const { type } = useParams();
+  const allowedRoles = type === 'purchases' ? OWNER_ONLY_ROLES : OWNER_AND_STAFF_ROLES;
+
+  return (
+    <RoleGuard allowedRoles={allowedRoles}>
+      {children}
+    </RoleGuard>
+  );
 }
 
 function AppShell() {
@@ -118,22 +142,22 @@ function AppShell() {
               )}
             >
               <Routes>
-                <Route path="/" element={<EmailActivationRequiredRoute><Dashboard /></EmailActivationRequiredRoute>} />
-                <Route path="products" element={<EmailActivationRequiredRoute><Navigate to="/app/inventory" replace /></EmailActivationRequiredRoute>} />
-                <Route path="inventory" element={<EmailActivationRequiredRoute><Inventory /></EmailActivationRequiredRoute>} />
-                <Route path="purchases" element={<EmailActivationRequiredRoute><Purchases /></EmailActivationRequiredRoute>} />
-                <Route path="sales" element={<EmailActivationRequiredRoute><Sales /></EmailActivationRequiredRoute>} />
-                <Route path="services" element={<EmailActivationRequiredRoute><Services /></EmailActivationRequiredRoute>} />
-                <Route path="parties" element={<EmailActivationRequiredRoute><Parties /></EmailActivationRequiredRoute>} />
-                <Route path="banks" element={<EmailActivationRequiredRoute><Navigate to={buildSettingsTabPath(BANKS_SETTINGS_TAB)} replace /></EmailActivationRequiredRoute>} />
-                <Route path="ledger" element={<EmailActivationRequiredRoute><Ledger /></EmailActivationRequiredRoute>} />
-                <Route path="analytics" element={<EmailActivationRequiredRoute><Analytics /></EmailActivationRequiredRoute>} />
+                <Route path="/" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Dashboard /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="products" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to="/app/inventory" replace /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="inventory" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Inventory /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="purchases" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Purchases /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Sales /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="services" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Services /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Parties /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="banks" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to={buildSettingsTabPath(BANKS_SETTINGS_TAB)} replace /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="ledger" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Ledger /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="analytics" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Analytics /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route
                   path="order-attributes"
-                  element={<EmailActivationRequiredRoute><Navigate to={buildSettingsTabPath(ORDER_ATTRIBUTES_SETTINGS_TAB)} replace /></EmailActivationRequiredRoute>}
+                  element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to={buildSettingsTabPath(ORDER_ATTRIBUTES_SETTINGS_TAB)} replace /></RoleGuard></EmailActivationRequiredRoute>}
                 />
-                <Route path="settings" element={<EmailActivationRequiredRoute><Settings /></EmailActivationRequiredRoute>} />
-                <Route path="invoice/:type/:id" element={<EmailActivationRequiredRoute><Invoice /></EmailActivationRequiredRoute>} />
+                <Route path="settings" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Settings /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="invoice/:type/:id" element={<EmailActivationRequiredRoute><InvoiceAccessRoute><Invoice /></InvoiceAccessRoute></EmailActivationRequiredRoute>} />
                 <Route path="activate-account" element={<ActivationOnlyRoute><ActivateAccount /></ActivationOnlyRoute>} />
               </Routes>
             </Suspense>

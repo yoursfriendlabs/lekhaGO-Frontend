@@ -12,7 +12,7 @@ const navItems = [
   { to: '/app/parties', key: 'nav.parties', icon: Users  , role: ['owner']},
   // { to: '/app/ledger', key: 'nav.ledger', icon: FileText },
   // { to: '/app/analytics', key: 'nav.stats', icon: BarChart3 },
-  { to: '/app/settings', key: 'nav.settings', icon: Settings2 , role: ['owner'] }
+  { to: '/app/settings', key: 'nav.settings', icon: Settings2 , role: ['owner','staff'] }
 ];
 
 export default function MobileNav() {

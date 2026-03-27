@@ -5,6 +5,7 @@ export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://api.yoursf
 // export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 const INACTIVE_USER_REGEX = /user is inactive/i;
+const SESSION_EXPIRED_MESSAGE = 'Your session expired. Please log in again.';
 const responseCache = new Map();
 const inflightRequests = new Map();
 const tagIndex = new Map();
@@ -130,6 +131,27 @@ function handleInactiveUser(message) {
   }
 }
 
+function isAuthRequestPath(path = '') {
+  return String(path).startsWith('/api/auth/');
+}
+
+function shouldHandleUnauthorized(path, token) {
+  if (isAuthRequestPath(path)) return false;
+  if (token) return true;
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname.startsWith('/app');
+}
+
+function handleUnauthorizedSession(message) {
+  clearApiCache();
+  clearSession();
+  setSessionNotice(message || SESSION_EXPIRED_MESSAGE);
+
+  if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
+    window.location.replace('/login');
+  }
+}
+
 function buildRequestUrl(path) {
   return `${API_BASE}${path}`;
 }
@@ -200,6 +222,11 @@ async function request(path, options = {}, config = {}) {
         if (res.status === 403 && INACTIVE_USER_REGEX.test(message)) {
           error.inactiveUser = true;
           handleInactiveUser(message);
+        }
+
+        if (res.status === 401 && shouldHandleUnauthorized(path, token)) {
+          error.unauthorized = true;
+          handleUnauthorizedSession(message);
         }
 
         throw error;
