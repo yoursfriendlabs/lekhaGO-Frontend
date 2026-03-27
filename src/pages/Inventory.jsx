@@ -680,8 +680,8 @@ export default function Inventory() {
                   <input
                     className="input mt-1"
                     type="number"
-                    min="0.01"
-                    step="0.1"
+                    min="0"
+                    step="1"
                     value={restockQuantity}
                     onChange={(event) => setRestockQuantity(event.target.value)}
                     placeholder="0"
