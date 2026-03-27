@@ -963,10 +963,6 @@ export default function Services() {
         <div className="p-5 md:p-8">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary-200/70 bg-white/85 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 shadow-sm dark:border-primary-900/50 dark:bg-slate-950/50 dark:text-primary-200">
-                <Sparkles size={14} />
-                {t('services.workspaceLabel')}
-              </div>
               <h1 className="mt-4 font-serif text-3xl text-slate-900 dark:text-white md:text-4xl">{t('services.title')}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 md:text-base">
                 {t('services.subtitle')}
