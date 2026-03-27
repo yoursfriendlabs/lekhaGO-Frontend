@@ -25,7 +25,7 @@ const emptyForm = {
   email: '',
   address: '',
   type: 'customer',
-  openingBalance: '',
+  openingBalance: 0,
   asOfDate: '',
   balanceType: 'receive',
 };
@@ -277,7 +277,7 @@ export default function Parties() {
       email: party.email || '',
       address: party.address || '',
       type: party.type || 'customer',
-      openingBalance: party.openingBalance || '',
+      openingBalance: party.openingBalance || 0,
       asOfDate: party.asOfDate || '',
       balanceType: party.balanceType || 'receive',
     });
@@ -770,11 +770,20 @@ export default function Parties() {
             <div className="grid gap-3 md:grid-cols-2">
               <div>
                 <label className="label">{t('parties.openingBalance')}</label>
-                <input className="input mt-1" name="openingBalance" type="number" step="0.01" value={form.openingBalance} onChange={handleChange} />
+
+                <input className="input mt-1" name="openingBalance" type="number"  step="1" defaultValue={0} min={0} value={form.openingBalance} onChange={handleChange} />
+
               </div>
+
               <div>
                 <label className="label">{t('parties.asOfDate')}</label>
-                <input className="input mt-1" name="asOfDate" type="date" value={form.asOfDate} onChange={handleChange} />
+                <input
+  className="input mt-1"
+  name="asOfDate"
+  type="date"
+  value={form.asOfDate || new Date().toISOString().split("T")[0]}
+  onChange={handleChange}
+/>
               </div>
               <div className="flex gap-2">
                 {['receive', 'give'].map((type) => (
