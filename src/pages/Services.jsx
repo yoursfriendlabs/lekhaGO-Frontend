@@ -32,6 +32,7 @@ import {
   UserRound,
   Wallet,
   Wrench,
+  MessageCircle,
 } from 'lucide-react';
 import { usePartyStore } from '../stores/parties';
 import { useServiceStore } from '../stores/services';
@@ -40,6 +41,7 @@ import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
+import { getWhatsAppLink } from '../lib/whatsapp.js';
 import {
   mergeLookupEntities,
   normalizeLookupParty,
@@ -58,6 +60,7 @@ const emptyItem = {
   quantity: '1',
   unitType: 'primary',
   unitPrice: '0',
+  taxRate: '0',
   lineTotal: '0',
 };
 
@@ -109,6 +112,10 @@ function DeliveryBadge({ date }) {
     );
   }
   return <span className="text-xs text-slate-600 dark:text-slate-400">{label}</span>;
+}
+
+function getVatAmount(lineTotal, taxRate) {
+  return (Number(lineTotal || 0) * Number(taxRate || 0)) / 100;
 }
 
 function OverviewMetric({ icon: Icon, label, value, tone = 'slate' }) {
@@ -358,19 +365,23 @@ export default function Services() {
       .catch(() => null);
   }, []);
 
+  const chargeableItems = useMemo(() => items.filter((item) => !isPlaceholderItem(item)), [items]);
+
   // ── Totals ──
   const totals = useMemo(() => {
-    const laborTotal = items
+    const laborTotal = chargeableItems
       .filter((i) => i.itemType === 'labor')
       .reduce((s, i) => s + Number(i.lineTotal || 0), 0);
-    const partsTotal = items
+    const partsTotal = chargeableItems
       .filter((i) => i.itemType === 'part')
       .reduce((s, i) => s + Number(i.lineTotal || 0), 0);
-    const grandTotal = laborTotal + partsTotal;
+    const subTotal = laborTotal + partsTotal;
+    const taxTotal = chargeableItems.reduce((sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate), 0);
+    const grandTotal = subTotal + taxTotal;
     const received = isPaid ? grandTotal : Math.min(Number(amountReceived || 0), grandTotal);
     const due = Math.max(grandTotal - received, 0);
-    return { laborTotal, partsTotal, grandTotal, received, due };
-  }, [items, amountReceived, isPaid]);
+    return { laborTotal, partsTotal, subTotal, taxTotal, grandTotal, received, due };
+  }, [chargeableItems, amountReceived, isPaid]);
 
   const visibleItems = useMemo(() => {
     if (items.length === 1 && isPlaceholderItem(items[0])) return [];
@@ -499,6 +510,7 @@ export default function Services() {
     setItemDraft((previous) => ({
       ...previous,
       productId: option?.value || '',
+      taxRate: String(product?.taxRate || 0),
       actualUnit: '',
     }));
 
@@ -588,6 +600,15 @@ export default function Services() {
     return partySearchResults.slice(0, 6);
   }, [partySearchResults]);
   const selectedPartyBalanceMeta = getPartyBalanceMeta(selectedParty?.currentAmount, t);
+  const selectedPartyHasBalance = selectedParty?.currentAmount !== undefined && selectedParty?.currentAmount !== null;
+  const selectedPartyHasDue = selectedPartyHasBalance && selectedPartyBalanceMeta.absoluteAmount > 0;
+  const selectedPartyWhatsAppMessage = selectedPartyHasDue
+    ? `your total due amount is ${t('currency.formatted', {
+        symbol: t('currency.symbol'),
+        amount: selectedPartyBalanceMeta.absoluteAmount.toFixed(2),
+      })}`
+    : 'Hello, Welcome to Rose Boutique and Creation';
+  const selectedPartyWhatsAppLink = getWhatsAppLink(selectedParty?.phone, selectedPartyWhatsAppMessage);
 
   const selectParty = (party) => {
     setSelectedParty(party);
@@ -718,6 +739,7 @@ export default function Services() {
         quantity: String(i.quantity ?? '1'),
         unitType: i.unitType || 'primary',
         unitPrice: String(i.unitPrice ?? '0'),
+        taxRate: String(i.taxRate ?? '0'),
         lineTotal: String(i.lineTotal ?? '0'),
       })) : [{ ...emptyItem }]);
 
@@ -750,13 +772,14 @@ export default function Services() {
     e.preventDefault();
     if (!businessId) { setFormNotice({ type: 'error', message: t('errors.businessIdRequired') }); return; }
     if (!header.partyId) { setFormNotice({ type: 'error', message: t('errors.customerRequired') }); return; }
-    const invalidPart = items.find((i) => i.itemType === 'part' && !i.productId);
+    const invalidPart = chargeableItems.find((i) => i.itemType === 'part' && !i.productId);
     if (invalidPart) { setFormNotice({ type: 'error', message: t('errors.selectProductPart') }); return; }
-    const invalidConversion = items.find((i) => {
+    const invalidConversion = chargeableItems.find((i) => {
       if (i.itemType !== 'part' || i.unitType !== 'secondary') return false;
       return Number(getProductById(i.productId)?.conversionRate || 0) <= 0;
     });
     if (invalidConversion) { setFormNotice({ type: 'error', message: t('errors.conversionRequired') }); return; }
+    if (!chargeableItems.length) { setFormNotice({ type: 'error', message: t('services.addFirstItem') }); return; }
     if (requiresBankSelection(header, totals.received)) {
       setFormNotice({ type: 'error', message: t('payments.bankRequired') });
       return;
@@ -768,15 +791,18 @@ export default function Services() {
         ...headerFields,
         laborTotal: totals.laborTotal,
         partsTotal: totals.partsTotal,
+        subTotal: totals.subTotal,
+        taxTotal: totals.taxTotal,
         grandTotal: totals.grandTotal,
         receivedTotal: totals.received,
         ...(Number(totals.received || 0) > 0 ? buildPaymentPayload({ paymentMethod, bankId, paymentNote }) : { paymentMethod: 'cash' }),
-        items: items.map((item) => ({
+        items: chargeableItems.map((item) => ({
           ...item,
           quantity: Number(item.quantity),
           unitType: item.unitType || 'primary',
           conversionRate: Number(getProductById(item.productId)?.conversionRate || 0),
           unitPrice: Number(item.unitPrice),
+          taxRate: Number(item.taxRate),
           lineTotal: Number(item.lineTotal),
         })),
       };
@@ -1336,15 +1362,45 @@ export default function Services() {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate font-semibold text-slate-800 dark:text-slate-100">{selectedParty.name}</p>
-                                  {selectedParty.phone ? <p className="text-xs text-slate-500">{selectedParty.phone}</p> : null}
-                                  {selectedParty.currentAmount !== undefined && selectedParty.currentAmount !== null ? (
-                                    <p className={`text-xs ${selectedPartyBalanceMeta.textClass}`}>
-                                      {selectedPartyBalanceMeta.label}:{' '}
-                                      {t('currency.formatted', {
-                                        symbol: t('currency.symbol'),
-                                        amount: selectedPartyBalanceMeta.absoluteAmount.toFixed(2),
-                                      })}
-                                    </p>
+                                  {selectedParty.phone ? (
+                                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                                      <p className="text-xs text-slate-500">{selectedParty.phone}</p>
+                                      {!selectedPartyHasDue && selectedPartyWhatsAppLink ? (
+                                        <a
+                                          href={selectedPartyWhatsAppLink}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700"
+                                          aria-label={`Open WhatsApp chat for ${selectedParty.phone}`}
+                                        >
+                                          <MessageCircle size={12} />
+                                          WhatsApp
+                                        </a>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
+                                  {selectedPartyHasBalance ? (
+                                    <div className="mt-0.5">
+                                      <p className={`text-xs ${selectedPartyBalanceMeta.textClass}`}>
+                                        {selectedPartyBalanceMeta.label}:{' '}
+                                        {t('currency.formatted', {
+                                          symbol: t('currency.symbol'),
+                                          amount: selectedPartyBalanceMeta.absoluteAmount.toFixed(2),
+                                        })}
+                                      </p>
+                                      {selectedPartyHasDue && selectedPartyWhatsAppLink ? (
+                                        <a
+                                          href={selectedPartyWhatsAppLink}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="mt-1 inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-50 dark:bg-slate-900 dark:text-emerald-300 dark:ring-emerald-800"
+                                          aria-label={`Open WhatsApp chat for ${selectedParty.phone}`}
+                                        >
+                                          <MessageCircle size={12} />
+                                          WhatsApp
+                                        </a>
+                                      ) : null}
+                                    </div>
                                   ) : null}
                                 </div>
                                 <button type="button" onClick={clearParty} className="rounded-xl p-2 text-slate-400 transition hover:bg-white hover:text-slate-700 dark:hover:bg-slate-800">
@@ -1501,6 +1557,7 @@ export default function Services() {
                               const product = getProductById(item.productId);
                               const displayName = item.description || (product ? product.name : '') || '—';
                               const unitLabel = item.itemType === 'part' ? getUnitLabel(product, item.unitType) : '';
+                              const itemVatAmount = getVatAmount(item.lineTotal, item.taxRate);
 
                               if (editingItemIdx === idx && showItemForm) return null;
                               if (isPlaceholderItem(item)) return null;
@@ -1531,6 +1588,14 @@ export default function Services() {
                                             <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-slate-950/50">
                                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.unitPrice')}</p>
                                               <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{money(item.unitPrice)}</p>
+                                            </div>
+                                            <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-slate-950/50">
+                                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.tax')}</p>
+                                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{Number(item.taxRate || 0).toFixed(2)}%</p>
+                                            </div>
+                                            <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-slate-950/50">
+                                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.taxTotal')}</p>
+                                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{money(itemVatAmount)}</p>
                                             </div>
                                             <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-slate-950/50">
                                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.total')}</p>
@@ -1581,6 +1646,9 @@ export default function Services() {
                               <div className="rounded-[22px] border border-white/70 bg-white/80 px-4 py-3 text-right dark:border-slate-800/60 dark:bg-slate-950/50">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.total')}</p>
                                 <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</p>
+                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                  {t('services.taxTotal')}: {money(getVatAmount(itemDraft.lineTotal, itemDraft.taxRate))}
+                                </p>
                               </div>
                             </div>
 
@@ -1678,6 +1746,20 @@ export default function Services() {
                                   onChange={(e) => handleDraftChange('unitPrice', e.target.value)}
                                 />
                               </div>
+                              <div>
+                                <label className="label">{t('services.tax')}</label>
+                                <input
+                                  className="input mt-1"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={itemDraft.taxRate}
+                                  onChange={(e) => handleDraftChange('taxRate', e.target.value)}
+                                />
+                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                  {t('services.taxTotal')}: {money(getVatAmount(itemDraft.lineTotal, itemDraft.taxRate))}
+                                </p>
+                              </div>
                             </div>
 
                             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -1711,8 +1793,12 @@ export default function Services() {
                         className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                       >
                         <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                          <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
-                            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                            <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
+                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
+                              <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.subTotal')}</p>
+                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.subTotal)}</p>
+                              </div>
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.laborTotal')}</p>
                                 <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.laborTotal)}</p>
@@ -1720,6 +1806,10 @@ export default function Services() {
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.partsTotal')}</p>
                                 <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.partsTotal)}</p>
+                              </div>
+                              <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.taxTotal')}</p>
+                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.taxTotal)}</p>
                               </div>
                               <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white dark:bg-primary-900/70">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">{t('services.grandTotal')}</p>

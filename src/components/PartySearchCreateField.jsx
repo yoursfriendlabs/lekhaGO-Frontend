@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Phone, Plus, Search, X } from 'lucide-react';
+import { MessageCircle, Phone, Plus, Search, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { normalizeLookupParty } from '../lib/lookups.js';
 import { getPartyBalanceMeta } from '../lib/partyBalances.js';
+import { getWhatsAppLink } from '../lib/whatsapp.js';
 
 function getInitials(name = '') {
   const trimmed = String(name || '').trim();
@@ -40,6 +41,15 @@ export default function PartySearchCreateField({
   const debouncedQuery = useDebouncedValue(query, 250);
   const visibleResults = useMemo(() => results.slice(0, 6), [results]);
   const balanceMeta = getPartyBalanceMeta(selected?.currentAmount, t);
+  const hasBalance = selected?.currentAmount !== undefined && selected?.currentAmount !== null;
+  const hasDue = hasBalance && balanceMeta.absoluteAmount > 0;
+  const whatsappMessage = hasDue
+    ? `your total due amount is ${t('currency.formatted', {
+        symbol: t('currency.symbol'),
+        amount: balanceMeta.absoluteAmount.toFixed(2),
+      })}`
+    : 'Hello, Welcome to Rose Boutique and Creation';
+  const whatsappLink = getWhatsAppLink(selected?.phone, whatsappMessage);
 
   const resetLocalState = () => {
     setQuery('');
@@ -138,15 +148,45 @@ export default function PartySearchCreateField({
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold text-slate-800 dark:text-slate-100">{selected.name || placeholder || '—'}</p>
-            {selected.phone ? <p className="text-xs text-slate-500">{selected.phone}</p> : null}
-            {selected.currentAmount !== undefined && selected.currentAmount !== null ? (
-              <p className={`text-xs ${balanceMeta.textClass}`}>
-                {balanceMeta.label}:{' '}
-                {t('currency.formatted', {
-                  symbol: t('currency.symbol'),
-                  amount: balanceMeta.absoluteAmount.toFixed(2),
-                })}
-              </p>
+            {selected.phone ? (
+              <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                <p className="text-xs text-slate-500">{selected.phone}</p>
+                {!hasDue && whatsappLink ? (
+                  <a
+                    href={whatsappLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700"
+                    aria-label={`Open WhatsApp chat for ${selected.phone}`}
+                  >
+                    <MessageCircle size={12} />
+                    WhatsApp
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
+            {hasBalance ? (
+              <div className="mt-0.5">
+                <p className={`text-xs ${balanceMeta.textClass}`}>
+                  {balanceMeta.label}:{' '}
+                  {t('currency.formatted', {
+                    symbol: t('currency.symbol'),
+                    amount: balanceMeta.absoluteAmount.toFixed(2),
+                  })}
+                </p>
+                {hasDue && whatsappLink ? (
+                  <a
+                    href={whatsappLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-1 inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-50 dark:bg-slate-900 dark:text-emerald-300 dark:ring-emerald-800"
+                    aria-label={`Open WhatsApp chat for ${selected.phone}`}
+                  >
+                    <MessageCircle size={12} />
+                    WhatsApp
+                  </a>
+                ) : null}
+              </div>
             ) : null}
           </div>
           <button

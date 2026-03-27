@@ -81,6 +81,10 @@ const emptyExpenseItem = {
 
 const getEmptyItem = (entryType) => (entryType === 'expense' ? { ...emptyExpenseItem } : { ...emptyPurchaseItem });
 
+function getVatAmount(lineTotal, taxRate) {
+  return (Number(lineTotal || 0) * Number(taxRate || 0)) / 100;
+}
+
 export default function Purchases() {
   const { t } = useI18n();
   const { businessId } = useAuth();
@@ -135,7 +139,7 @@ export default function Purchases() {
   const totals = useMemo(() => {
     const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
     const taxTotal = items.reduce(
-      (sum, item) => sum + (Number(item.lineTotal || 0) * Number(item.taxRate || 0)) / 100,
+      (sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate),
       0
     );
     return { subTotal, taxTotal, grandTotal: subTotal + taxTotal };
@@ -247,6 +251,9 @@ export default function Purchases() {
 
     if (product?.id) {
       cacheProducts([product]);
+      setItems((prev) => prev.map((item, idx) => (
+        idx === index ? { ...item, taxRate: String(product.taxRate || 0) } : item
+      )));
     }
 
     handleItemChange(index, 'productId', option?.value || '');
@@ -575,6 +582,7 @@ export default function Purchases() {
               <div className="space-y-4">
                 {items.map((item, idx) => {
                   const product = getProductById(item.productId);
+                  const itemVatAmount = getVatAmount(item.lineTotal, item.taxRate);
                   const itemHeading = isExpense
                     ? item.description || `${t('purchases.expenseDescription')} ${idx + 1}`
                     : product?.name || `${t('purchases.product')} ${idx + 1}`;
@@ -585,6 +593,7 @@ export default function Purchases() {
                         <div className="min-w-0">
                           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{itemHeading}</p>
                           <p className="mt-1 text-sm text-slate-500">{t('common.lineTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.lineTotal })}</p>
+                          <p className="mt-1 text-xs text-slate-500">{t('purchases.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: itemVatAmount.toFixed(2) })}</p>
                         </div>
                         {items.length > 1 ? (
                           <button className="btn-ghost w-full justify-center sm:w-auto" type="button" onClick={() => removeItem(idx)}>{t('common.remove')}</button>
@@ -672,6 +681,9 @@ export default function Purchases() {
                           <div>
                             <label className="label">{t('purchases.tax')}</label>
                             <input className="input mt-1" type="number" step="0.01" value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
+                            <p className="mt-1 text-xs text-slate-500">
+                              {t('purchases.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: itemVatAmount.toFixed(2) })}
+                            </p>
                           </div>
                         </div>
                       )}

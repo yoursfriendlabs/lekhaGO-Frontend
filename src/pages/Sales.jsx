@@ -38,6 +38,10 @@ const emptyItem = {
   lineTotal: '0'
 };
 
+function getVatAmount(lineTotal, taxRate) {
+  return (Number(lineTotal || 0) * Number(taxRate || 0)) / 100;
+}
+
 // ── Matches Services StatusBadge exactly ──
 function StatusBadge({ status }) {
   const map = {
@@ -131,7 +135,7 @@ export default function Sales() {
   const totals = useMemo(() => {
     const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
     const taxTotal = items.reduce(
-      (sum, item) => sum + (Number(item.lineTotal || 0) * Number(item.taxRate || 0)) / 100,
+      (sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate),
       0
     );
     return { subTotal, taxTotal, grandTotal: subTotal + taxTotal };
@@ -202,6 +206,9 @@ export default function Sales() {
 
     if (product?.id) {
       cacheProducts([product]);
+      setItems((prev) => prev.map((item, idx) => (
+        idx === index ? { ...item, taxRate: String(product.taxRate || 0) } : item
+      )));
     }
 
     handleItemChange(index, 'productId', option?.value || '');
@@ -567,6 +574,7 @@ export default function Sales() {
                 {items.map((item, idx) => {
                   const product = getProductById(item.productId);
                   const itemHeading = product?.name || `${t('sales.product')} ${idx + 1}`;
+                  const itemVatAmount = getVatAmount(item.lineTotal, item.taxRate);
 
                   return (
                     <div key={`item-${idx}`} className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
@@ -574,6 +582,7 @@ export default function Sales() {
                         <div className="min-w-0">
                           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{itemHeading}</p>
                           <p className="mt-1 text-sm text-slate-500">{t('sales.lineTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.lineTotal })}</p>
+                          <p className="mt-1 text-xs text-slate-500">{t('sales.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: itemVatAmount.toFixed(2) })}</p>
                         </div>
                         {items.length > 1 ? (
                           <button className="btn-ghost w-full justify-center sm:w-auto" type="button" onClick={() => removeItem(idx)}>
@@ -623,6 +632,9 @@ export default function Sales() {
                         <div>
                           <label className="label">{t('sales.tax')}</label>
                           <input className="input mt-1" type="number" step="0.01" value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
+                          <p className="mt-1 text-xs text-slate-500">
+                            {t('sales.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: itemVatAmount.toFixed(2) })}
+                          </p>
                         </div>
                       </div>
                     </div>

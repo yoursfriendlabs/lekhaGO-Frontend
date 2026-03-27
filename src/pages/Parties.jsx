@@ -16,8 +16,9 @@ import {
 } from '../lib/partyBalances.js';
 import { usePartyStore } from '../stores/parties';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { Plus, Bell, Search, Filter, ChevronDown } from 'lucide-react';
+import { Plus, Bell, Search, Filter, ChevronDown, MessageCircle } from 'lucide-react';
 import { buildPaymentPayload, requiresBankSelection } from '../lib/payments';
+import { getWhatsAppLink } from '../lib/whatsapp.js';
 
 const emptyForm = {
   name: '',
@@ -255,6 +256,14 @@ export default function Parties() {
     ? { ...(selectedParty || {}), ...(statementData.party || {}) }
     : null;
   const selectedBalanceMeta = getPartyBalanceMeta(selectedPartyView?.currentAmount, t);
+  const selectedPartyHasDue = selectedBalanceMeta.absoluteAmount > 0;
+  const selectedPartyWhatsAppMessage = selectedPartyHasDue
+    ? `your total due amount is ${t('currency.formatted', {
+        symbol: t('currency.symbol'),
+        amount: selectedBalanceMeta.absoluteAmount.toFixed(2),
+      })}`
+    : 'Hello, Welcome to Rose Boutique and Creation';
+  const selectedPartyWhatsAppLink = getWhatsAppLink(selectedPartyView?.phone, selectedPartyWhatsAppMessage);
   const totalTxPages = Math.max(1, Math.ceil(statementData.summary.totalRows / TX_PAGE_SIZE));
 
   const handleChange = (event) => {
@@ -595,7 +604,21 @@ export default function Parties() {
                   </div>
                   <div>
                     <p className="text-xl font-semibold text-slate-900">{selectedPartyView.name}</p>
-                    <p className="text-sm text-slate-500">{selectedPartyView.phone || '-'}</p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                      <p className="text-sm text-slate-500">{selectedPartyView.phone || '-'}</p>
+                      {!selectedPartyHasDue && selectedPartyWhatsAppLink ? (
+                        <a
+                          href={selectedPartyWhatsAppLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-200"
+                          aria-label={`Open WhatsApp chat for ${selectedPartyView.phone}`}
+                        >
+                          <MessageCircle size={12} />
+                          WhatsApp
+                        </a>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
                 <div className="text-right">
@@ -606,6 +629,18 @@ export default function Parties() {
                       amount: selectedBalanceMeta.absoluteAmount.toFixed(2),
                     })}
                   </p>
+                  {selectedPartyHasDue && selectedPartyWhatsAppLink ? (
+                    <a
+                      href={selectedPartyWhatsAppLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-emerald-700 shadow-sm ring-1 ring-emerald-200 transition hover:bg-emerald-50"
+                      aria-label={`Open WhatsApp chat for ${selectedPartyView.phone}`}
+                    >
+                      <MessageCircle size={12} />
+                      WhatsApp
+                    </a>
+                  ) : null}
                 </div>
               </div>
 
