@@ -7,7 +7,6 @@ const navItems = [
   { to: '/app', key: 'nav.dashboard' },
   { to: '/app/inventory', key: 'nav.items', role: ['owner','staff'] },
   { to: '/app/services', key: 'nav.services', role: ['owner','staff'] },
-  { to: '/app/sales', key: 'nav.sales', role: ['owner','staff'] },
   { to: '/app/purchases', key: 'nav.purchases', role: ['owner'] },
   { to: '/app/parties', key: 'nav.parties', role: ['owner']  },
   { to: '/app/ledger', key: 'nav.ledger', role: ['owner','staff'] },

@@ -275,7 +275,7 @@ export default function Dashboard() {
               <Package size={18} className="text-slate-400" />
             </div>
             <div className="mt-4 grid gap-2">
-              <Link className="btn-primary w-full justify-center" to="/app/sales">{t('dashboard.newSale')}</Link>
+              <Link className="btn-primary w-full justify-center" to="/app/services">{t('dashboard.newSale')}</Link>
               <Link className="btn-secondary w-full justify-center" to="/app/purchases">{t('dashboard.newPurchase')}</Link>
               <Link className="btn-ghost w-full justify-center" to="/app/inventory">{t('dashboard.addProduct')}</Link>
             </div>
@@ -359,7 +359,7 @@ export default function Dashboard() {
         <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
             <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.recentSales')}</h3>
-            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/sales">{t('dashboard.viewAll')}</Link>
+            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/services">{t('dashboard.viewAll')}</Link>
           </div>
           <div className="mt-4 space-y-3">
             {recentSales.length === 0 ? (

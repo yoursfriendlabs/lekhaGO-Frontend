@@ -16,7 +16,6 @@ import { BANKS_SETTINGS_TAB, buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Purchases = lazy(() => import('./pages/Purchases'));
-const Sales = lazy(() => import('./pages/Sales'));
 const Services = lazy(() => import('./pages/Services'));
 const Parties = lazy(() => import('./pages/Parties'));
 const Ledger = lazy(() => import('./pages/Ledger'));
@@ -146,7 +145,7 @@ function AppShell() {
                 <Route path="products" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to="/app/inventory" replace /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route path="inventory" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Inventory /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route path="purchases" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Purchases /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Sales /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to="/app/services" replace /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route path="services" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Services /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Parties /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route path="banks" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to={buildSettingsTabPath(BANKS_SETTINGS_TAB)} replace /></RoleGuard></EmailActivationRequiredRoute>} />

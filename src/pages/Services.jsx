@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
@@ -8,18 +7,38 @@ import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import SearchableSelect from '../components/SearchableSelect';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import InvoiceHeader from '../components/InvoiceHeader';
-import { api, API_BASE } from '../lib/api';
+import MobileFormStepper from '../components/MobileFormStepper.jsx';
+import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
 import { useI18n } from '../lib/i18n.jsx';
 import FileUpload from '../components/FileUpload';
 import DynamicAttributes from '../components/DynamicAttributes';
-import { X, Plus, Clock, Check, Search, Pencil, FileText, ChevronDown, Phone } from 'lucide-react';
+import {
+  X,
+  Plus,
+  Clock,
+  Check,
+  Search,
+  Pencil,
+  FileText,
+  ChevronDown,
+  Phone,
+  ArrowRight,
+  CalendarDays,
+  LayoutList,
+  Package,
+  Sparkles,
+  UserRound,
+  Wallet,
+  Wrench,
+} from 'lucide-react';
 import { usePartyStore } from '../stores/parties';
 import { useServiceStore } from '../stores/services';
 import { useProductStore } from '../stores/products';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useIsMobile } from '../hooks/useIsMobile.js';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
 import {
   mergeLookupEntities,
@@ -92,6 +111,84 @@ function DeliveryBadge({ date }) {
   return <span className="text-xs text-slate-600 dark:text-slate-400">{label}</span>;
 }
 
+function OverviewMetric({ icon: Icon, label, value, tone = 'slate' }) {
+  const styles = {
+    slate: {
+      wrapper: 'border-slate-200/70 bg-white/80 dark:border-slate-800/60 dark:bg-slate-950/40',
+      icon: 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900',
+    },
+    blue: {
+      wrapper: 'border-blue-200/70 bg-blue-50/70 dark:border-blue-900/40 dark:bg-blue-900/20',
+      icon: 'bg-blue-600 text-white',
+    },
+    amber: {
+      wrapper: 'border-amber-200/70 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-900/20',
+      icon: 'bg-amber-500 text-white',
+    },
+    rose: {
+      wrapper: 'border-rose-200/70 bg-rose-50/80 dark:border-rose-900/40 dark:bg-rose-900/20',
+      icon: 'bg-rose-500 text-white',
+    },
+  };
+
+  const palette = styles[tone] || styles.slate;
+
+  return (
+    <div className={`rounded-[24px] border p-4 shadow-sm shadow-slate-200/20 ${palette.wrapper}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{label}</p>
+          <p className="mt-2 truncate text-2xl font-semibold text-slate-900 dark:text-white">{value}</p>
+        </div>
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${palette.icon}`}>
+          <Icon size={18} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FilterChip({ label, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center rounded-full border px-4 py-2 text-sm font-semibold transition ${
+        active
+          ? 'border-primary-300 bg-primary-50 text-primary-700 shadow-sm dark:border-primary-700/70 dark:bg-primary-900/30 dark:text-primary-200'
+          : 'border-slate-200/80 bg-white/80 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-700'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function SummaryPill({ icon: Icon, label, value, valueClassName = '' }) {
+  return (
+    <div className="rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm shadow-primary-950/5 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/50">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 rounded-xl bg-primary-50 p-2 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200">
+          <Icon size={14} />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{label}</p>
+          <p className={`mt-1 truncate text-sm font-semibold text-slate-900 dark:text-white ${valueClassName}`}>{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function isPlaceholderItem(item) {
+  if (!item) return true;
+  return !String(item.description || '').trim()
+    && !String(item.productId || '').trim()
+    && Number(item.unitPrice || 0) === 0
+    && Number(item.lineTotal || 0) === 0
+    && Number(item.quantity || 1) === 1;
+}
+
 function StatusBadge({ status }) {
   const map = {
     open: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
@@ -139,6 +236,7 @@ const STATUS_STEPS = [
 export default function Services() {
   const { t } = useI18n();
   const { businessId, user } = useAuth();
+  const isMobile = useIsMobile();
   const { settings: bizSettings } = useBusinessSettings();
 
   const { upsert: upsertParty } = usePartyStore();
@@ -205,6 +303,7 @@ export default function Services() {
   const [showItemForm, setShowItemForm] = useState(false);
   const [itemDraft, setItemDraft] = useState({ ...emptyItem });
   const [editingItemIdx, setEditingItemIdx] = useState(null);
+  const [mobileStep, setMobileStep] = useState('details');
 
   // ── Load services list ──
   const loadServices = () => {
@@ -272,6 +371,21 @@ export default function Services() {
     const due = Math.max(grandTotal - received, 0);
     return { laborTotal, partsTotal, grandTotal, received, due };
   }, [items, amountReceived, isPaid]);
+
+  const visibleItems = useMemo(() => {
+    if (items.length === 1 && isPlaceholderItem(items[0])) return [];
+    return items;
+  }, [items]);
+
+  const formSteps = useMemo(() => ([
+    { id: 'details', label: t('services.detailStep') },
+    { id: 'items', label: t('services.itemsStep') },
+    { id: 'payment', label: t('services.paymentStep') },
+  ]), [t]);
+
+  const mobileStepIndex = formSteps.findIndex((step) => step.id === mobileStep);
+  const canGoBackStep = mobileStepIndex > 0;
+  const canGoForwardStep = mobileStepIndex >= 0 && mobileStepIndex < formSteps.length - 1;
 
   useEffect(() => {
     if (isPaid) setAmountReceived(totals.grandTotal.toFixed(2));
@@ -440,12 +554,14 @@ export default function Services() {
     setItemDraft({ ...emptyItem });
     setEditingItemIdx(null);
     setShowItemForm(true);
+    setMobileStep('items');
   };
 
   const startEditItem = (idx) => {
     setItemDraft({ ...items[idx] });
     setEditingItemIdx(idx);
     setShowItemForm(true);
+    setMobileStep('items');
   };
 
   const cancelItemForm = () => {
@@ -461,7 +577,7 @@ export default function Services() {
     if (editingItemIdx !== null) {
       setItems((prev) => prev.map((item, idx) => (idx === editingItemIdx ? draft : item)));
     } else {
-      setItems((prev) => [...prev, draft]);
+      setItems((prev) => (prev.length === 1 && isPlaceholderItem(prev[0]) ? [draft] : [...prev, draft]));
     }
     setShowItemForm(false);
     setEditingItemIdx(null);
@@ -543,6 +659,7 @@ export default function Services() {
     setEditingItemIdx(null);
     setSuggestedOrderNo('');
     setProductDirectory({});
+    setMobileStep('details');
   };
 
   const openDialog = async () => {
@@ -617,6 +734,16 @@ export default function Services() {
     }
   };
   const closeDialog = () => { setDialogOpen(false); resetForm(); };
+
+  const goToNextMobileStep = () => {
+    if (!canGoForwardStep) return;
+    setMobileStep(formSteps[mobileStepIndex + 1].id);
+  };
+
+  const goToPreviousMobileStep = () => {
+    if (!canGoBackStep) return;
+    setMobileStep(formSteps[mobileStepIndex - 1].id);
+  };
 
   // ── Submit ──
   const handleSubmit = async (e) => {
@@ -699,6 +826,29 @@ export default function Services() {
     const start = (page - 1) * pageSize;
     return filteredServiceList.slice(start, start + pageSize);
   }, [filteredServiceList, page, pageSize]);
+
+  const serviceOverview = useMemo(() => {
+    const openCount = safeServiceList.filter((order) => order.status === 'open').length;
+    const inProgressCount = safeServiceList.filter((order) => order.status === 'in_progress').length;
+    const pendingCollection = safeServiceList.reduce(
+      (sum, order) => sum + Math.max(Number(order.grandTotal || 0) - Number(order.receivedTotal || 0), 0),
+      0
+    );
+
+    return {
+      totalOrders: safeServiceList.length,
+      openCount,
+      inProgressCount,
+      pendingCollection,
+    };
+  }, [safeServiceList]);
+
+  const statusFilterOptions = useMemo(() => ([
+    { value: 'all', label: t('services.allStatuses') },
+    { value: 'open', label: t('services.open') },
+    { value: 'in_progress', label: t('services.inProgress') },
+    { value: 'closed', label: t('services.closed') },
+  ]), [t]);
 
   // ── Status dialog ──
   const openStatusDialog = (order) => {
@@ -799,696 +949,860 @@ export default function Services() {
     window.print();
   };
 
+  const showDetailsStep = !isMobile || mobileStep === 'details';
+  const showItemsStep = !isMobile || mobileStep === 'items';
+  const showPaymentStep = !isMobile || mobileStep === 'payment';
+  const dialogTitle = editingId ? t('services.editOrder') : t('services.newOrder');
+  const summaryOrderNo = header.orderNo || suggestedOrderNo || '—';
+  const summaryDeliveryDate = header.deliveryDate ? formatMaybeDate(header.deliveryDate, 'D MMM YYYY') : '—';
+
   // ── Render ──
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={t('services.title')}
-        subtitle={t('services.subtitle')}
-        action={
-          <button className="btn-primary w-full sm:w-auto" type="button" onClick={openDialog}>
-            <Plus size={16} className="mr-1.5 inline" />
-            {t('services.newOrder')}
-          </button>
-        }
-      />
+      <section className="overflow-hidden rounded-[32px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.22),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(249,245,239,0.96))] shadow-sm shadow-primary-950/10 dark:border-primary-900/40 dark:bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.18),transparent_42%),linear-gradient(135deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))]">
+        <div className="p-5 md:p-8">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary-200/70 bg-white/85 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 shadow-sm dark:border-primary-900/50 dark:bg-slate-950/50 dark:text-primary-200">
+                <Sparkles size={14} />
+                {t('services.workspaceLabel')}
+              </div>
+              <h1 className="mt-4 font-serif text-3xl text-slate-900 dark:text-white md:text-4xl">{t('services.title')}</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 md:text-base">
+                {t('services.subtitle')}
+              </p>
+            </div>
+
+            <button className="btn-primary w-full sm:w-auto" type="button" onClick={openDialog}>
+              <Plus size={16} className="mr-1.5 inline" />
+              {t('services.newOrder')}
+            </button>
+          </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <OverviewMetric icon={LayoutList} label={t('services.totalOrders')} value={serviceOverview.totalOrders} />
+            <OverviewMetric icon={Wrench} label={t('services.open')} value={serviceOverview.openCount} tone="blue" />
+            <OverviewMetric icon={CalendarDays} label={t('services.activeJobs')} value={serviceOverview.inProgressCount} tone="amber" />
+            <OverviewMetric icon={Wallet} label={t('services.pendingCollection')} value={money(serviceOverview.pendingCollection)} tone="rose" />
+          </div>
+        </div>
+      </section>
 
       {listError ? <Notice title={listError} tone="error" /> : null}
 
       {/* ── Orders Table ── */}
-      <div className="card">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-col items-start gap-2">
-            <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('services.recentOrders')}</h3>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => setStatusFilter('all')} className={statusFilter === 'all' ? "bg-blue-50 border  border-blue-500 text-blue-500 px-2 rounded" : "border rounded px-2 border-gray-300"}>
-                All
-              </button>
-              <button onClick={() => setStatusFilter('open')} className={statusFilter === 'open' ? "bg-blue-50 border px-2 border-blue-500 text-blue-500 rounded" : "border rounded px-2 border-gray-300"}>
-                Open
-              </button>
-              <button onClick={() => setStatusFilter('in_progress')} className={statusFilter === 'in_progress' ? "bg-yellow-50 border px-2 border-yellow-500 text-yellow-500 rounded" : "border rounded px-2 border-gray-300"}>
-                In Progress
-              </button>
-              <button onClick={() => setStatusFilter('closed')} className={statusFilter === 'closed' ? "bg-green-50 border px-2 border-green-500 text-green-500 rounded" : "border rounded px-2 border-gray-300"}>
-                Closed
-              </button>
+      <div className="card !p-0 overflow-hidden">
+        <div className="border-b border-slate-200/70 px-4 py-4 dark:border-slate-800/70 md:px-6 md:py-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-2xl">
+              <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('services.recentOrders')}</h3>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('services.browseOrdersHint')}</p>
+            </div>
+
+            <div className="w-full xl:max-w-sm">
+              <SearchableSelect
+                className="w-full"
+                options={[
+                  { value: '', label: t('services.filterByParty') },
+                  ...serviceParties.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+                value={partyFilterId}
+                onChange={setPartyFilterId}
+                placeholder={t('services.filterByParty')}
+              />
             </div>
           </div>
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <SearchableSelect
-              className="w-full sm:min-w-[180px]"
-              options={[
-                { value: '', label: t('services.filterByParty') },
-                ...serviceParties.map((p) => ({ value: p.id, label: p.name })),
-              ]}
-              value={partyFilterId}
-              onChange={setPartyFilterId}
-              placeholder={t('services.filterByParty')}
-            />
+
+          <div className="mt-4 flex gap-2 overflow-x-auto no-scrollbar">
+            {statusFilterOptions.map((option) => (
+              <FilterChip
+                key={option.value}
+                label={option.label}
+                active={statusFilter === option.value}
+                onClick={() => setStatusFilter(option.value)}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Mobile card view */}
-        <div className="mt-4 md:hidden space-y-3">
-          {listLoading && safeServiceList.length === 0 ? (
-            <p className="py-4 text-sm text-slate-500">{t('common.loading')}</p>
-          ) : pagedServices.length === 0 ? (
-            <p className="py-4 text-sm text-slate-500">{t('services.noOrders')}</p>
-          ) : (
-            pagedServices.map((order) => {
-              const due = Math.max(Number(order.grandTotal || 0) - Number(order.receivedTotal || 0), 0);
-              const days = getDeliveryDaysLeft(order.deliveryDate);
-              const isUrgent = order.status !== 'closed' && days !== null && days < 3;
-              return (
-                <div
-                  key={order.id}
-                  className={`rounded-2xl border p-4 text-sm ${
-                    isUrgent
-                      ? 'border-red-200/70 bg-red-50/40 dark:border-red-900/30 dark:bg-red-950/10'
-                      : 'border-slate-200/70 bg-white/80 dark:border-slate-800/60 dark:bg-slate-900/60'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
-                        {order.orderNo || order.id.slice(0, 8)}
-                      </p>
-                      <p className="text-xs text-slate-500 mt-0.5">{order.Party?.name || order.partyName || '—'}</p>
-                      <PaymentTypeSummary
-                        source={order}
-                        className="mt-1"
-                        labelClassName="text-xs font-medium"
-                        metaClassName="text-[11px]"
-                      />
-                      <p className="mt-1 text-xs text-slate-400">Created By: {getCreatorDisplayName(order)}</p>
-                      <div className="mt-1">
-                        <DeliveryBadge date={order.deliveryDate} />
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <StatusBadge status={order.status} />
-                      <p className="mt-1.5 font-semibold text-slate-800 dark:text-slate-200">{money(order.grandTotal)}</p>
-                      {due > 0 ? (
-                        <button
-                          type="button"
-                          className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300"
-                          onClick={() => openPayDialog(order)}
-                        >
-                          {money(due)} due
-                        </button>
-                      ) : (
-                        <p className="mt-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">Paid</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                      onClick={() => openStatusDialog(order)}
-                    >
-                      <ChevronDown size={12} /> Status
-                    </button>
-                    <div className="flex items-center gap-1">
-                      {order.attachment && (
-                        <button
-                          type="button"
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          onClick={() => setLightboxUrl(order.attachment)}
-                        >
-                          <FileText size={14} />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800"
-                        onClick={() => openInvoiceModal(order)}
-                      >
-                        <FileText size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-                        onClick={() => openEditDialog(order)}
-                      >
-                        <Pencil size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+        <div className="px-4 py-4 md:px-6 md:py-6">
+          <div className="space-y-3 md:hidden">
+            {listLoading && safeServiceList.length === 0 ? (
+              <p className="py-4 text-sm text-slate-500">{t('common.loading')}</p>
+            ) : pagedServices.length === 0 ? (
+              <p className="py-4 text-sm text-slate-500">{t('services.noOrders')}</p>
+            ) : (
+              pagedServices.map((order) => {
+                const due = Math.max(Number(order.grandTotal || 0) - Number(order.receivedTotal || 0), 0);
+                const days = getDeliveryDaysLeft(order.deliveryDate);
+                const isUrgent = order.status !== 'closed' && days !== null && days < 3;
 
-        {/* Desktop table */}
-        <div className="mt-4 overflow-x-auto hidden md:block">
-          <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-slate-400">
-              <tr>
-                <th className="py-2 pr-4 text-left">{t('services.orderNo')}</th>
-                <th className="py-2 pr-4 text-left">{t('services.customer')}</th>
-                <th className="py-2 pr-4 text-left">{t('services.deliveryDate')}</th>
-                <th className="py-2 pr-4 text-left">{t('services.status')}</th>
-                <th className="py-2 pr-4 text-left">{t('common.payment')}</th>
-                <th className="py-2 pr-2 text-left text-xs">Attach.</th>
-                <th className="py-2 pr-4 text-right">{t('services.grandTotal')}</th>
-                <th className="py-2 pr-4 text-right">{t('services.amountReceived')}</th>
-                <th className="py-2 pr-4 text-right">{t('services.due')}</th>
-                <th className="py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {listLoading && safeServiceList.length === 0 ? (
-                <tr><td colSpan={10} className="py-4 text-slate-500">{t('common.loading')}</td></tr>
-              ) : pagedServices.length === 0 ? (
-                <tr><td colSpan={10} className="py-4 text-slate-500">{t('services.noOrders')}</td></tr>
-              ) : (
-                pagedServices.map((order) => {
-                  const days = getDeliveryDaysLeft(order.deliveryDate);
-                  const isUrgent = order.status !== 'closed' && days !== null && days < 3;
-                  const isWarning = order.status !== 'closed' && days !== null && days >= 3 && days < 8;
-                  const rowClass = isUrgent
-                    ? 'border-t border-red-200/60 bg-red-50/40 dark:border-red-900/30 dark:bg-red-950/10'
-                    : isWarning
-                    ? 'border-t border-amber-200/60 bg-amber-50/40 dark:border-amber-900/30 dark:bg-amber-950/10'
-                    : 'border-t border-slate-200/70 dark:border-slate-800/70';
-                  const due = Math.max(Number(order.grandTotal || 0) - Number(order.receivedTotal || 0), 0);
-                  return (
-                    <tr key={order.id} className={rowClass}>
-                      <td className="py-2.5 pr-4 font-medium text-slate-800 dark:text-slate-200">
-                        {order.orderNo || order.id.slice(0, 8)}
-                      </td>
-                      <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
-                        <div>{order.Party?.name || order.partyName || <span className="text-slate-400">—</span>}</div>
-                        <div className="text-xs text-slate-400">Created By: {getCreatorDisplayName(order)}</div>
-                      </td>
-                      <td className="py-2.5 pr-4"><DeliveryBadge date={order.deliveryDate} /></td>
-                      <td className="py-2.5 pr-4">
-                        <button type="button" className="transition hover:opacity-75" onClick={() => openStatusDialog(order)}>
+                return (
+                  <div
+                    key={order.id}
+                    className={`rounded-[26px] border p-4 text-sm shadow-sm ${
+                      isUrgent
+                        ? 'border-red-200/70 bg-red-50/60 dark:border-red-900/30 dark:bg-red-950/10'
+                        : 'border-slate-200/70 bg-white/90 dark:border-slate-800/60 dark:bg-slate-900/70'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-base font-semibold text-slate-900 dark:text-white">
+                            {order.orderNo || order.id.slice(0, 8)}
+                          </p>
                           <StatusBadge status={order.status} />
-                        </button>
-                      </td>
-                      <td className="py-2.5 pr-4">
-                        <PaymentTypeSummary source={order} />
-                      </td>
-                      <td className="py-2.5 pr-2">
-                        {order.attachment ? (
-                          <button type="button" onClick={() => setLightboxUrl(order.attachment)}>
-                            <img
-                              src={order.attachment}
-                              alt="attach"
-                              className="h-8 w-8 rounded object-cover border border-slate-200 hover:opacity-80 transition"
-                              onError={(e) => { e.target.style.display = 'none'; }}
-                            />
-                          </button>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 pr-4 text-right font-semibold text-slate-800 dark:text-slate-200">{money(order.grandTotal)}</td>
-                      <td className="py-2.5 pr-4 text-right text-emerald-700 dark:text-emerald-400">{money(order.receivedTotal)}</td>
-                      <td className="py-2.5 pr-4 text-right">
+                        </div>
+
+                        <div className="mt-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200">
+                            <UserRound size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-slate-800 dark:text-slate-100">{order.Party?.name || order.partyName || '—'}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Created by {getCreatorDisplayName(order)}</p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <DeliveryBadge date={order.deliveryDate} />
+                          <PaymentTypeSummary
+                            source={order}
+                            className="rounded-full bg-slate-100/80 px-2.5 py-1 dark:bg-slate-800/80"
+                            labelClassName="text-[11px] font-semibold"
+                            metaClassName="text-[11px]"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="min-w-[96px] rounded-[22px] border border-slate-200/70 bg-slate-50/80 p-3 text-right dark:border-slate-800/70 dark:bg-slate-950/40">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{t('services.summaryTotal')}</p>
+                        <p className="mt-2 text-base font-semibold text-slate-900 dark:text-white">{money(order.grandTotal)}</p>
                         {due > 0 ? (
                           <button
                             type="button"
-                            className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60"
+                            className="mt-2 inline-flex items-center justify-center rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
                             onClick={() => openPayDialog(order)}
                           >
-                            {money(due)} · Pay
+                            {money(due)}
                           </button>
                         ) : (
-                          <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Paid</span>
+                          <p className="mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">{t('common.paid')}</p>
                         )}
-                      </td>
-                      <td className="py-2.5 text-right">
-                        <div className="inline-flex items-center gap-1">
-                          <button type="button" title="Edit" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800" onClick={() => openEditDialog(order)}>
-                            <Pencil size={14} />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-3 gap-2 border-t border-slate-200/70 pt-3 dark:border-slate-800/70">
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center gap-1 rounded-2xl border border-slate-200/70 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60"
+                        onClick={() => openStatusDialog(order)}
+                      >
+                        <ChevronDown size={12} />
+                        {t('services.status')}
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center gap-1 rounded-2xl border border-slate-200/70 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60"
+                        onClick={() => openInvoiceModal(order)}
+                      >
+                        <FileText size={12} />
+                        {t('common.view')}
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center gap-1 rounded-2xl border border-slate-200/70 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60"
+                        onClick={() => openEditDialog(order)}
+                      >
+                        <Pencil size={12} />
+                        {t('common.edit')}
+                      </button>
+                    </div>
+
+                    {order.attachment ? (
+                      <button
+                        type="button"
+                        className="mt-2 inline-flex items-center gap-2 text-xs font-medium text-primary-700 dark:text-primary-300"
+                        onClick={() => setLightboxUrl(order.attachment)}
+                      >
+                        <FileText size={12} />
+                        {t('services.attachment')}
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase tracking-[0.18em] text-slate-400">
+                <tr>
+                  <th className="py-2 pr-4 text-left">{t('services.orderNo')}</th>
+                  <th className="py-2 pr-4 text-left">{t('services.customer')}</th>
+                  <th className="py-2 pr-4 text-left">{t('services.deliveryDate')}</th>
+                  <th className="py-2 pr-4 text-left">{t('services.status')}</th>
+                  <th className="py-2 pr-4 text-left">{t('common.payment')}</th>
+                  <th className="py-2 pr-2 text-left">{t('services.attachment')}</th>
+                  <th className="py-2 pr-4 text-right">{t('services.grandTotal')}</th>
+                  <th className="py-2 pr-4 text-right">{t('services.amountReceived')}</th>
+                  <th className="py-2 pr-4 text-right">{t('services.due')}</th>
+                  <th className="py-2 text-right">{t('common.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {listLoading && safeServiceList.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="py-4 text-slate-500">{t('common.loading')}</td>
+                  </tr>
+                ) : pagedServices.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="py-4 text-slate-500">{t('services.noOrders')}</td>
+                  </tr>
+                ) : (
+                  pagedServices.map((order) => {
+                    const days = getDeliveryDaysLeft(order.deliveryDate);
+                    const isUrgent = order.status !== 'closed' && days !== null && days < 3;
+                    const isWarning = order.status !== 'closed' && days !== null && days >= 3 && days < 8;
+                    const rowClass = isUrgent
+                      ? 'border-t border-red-200/60 bg-red-50/40 dark:border-red-900/30 dark:bg-red-950/10'
+                      : isWarning
+                        ? 'border-t border-amber-200/60 bg-amber-50/40 dark:border-amber-900/30 dark:bg-amber-950/10'
+                        : 'border-t border-slate-200/70 dark:border-slate-800/70';
+                    const due = Math.max(Number(order.grandTotal || 0) - Number(order.receivedTotal || 0), 0);
+
+                    return (
+                      <tr key={order.id} className={rowClass}>
+                        <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                          {order.orderNo || order.id.slice(0, 8)}
+                        </td>
+                        <td className="py-3 pr-4 text-slate-700 dark:text-slate-300">
+                          <div>{order.Party?.name || order.partyName || <span className="text-slate-400">—</span>}</div>
+                          <div className="text-xs text-slate-400">Created by {getCreatorDisplayName(order)}</div>
+                        </td>
+                        <td className="py-3 pr-4"><DeliveryBadge date={order.deliveryDate} /></td>
+                        <td className="py-3 pr-4">
+                          <button type="button" className="transition hover:opacity-75" onClick={() => openStatusDialog(order)}>
+                            <StatusBadge status={order.status} />
                           </button>
-                          <button type="button" title="View Invoice" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800" onClick={() => openInvoiceModal(order)}>
-                            <FileText size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <PaymentTypeSummary source={order} />
+                        </td>
+                        <td className="py-3 pr-2">
+                          {order.attachment ? (
+                            <button type="button" onClick={() => setLightboxUrl(order.attachment)}>
+                              <img
+                                src={order.attachment}
+                                alt="attach"
+                                className="h-9 w-9 rounded-2xl border border-slate-200 object-cover transition hover:opacity-80 dark:border-slate-800"
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            </button>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 pr-4 text-right font-semibold text-slate-800 dark:text-slate-200">{money(order.grandTotal)}</td>
+                        <td className="py-3 pr-4 text-right text-emerald-700 dark:text-emerald-400">{money(order.receivedTotal)}</td>
+                        <td className="py-3 pr-4 text-right">
+                          {due > 0 ? (
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60"
+                              onClick={() => openPayDialog(order)}
+                            >
+                              {money(due)}
+                            </button>
+                          ) : (
+                            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{t('common.paid')}</span>
+                          )}
+                        </td>
+                        <td className="py-3 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <button type="button" title={t('common.edit')} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800" onClick={() => openEditDialog(order)}>
+                              <Pencil size={14} />
+                            </button>
+                            <button type="button" title={t('common.view')} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800" onClick={() => openInvoiceModal(order)}>
+                              <FileText size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-4">
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={filteredServiceList.length}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              pageSizeOptions={[10, 20, 50]}
+            />
+          </div>
         </div>
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={filteredServiceList.length}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-          pageSizeOptions={[10, 20, 50]}
-        />
       </div>
 
       {/* ── New / Edit Order Dialog ── */}
       {dialogOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/50 backdrop-blur-sm md:items-center md:p-4"
+          className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm"
           onClick={(e) => { if (e.target === e.currentTarget) closeDialog(); }}
         >
-          <div className="relative flex max-h-[100dvh] w-full max-w-2xl flex-col rounded-t-3xl bg-white shadow-2xl dark:bg-slate-950 md:max-h-[90vh] md:rounded-3xl">
-            {/* Dialog header */}
-            <div className="flex items-center justify-between border-b border-slate-200/70 px-4 py-4 dark:border-slate-800/70 md:px-5">
-              <h2 className="font-serif text-xl text-slate-900 dark:text-white">
-                {editingId ? 'Edit Service Order' : t('services.newOrder')}
-              </h2>
-              <button type="button" onClick={closeDialog} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
-                <X size={20} />
-              </button>
-            </div>
+          <div className="flex h-full items-end justify-center md:items-center md:p-4">
+            <div className="relative flex h-[100dvh] w-full max-w-5xl flex-col overflow-hidden bg-[#fcfaf6] shadow-2xl dark:bg-slate-950 md:h-auto md:max-h-[94vh] md:rounded-[32px] md:border md:border-slate-200/70 md:dark:border-slate-800/70">
+              <div className="flex items-center justify-between border-b border-slate-200/70 bg-white/85 px-4 py-4 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-6">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary-700 dark:text-primary-200">{t('services.workspaceLabel')}</p>
+                  <h2 className="mt-1 truncate font-serif text-2xl text-slate-900 dark:text-white">{dialogTitle}</h2>
+                </div>
+                <button type="button" onClick={closeDialog} className="rounded-2xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
+                  <X size={20} />
+                </button>
+              </div>
 
-            <form onSubmit={handleSubmit}>
-              <div className="max-h-[calc(100dvh-8rem)] space-y-5 overflow-y-auto px-4 py-4 md:max-h-[80vh] md:px-5 md:py-5">
-                {formNotice.message ? (
-                  <Notice title={formNotice.message} tone={formNotice.type} />
-                ) : null}
+              <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-6">
+                  <div className="space-y-4">
+                    {formNotice.message ? (
+                      <Notice title={formNotice.message} tone={formNotice.type} />
+                    ) : null}
 
-                {editLoading && (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
-                  </div>
-                )}
-
-                {/* ── Customer Autocomplete ── */}
-                <FormSectionCard hint={t('services.customerRequired')}>
-                  <label className="label">
-                    {t('services.customer')} <span className="ml-1 text-rose-500">*</span>
-                  </label>
-                  <div className="relative mt-1">
-                    {selectedParty ? (
-                      <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-900/10">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-white">
-                          {selectedParty.name.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{selectedParty.name}</p>
-                          {selectedParty.phone && <p className="text-xs text-slate-500">{selectedParty.phone}</p>}
-                          {selectedParty.currentAmount !== undefined && selectedParty.currentAmount !== null && (
-                            <p className={`text-xs ${selectedPartyBalanceMeta.textClass}`}>
-                              {selectedPartyBalanceMeta.label}:{' '}
-                              {t('currency.formatted', {
-                                symbol: t('currency.symbol'),
-                                amount: selectedPartyBalanceMeta.absoluteAmount.toFixed(2),
-                              })}
-                            </p>
-                          )}
-                        </div>
-                        <button type="button" onClick={clearParty} className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600 dark:hover:bg-slate-800">
-                          <X size={16} />
-                        </button>
+                    {editLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
                       </div>
-                    ) : (
-                      <div>
-                        <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-white px-3 py-2.5 dark:border-slate-700/60 dark:bg-slate-900/60 focus-within:border-primary-300">
-                          <Search size={16} className="shrink-0 text-slate-400" />
-                          <input
-                            className="flex-1 bg-transparent outline-none text-sm placeholder:text-slate-400 dark:text-slate-200"
-                            placeholder={t('services.customerSearch')}
-                            value={partyQuery}
-                            onChange={handlePartySearch}
-                            onFocus={() => setPartyDropdownOpen(true)}
-                          />
-                          {partyQuery && (
-                            <button type="button" onClick={clearParty} className="text-slate-400 hover:text-slate-600">
-                              <X size={14} />
-                            </button>
-                          )}
+                    ) : null}
+
+                    <div className="rounded-[30px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.18),transparent_45%),linear-gradient(140deg,rgba(255,255,255,0.98),rgba(249,245,239,0.95))] p-4 shadow-sm shadow-primary-950/10 dark:border-primary-900/40 dark:bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.16),transparent_45%),linear-gradient(140deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] md:p-5">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div className="min-w-0">
+                          <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/75 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary-700 dark:border-slate-800/60 dark:bg-slate-950/50 dark:text-primary-200">
+                            <Sparkles size={12} />
+                            {dialogTitle}
+                          </div>
+                          <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                            {summaryOrderNo} · {summaryDeliveryDate}
+                          </p>
                         </div>
+                        <StatusBadge status={header.status} />
+                      </div>
 
-                        {/* Dropdown */}
-                        {partyDropdownOpen && partyQuery.trim() && (
-                          <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                            {filteredParties.length > 0 && filteredParties.map((party) => (
-                              <button
-                                key={party.id}
-                                type="button"
-                                className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800/60 border-b border-slate-100/80 dark:border-slate-800/50 last:border-b-0"
-                                onClick={() => selectParty(party)}
-                              >
-                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                  {party.name.slice(0, 2).toUpperCase()}
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-slate-800 dark:text-slate-200">{party.name}</p>
-                                  {party.phone && <p className="text-xs text-slate-500">{party.phone}</p>}
-                                </div>
-                              </button>
-                            ))}
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <SummaryPill icon={UserRound} label={t('services.summaryCustomer')} value={selectedParty?.name || '—'} />
+                        <SummaryPill icon={CalendarDays} label={t('services.summaryDelivery')} value={summaryDeliveryDate} />
+                        <SummaryPill icon={Package} label={t('services.summaryItems')} value={visibleItems.length || 0} />
+                        <SummaryPill
+                          icon={Wallet}
+                          label={t('services.summaryDue')}
+                          value={money(totals.due)}
+                          valueClassName={totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}
+                        />
+                      </div>
+                    </div>
 
-                            {/* Add new inline */}
-                            {!showAddNew ? (
-                              <button
-                                type="button"
-                                className="flex w-full items-center gap-2 px-4 py-3 text-sm text-primary-700 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 rounded-b-2xl"
-                                onClick={() => setShowAddNew(true)}
-                              >
-                                <Plus size={14} />
-                                Add &ldquo;{partyQuery.trim()}&rdquo; as customer
-                              </button>
+                    {isMobile ? (
+                      <MobileFormStepper
+                        steps={formSteps}
+                        currentStep={mobileStep}
+                        onStepChange={setMobileStep}
+                        onNext={goToNextMobileStep}
+                        onBack={goToPreviousMobileStep}
+                        canProceed={!editLoading}
+                        backLabel={t('common.back')}
+                        nextLabel={mobileStep === 'items' ? t('services.paymentStep') : t('common.continue')}
+                      />
+                    ) : null}
+
+                    {showDetailsStep ? (
+                      <>
+                        <FormSectionCard
+                          title={t('services.detailsSectionTitle')}
+                          hint={t('services.detailsSectionHint')}
+                          className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                        >
+                          <label className="label">
+                            {t('services.customer')} <span className="ml-1 text-rose-500">*</span>
+                          </label>
+                          <div className="relative mt-2">
+                            {selectedParty ? (
+                              <div className="flex items-center gap-3 rounded-[24px] border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-900/10">
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-sm font-bold text-white">
+                                  {selectedParty.name.slice(0, 2).toUpperCase()}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate font-semibold text-slate-800 dark:text-slate-100">{selectedParty.name}</p>
+                                  {selectedParty.phone ? <p className="text-xs text-slate-500">{selectedParty.phone}</p> : null}
+                                  {selectedParty.currentAmount !== undefined && selectedParty.currentAmount !== null ? (
+                                    <p className={`text-xs ${selectedPartyBalanceMeta.textClass}`}>
+                                      {selectedPartyBalanceMeta.label}:{' '}
+                                      {t('currency.formatted', {
+                                        symbol: t('currency.symbol'),
+                                        amount: selectedPartyBalanceMeta.absoluteAmount.toFixed(2),
+                                      })}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <button type="button" onClick={clearParty} className="rounded-xl p-2 text-slate-400 transition hover:bg-white hover:text-slate-700 dark:hover:bg-slate-800">
+                                  <X size={16} />
+                                </button>
+                              </div>
                             ) : (
-                              <div className="rounded-b-2xl border-t border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-                                <p className="mb-2 text-xs font-semibold text-slate-600 dark:text-slate-300">New: <span className="text-primary-700">{partyQuery.trim()}</span></p>
-                                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
-                                  <Phone size={13} className="text-slate-400 shrink-0" />
+                              <div>
+                                <div className="flex items-center gap-2 rounded-[24px] border border-slate-200/70 bg-white px-3 py-3 shadow-sm shadow-slate-200/10 dark:border-slate-700/60 dark:bg-slate-900/60 focus-within:border-primary-300">
+                                  <Search size={16} className="shrink-0 text-slate-400" />
                                   <input
-                                    className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-                                    type="tel"
-                                    inputMode="numeric"
-                                    placeholder={t('parties.phonePlaceholder')}
-                                    value={newPartyPhone}
-                                    onChange={(e) => setNewPartyPhone(e.target.value)}
+                                    className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400 dark:text-slate-200"
+                                    placeholder={t('services.customerSearch')}
+                                    value={partyQuery}
+                                    onChange={handlePartySearch}
+                                    onFocus={() => setPartyDropdownOpen(true)}
                                   />
+                                  {partyQuery ? (
+                                    <button type="button" onClick={clearParty} className="text-slate-400 transition hover:text-slate-600">
+                                      <X size={14} />
+                                    </button>
+                                  ) : null}
                                 </div>
-                                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                                  <button type="button" className="btn-ghost text-xs" onClick={() => setShowAddNew(false)}>Cancel</button>
-                                  <button type="button" className="btn-primary text-xs" onClick={createAndSelectParty}>Create & Select</button>
-                                </div>
+
+                                {partyDropdownOpen && partyQuery.trim() ? (
+                                  <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                                    {filteredParties.length > 0 ? filteredParties.map((party) => (
+                                      <button
+                                        key={party.id}
+                                        type="button"
+                                        className="flex w-full items-center gap-3 border-b border-slate-100/80 px-4 py-3 text-left text-sm transition hover:bg-slate-50 dark:border-slate-800/50 dark:hover:bg-slate-800/60 last:border-b-0"
+                                        onClick={() => selectParty(party)}
+                                      >
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                          {party.name.slice(0, 2).toUpperCase()}
+                                        </div>
+                                        <div>
+                                          <p className="font-semibold text-slate-800 dark:text-slate-200">{party.name}</p>
+                                          {party.phone ? <p className="text-xs text-slate-500">{party.phone}</p> : null}
+                                        </div>
+                                      </button>
+                                    )) : null}
+
+                                    {!showAddNew ? (
+                                      <button
+                                        type="button"
+                                        className="flex w-full items-center gap-2 px-4 py-3 text-sm text-primary-700 transition hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/20"
+                                        onClick={() => setShowAddNew(true)}
+                                      >
+                                        <Plus size={14} />
+                                        Add &ldquo;{partyQuery.trim()}&rdquo; as customer
+                                      </button>
+                                    ) : (
+                                      <div className="border-t border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                                        <p className="mb-2 text-xs font-semibold text-slate-600 dark:text-slate-300">New: <span className="text-primary-700">{partyQuery.trim()}</span></p>
+                                        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                                          <Phone size={13} className="shrink-0 text-slate-400" />
+                                          <input
+                                            className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                                            type="tel"
+                                            inputMode="numeric"
+                                            placeholder={t('parties.phonePlaceholder')}
+                                            value={newPartyPhone}
+                                            onChange={(e) => setNewPartyPhone(e.target.value)}
+                                          />
+                                        </div>
+                                        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                                          <button type="button" className="btn-ghost text-xs" onClick={() => setShowAddNew(false)}>{t('common.cancel')}</button>
+                                          <button type="button" className="btn-primary text-xs" onClick={createAndSelectParty}>{t('services.addSelect')}</button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : null}
                               </div>
                             )}
                           </div>
+
+                          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                            <div>
+                              <label className="label">{t('services.orderNo')}</label>
+                              <input
+                                className="input mt-1"
+                                name="orderNo"
+                                value={header.orderNo}
+                                onChange={handleHeaderChange}
+                                placeholder={!editingId ? suggestedOrderNo : ''}
+                              />
+                            </div>
+                            <div>
+                              <label className="label">{t('services.status')}</label>
+                              <select className="input mt-1" name="status" value={header.status} onChange={handleHeaderChange}>
+                                <option value="open">{t('services.open')}</option>
+                                <option value="in_progress">{t('services.inProgress')}</option>
+                                <option value="closed">{t('services.closed')}</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="label">{t('services.deliveryDate')}</label>
+                              <input type="date" className="input mt-1" name="deliveryDate" value={header.deliveryDate} onChange={handleHeaderChange} />
+                            </div>
+                          </div>
+                        </FormSectionCard>
+
+                        <FormSectionCard
+                          title={t('services.notesSectionTitle')}
+                          hint={t('services.notesSectionHint')}
+                          className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                        >
+                          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                            <div>
+                              <label className="label">{t('services.notes')}</label>
+                              <textarea
+                                className="input mt-1 h-32 resize-none"
+                                name="notes"
+                                value={header.notes}
+                                onChange={handleHeaderChange}
+                                placeholder={t('services.notesPlaceholder')}
+                              />
+                            </div>
+                            <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
+                              <FileUpload
+                                label={t('services.attachment')}
+                                initialUrl={header.attachment}
+                                onUpload={(url) => setHeader((prev) => ({ ...prev, attachment: url }))}
+                              />
+                            </div>
+                          </div>
+                        </FormSectionCard>
+
+                        <FormSectionCard
+                          title={t('services.orderInformation')}
+                          className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                        >
+                          <DynamicAttributes
+                            entityType="service"
+                            attributes={header.attributes}
+                            onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))}
+                          />
+                        </FormSectionCard>
+                      </>
+                    ) : null}
+
+                    {showItemsStep ? (
+                      <FormSectionCard
+                        title={t('services.items')}
+                        hint={t('services.itemsSectionHint')}
+                        action={<span className="text-sm font-semibold text-slate-500">{visibleItems.length} {t('services.items')}</span>}
+                        className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                      >
+                        {visibleItems.length > 0 ? (
+                          <div className="mb-4 space-y-3">
+                            {items.map((item, idx) => {
+                              const product = getProductById(item.productId);
+                              const displayName = item.description || (product ? product.name : '') || '—';
+                              const unitLabel = item.itemType === 'part' ? getUnitLabel(product, item.unitType) : '';
+
+                              if (editingItemIdx === idx && showItemForm) return null;
+                              if (isPlaceholderItem(item)) return null;
+
+                              return (
+                                <div
+                                  key={`item-row-${idx}`}
+                                  className="rounded-[24px] border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800/60 dark:bg-slate-900/40"
+                                >
+                                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-start gap-3">
+                                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}>
+                                          {item.itemType === 'labor' ? <Wrench size={18} /> : <Package size={18} />}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}>
+                                              {item.itemType === 'labor' ? t('services.serviceLine') : t('services.productLine')}
+                                            </span>
+                                            <p className="truncate font-semibold text-slate-900 dark:text-white">{displayName}</p>
+                                          </div>
+                                          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                                            <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-slate-950/50">
+                                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.qty')}</p>
+                                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{item.quantity}{unitLabel ? ` ${unitLabel}` : ''}</p>
+                                            </div>
+                                            <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-slate-950/50">
+                                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.unitPrice')}</p>
+                                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{money(item.unitPrice)}</p>
+                                            </div>
+                                            <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-slate-950/50">
+                                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.total')}</p>
+                                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{money(item.lineTotal)}</p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-2 md:pl-4">
+                                      <button
+                                        type="button"
+                                        className="btn-ghost flex-1 text-sm md:flex-none"
+                                        onClick={() => startEditItem(idx)}
+                                      >
+                                        <Pencil size={14} className="mr-1.5 inline" />
+                                        {t('common.edit')}
+                                      </button>
+                                      {items.length > 1 ? (
+                                        <button
+                                          type="button"
+                                          className="btn-ghost flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 md:flex-none dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/20"
+                                          onClick={() => removeItem(idx)}
+                                        >
+                                          <X size={14} className="mr-1.5 inline" />
+                                          {t('common.remove')}
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="mb-4 rounded-[24px] border border-dashed border-slate-300 bg-slate-50/70 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-400">
+                            {t('services.addFirstItem')}
+                          </div>
                         )}
-                      </div>
-                    )}
-                  </div>
-                </FormSectionCard>
 
-                {/* ── Meta fields ── */}
-                <FormSectionCard>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div>
-                      <label className="label">{t('services.orderNo')}</label>
-                      <input
-                        className="input mt-1"
-                        name="orderNo"
-                        value={header.orderNo}
-                        onChange={handleHeaderChange}
-                        placeholder={!editingId ? suggestedOrderNo : ''}
-                      />
-                    </div>
-                    <div>
-                      <label className="label">{t('services.status')}</label>
-                      <select className="input mt-1" name="status" value={header.status} onChange={handleHeaderChange}>
-                        <option value="open">{t('services.open')}</option>
-                        <option value="in_progress">{t('services.inProgress')}</option>
-                        <option value="closed">{t('services.closed')}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="label">{t('services.deliveryDate')}</label>
-                      <input type="date" className="input mt-1" name="deliveryDate" value={header.deliveryDate} onChange={handleHeaderChange} />
-                    </div>
-                  </div>
-                </FormSectionCard>
-
-                {/* ── Notes + Attachment ── */}
-                <FormSectionCard>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="label">{t('services.notes')}</label>
-                      <textarea
-                        className="input mt-1 h-20 resize-none"
-                        name="notes"
-                        value={header.notes}
-                        onChange={handleHeaderChange}
-                        placeholder={t('services.notesPlaceholder')}
-                      />
-                    </div>
-                    <FileUpload
-                      label={t('services.attachment')}
-                      initialUrl={header.attachment}
-                      onUpload={(url) => setHeader((prev) => ({ ...prev, attachment: url }))}
-                    />
-                  </div>
-                </FormSectionCard>
-
-                {/* ── Dynamic Attributes ── */}
-                <FormSectionCard title={t('services.orderInformation')} className="bg-slate-50/50 dark:bg-slate-900/30">
-                  <DynamicAttributes
-                    entityType="service"
-                    attributes={header.attributes}
-                    onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))}
-                  />
-                </FormSectionCard>
-
-                {/* ── Items Section ── */}
-                <FormSectionCard
-                  title={t('services.items')}
-                  action={<span className="text-xs text-slate-400">{items.length} item{items.length !== 1 ? 's' : ''}</span>}
-                >
-                  {/* Existing items as compact rows */}
-                  {items.length > 0 && (
-                    <div className="space-y-2 mb-3">
-                      {items.map((item, idx) => {
-                        const product = getProductById(item.productId);
-                        const displayName = item.description || (product ? product.name : '') || '—';
-                        return editingItemIdx === idx && showItemForm ? null : (
-                          <div
-                            key={`item-row-${idx}`}
-                            className="flex flex-col gap-3 rounded-xl border border-slate-200/70 bg-white/80 px-3 py-3 text-sm dark:border-slate-800/60 dark:bg-slate-900/60 sm:flex-row sm:items-center"
-                          >
-                            <div className="flex min-w-0 flex-1 items-start gap-2">
-                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                              }`}>
-                                {item.itemType === 'labor' ? 'Service' : 'Product'}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <span className="block truncate text-slate-700 dark:text-slate-300">{displayName}</span>
-                                <span className="mt-1 block text-xs text-slate-400">{item.quantity} {item.actualUnit} × {money(item.unitPrice)}</span>
+                        {showItemForm ? (
+                          <div className="mb-4 rounded-[28px] border border-primary-200 bg-primary-50/55 p-4 shadow-sm dark:border-primary-900/40 dark:bg-primary-900/15">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                              <div className="max-w-2xl">
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-200">{t('services.itemComposerTitle')}</p>
+                                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{t('services.itemComposerHint')}</p>
+                              </div>
+                              <div className="rounded-[22px] border border-white/70 bg-white/80 px-4 py-3 text-right dark:border-slate-800/60 dark:bg-slate-950/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.total')}</p>
+                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</p>
                               </div>
                             </div>
-                            <div className="flex items-center justify-between gap-3 sm:justify-end">
-                              <span className="shrink-0 font-semibold text-slate-800 dark:text-slate-200">{money(item.lineTotal)}</span>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  type="button"
-                                  className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
-                                  onClick={() => startEditItem(idx)}
+
+                            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                              <div>
+                                <label className="label">{t('services.type')}</label>
+                                <select
+                                  className="input mt-1"
+                                  value={itemDraft.itemType}
+                                  onChange={(e) => handleDraftChange('itemType', e.target.value)}
                                 >
-                                  <Pencil size={13} />
-                                </button>
-                                {items.length > 1 && (
-                                  <button
-                                    type="button"
-                                    className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-900/20"
-                                    onClick={() => removeItem(idx)}
-                                  >
-                                    <X size={13} />
-                                  </button>
-                                )}
+                                  <option value="labor">{t('services.serviceLine')}</option>
+                                  <option value="part">{t('services.productLine')}</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="label">{t('services.description')}</label>
+                                <input
+                                  className="input mt-1"
+                                  value={itemDraft.description}
+                                  onChange={(e) => handleDraftChange('description', e.target.value)}
+                                  placeholder={t('services.placeholderService')}
+                                />
+                              </div>
+
+                              {itemDraft.itemType === 'part' ? (
+                                <div className="sm:col-span-2">
+                                  <label className="label">{t('services.productParts')}</label>
+                                  <AsyncSearchableSelect
+                                    className="mt-1"
+                                    value={itemDraft.productId}
+                                    selectedOption={getProductById(itemDraft.productId) ? toProductLookupOption(getProductById(itemDraft.productId)) : null}
+                                    onChange={handleDraftProductSelection}
+                                    loadOptions={loadProductOptions}
+                                    placeholder={t('purchases.selectProduct')}
+                                    searchPlaceholder={t('purchases.selectProduct')}
+                                    noResultsLabel={t('common.noData')}
+                                    loadingLabel={t('common.loading')}
+                                  />
+                                </div>
+                              ) : null}
+
+                              {itemDraft.itemType === 'part' && (() => {
+                                const prod = getProductById(itemDraft.productId);
+                                return prod?.secondaryUnit ? (
+                                  <div className="sm:col-span-2">
+                                    <label className="label">{t('products.unitType')}</label>
+                                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDraftChange('unitType', 'primary', prod.primaryUnit)}
+                                        className={itemDraft.unitType === 'primary' ? 'btn-primary w-full text-sm' : 'btn-ghost w-full text-sm'}
+                                      >
+                                        {prod.primaryUnit || t('products.primaryUnit')}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDraftChange('unitType', 'secondary', prod.secondaryUnit)}
+                                        className={itemDraft.unitType === 'secondary' ? 'btn-primary w-full text-sm' : 'btn-ghost w-full text-sm'}
+                                      >
+                                        {prod.secondaryUnit} <span className="ml-1 text-xs opacity-70">({t('products.secondaryUnit')})</span>
+                                      </button>
+                                    </div>
+                                    {prod.conversionRate > 0 ? (
+                                      <p className="mt-2 text-xs text-slate-500">
+                                        1 {prod.primaryUnit} = {prod.conversionRate} {prod.secondaryUnit}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                ) : null;
+                              })()}
+
+                              <div>
+                                <label className="label">{t('services.qty')}</label>
+                                <input
+                                  className="input mt-1"
+                                  type="number"
+                                  min="0"
+                                  step="0.1"
+                                  value={itemDraft.quantity}
+                                  onChange={(e) => handleDraftChange('quantity', e.target.value)}
+                                />
+                                {itemDraft.itemType === 'part' ? (
+                                  <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(itemDraft.productId), itemDraft.unitType)}</p>
+                                ) : null}
+                              </div>
+                              <div>
+                                <label className="label">{t('services.unitPrice')}</label>
+                                <input
+                                  className="input mt-1"
+                                  type="number"
+                                  min="0"
+                                  step="0.1"
+                                  value={itemDraft.unitPrice}
+                                  onChange={(e) => handleDraftChange('unitPrice', e.target.value)}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                              <button type="button" className="btn-ghost text-sm" onClick={cancelItemForm}>
+                                {t('common.cancel')}
+                              </button>
+                              <button type="button" className="btn-primary text-sm" onClick={confirmItem}>
+                                {editingItemIdx !== null ? t('common.update') : t('common.add')}
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {!showItemForm ? (
+                          <button
+                            type="button"
+                            className="btn-ghost w-full border-2 border-dashed border-slate-300 py-3 text-slate-600 hover:border-primary-300 hover:text-primary-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-primary-600"
+                            onClick={startAddItem}
+                          >
+                            <Plus size={15} className="mr-1.5 inline" />
+                            {t('services.addLine')}
+                          </button>
+                        ) : null}
+                      </FormSectionCard>
+                    ) : null}
+
+                    {showPaymentStep ? (
+                      <FormSectionCard
+                        title={t('services.paymentSectionTitle')}
+                        hint={t('services.paymentSectionHint')}
+                        className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                      >
+                        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                          <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
+                            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                              <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.laborTotal')}</p>
+                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.laborTotal)}</p>
+                              </div>
+                              <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.partsTotal')}</p>
+                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.partsTotal)}</p>
+                              </div>
+                              <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white dark:bg-primary-900/70">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">{t('services.grandTotal')}</p>
+                                <p className="mt-1 text-xl font-semibold">{money(totals.grandTotal)}</p>
                               </div>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
 
-                  {/* Inline Add / Edit Item Form */}
-                  {showItemForm && (
-                    <div className="rounded-2xl border-2 border-primary-200 bg-primary-50/40 p-4 dark:border-primary-800/40 dark:bg-primary-900/10 mb-3">
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-primary-700 dark:text-primary-400">
-                        {editingItemIdx !== null ? 'Edit Item' : 'Add Item'}
+                          <div className="space-y-4">
+                            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                              <div>
+                                <label className="label">{t('services.amountReceived')}</label>
+                                <input
+                                  className="input mt-1"
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={isPaid ? totals.grandTotal.toFixed(2) : amountReceived}
+                                  disabled={isPaid}
+                                  onChange={(e) => setAmountReceived(e.target.value)}
+                                />
+                              </div>
+                              <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-slate-300 dark:hover:bg-slate-800/60">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded accent-primary-600"
+                                  checked={isPaid}
+                                  onChange={(e) => setIsPaid(e.target.checked)}
+                                />
+                                {t('services.fullyPaid')}
+                              </label>
+                            </div>
+
+                            {totals.due > 0 ? (
+                              <div className="rounded-[24px] border border-rose-200/70 bg-rose-50/70 px-4 py-3 dark:border-rose-900/40 dark:bg-rose-900/20">
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500 dark:text-rose-300">{t('services.dueAmount')}</p>
+                                <p className="mt-1 text-lg font-semibold text-rose-700 dark:text-rose-200">{money(totals.due)}</p>
+                              </div>
+                            ) : (
+                              <div className="rounded-[24px] border border-emerald-200/70 bg-emerald-50/70 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-900/20">
+                                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-200">{t('services.fullyPaid')}</p>
+                              </div>
+                            )}
+
+                            <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
+                              <PaymentMethodFields
+                                value={header}
+                                onChange={(patch) => setHeader((prev) => ({ ...prev, ...patch }))}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </FormSectionCard>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200/70 bg-white/90 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-6">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="rounded-2xl bg-slate-100/90 px-4 py-3 text-sm dark:bg-slate-900/70">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.summaryDue')}</p>
+                      <p className={`mt-1 font-semibold ${totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
+                        {money(totals.due)}
                       </p>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <label className="label">{t('services.type')}</label>
-                          <select
-                            className="input mt-1"
-                            value={itemDraft.itemType}
-                            onChange={(e) => handleDraftChange('itemType', e.target.value)}
-                          >
-                            <option value="labor">{'Service'}</option>
-                            <option value="part">{'Product'}</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="label">{t('services.description')}</label>
-                          <input
-                            className="input mt-1"
-                            value={itemDraft.description}
-                            onChange={(e) => handleDraftChange('description', e.target.value)}
-                            placeholder={t('services.placeholderService')}
-                          />
-                        </div>
-                        {itemDraft.itemType === 'part' && (
-                          <div className="sm:col-span-2">
-                            <label className="label">{t('services.productParts')}</label>
-                            <AsyncSearchableSelect
-                              className="mt-1"
-                              value={itemDraft.productId}
-                              selectedOption={getProductById(itemDraft.productId) ? toProductLookupOption(getProductById(itemDraft.productId)) : null}
-                              onChange={handleDraftProductSelection}
-                              loadOptions={loadProductOptions}
-                              placeholder={t('purchases.selectProduct')}
-                              searchPlaceholder={t('purchases.selectProduct')}
-                              noResultsLabel={t('common.noData')}
-                              loadingLabel={t('common.loading')}
-                            />
-                          </div>
-                        )}
-                        {/* Unit type selector — only when product has a secondary unit */}
-                        {itemDraft.itemType === 'part' && (() => {
-                          const prod = getProductById(itemDraft.productId);
-                          return prod?.secondaryUnit ? (
-                            <div className="sm:col-span-2">
-                              <label className="label">{t('products.unitType')}</label>
-                              <div className="mt-1 flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDraftChange('unitType', 'primary', prod.primaryUnit)}
-                                  className={itemDraft.unitType === 'primary' ? 'btn-primary flex-1 text-sm' : 'btn-ghost flex-1 text-sm'}
-                                >
-                                  {prod.primaryUnit || t('products.primaryUnit')}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDraftChange('unitType', 'secondary', prod.secondaryUnit)}
-                                  className={itemDraft.unitType === 'secondary' ? 'btn-primary flex-1 text-sm' : 'btn-ghost flex-1 text-sm'}
-                                >
-                                  {prod.secondaryUnit} <span className="opacity-60 text-xs ml-1">({t('products.secondaryUnit')})</span>
-                                </button>
-                              </div>
-                              {prod.conversionRate > 0 && (
-                                <p className="mt-1 text-xs text-slate-500">
-                                  1 {prod.primaryUnit} = {prod.conversionRate} {prod.secondaryUnit}
-                                </p>
-                              )}
-                            </div>
-                          ) : null;
-                        })()}
-                        <div>
-                          <label className="label">{t('services.qty')}</label>
-                          <input
-                            className="input mt-1"
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={itemDraft.quantity}
-                            onChange={(e) => handleDraftChange('quantity', e.target.value)}
-                          />
-                          {itemDraft.itemType === 'part' && (
-                            <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(itemDraft.productId), itemDraft.unitType)}</p>
-                          )}
-                        </div>
-                        <div>
-                          <label className="label">{t('services.unitPrice')}</label>
-                          <input
-                            className="input mt-1"
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={itemDraft.unitPrice}
-                            onChange={(e) => handleDraftChange('unitPrice', e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <span className="text-sm text-slate-600 dark:text-slate-300">
-                          Total: <strong className="text-slate-800 dark:text-slate-200">{money(itemDraft.lineTotal)}</strong>
-                        </span>
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          <button type="button" className="btn-ghost text-sm" onClick={cancelItemForm}>
-                            Cancel
-                          </button>
-                          <button type="button" className="btn-primary text-sm" onClick={confirmItem}>
-                            {editingItemIdx !== null ? 'Update' : 'Add'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {!showItemForm && (
-                    <button
-                      type="button"
-                      className="btn-ghost w-full border-2 border-dashed border-slate-200 text-slate-500 hover:border-primary-300 hover:text-primary-700 dark:border-slate-700 dark:hover:border-primary-600"
-                      onClick={startAddItem}
-                    >
-                      <Plus size={15} className="mr-1.5 inline" />
-                      {t('services.addLine')}
-                    </button>
-                  )}
-                </FormSectionCard>
-
-                {/* ── Totals + Payment ── */}
-                <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
-                  <div className="grid gap-2 text-sm sm:grid-cols-3">
-                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
-                      <span className="text-slate-500">{t('services.laborTotal')}</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{money(totals.laborTotal)}</span>
-                    </div>
-                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
-                      <span className="text-slate-500">{t('services.partsTotal')}</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{money(totals.partsTotal)}</span>
-                    </div>
-                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
-                      <span className="text-slate-500">{t('services.grandTotal')}</span>
-                      <span className="text-lg font-bold text-slate-900 dark:text-white">{money(totals.grandTotal)}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-700/60">
-                    <div className="flex flex-wrap items-end gap-3">
-                      <div className="flex-1 min-w-[140px]">
-                        <label className="label">{t('services.amountReceived')}</label>
-                        <input
-                          className="input mt-1"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={isPaid ? totals.grandTotal.toFixed(2) : amountReceived}
-                          disabled={isPaid}
-                          onChange={(e) => setAmountReceived(e.target.value)}
-                        />
-                      </div>
-                      <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800/40">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 rounded accent-primary-600"
-                          checked={isPaid}
-                          onChange={(e) => setIsPaid(e.target.checked)}
-                        />
-                        {t('services.fullyPaid')}
-                      </label>
                     </div>
 
-                    {totals.due > 0 && (
-                      <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-2.5 text-sm dark:border-rose-800/40 dark:bg-rose-900/20">
-                        <span className="text-rose-500 dark:text-rose-400">{t('services.dueAmount')}:</span>
-                        <span className="font-bold text-rose-700 dark:text-rose-300">{money(totals.due)}</span>
-                      </div>
-                    )}
-
-                    <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-700/60">
-                      <PaymentMethodFields
-                        value={header}
-                        onChange={(patch) => setHeader((prev) => ({ ...prev, ...patch }))}
-                      />
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row">
+                      <button type="button" className="btn-ghost w-full sm:w-auto" onClick={closeDialog}>
+                        {t('common.cancel')}
+                      </button>
+                      <button type="submit" className="btn-primary w-full sm:w-auto" disabled={editLoading}>
+                        {editingId ? t('common.update') : t('services.saveOrder')}
+                        <ArrowRight size={14} className="ml-1.5 inline" />
+                      </button>
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Dialog footer */}
-              <div className="flex flex-col-reverse gap-3 border-t border-slate-200/70 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] dark:border-slate-800/70 md:flex-row md:justify-end md:px-5 md:pb-4">
-                <button type="button" className="btn-ghost w-full sm:w-auto" onClick={closeDialog}>
-                  {t('common.cancel')}
-                </button>
-                <button type="submit" className="btn-primary w-full sm:w-auto" disabled={editLoading}>
-                  {editingId ? t('common.update') : t('services.saveOrder')}
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
         </div>
       )}
