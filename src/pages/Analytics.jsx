@@ -3,6 +3,8 @@ import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import BarGraph from '../components/BarGraph';
 import PieChart from '../components/PieChart';
+import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
+import CreatorFilterSelect from '../components/CreatorFilterSelect.jsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 import dayjs, { todayISODate } from '../lib/datetime';
@@ -216,7 +218,10 @@ export default function Analytics() {
     fromDate: dayjs().startOf('month').format('YYYY-MM-DD'),
     toDate: todayISODate(),
     groupBy: 'auto',
+    partyId: '',
+    createdBy: '',
   });
+  const [selectedPartyFilterOption, setSelectedPartyFilterOption] = useState(null);
 
   useEffect(() => {
     let isActive = true;
@@ -228,6 +233,8 @@ export default function Analytics() {
       from: filters.fromDate || undefined,
       to: filters.toDate || undefined,
       groupBy: filters.groupBy || 'auto',
+      partyId: filters.partyId || undefined,
+      createdBy: filters.createdBy || undefined,
     })
       .then((data) => {
         if (!isActive) return;
@@ -246,11 +253,16 @@ export default function Analytics() {
     return () => {
       isActive = false;
     };
-  }, [filters.fromDate, filters.groupBy, filters.toDate]);
+  }, [filters.createdBy, filters.fromDate, filters.groupBy, filters.partyId, filters.toDate]);
 
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handlePartyFilterChange = (option) => {
+    setSelectedPartyFilterOption(option || null);
+    setFilters((prev) => ({ ...prev, partyId: option?.value || '' }));
   };
 
   const formatMoney = (value) => {
@@ -327,7 +339,7 @@ export default function Analytics() {
       {status ? <Notice title={status} tone="error" /> : null}
 
       <div className="card space-y-4">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <div>
             <label className="label">{t('common.from')}</label>
             <input
@@ -356,6 +368,26 @@ export default function Analytics() {
               <option value="week">{t('analytics.filters.week')}</option>
               <option value="month">{t('analytics.filters.month')}</option>
             </select>
+          </div>
+          <div>
+            <label className="label">{t('services.filterByParty')}</label>
+            <PartyFilterSelect
+              className="mt-1"
+              type="customer"
+              value={filters.partyId}
+              selectedOption={selectedPartyFilterOption}
+              onChange={handlePartyFilterChange}
+              placeholder={t('services.allParties')}
+              searchPlaceholder={t('parties.searchPlaceholder')}
+            />
+          </div>
+          <div>
+            <label className="label">{t('filters.createdBy')}</label>
+            <CreatorFilterSelect
+              className="mt-1"
+              value={filters.createdBy}
+              onChange={(value) => setFilters((prev) => ({ ...prev, createdBy: value }))}
+            />
           </div>
         </div>
         <p className="text-xs text-slate-500">{loading ? t('common.loading') : seriesCaption}</p>

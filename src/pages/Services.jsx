@@ -4,10 +4,11 @@ import Pagination from '../components/Pagination';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
-import SearchableSelect from '../components/SearchableSelect';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import InvoiceHeader from '../components/InvoiceHeader';
 import MobileFormStepper from '../components/MobileFormStepper.jsx';
+import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
+import CreatorFilterSelect from '../components/CreatorFilterSelect.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
@@ -74,8 +75,81 @@ const makeEmptyHeader = () => ({
   bankId: '',
   paymentNote: '',
   attachment: '',
+  attachments: [],
   attributes: {},
 });
+
+function normalizeAttachmentUrls(...values) {
+  const next = [];
+  const seen = new Set();
+
+  const addValue = (value) => {
+    if (!value) return;
+
+    if (Array.isArray(value)) {
+      value.forEach(addValue);
+      return;
+    }
+
+    const normalized = String(value).trim();
+    if (!normalized || seen.has(normalized)) return;
+
+    seen.add(normalized);
+    next.push(normalized);
+  };
+
+  values.forEach(addValue);
+  return next;
+}
+
+function getServiceAttachmentUrls(record) {
+  return normalizeAttachmentUrls(record?.attachments, record?.attachment);
+}
+
+function isPdfAttachment(url) {
+  return /\.pdf(?:$|[?#])/i.test(String(url || ''));
+}
+
+function AttachmentPreview({ url, onOpen, size = 'sm' }) {
+  const sizeClass = size === 'lg' ? 'h-24 w-24' : size === 'md' ? 'h-14 w-14' : 'h-9 w-9';
+
+  return (
+    <button
+      type="button"
+      className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:opacity-80 dark:border-slate-800 dark:bg-slate-900 ${sizeClass}`}
+      onClick={() => onOpen(url)}
+    >
+      {isPdfAttachment(url) ? (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-slate-900/90 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white dark:bg-slate-100 dark:text-slate-900">
+          <FileText size={14} />
+          PDF
+        </div>
+      ) : (
+        <img src={url} alt="Attachment" className="h-full w-full object-cover" />
+      )}
+    </button>
+  );
+}
+
+function AttachmentStrip({ urls = [], onOpen, maxVisible = 3, size = 'sm' }) {
+  if (!urls.length) return null;
+
+  const visibleUrls = urls.slice(0, maxVisible);
+  const hiddenCount = urls.length - visibleUrls.length;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {visibleUrls.map((url) => (
+        <AttachmentPreview key={url} url={url} onOpen={onOpen} size={size} />
+      ))}
+      {hiddenCount > 0 ? (
+        <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-2xl bg-slate-100 px-2 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+          +{hiddenCount}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 function getDeliveryDaysLeft(deliveryDate) {
   if (!deliveryDate) return null;
@@ -276,6 +350,8 @@ export default function Services() {
 
   // ── Party filter ──
   const [partyFilterId, setPartyFilterId] = useState('');
+  const [selectedPartyFilterOption, setSelectedPartyFilterOption] = useState(null);
+  const [createdByFilterId, setCreatedByFilterId] = useState('');
 
   // ── Edit state ──
   const [editingId, setEditingId] = useState(null);
@@ -311,25 +387,28 @@ export default function Services() {
   const [itemDraft, setItemDraft] = useState({ ...emptyItem });
   const [editingItemIdx, setEditingItemIdx] = useState(null);
   const [mobileStep, setMobileStep] = useState('details');
+  const [mobileSummaryExpanded, setMobileSummaryExpanded] = useState(false);
+  const listParams = useMemo(() => ({
+    limit: 50,
+    ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+    ...(partyFilterId ? { partyId: partyFilterId } : {}),
+    ...(createdByFilterId ? { createdBy: createdByFilterId } : {}),
+  }), [createdByFilterId, partyFilterId, statusFilter]);
 
   // ── Load services list ──
   const loadServices = () => {
-    const params = { limit: 50 };
-    if (statusFilter !== 'all') params.status = statusFilter;
-    invalidateServices(params);
-    fetchServices(params, true).catch((err) => setListError(err.message));
+    invalidateServices(listParams);
+    fetchServices(listParams, true).catch((err) => setListError(err.message));
   };
 
   useEffect(() => {
     if (!businessId) return;
-    const params = { limit: 50 };
-    if (statusFilter !== 'all') params.status = statusFilter;
-    fetchServices(params).catch((err) => setListError(err.message));
-  }, [businessId, fetchServices, statusFilter]);
+    fetchServices(listParams).catch((err) => setListError(err.message));
+  }, [businessId, fetchServices, listParams]);
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter, partyFilterId]);
+  }, [createdByFilterId, partyFilterId, statusFilter]);
 
   useEffect(() => {
     const search = debouncedPartyQuery.trim();
@@ -401,6 +480,17 @@ export default function Services() {
   useEffect(() => {
     if (isPaid) setAmountReceived(totals.grandTotal.toFixed(2));
   }, [isPaid, totals.grandTotal]);
+
+  useEffect(() => {
+    if (!dialogOpen || !isMobile) return undefined;
+    setMobileSummaryExpanded(false);
+    const node = formScrollRef.current;
+    if (!node) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      node.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [dialogOpen, isMobile, mobileStep]);
 
   // ── Product helpers ──
   const getProductById = (id) => {
@@ -681,6 +771,7 @@ export default function Services() {
     setSuggestedOrderNo('');
     setProductDirectory({});
     setMobileStep('details');
+    setMobileSummaryExpanded(false);
   };
 
   const openDialog = async () => {
@@ -724,7 +815,8 @@ export default function Services() {
         notes: full.notes || '',
         deliveryDate: toDateInputValue(full.deliveryDate) || todayISODate(),
         ...normalizePaymentFields(full),
-        attachment: full.attachment || '',
+        attachment: normalizeAttachmentUrls(full.attachments, full.attachment)[0] || '',
+        attachments: normalizeAttachmentUrls(full.attachments, full.attachment),
         attributes: full.attributes || {},
       });
       cacheProducts(hydratedProducts);
@@ -767,6 +859,11 @@ export default function Services() {
     setMobileStep(formSteps[mobileStepIndex - 1].id);
   };
 
+  const handlePartyFilterChange = (option) => {
+    setPartyFilterId(option?.value || '');
+    setSelectedPartyFilterOption(option || null);
+  };
+
   // ── Submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -787,8 +884,11 @@ export default function Services() {
     try {
       const manualOrderNo = String(header.orderNo || '').trim();
       const { paymentMethod, bankId, paymentNote, ...headerFields } = header;
+      const attachmentUrls = normalizeAttachmentUrls(header.attachments, header.attachment);
       const payload = {
         ...headerFields,
+        attachments: attachmentUrls,
+        ...(attachmentUrls[0] ? { attachment: attachmentUrls[0] } : {}),
         laborTotal: totals.laborTotal,
         partsTotal: totals.partsTotal,
         subTotal: totals.subTotal,
@@ -829,24 +929,8 @@ export default function Services() {
     }
   };
 
-  // ── Unique parties from service list (for filter dropdown) ──
-  const serviceParties = useMemo(() => {
-    const seen = new Set();
-    const result = [];
-    safeServiceList.forEach((order) => {
-      const id = order.partyId;
-      if (!id || seen.has(id)) return;
-      seen.add(id);
-      result.push({ id, name: order.partyName || order.Party?.name || id });
-    });
-    return result.sort((a, b) => a.name.localeCompare(b.name));
-  }, [safeServiceList]);
-
-  // ── Filtered + paged service list ──
-  const filteredServiceList = useMemo(() => {
-    if (!partyFilterId) return safeServiceList;
-    return safeServiceList.filter((order) => order.partyId === partyFilterId);
-  }, [safeServiceList, partyFilterId]);
+  // ── Paged service list ──
+  const filteredServiceList = safeServiceList;
 
   const pagedServices = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -957,6 +1041,7 @@ export default function Services() {
   const money = (val) =>
     t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(val || 0).toFixed(2) });
 
+  const formScrollRef = useRef(null);
   const invoicePrintRef = useRef(null);
 
   const handlePrint = () => {
@@ -981,6 +1066,10 @@ export default function Services() {
   const dialogTitle = editingId ? t('services.editOrder') : t('services.newOrder');
   const summaryOrderNo = header.orderNo || suggestedOrderNo || '—';
   const summaryDeliveryDate = header.deliveryDate ? formatMaybeDate(header.deliveryDate, 'D MMM YYYY') : '—';
+  const invoiceAttachmentUrls = invoiceOrder ? getServiceAttachmentUrls(invoiceOrder) : [];
+  const mobilePrimaryActionLabel = canGoForwardStep
+    ? t('common.continue')
+    : editingId ? t('common.update') : t('services.saveOrder');
 
   // ── Render ──
   return (
@@ -1021,17 +1110,27 @@ export default function Services() {
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('services.browseOrdersHint')}</p>
             </div>
 
-            <div className="w-full xl:max-w-sm">
-              <SearchableSelect
-                className="w-full"
-                options={[
-                  { value: '', label: t('services.filterByParty') },
-                  ...serviceParties.map((p) => ({ value: p.id, label: p.name })),
-                ]}
-                value={partyFilterId}
-                onChange={setPartyFilterId}
-                placeholder={t('services.filterByParty')}
-              />
+            <div className="grid w-full gap-3 xl:max-w-2xl xl:grid-cols-2">
+              <div>
+                <label className="label">{t('services.filterByParty')}</label>
+                <PartyFilterSelect
+                  className="mt-1"
+                  type="customer"
+                  value={partyFilterId}
+                  selectedOption={selectedPartyFilterOption}
+                  onChange={handlePartyFilterChange}
+                  placeholder={t('services.allParties')}
+                  searchPlaceholder={t('parties.searchPlaceholder')}
+                />
+              </div>
+              <div>
+                <label className="label">{t('filters.createdBy')}</label>
+                <CreatorFilterSelect
+                  className="mt-1"
+                  value={createdByFilterId}
+                  onChange={setCreatedByFilterId}
+                />
+              </div>
             </div>
           </div>
 
@@ -1058,6 +1157,7 @@ export default function Services() {
                 const due = Math.max(Number(order.grandTotal || 0) - Number(order.receivedTotal || 0), 0);
                 const days = getDeliveryDaysLeft(order.deliveryDate);
                 const isUrgent = order.status !== 'closed' && days !== null && days < 3;
+                const attachmentUrls = getServiceAttachmentUrls(order);
 
                 return (
                   <div
@@ -1142,15 +1242,13 @@ export default function Services() {
                       </button>
                     </div>
 
-                    {order.attachment ? (
-                      <button
-                        type="button"
-                        className="mt-2 inline-flex items-center gap-2 text-xs font-medium text-primary-700 dark:text-primary-300"
-                        onClick={() => setLightboxUrl(order.attachment)}
-                      >
-                        <FileText size={12} />
-                        {t('services.attachment')}
-                      </button>
+                    {attachmentUrls.length > 0 ? (
+                      <div className="mt-3">
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          {t('services.attachment')}
+                        </p>
+                        <AttachmentStrip urls={attachmentUrls} onOpen={setLightboxUrl} size="md" />
+                      </div>
                     ) : null}
                   </div>
                 );
@@ -1194,6 +1292,7 @@ export default function Services() {
                         ? 'border-t border-amber-200/60 bg-amber-50/40 dark:border-amber-900/30 dark:bg-amber-950/10'
                         : 'border-t border-slate-200/70 dark:border-slate-800/70';
                     const due = Math.max(Number(order.grandTotal || 0) - Number(order.receivedTotal || 0), 0);
+                    const attachmentUrls = getServiceAttachmentUrls(order);
 
                     return (
                       <tr key={order.id} className={rowClass}>
@@ -1214,15 +1313,8 @@ export default function Services() {
                           <PaymentTypeSummary source={order} />
                         </td>
                         <td className="py-3 pr-2">
-                          {order.attachment ? (
-                            <button type="button" onClick={() => setLightboxUrl(order.attachment)}>
-                              <img
-                                src={order.attachment}
-                                alt="attach"
-                                className="h-9 w-9 rounded-2xl border border-slate-200 object-cover transition hover:opacity-80 dark:border-slate-800"
-                                onError={(e) => { e.target.style.display = 'none'; }}
-                              />
-                            </button>
+                          {attachmentUrls.length > 0 ? (
+                            <AttachmentStrip urls={attachmentUrls} onOpen={setLightboxUrl} maxVisible={2} />
                           ) : (
                             <span className="text-slate-300">—</span>
                           )}
@@ -1292,7 +1384,7 @@ export default function Services() {
               </div>
 
               <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-6">
+                <div ref={formScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-6">
                   <div className="space-y-4">
                     {formNotice.message ? (
                       <Notice title={formNotice.message} tone={formNotice.type} />
@@ -1304,32 +1396,96 @@ export default function Services() {
                       </div>
                     ) : null}
 
-                    <div className="rounded-[30px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.18),transparent_45%),linear-gradient(140deg,rgba(255,255,255,0.98),rgba(249,245,239,0.95))] p-4 shadow-sm shadow-primary-950/10 dark:border-primary-900/40 dark:bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.16),transparent_45%),linear-gradient(140deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] md:p-5">
-                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div className="min-w-0">
-                          <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/75 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary-700 dark:border-slate-800/60 dark:bg-slate-950/50 dark:text-primary-200">
-                            <Sparkles size={12} />
-                            {dialogTitle}
-                          </div>
-                          <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                            {summaryOrderNo} · {summaryDeliveryDate}
-                          </p>
-                        </div>
-                        <StatusBadge status={header.status} />
-                      </div>
+                    {isMobile ? (
+                      <div className="rounded-[28px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.16),transparent_48%),linear-gradient(140deg,rgba(255,255,255,0.98),rgba(249,245,239,0.95))] p-4 shadow-sm shadow-primary-950/10 dark:border-primary-900/40 dark:bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.14),transparent_48%),linear-gradient(140deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))]">
+                        <button
+                          type="button"
+                          onClick={() => setMobileSummaryExpanded((prev) => !prev)}
+                          aria-expanded={mobileSummaryExpanded}
+                          className="w-full text-left"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/75 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:border-slate-800/60 dark:bg-slate-950/50 dark:text-primary-200">
+                                  <Sparkles size={12} />
+                                  {t('services.summaryCard')}
+                                </div>
+                                <StatusBadge status={header.status} />
+                              </div>
+                              <p className="mt-3 truncate text-base font-semibold text-slate-900 dark:text-white">
+                                {selectedParty?.name || summaryOrderNo}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                {summaryOrderNo} · {summaryDeliveryDate}
+                              </p>
+                            </div>
 
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <SummaryPill icon={UserRound} label={t('services.summaryCustomer')} value={selectedParty?.name || '—'} />
-                        <SummaryPill icon={CalendarDays} label={t('services.summaryDelivery')} value={summaryDeliveryDate} />
-                        <SummaryPill icon={Package} label={t('services.summaryItems')} value={visibleItems.length || 0} />
-                        <SummaryPill
-                          icon={Wallet}
-                          label={t('services.summaryDue')}
-                          value={money(totals.due)}
-                          valueClassName={totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}
-                        />
+                            <div className="shrink-0 text-right">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                {t('services.summaryDue')}
+                              </p>
+                              <p className={`mt-1 text-base font-semibold ${totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
+                                {money(totals.due)}
+                              </p>
+                              <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 dark:text-primary-200">
+                                {visibleItems.length} {t('services.summaryItems')}
+                                <ChevronDown
+                                  size={14}
+                                  className={`transition ${mobileSummaryExpanded ? 'rotate-180' : ''}`}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+
+                        {mobileSummaryExpanded ? (
+                          <div className="mt-4 grid grid-cols-2 gap-3">
+                            <SummaryPill icon={UserRound} label={t('services.summaryCustomer')} value={selectedParty?.name || '—'} />
+                            <SummaryPill icon={CalendarDays} label={t('services.summaryDelivery')} value={summaryDeliveryDate} />
+                            <SummaryPill icon={Package} label={t('services.summaryItems')} value={visibleItems.length || 0} />
+                            <SummaryPill
+                              icon={Wallet}
+                              label={t('services.summaryDue')}
+                              value={money(totals.due)}
+                              valueClassName={totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}
+                            />
+                          </div>
+                        ) : (
+                          <div className="mt-3 flex items-center gap-2 rounded-2xl bg-white/55 px-3 py-2 text-xs text-slate-600 dark:bg-slate-950/35 dark:text-slate-300">
+                            <CalendarDays size={13} className="text-primary-700 dark:text-primary-200" />
+                            <span>{t('services.summaryDelivery')}: {summaryDeliveryDate}</span>
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    ) : (
+                      <div className="rounded-[30px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.18),transparent_45%),linear-gradient(140deg,rgba(255,255,255,0.98),rgba(249,245,239,0.95))] p-4 shadow-sm shadow-primary-950/10 dark:border-primary-900/40 dark:bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.16),transparent_45%),linear-gradient(140deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] md:p-5">
+                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                          <div className="min-w-0">
+                            <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/75 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary-700 dark:border-slate-800/60 dark:bg-slate-950/50 dark:text-primary-200">
+                              <Sparkles size={12} />
+                              {dialogTitle}
+                            </div>
+                            <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
+                              {summaryOrderNo} · {summaryDeliveryDate}
+                            </p>
+                          </div>
+                          <StatusBadge status={header.status} />
+                        </div>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <SummaryPill icon={UserRound} label={t('services.summaryCustomer')} value={selectedParty?.name || '—'} />
+                          <SummaryPill icon={CalendarDays} label={t('services.summaryDelivery')} value={summaryDeliveryDate} />
+                          <SummaryPill icon={Package} label={t('services.summaryItems')} value={visibleItems.length || 0} />
+                          <SummaryPill
+                            icon={Wallet}
+                            label={t('services.summaryDue')}
+                            value={money(totals.due)}
+                            valueClassName={totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {isMobile ? (
                       <MobileFormStepper
@@ -1341,6 +1497,7 @@ export default function Services() {
                         canProceed={!editLoading}
                         backLabel={t('common.back')}
                         nextLabel={mobileStep === 'items' ? t('services.paymentStep') : t('common.continue')}
+                        showNavigation={false}
                       />
                     ) : null}
 
@@ -1524,8 +1681,13 @@ export default function Services() {
                             <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
                               <FileUpload
                                 label={t('services.attachment')}
-                                initialUrl={header.attachment}
-                                onUpload={(url) => setHeader((prev) => ({ ...prev, attachment: url }))}
+                                multiple
+                                initialUrls={header.attachments}
+                                onUpload={(urls) => setHeader((prev) => ({
+                                  ...prev,
+                                  attachments: Array.isArray(urls) ? urls : normalizeAttachmentUrls(urls),
+                                  attachment: Array.isArray(urls) ? (urls[0] || '') : String(urls || ''),
+                                }))}
                               />
                             </div>
                           </div>
@@ -1868,24 +2030,67 @@ export default function Services() {
                 </div>
 
                 <div className="border-t border-slate-200/70 bg-white/90 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-6">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="rounded-2xl bg-slate-100/90 px-4 py-3 text-sm dark:bg-slate-900/70">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.summaryDue')}</p>
-                      <p className={`mt-1 font-semibold ${totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
-                        {money(totals.due)}
-                      </p>
-                    </div>
+                  {isMobile ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-100/90 px-4 py-3 text-sm dark:bg-slate-900/70">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            {formSteps[mobileStepIndex]?.label || t('services.detailStep')}
+                          </p>
+                          <p className="mt-1 truncate font-semibold text-slate-700 dark:text-slate-200">
+                            {summaryOrderNo}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                            {t('services.summaryDue')}
+                          </p>
+                          <p className={`mt-1 font-semibold ${totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
+                            {money(totals.due)}
+                          </p>
+                        </div>
+                      </div>
 
-                    <div className="flex flex-col-reverse gap-3 sm:flex-row">
-                      <button type="button" className="btn-ghost w-full sm:w-auto" onClick={closeDialog}>
-                        {t('common.cancel')}
-                      </button>
-                      <button type="submit" className="btn-primary w-full sm:w-auto" disabled={editLoading}>
-                        {editingId ? t('common.update') : t('services.saveOrder')}
-                        <ArrowRight size={14} className="ml-1.5 inline" />
-                      </button>
+                      <div className={`grid gap-3 ${canGoBackStep ? 'grid-cols-[minmax(0,0.72fr)_minmax(0,1fr)]' : 'grid-cols-1'}`}>
+                        {canGoBackStep ? (
+                          <button type="button" className="btn-ghost w-full" onClick={goToPreviousMobileStep} disabled={editLoading}>
+                            {t('common.back')}
+                          </button>
+                        ) : null}
+
+                        {canGoForwardStep ? (
+                          <button type="button" className="btn-primary w-full" onClick={goToNextMobileStep} disabled={editLoading}>
+                            {mobilePrimaryActionLabel}
+                            <ArrowRight size={14} className="ml-1.5 inline" />
+                          </button>
+                        ) : (
+                          <button type="submit" className="btn-primary w-full" disabled={editLoading}>
+                            {mobilePrimaryActionLabel}
+                            <Check size={14} className="ml-1.5 inline" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div className="rounded-2xl bg-slate-100/90 px-4 py-3 text-sm dark:bg-slate-900/70">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.summaryDue')}</p>
+                        <p className={`mt-1 font-semibold ${totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
+                          {money(totals.due)}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col-reverse gap-3 sm:flex-row">
+                        <button type="button" className="btn-ghost w-full sm:w-auto" onClick={closeDialog}>
+                          {t('common.cancel')}
+                        </button>
+                        <button type="submit" className="btn-primary w-full sm:w-auto" disabled={editLoading}>
+                          {editingId ? t('common.update') : t('services.saveOrder')}
+                          <ArrowRight size={14} className="ml-1.5 inline" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </form>
             </div>
@@ -1899,7 +2104,7 @@ export default function Services() {
           <button type="button" className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onClick={() => setLightboxUrl(null)}>
             <X size={20} />
           </button>
-          {lightboxUrl.toLowerCase().endsWith('.pdf') ? (
+          {isPdfAttachment(lightboxUrl) ? (
             <a href={lightboxUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-white px-6 py-4 text-slate-800 font-semibold" onClick={(e) => e.stopPropagation()}>
               Open PDF in new tab
             </a>
@@ -2041,20 +2246,10 @@ export default function Services() {
                 </div>
 
                 {/* ── Attachment ── */}
-                {invoiceOrder.attachment && (
+                {invoiceAttachmentUrls.length > 0 && (
                   <div className="border-t border-slate-200/70 px-8 py-5 dark:border-slate-800/70">
                     <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Attachment</p>
-                    {invoiceOrder.attachment.toLowerCase().endsWith('.pdf') ? (
-                      <a href={invoiceOrder.attachment} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-primary-700 hover:underline">
-                        <FileText size={16} /> View attached PDF
-                      </a>
-                    ) : (
-                      <img
-                        src={invoiceOrder.attachment}
-                        alt="Attachment"
-                        className="max-h-56 rounded-xl border border-slate-200 object-contain dark:border-slate-800"
-                      />
-                    )}
+                    <AttachmentStrip urls={invoiceAttachmentUrls} onOpen={setLightboxUrl} maxVisible={4} size="lg" />
                   </div>
                 )}
 

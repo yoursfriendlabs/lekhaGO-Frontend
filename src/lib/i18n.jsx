@@ -15,6 +15,7 @@ const dictionaries = {
       back: 'Back',
       continue: 'Continue',
       details: 'Details',
+      from: 'From',
       uploadHint: 'Upload your bill or attachment here',
       cancel: 'Cancel',
       change: 'Change',
@@ -43,6 +44,7 @@ const dictionaries = {
       search: 'Search',
       status: 'Status',
       total: 'Total',
+      to: 'To',
       view: 'View',
       yes: 'Yes',
       no: 'No',
@@ -59,6 +61,10 @@ const dictionaries = {
       expenseLineRequired: 'Add at least one expense line with an amount.',
       conversionRequired: 'Set a conversion rate for the secondary unit.',
       phoneMinDigits: 'Phone number must be at least 10 digits.',
+    },
+    filters: {
+      createdBy: 'Created by',
+      allCreators: 'All creators',
     },
     currency: {
       symbol: 'Rs',
@@ -479,7 +485,7 @@ const dictionaries = {
     },
     services: {
       title: 'Sales & Service',
-      subtitle: 'Run service jobs and product charges from one mobile-first workspace.',
+      subtitle: 'Create or update you sales and service.',
       workspaceLabel: 'Sales & service workspace',
       totalOrders: 'Total orders',
       activeJobs: 'In progress',
@@ -980,6 +986,7 @@ const dictionaries = {
       create: 'सिर्जना गर्नुहोस्',
       date: 'मिति',
       details: 'विवरण',
+      from: 'देखि',
       due: 'बक्यौता',
       edit: 'सम्पादन',
       filter: 'फिल्टर',
@@ -1001,9 +1008,14 @@ const dictionaries = {
       search: 'खोज्नुहोस्',
       status: 'स्थिति',
       total: 'जम्मा',
+      to: 'सम्म',
       view: 'हेर्नुहोस्',
       yes: 'हो',
       no: 'होइन',
+    },
+    filters: {
+      createdBy: 'सिर्जना गर्ने',
+      allCreators: 'सबै सिर्जनाकर्ता',
     },
     currency: {
       symbol: 'रु',

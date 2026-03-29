@@ -1,4 +1,14 @@
-export default function MobileFormStepper({ steps = [], currentStep, onStepChange, onNext, onBack, canProceed = true, nextLabel = 'Continue', backLabel = 'Back' }) {
+export default function MobileFormStepper({
+  steps = [],
+  currentStep,
+  onStepChange,
+  onNext,
+  onBack,
+  canProceed = true,
+  nextLabel = 'Continue',
+  backLabel = 'Back',
+  showNavigation = true,
+}) {
   const currentIndex = Math.max(steps.findIndex((step) => step.id === currentStep), 0);
   const isFirstStep = currentIndex === 0;
   const isLastStep = currentIndex === steps.length - 1;
@@ -33,32 +43,33 @@ export default function MobileFormStepper({ steps = [], currentStep, onStepChang
         })}
       </div>
       
-      {/* Navigation buttons */}
-      <div className="mt-4 flex gap-2 border-t border-slate-200/70 pt-3">
-        {!isFirstStep && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-          >
-            {backLabel}
-          </button>
-        )}
-        {!isLastStep && (
-          <button
-            type="button"
-            onClick={onNext}
-            disabled={!canProceed}
-            className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-95 ${
-              canProceed
-                ? 'bg-primary text-white hover:bg-primary-600'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            {nextLabel}
-          </button>
-        )}
-      </div>
+      {showNavigation ? (
+        <div className="mt-4 flex gap-2 border-t border-slate-200/70 pt-3">
+          {!isFirstStep && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition active:scale-95 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            >
+              {backLabel}
+            </button>
+          )}
+          {!isLastStep && (
+            <button
+              type="button"
+              onClick={onNext}
+              disabled={!canProceed}
+              className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-95 ${
+                canProceed
+                  ? 'bg-primary text-white hover:bg-primary-600'
+                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              {nextLabel}
+            </button>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

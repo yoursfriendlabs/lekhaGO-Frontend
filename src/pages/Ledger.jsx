@@ -4,7 +4,7 @@ import { Download, Printer } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
-import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
+import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import { API_BASE, api } from '../lib/api';
 import { useBusinessSettings } from '../lib/businessSettings';
@@ -198,18 +198,6 @@ export default function Ledger() {
   }, [biz?.logoUrl]);
   const balanceToneClass = getBalanceToneClass(summary.currentBalance);
   const balanceLabel = getBalanceLabel(summary.currentBalance, t);
-
-  const loadPartyOptions = async (search) => {
-    const primary = await api.lookupParties({ search, limit: 10 });
-    const primaryItems = Array.isArray(primary?.items) ? primary.items : [];
-
-    if (primaryItems.length > 0) {
-      return primaryItems.map((party) => toPartyLookupOption(party));
-    }
-
-    const fallback = await api.lookupParties({ search, type: 'both', limit: 10 });
-    return (fallback?.items || []).map((party) => toPartyLookupOption(party));
-  };
 
   const handlePartyFilterChange = (option) => {
     const partyId = option?.value || '';
@@ -434,17 +422,13 @@ export default function Ledger() {
             <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_180px]">
               <div>
                 <label className="label">{t('ledger.party')}</label>
-                <AsyncSearchableSelect
+                <PartyFilterSelect
                   className="mt-1"
                   value={selectedPartyId}
                   selectedOption={selectedPartyOption}
                   onChange={handlePartyFilterChange}
-                  loadOptions={loadPartyOptions}
                   placeholder={t('ledger.allParties')}
                   searchPlaceholder={t('ledger.searchPlaceholder')}
-                  noResultsLabel={t('common.noData')}
-                  loadingLabel={t('common.loading')}
-                  minQueryLength={0}
                 />
                 {selectedPartyId ? (
                   <button type="button" className="mt-2 text-xs font-medium text-primary-700 hover:text-primary-600" onClick={() => handlePartyFilterChange(null)}>

@@ -145,6 +145,7 @@ export default function Inventory() {
   const unitListId = 'inventory-unit-options';
 
   const [status, setStatus] = useState({ type: 'info', message: '' });
+  const [toast, setToast] = useState({ type: '', message: '' });
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
@@ -200,6 +201,12 @@ export default function Inventory() {
   useEffect(() => {
     if (productsError) setStatus({ type: 'error', message: productsError });
   }, [productsError]);
+
+  useEffect(() => {
+    if (!toast.message) return undefined;
+    const timeoutId = window.setTimeout(() => setToast({ type: '', message: '' }), 3200);
+    return () => window.clearTimeout(timeoutId);
+  }, [toast.message]);
 
   const items = useMemo(() => {
     return products.map((product) => ({
@@ -379,29 +386,24 @@ export default function Inventory() {
     setStatus({ type: 'info', message: '' });
 
     try {
-      const nextStock = getCurrentStock(restockProduct) + quantityToAdd;
-      const payload = {
-        ...buildProductPayload(productToForm(restockProduct)),
-        openingStock: nextStock,
-      };
-      const updatedProduct = await api.updateProduct(restockProduct.id, payload);
+      const response = await api.restockProduct(restockProduct.id, { quantity: quantityToAdd });
+      const updatedProduct = response?.product || response;
+      const fallbackStock = getCurrentStock(restockProduct) + quantityToAdd;
 
       patchProduct(restockProduct.id, updatedProduct || {
         ...restockProduct,
-        ...payload,
-        openingStock: nextStock,
-        stockOnHand: nextStock,
+        stockOnHand: fallbackStock,
       });
 
       const quantityLabel = `${formatQuantity(quantityToAdd)}${restockProduct.primaryUnit ? ` ${restockProduct.primaryUnit}` : ''}`;
-      setStatus({
+      closeRestockDialog();
+      setToast({
         type: 'success',
-        message: t('inventory.messages.itemRestocked', {
+        message: response?.message || t('inventory.messages.itemRestocked', {
           name: restockProduct.name,
           quantity: quantityLabel,
         }),
       });
-      closeRestockDialog();
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     } finally {
@@ -435,6 +437,12 @@ export default function Inventory() {
 
   return (
     <div className="space-y-8">
+      {toast.message ? (
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+92px)] left-4 right-4 z-[80] md:left-auto md:right-6 md:w-full md:max-w-sm">
+          <Notice title={toast.message} tone={toast.type || 'success'} />
+        </div>
+      ) : null}
+
       <PageHeader
         title={t('inventory.itemsTitle')}
         subtitle={t('inventory.itemsSubtitle')}
@@ -681,7 +689,7 @@ export default function Inventory() {
                     className="input mt-1"
                     type="number"
                     min="0"
-                    step="1"
+                    step="0.01"
                     value={restockQuantity}
                     onChange={(event) => setRestockQuantity(event.target.value)}
                     placeholder="0"

@@ -8,32 +8,131 @@ function toAbsoluteUrl(url) {
   return `${API_BASE}${url}`;
 }
 
-export default function FileUpload({ onUpload, initialUrl = '', label }) {
+function normalizeUrls(...values) {
+  const next = [];
+  const seen = new Set();
+
+  const addValue = (value) => {
+    if (!value) return;
+
+    if (Array.isArray(value)) {
+      value.forEach(addValue);
+      return;
+    }
+
+    const normalized = String(value).trim();
+    if (!normalized || seen.has(normalized)) return;
+
+    seen.add(normalized);
+    next.push(normalized);
+  };
+
+  values.forEach(addValue);
+  return next;
+}
+
+function isPdfUrl(url) {
+  return /\.pdf(?:$|[?#])/i.test(String(url || ''));
+}
+
+export default function FileUpload({
+  onUpload,
+  initialUrl = '',
+  initialUrls = [],
+  label,
+  multiple = false,
+}) {
   const { t } = useI18n();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
-  const [preview, setPreview] = useState(initialUrl);
+  const [uploadedUrls, setUploadedUrls] = useState(() => normalizeUrls(multiple ? initialUrls : initialUrl));
 
   useEffect(() => {
-    setPreview(toAbsoluteUrl(initialUrl));
-  }, [initialUrl]);
+    setUploadedUrls(normalizeUrls(multiple ? initialUrls : initialUrl));
+  }, [initialUrl, initialUrls, multiple]);
 
   const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
     setUploading(true);
     setError('');
     try {
-      const { url } = await api.uploadAttachment(file);
-      setPreview(toAbsoluteUrl(url));
-      onUpload(url);
+      if (multiple) {
+        const response = await api.uploadAttachments(files);
+        const nextUrls = normalizeUrls(uploadedUrls, response?.urls || []);
+        setUploadedUrls(nextUrls);
+        onUpload(nextUrls);
+      } else {
+        const { url } = await api.uploadAttachment(files[0]);
+        const nextUrls = normalizeUrls(url);
+        setUploadedUrls(nextUrls);
+        onUpload(nextUrls[0] || '');
+      }
     } catch (err) {
       setError(err.message || 'Upload failed');
     } finally {
+      e.target.value = '';
       setUploading(false);
     }
   };
+
+  const handleRemove = (urlToRemove) => {
+    const nextUrls = uploadedUrls.filter((url) => url !== urlToRemove);
+    setUploadedUrls(nextUrls);
+    onUpload(multiple ? nextUrls : nextUrls[0] || '');
+  };
+
+  const previewUrls = uploadedUrls.map((url) => toAbsoluteUrl(url));
+
+  if (multiple) {
+    return (
+      <div className="space-y-3">
+        {label && <label className="label">{label}</label>}
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {previewUrls.map((url, index) => (
+            <div key={`${url}-${index}`} className="group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50">
+              <button
+                type="button"
+                className="absolute right-2 top-2 z-10 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white"
+                onClick={() => handleRemove(uploadedUrls[index])}
+              >
+                {t('common.remove')}
+              </button>
+              <div className="flex h-28 items-center justify-center">
+                {isPdfUrl(url) ? (
+                  <div className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white dark:bg-slate-100 dark:text-slate-900">
+                    PDF
+                  </div>
+                ) : (
+                  <img src={url} alt={`Attachment ${index + 1}`} className="h-full w-full object-cover" />
+                )}
+              </div>
+            </div>
+          ))}
+
+          <label className="relative flex h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-4 text-center transition hover:border-primary-300 hover:bg-primary-50/40 dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-primary-700">
+            <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              {uploading ? t('common.loading') : t('common.add')}
+            </span>
+            <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {uploading ? (t('common.uploading') || 'Uploading...') : (t('common.uploadHint') || 'Tap to upload image or document')}
+            </span>
+            <input
+              type="file"
+              className="absolute inset-0 cursor-pointer opacity-0"
+              onChange={handleFileChange}
+              accept="image/*,.pdf"
+              disabled={uploading}
+              multiple
+              aria-label={label || 'Upload files'}
+            />
+          </label>
+        </div>
+        {error ? <p className="text-xs text-red-500">{error}</p> : null}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2">
@@ -41,8 +140,14 @@ export default function FileUpload({ onUpload, initialUrl = '', label }) {
       <div className="flex items-center gap-4">
         <div className="relative group">
           <div className="h-24 w-24 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/50 flex items-center justify-center">
-            {preview ? (
-              <img src={preview} alt="Preview" className="h-full w-full object-cover" />
+            {previewUrls[0] ? (
+              isPdfUrl(previewUrls[0]) ? (
+                <div className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white dark:bg-slate-100 dark:text-slate-900">
+                  PDF
+                </div>
+              ) : (
+                <img src={previewUrls[0]} alt="Preview" className="h-full w-full object-cover" />
+              )
             ) : (
               <svg className="h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -67,6 +172,11 @@ export default function FileUpload({ onUpload, initialUrl = '', label }) {
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {uploading ? t('common.uploading') || 'Uploading...' : t('common.uploadHint') || 'Tap to upload image or document'}
           </p>
+          {previewUrls[0] ? (
+            <button type="button" className="mt-2 text-xs font-medium text-primary-700 hover:text-primary-600" onClick={() => handleRemove(uploadedUrls[0])}>
+              {t('common.remove')}
+            </button>
+          ) : null}
           {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
         </div>
       </div>

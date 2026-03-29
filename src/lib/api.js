@@ -413,6 +413,16 @@ export const api = {
     request('/api/products', { method: 'POST', body: JSON.stringify(data) }, mutationConfig(['products', 'reports', 'dashboard'])),
   updateProduct: (id, data) =>
     request(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify(data) }, mutationConfig([detailTags('product', id), 'products', 'reports', 'dashboard'])),
+  restockProduct: (id, data) => {
+    const body = JSON.stringify(data);
+    const config = mutationConfig([detailTags('product', id), 'products', 'reports', 'dashboard']);
+
+    return request(`/api/products/${id}/restock`, { method: 'POST', body }, config)
+      .catch((error) => {
+        if (error?.status !== 404) throw error;
+        return request(`/api/inventory/${id}/restock`, { method: 'POST', body }, config);
+      });
+  },
   listCategories: (params = {}) =>
     collectionRequest('/api/categories', params, listCache(['categories'], CACHE_TTL.settings)),
   createCategory: (data) =>
@@ -506,6 +516,20 @@ export const api = {
     formData.append('file', file);
 
     return request('/api/uploads/attachment', {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Content-Type': '',
+      },
+    });
+  },
+  uploadAttachments: (files) => {
+    const formData = new FormData();
+    Array.from(files || []).forEach((file) => {
+      formData.append('files', file);
+    });
+
+    return request('/api/uploads/attachments', {
       method: 'POST',
       body: formData,
       headers: {

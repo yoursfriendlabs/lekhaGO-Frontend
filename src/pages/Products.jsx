@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import FormSectionCard from '../components/FormSectionCard.jsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
@@ -94,6 +95,16 @@ const parseNumber = (value) => {
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+
+const getCurrentStock = (product = {}) => Number(product.stockOnHand ?? product.openingStock ?? 0);
+
+const isRestockableProduct = (product = {}) => String(product.itemType || '').toLowerCase() !== 'service';
+
+const formatQuantity = (value) =>
+  Number(value || 0).toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
 
 const isBlankRow = (row) => {
   const numericDefaults = [
@@ -189,6 +200,7 @@ export default function Products() {
   const [form, setForm] = useState(makeEmptyProduct());
   const [status, setStatus] = useState({ type: 'info', message: '' });
   const [listStatus, setListStatus] = useState({ type: 'info', message: '' });
+  const [toast, setToast] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(false);
   const [bulkRows, setBulkRows] = useState([makeEmptyProduct()]);
   const [bulkStatus, setBulkStatus] = useState({ type: 'info', message: '' });
@@ -196,6 +208,10 @@ export default function Products() {
   const [bulkText, setBulkText] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState('single');
+  const [isRestockOpen, setIsRestockOpen] = useState(false);
+  const [restockProduct, setRestockProduct] = useState(null);
+  const [restockQuantity, setRestockQuantity] = useState('');
+  const [restockSaving, setRestockSaving] = useState(false);
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [page, setPage] = useState(1);
@@ -218,6 +234,12 @@ export default function Products() {
   useEffect(() => {
     setPage(1);
   }, [query, typeFilter]);
+
+  useEffect(() => {
+    if (!toast.message) return undefined;
+    const timeoutId = window.setTimeout(() => setToast({ type: '', message: '' }), 3200);
+    return () => window.clearTimeout(timeoutId);
+  }, [toast.message]);
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -261,6 +283,30 @@ export default function Products() {
 
   const closeDialog = () => setIsOpen(false);
 
+  const openRestockDialog = (productId) => {
+    const product = products.find((entry) => String(entry.id) === String(productId));
+    if (!product) {
+      setListStatus({ type: 'error', message: t('common.noData') });
+      return;
+    }
+
+    if (!isRestockableProduct(product)) {
+      setListStatus({ type: 'error', message: t('inventory.messages.serviceNoRestock') });
+      return;
+    }
+
+    setRestockProduct(product);
+    setRestockQuantity('');
+    setListStatus({ type: 'info', message: '' });
+    setIsRestockOpen(true);
+  };
+
+  const closeRestockDialog = () => {
+    setIsRestockOpen(false);
+    setRestockProduct(null);
+    setRestockQuantity('');
+  };
+
   const filteredProducts = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return products.filter((product) => {
@@ -279,6 +325,56 @@ export default function Products() {
     const start = (page - 1) * pageSize;
     return filteredProducts.slice(start, start + pageSize);
   }, [filteredProducts, page, pageSize]);
+
+  const currentRestockStock = restockProduct ? getCurrentStock(restockProduct) : 0;
+  const nextRestockStock = currentRestockStock + parseNumber(restockQuantity);
+  const restockUnitSuffix = restockProduct?.primaryUnit ? ` ${restockProduct.primaryUnit}` : '';
+
+  const handleRestockSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!restockProduct) return;
+
+    const quantityToAdd = parseNumber(restockQuantity);
+    if (quantityToAdd <= 0) {
+      setListStatus({ type: 'error', message: t('inventory.messages.restockQuantityRequired') });
+      return;
+    }
+
+    setRestockSaving(true);
+    setListStatus({ type: 'info', message: '' });
+
+    try {
+      const response = await api.restockProduct(restockProduct.id, { quantity: quantityToAdd });
+      const updatedProduct = response?.product || response;
+      const fallbackStock = getCurrentStock(restockProduct) + quantityToAdd;
+
+      setProducts((previous) =>
+        previous.map((product) => (
+          String(product.id) === String(restockProduct.id)
+            ? {
+              ...product,
+              ...(updatedProduct || { stockOnHand: fallbackStock }),
+            }
+            : product
+        ))
+      );
+
+      const quantityLabel = `${formatQuantity(quantityToAdd)}${restockProduct.primaryUnit ? ` ${restockProduct.primaryUnit}` : ''}`;
+      closeRestockDialog();
+      setToast({
+        type: 'success',
+        message: response?.message || t('inventory.messages.itemRestocked', {
+          name: restockProduct.name,
+          quantity: quantityLabel,
+        }),
+      });
+    } catch (err) {
+      setListStatus({ type: 'error', message: err.message });
+    } finally {
+      setRestockSaving(false);
+    }
+  };
 
   const handleBulkChange = (index, event) => {
     const { name, value, type, checked } = event.target;
@@ -459,6 +555,12 @@ export default function Products() {
 
   return (
     <div className="space-y-8">
+      {toast.message ? (
+        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+92px)] left-4 right-4 z-[80] md:left-auto md:right-6 md:w-full md:max-w-sm">
+          <Notice title={toast.message} tone={toast.type || 'success'} />
+        </div>
+      ) : null}
+
       <PageHeader
         title={t('products.title')}
         subtitle={t('products.subtitle')}
@@ -505,7 +607,7 @@ export default function Products() {
                 <th className="py-2 text-left">{t('products.primaryUnit')}</th>
                 <th className="py-2 text-left">{t('products.secondaryUnit')}</th>
                 <th className="py-2 text-left">{t('products.conversionRate')}</th>
-                <th className="py-2 text-right">{t('inventory.openingStock')}</th>
+                <th className="py-2 text-right">{t('inventory.quantityOnHand')}</th>
                 <th className="py-2 text-right">{t('products.purchasePrice')}</th>
                 <th className="py-2 text-right">{t('products.salePrice')}</th>
                 <th className="py-2 text-right">{t('products.secondaryPrice')}</th>
@@ -514,12 +616,13 @@ export default function Products() {
                 <th className="py-2 text-right">{t('inventory.minWholesaleQty')}</th>
                 <th className="py-2 text-left">{t('inventory.lowStockAlert')}</th>
                 <th className="py-2 text-right">{t('products.taxRate')}</th>
+                <th className="py-2 text-right">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {pagedProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={16} className="py-3 text-slate-500">
+                  <td colSpan={17} className="py-3 text-slate-500">
                     {t('products.noProducts')}
                   </td>
                 </tr>
@@ -544,7 +647,7 @@ export default function Products() {
                         : '—'}
                     </td>
                     <td className="py-2 text-right">
-                      {Number(product.openingStock || 0).toFixed(2)} {product.primaryUnit || ''}
+                      {getCurrentStock(product).toFixed(2)} {product.primaryUnit || ''}
                     </td>
                     <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(product.purchasePrice || 0).toFixed(2) })}</td>
                     <td className="py-2 text-right">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(product.salePrice || 0).toFixed(2) })}</td>
@@ -570,6 +673,19 @@ export default function Products() {
                     </td>
                     <td className="py-2">{product.lowStockAlert ? t('common.yes') : t('common.no')}</td>
                     <td className="py-2 text-right">{Number(product.taxRate || 0).toFixed(2)}</td>
+                    <td className="py-2 text-right">
+                      {isRestockableProduct(product) ? (
+                        <button
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
+                          type="button"
+                          onClick={() => openRestockDialog(product.id)}
+                        >
+                          {t('inventory.restock')}
+                        </button>
+                      ) : (
+                        <span className="text-slate-300">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))
               )}
@@ -587,6 +703,60 @@ export default function Products() {
           }}
         />
       </div>
+
+      <Dialog isOpen={isRestockOpen} onClose={closeRestockDialog} title={t('inventory.restockItem')} size="md">
+        <form className="space-y-5" onSubmit={handleRestockSubmit}>
+          <FormSectionCard hint={t('inventory.restockHelp')}>
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{t('inventory.itemName')}</p>
+                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{restockProduct?.name || '-'}</p>
+                <p className="text-sm text-slate-500">{restockProduct?.primaryUnit || t('inventory.noUnit')}</p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="label">{t('inventory.quantityOnHand')}</label>
+                  <div className="mt-1 rounded-2xl border border-slate-200/70 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 dark:border-slate-800/70 dark:bg-slate-900/50 dark:text-slate-200">
+                    {formatQuantity(currentRestockStock)}{restockUnitSuffix}
+                  </div>
+                </div>
+                <div>
+                  <label className="label">{t('inventory.restockQuantity')}</label>
+                  <input
+                    className="input mt-1"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={restockQuantity}
+                    onChange={(event) => setRestockQuantity(event.target.value)}
+                    placeholder="0"
+                    autoFocus
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">{t('inventory.newStockLevel')}</p>
+                <p className="mt-1 text-lg font-semibold text-emerald-900 dark:text-emerald-200">
+                  {formatQuantity(nextRestockStock)}{restockUnitSuffix}
+                </p>
+                <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">{t('inventory.restockEditHint')}</p>
+              </div>
+            </div>
+          </FormSectionCard>
+
+          <div className="mobile-sticky-actions flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button className="btn-secondary w-full sm:w-auto" type="button" onClick={closeRestockDialog}>
+              {t('common.close')}
+            </button>
+            <button className="btn-primary w-full sm:w-auto" type="submit" disabled={restockSaving}>
+              {restockSaving ? t('common.loading') : t('inventory.restock')}
+            </button>
+          </div>
+        </form>
+      </Dialog>
 
       <Dialog isOpen={isOpen} onClose={closeDialog} title={t('products.dialogTitle')} size="xl">
         <div className="mb-4 flex flex-wrap gap-2">

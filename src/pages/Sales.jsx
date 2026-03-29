@@ -8,6 +8,8 @@ import FormSectionCard from '../components/FormSectionCard.jsx';
 import MobileFormStepper from '../components/MobileFormStepper.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import PartySearchCreateField from '../components/PartySearchCreateField.jsx';
+import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
+import CreatorFilterSelect from '../components/CreatorFilterSelect.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Dialog } from '../components/ui/Dialog.tsx';
@@ -82,6 +84,9 @@ export default function Sales() {
   const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState('');
   const [productDirectory, setProductDirectory] = useState({});
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [partyFilterId, setPartyFilterId] = useState('');
+  const [selectedPartyFilterOption, setSelectedPartyFilterOption] = useState(null);
+  const [createdByFilterId, setCreatedByFilterId] = useState('');
 
   // ── UI state ──
   const [statusFilter, setStatusFilter] = useState('all');
@@ -108,18 +113,22 @@ export default function Sales() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [mobileStep, setMobileStep] = useState('details');
+  const listParams = useMemo(() => ({
+    limit: 50,
+    ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+    ...(partyFilterId ? { partyId: partyFilterId } : {}),
+    ...(createdByFilterId ? { createdBy: createdByFilterId } : {}),
+  }), [createdByFilterId, partyFilterId, statusFilter]);
 
   // ── Load sales list ──
   useEffect(() => {
     if (!businessId) return;
-    const params = { limit: 50 };
-    if (statusFilter !== 'all') params.status = statusFilter;
-    fetchSales(params);
-  }, [businessId, fetchSales, statusFilter]);
+    fetchSales(listParams);
+  }, [businessId, fetchSales, listParams]);
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter]);
+  }, [createdByFilterId, partyFilterId, statusFilter]);
 
   const resolveCustomerName = (sale) => {
     const direct = getCustomerName(sale);
@@ -199,6 +208,11 @@ export default function Sales() {
   const handleCustomerSelect = (party) => {
     setSelectedCustomer(party || null);
     setHeader((previous) => ({ ...previous, partyId: party?.id || '' }));
+  };
+
+  const handlePartyFilterChange = (option) => {
+    setPartyFilterId(option?.value || '');
+    setSelectedPartyFilterOption(option || null);
   };
 
   const handleProductSelection = (index, option) => {
@@ -443,10 +457,8 @@ export default function Sales() {
       resetForm();
       setIsOpen(false);
       useProductStore.getState().invalidate();
-      invalidateSales();
-      const params = { limit: 50 };
-      if (statusFilter !== 'all') params.status = statusFilter;
-      fetchSales(params, true);
+      invalidateSales(listParams);
+      fetchSales(listParams, true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     }
@@ -728,11 +740,33 @@ export default function Sales() {
       {/* ── Sales Table Card ── */}
       <div className="card">
 
-        {/* Header: title + pill filters on left, export on right */}
+        {/* Header: title + filters on left, export on right */}
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-col items-start gap-2">
+          <div className="min-w-0 flex-1">
             <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('sales.recentSales')}</h3>
-            <div className="flex flex-wrap gap-2">
+            <div className="mt-3 grid gap-3 lg:grid-cols-2">
+              <div>
+                <label className="label">{t('services.filterByParty')}</label>
+                <PartyFilterSelect
+                  className="mt-1"
+                  type="customer"
+                  value={partyFilterId}
+                  selectedOption={selectedPartyFilterOption}
+                  onChange={handlePartyFilterChange}
+                  placeholder={t('services.allParties')}
+                  searchPlaceholder={t('parties.searchPlaceholder')}
+                />
+              </div>
+              <div>
+                <label className="label">{t('filters.createdBy')}</label>
+                <CreatorFilterSelect
+                  className="mt-1"
+                  value={createdByFilterId}
+                  onChange={setCreatedByFilterId}
+                />
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setStatusFilter('all')}
@@ -762,7 +796,7 @@ export default function Sales() {
               </button>
             </div>
           </div>
-          <button className="btn-ghost" type="button" onClick={exportCsv}>{t('sales.exportCsv')}</button>
+          <button className="btn-ghost shrink-0" type="button" onClick={exportCsv}>{t('sales.exportCsv')}</button>
         </div>
 
         {/* ── Mobile card view ── */}
