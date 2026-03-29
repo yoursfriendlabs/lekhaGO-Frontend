@@ -680,7 +680,7 @@ export default function Purchases() {
                           </div>
                           <div>
                             <label className="label">{t('purchases.tax')}</label>
-                            <input className="input mt-1" type="number" step="1" value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
+                            <input className="input mt-1" type="number" step="1" min={0} value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
                             <p className="mt-1 text-xs text-slate-500">
                               {t('purchases.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: itemVatAmount.toFixed(2) })}
                             </p>
