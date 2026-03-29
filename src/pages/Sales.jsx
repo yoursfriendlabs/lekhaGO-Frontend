@@ -643,7 +643,7 @@ export default function Sales() {
                         </div>
                         <div>
                           <label className="label">{t('sales.tax')}</label>
-                          <input className="input mt-1" type="number" step="0.01" value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
+                          <input className="input mt-1" type="number" step="1" value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
                           <p className="mt-1 text-xs text-slate-500">
                             {t('sales.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: itemVatAmount.toFixed(2) })}
                           </p>
