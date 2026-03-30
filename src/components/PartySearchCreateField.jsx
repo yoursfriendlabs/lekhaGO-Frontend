@@ -5,7 +5,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { normalizeLookupParty } from '../lib/lookups.js';
 import { getPartyBalanceMeta } from '../lib/partyBalances.js';
-import { getWhatsAppLink } from '../lib/whatsapp.js';
+import { getDueWhatsAppMessage, getWhatsAppLink } from '../lib/whatsapp.js';
 
 function getInitials(name = '') {
   const trimmed = String(name || '').trim();
@@ -43,12 +43,15 @@ export default function PartySearchCreateField({
   const balanceMeta = getPartyBalanceMeta(selected?.currentAmount, t);
   const hasBalance = selected?.currentAmount !== undefined && selected?.currentAmount !== null;
   const hasDue = hasBalance && balanceMeta.absoluteAmount > 0;
-  const whatsappMessage = hasDue
-    ? `your total due amount is ${t('currency.formatted', {
-        symbol: t('currency.symbol'),
-        amount: balanceMeta.absoluteAmount.toFixed(2),
-      })}`
-    : 'Hello, Welcome to Rose Boutique and Creation';
+  const whatsappMessage = getDueWhatsAppMessage(
+    selected?.name,
+    hasDue
+      ? t('currency.formatted', {
+          symbol: t('currency.symbol'),
+          amount: balanceMeta.absoluteAmount.toFixed(2),
+        })
+      : '',
+  );
   const whatsappLink = getWhatsAppLink(selected?.phone, whatsappMessage);
 
   const resetLocalState = () => {

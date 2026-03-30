@@ -42,7 +42,7 @@ import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
-import { getWhatsAppLink } from '../lib/whatsapp.js';
+import { getDueWhatsAppMessage, getWhatsAppLink } from '../lib/whatsapp.js';
 import {
   mergeLookupEntities,
   normalizeLookupParty,
@@ -692,12 +692,15 @@ export default function Services() {
   const selectedPartyBalanceMeta = getPartyBalanceMeta(selectedParty?.currentAmount, t);
   const selectedPartyHasBalance = selectedParty?.currentAmount !== undefined && selectedParty?.currentAmount !== null;
   const selectedPartyHasDue = selectedPartyHasBalance && selectedPartyBalanceMeta.absoluteAmount > 0;
-  const selectedPartyWhatsAppMessage = selectedPartyHasDue
-    ? `your total due amount is ${t('currency.formatted', {
-        symbol: t('currency.symbol'),
-        amount: selectedPartyBalanceMeta.absoluteAmount.toFixed(2),
-      })}`
-    : 'Hello, Welcome to Rose Boutique and Creation';
+  const selectedPartyWhatsAppMessage = getDueWhatsAppMessage(
+    selectedParty?.name,
+    selectedPartyHasDue
+      ? t('currency.formatted', {
+          symbol: t('currency.symbol'),
+          amount: selectedPartyBalanceMeta.absoluteAmount.toFixed(2),
+        })
+      : '',
+  );
   const selectedPartyWhatsAppLink = getWhatsAppLink(selectedParty?.phone, selectedPartyWhatsAppMessage);
 
   const selectParty = (party) => {

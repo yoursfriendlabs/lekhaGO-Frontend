@@ -18,7 +18,7 @@ import { usePartyStore } from '../stores/parties';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { Plus, Bell, Search, Filter, ChevronDown, MessageCircle } from 'lucide-react';
 import { buildPaymentPayload, requiresBankSelection } from '../lib/payments';
-import { getWhatsAppLink } from '../lib/whatsapp.js';
+import { getDueWhatsAppMessage, getWhatsAppLink } from '../lib/whatsapp.js';
 
 const emptyForm = {
   name: '',
@@ -257,12 +257,15 @@ export default function Parties() {
     : null;
   const selectedBalanceMeta = getPartyBalanceMeta(selectedPartyView?.currentAmount, t);
   const selectedPartyHasDue = selectedBalanceMeta.absoluteAmount > 0;
-  const selectedPartyWhatsAppMessage = selectedPartyHasDue
-    ? `your total due amount is ${t('currency.formatted', {
-        symbol: t('currency.symbol'),
-        amount: selectedBalanceMeta.absoluteAmount.toFixed(2),
-      })}`
-    : 'Hello, Welcome to Rose Boutique and Creation';
+  const selectedPartyWhatsAppMessage = getDueWhatsAppMessage(
+    selectedPartyView?.name,
+    selectedPartyHasDue
+      ? t('currency.formatted', {
+          symbol: t('currency.symbol'),
+          amount: selectedBalanceMeta.absoluteAmount.toFixed(2),
+        })
+      : '',
+  );
   const selectedPartyWhatsAppLink = getWhatsAppLink(selectedPartyView?.phone, selectedPartyWhatsAppMessage);
   const totalTxPages = Math.max(1, Math.ceil(statementData.summary.totalRows / TX_PAGE_SIZE));
 
