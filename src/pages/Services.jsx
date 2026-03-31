@@ -2056,11 +2056,11 @@ export default function Services() {
                                 <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.subTotal)}</p>
                               </div>
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.laborTotal')}</p>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Service Total</p>
                                 <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.laborTotal)}</p>
                               </div>
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.partsTotal')}</p>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Product Total</p>
                                 <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.partsTotal)}</p>
                               </div>
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
@@ -2326,10 +2326,10 @@ export default function Services() {
                       <span>{t('services.subTotal')}</span><span>{money(invoiceTotals.subTotal)}</span>
                     </div>
                     <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                      <span>{t('services.laborTotal')}</span><span>{money(invoiceTotals.laborTotal)}</span>
+                      <span>Service Total</span><span>{money(invoiceTotals.laborTotal)}</span>
                     </div>
                     <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                      <span>{t('services.partsTotal')}</span><span>{money(invoiceTotals.partsTotal)}</span>
+                      <span>Product Total</span><span>{money(invoiceTotals.partsTotal)}</span>
                     </div>
                     <div className="flex justify-between text-slate-500 dark:text-slate-400">
                       <span>{t('services.taxTotal')}</span><span>{money(invoiceTotals.taxTotal)}</span>
