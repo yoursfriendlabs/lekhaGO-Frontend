@@ -31,6 +31,7 @@ export default function ForgotPassword() {
       setPasswordResetFlow({
         email: trimmedEmail,
         code: '',
+        verified: false,
         resendAvailableAt,
       });
       navigate('/forgot-password/otp', {

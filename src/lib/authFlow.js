@@ -47,11 +47,14 @@ const OTP_DIGIT_MAP = {
 
 const INVALID_OTP_REGEX = /(invalid|incorrect|wrong).*(otp|code)|(otp|code).*(invalid|incorrect|wrong)/i;
 const EXPIRED_OTP_REGEX = /(expired|timeout).*(otp|code)|(otp|code).*(expired|timeout)/i;
+const INVALID_OR_EXPIRED_OTP_REGEX = /invalid\s+or\s+expired/i;
 const COOLDOWN_REGEX = /(too many requests|cooldown|wait before|try again later|resend.*later|rate limit)/i;
 const WEAK_PASSWORD_REGEX =
   /(weak password|password (is )?too weak|password must|minimum password|at least .*character|include .*number|include .*uppercase|include .*lowercase)/i;
 const CURRENT_PASSWORD_REGEX =
   /(current|old).*(password).*(invalid|incorrect|wrong)|(invalid|incorrect|wrong).*(current|old).*(password)/i;
+const SAME_PASSWORD_REGEX =
+  /(new).*(password).*(different).*(current|old)|(current|old).*(password).*(different).*(new)/i;
 
 function readErrorPayload(error) {
   return error?.payload && typeof error.payload === 'object' ? error.payload : {};
@@ -135,6 +138,12 @@ export function getPasswordMatchMessage(password, confirmPassword, t) {
   return t('auth.errors.passwordMismatch');
 }
 
+export function getPasswordDifferenceMessage(currentPassword, newPassword, t) {
+  if (!currentPassword || !newPassword) return '';
+  if (currentPassword !== newPassword) return '';
+  return t('auth.errors.newPasswordMustDiffer');
+}
+
 export function resolveCooldownMessage(error, t) {
   const seconds = readRetryAfterSeconds(error);
   if (seconds > 0) return t('auth.errors.cooldownWithSeconds', { seconds });
@@ -144,6 +153,7 @@ export function resolveCooldownMessage(error, t) {
 export function resolveOtpErrorMessage(error, t) {
   const message = readErrorMessage(error);
 
+  if (INVALID_OR_EXPIRED_OTP_REGEX.test(message)) return t('auth.errors.invalidOrExpiredOtp');
   if (isExpiredOtpError(error, message)) return t('auth.errors.expiredOtp');
   if (isInvalidOtpError(error, message)) return t('auth.errors.invalidOtp');
 
@@ -156,6 +166,10 @@ export function resolveOtpErrorMessage(error, t) {
 
 export function resolvePasswordErrorMessage(error, t) {
   const message = readErrorMessage(error);
+
+  if (SAME_PASSWORD_REGEX.test(message)) {
+    return t('auth.errors.newPasswordMustDiffer');
+  }
 
   if (
     matchesCode(error, ['WEAK_PASSWORD', 'PASSWORD_TOO_WEAK', 'INVALID_PASSWORD'])

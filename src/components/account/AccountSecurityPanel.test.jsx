@@ -70,4 +70,17 @@ describe('AccountSecurityPanel', () => {
 
     expect(await screen.findByText(/current password is incorrect/i)).toBeInTheDocument();
   });
+
+  it('prevents reusing the current password on the client', async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(<AccountSecurityPanel />, { route: '/app/settings', withAuth: true });
+
+    await user.type(screen.getByLabelText(/current password/i), 'SamePass1');
+    await user.type(screen.getByLabelText(/^new password$/i), 'SamePass1');
+    await user.type(screen.getByLabelText(/confirm new password/i), 'SamePass1');
+
+    expect(screen.getByText(/different from your current password/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /change password/i })).toBeDisabled();
+  });
 });

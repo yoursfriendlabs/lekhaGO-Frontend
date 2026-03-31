@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Boxes, Users, ShoppingCart, Briefcase, Settings2 } from 'lucide-react';
+import { LayoutDashboard, Boxes, Users, ShoppingCart, Briefcase, Settings2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 
@@ -9,6 +9,7 @@ const navItems = [
   { to: '/app/services', key: 'nav.service', icon: Briefcase ,  role: ['owner','staff']},
   { to: '/app/purchases', key: 'nav.buy', icon: ShoppingCart , role: ['owner']},
   { to: '/app/parties', key: 'nav.parties', icon: Users  , role: ['owner']},
+  { to: '/app/admin', key: 'nav.admin', icon: ShieldCheck , role: ['owner']},
   { to: '/app/settings', key: 'nav.settings', icon: Settings2 , role: ['owner','staff'] }
 ];
 

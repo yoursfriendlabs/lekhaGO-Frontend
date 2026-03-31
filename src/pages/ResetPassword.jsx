@@ -14,9 +14,11 @@ function getResetContext(locationState) {
   const stored = getPasswordResetFlow();
   const email = normalizeEmail(locationState?.email || stored?.email);
   const code = String(locationState?.code || stored?.code || '').trim();
+  const verified = Boolean(locationState?.verified ?? stored?.verified);
 
-  if (!email || !code) return null;
-  return { email, code };
+  if (!email || !code) return { email, code, verified, missingReason: 'context_missing' };
+  if (!verified) return { email, code, verified, missingReason: 'verification_required' };
+  return { email, code, verified, missingReason: '' };
 }
 
 export default function ResetPassword() {
@@ -41,7 +43,23 @@ export default function ResetPassword() {
   );
   const canSubmit = Boolean(form.newPassword) && Boolean(form.confirmPassword) && !newPasswordError && !confirmPasswordError;
 
-  if (!context) {
+  if (context?.missingReason === 'verification_required') {
+    return (
+      <Navigate
+        to="/forgot-password/otp"
+        replace
+        state={{
+          email: context.email,
+          notice: {
+            type: 'warn',
+            message: t('auth.passwordResetVerificationRequired'),
+          },
+        }}
+      />
+    );
+  }
+
+  if (context?.missingReason === 'context_missing') {
     return (
       <Navigate
         to="/forgot-password"

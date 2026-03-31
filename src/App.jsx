@@ -14,6 +14,7 @@ import { hasUnverifiedEmail, isStaffActivationRequired } from './lib/authFlow';
 import { BANKS_SETTINGS_TAB, buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB } from './lib/settingsTabs';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Admin = lazy(() => import('./pages/Admin'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Purchases = lazy(() => import('./pages/Purchases'));
 const Services = lazy(() => import('./pages/Services'));
@@ -151,6 +152,7 @@ function AppShell() {
                 <Route path="banks" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to={buildSettingsTabPath(BANKS_SETTINGS_TAB)} replace /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route path="ledger" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Ledger /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route path="analytics" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Analytics /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="admin" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Admin /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route
                   path="order-attributes"
                   element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to={buildSettingsTabPath(ORDER_ATTRIBUTES_SETTINGS_TAB)} replace /></RoleGuard></EmailActivationRequiredRoute>}

@@ -31,8 +31,9 @@ describe('ForgotPasswordOtp', () => {
   it('shows a clear message when the OTP is invalid', async () => {
     setPasswordResetFlow({ email: 'owner@example.com', code: '', resendAvailableAt: 0 });
     verifyPasswordResetOtp.mockRejectedValue({
-      message: 'Invalid OTP',
-      payload: { code: 'INVALID_OTP' },
+      message: 'Invalid or expired code',
+      status: 400,
+      payload: { message: 'Invalid or expired code' },
     });
     const user = userEvent.setup();
 
@@ -48,7 +49,7 @@ describe('ForgotPasswordOtp', () => {
     await user.paste('123456');
     await user.click(screen.getByRole('button', { name: /^verify$/i }));
 
-    expect(await screen.findByText(/code you entered is invalid/i)).toBeInTheDocument();
+    expect(await screen.findByText(/invalid or expired/i)).toBeInTheDocument();
   });
 
   it('shows the resend cooldown state while the timer is active', async () => {

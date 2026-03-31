@@ -19,7 +19,21 @@ vi.mock('../lib/api', () => ({
 describe('ResetPassword', () => {
   beforeEach(() => {
     resetPassword.mockReset();
-    setPasswordResetFlow({ email: 'owner@example.com', code: '123456' });
+    setPasswordResetFlow({ email: 'owner@example.com', code: '123456', verified: true });
+  });
+
+  it('requires OTP verification before showing the new-password form', async () => {
+    setPasswordResetFlow({ email: 'owner@example.com', code: '123456', verified: false });
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/forgot-password/otp" element={<div>OTP step</div>} />
+        <Route path="/forgot-password/reset" element={<ResetPassword />} />
+      </Routes>,
+      { route: '/forgot-password/reset' }
+    );
+
+    expect(await screen.findByText('OTP step')).toBeInTheDocument();
   });
 
   it('validates weak and mismatched passwords before submit', async () => {

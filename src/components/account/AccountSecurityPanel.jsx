@@ -6,7 +6,13 @@ import PasswordField from '../auth/PasswordField.jsx';
 import SpinnerIcon from '../auth/SpinnerIcon.jsx';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { getPasswordMatchMessage, getPasswordValidationMessage, hasUnverifiedEmail, resolvePasswordErrorMessage } from '../../lib/authFlow';
+import {
+  getPasswordDifferenceMessage,
+  getPasswordMatchMessage,
+  getPasswordValidationMessage,
+  hasUnverifiedEmail,
+  resolvePasswordErrorMessage,
+} from '../../lib/authFlow';
 import { useI18n } from '../../lib/i18n.jsx';
 
 export default function AccountSecurityPanel() {
@@ -28,11 +34,16 @@ export default function AccountSecurityPanel() {
     () => getPasswordMatchMessage(form.newPassword, form.confirmPassword, t),
     [form.confirmPassword, form.newPassword, t]
   );
+  const samePasswordError = useMemo(
+    () => getPasswordDifferenceMessage(form.currentPassword, form.newPassword, t),
+    [form.currentPassword, form.newPassword, t]
+  );
   const canSubmit =
     Boolean(form.currentPassword)
     && Boolean(form.newPassword)
     && Boolean(form.confirmPassword)
     && !newPasswordError
+    && !samePasswordError
     && !confirmPasswordError;
 
   const handleChange = (event) => {
@@ -45,7 +56,7 @@ export default function AccountSecurityPanel() {
     event.preventDefault();
 
     if (!canSubmit) {
-      setStatus({ type: 'error', message: newPasswordError || confirmPasswordError || t('auth.errors.generic') });
+      setStatus({ type: 'error', message: newPasswordError || samePasswordError || confirmPasswordError || t('auth.errors.generic') });
       return;
     }
 
@@ -150,7 +161,7 @@ export default function AccountSecurityPanel() {
             autoComplete="new-password"
             disabled={saving}
             required
-            error={newPasswordError}
+            error={newPasswordError || samePasswordError}
             hint={t('auth.passwordStrengthHint')}
           />
           <PasswordField

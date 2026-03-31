@@ -192,6 +192,90 @@ function getVatAmount(lineTotal, taxRate) {
   return (Number(lineTotal || 0) * Number(taxRate || 0)) / 100;
 }
 
+function toFiniteNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeServiceItem(item) {
+  const quantity = toFiniteNumber(item?.quantity, 0);
+  const unitPrice = toFiniteNumber(item?.unitPrice, 0);
+  const lineTotal = toFiniteNumber(item?.lineTotal, quantity * unitPrice);
+
+  return {
+    ...item,
+    itemType: item?.itemType || 'labor',
+    description: item?.description || '',
+    productId: item?.productId || '',
+    quantity,
+    unitType: item?.unitType || 'primary',
+    unitPrice,
+    taxRate: toFiniteNumber(item?.taxRate, 0),
+    lineTotal,
+  };
+}
+
+function getServiceItems(record) {
+  if (Array.isArray(record)) return record.map(normalizeServiceItem);
+  if (!record || typeof record !== 'object') return [];
+  if (Array.isArray(record.items)) return record.items.map(normalizeServiceItem);
+  if (Array.isArray(record.ServiceItems)) return record.ServiceItems.map(normalizeServiceItem);
+  return [];
+}
+
+function getComputedServiceTotals(items) {
+  const laborTotal = items
+    .filter((item) => item.itemType === 'labor')
+    .reduce((sum, item) => sum + toFiniteNumber(item.lineTotal, 0), 0);
+  const partsTotal = items
+    .filter((item) => item.itemType === 'part')
+    .reduce((sum, item) => sum + toFiniteNumber(item.lineTotal, 0), 0);
+  const subTotal = laborTotal + partsTotal;
+  const taxTotal = items.reduce((sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate), 0);
+  const grandTotal = subTotal + taxTotal;
+
+  return {
+    laborTotal,
+    partsTotal,
+    subTotal,
+    taxTotal,
+    grandTotal,
+  };
+}
+
+function getServiceOrderTotals(record) {
+  const items = getServiceItems(record);
+  const computed = getComputedServiceTotals(items);
+  const laborTotal = toFiniteNumber(record?.laborTotal, computed.laborTotal);
+  const partsTotal = toFiniteNumber(record?.partsTotal, computed.partsTotal);
+  const subTotal = toFiniteNumber(record?.subTotal, laborTotal + partsTotal);
+  const taxTotal = toFiniteNumber(record?.taxTotal, computed.taxTotal);
+  const grandTotal = toFiniteNumber(record?.grandTotal, subTotal + taxTotal);
+
+  return {
+    laborTotal,
+    partsTotal,
+    subTotal,
+    taxTotal,
+    grandTotal,
+  };
+}
+
+function normalizeServiceOrder(record) {
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return record;
+
+  const items = getServiceItems(record);
+  const totals = getServiceOrderTotals({ ...record, items });
+
+  return {
+    ...record,
+    items,
+    ServiceItems: Array.isArray(record.ServiceItems) ? record.ServiceItems : items,
+    ...totals,
+    receivedTotal: toFiniteNumber(record.receivedTotal, 0),
+  };
+}
+
 function OverviewMetric({ icon: Icon, label, value, tone = 'slate' }) {
   const styles = {
     slate: {
@@ -366,7 +450,10 @@ export default function Services() {
 
   // ── Attribute definitions for invoice display ──
   const [attributeDefs, setAttributeDefs] = useState([]);
-  const safeServiceList = Array.isArray(serviceList) ? serviceList : [];
+  const safeServiceList = useMemo(
+    () => (Array.isArray(serviceList) ? serviceList.map(normalizeServiceOrder) : []),
+    [serviceList]
+  );
   const safeAttributeDefs = Array.isArray(attributeDefs) ? attributeDefs : [];
 
   // ── Form data ──
@@ -796,8 +883,8 @@ export default function Services() {
     setDialogOpen(true);
     setEditLoading(true);
     try {
-      const full = await api.getService(order.id);
-      const rawItems = full.ServiceItems || full.items || [];
+      const full = normalizeServiceOrder(await api.getService(order.id));
+      const rawItems = full.items || [];
       const hydratedProducts = rawItems
         .map((item) => normalizeLookupProduct(item))
         .filter((product) => product.id);
@@ -972,10 +1059,10 @@ export default function Services() {
   const closeStatusDialog = () => setStatusDialog(null);
 
   const openInvoiceModal = async (order) => {
-    setInvoiceOrder(order);
+    setInvoiceOrder(normalizeServiceOrder(order));
     setInvoiceLoading(true);
     try {
-      const full = await api.getService(order.id);
+      const full = normalizeServiceOrder(await api.getService(order.id));
       setInvoiceOrder(full);
     } catch (_) {
       // use list data if full fetch fails
@@ -1070,6 +1157,10 @@ export default function Services() {
   const summaryOrderNo = header.orderNo || suggestedOrderNo || '—';
   const summaryDeliveryDate = header.deliveryDate ? formatMaybeDate(header.deliveryDate, 'D MMM YYYY') : '—';
   const invoiceAttachmentUrls = invoiceOrder ? getServiceAttachmentUrls(invoiceOrder) : [];
+  const invoiceItems = invoiceOrder ? getServiceItems(invoiceOrder) : [];
+  const invoiceTotals = invoiceOrder
+    ? getServiceOrderTotals(invoiceOrder)
+    : { laborTotal: 0, partsTotal: 0, subTotal: 0, taxTotal: 0, grandTotal: 0 };
   const mobilePrimaryActionLabel = canGoForwardStep
     ? t('common.continue')
     : editingId ? t('common.update') : t('services.saveOrder');
@@ -1374,9 +1465,9 @@ export default function Services() {
           className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm"
           onClick={(e) => { if (e.target === e.currentTarget) closeDialog(); }}
         >
-          <div className="flex h-full items-end justify-center md:items-center md:p-4">
-            <div className="relative flex h-[100dvh] w-full max-w-5xl flex-col overflow-hidden bg-[#fcfaf6] shadow-2xl dark:bg-slate-950 md:h-auto md:max-h-[94vh] md:rounded-[32px] md:border md:border-slate-200/70 md:dark:border-slate-800/70">
-              <div className="flex items-center justify-between border-b border-slate-200/70 bg-white/85 px-4 py-4 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-6">
+          <div className="flex h-full items-end justify-center md:items-center md:p-5 xl:p-6">
+            <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#fcfaf6] shadow-2xl dark:bg-slate-950 md:h-[calc(100dvh-2.5rem)] md:max-h-[calc(100dvh-2.5rem)] md:max-w-[1440px] md:rounded-[32px] md:border md:border-slate-200/70 md:dark:border-slate-800/70">
+              <div className="flex items-center justify-between border-b border-slate-200/70 bg-white/85 px-4 py-4 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-8">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary-700 dark:text-primary-200">{t('services.workspaceLabel')}</p>
                   <h2 className="mt-1 truncate font-serif text-2xl text-slate-900 dark:text-white">{dialogTitle}</h2>
@@ -1387,8 +1478,8 @@ export default function Services() {
               </div>
 
               <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-                <div ref={formScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6 md:py-6">
-                  <div className="space-y-4">
+                <div ref={formScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
+                  <div className="mx-auto w-full max-w-[1320px] space-y-4">
                     {formNotice.message ? (
                       <Notice title={formNotice.message} tone={formNotice.type} />
                     ) : null}
@@ -2032,7 +2123,8 @@ export default function Services() {
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200/70 bg-white/90 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-6">
+                <div className="border-t border-slate-200/70 bg-white/90 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-8">
+                  <div className="mx-auto w-full max-w-[1320px]">
                   {isMobile ? (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-100/90 px-4 py-3 text-sm dark:bg-slate-900/70">
@@ -2094,6 +2186,7 @@ export default function Services() {
                       </div>
                     </div>
                   )}
+                  </div>
                 </div>
               </form>
             </div>
@@ -2194,12 +2287,14 @@ export default function Services() {
                         <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Product Name</th>
                         <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Qty</th>
                         <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Unit Price</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('services.tax')}</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('services.taxTotal')}</th>
                         <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                      {(invoiceOrder.ServiceItems || invoiceOrder.items || []).map((item, idx) => (
-                        <tr key={idx}>
+                      {invoiceItems.map((item, idx) => (
+                        <tr key={`${item.productId || item.description || 'service'}-${idx}`}>
                           <td className="py-3 pr-2">
                             <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}>
                               {item.itemType === 'labor' ? 'Service' : 'Product'}
@@ -2215,6 +2310,8 @@ export default function Services() {
                             {Number(item.quantity || 0).toFixed(item.quantity % 1 ? 3 : 0)}
                           </td>
                           <td className="py-3 text-right text-slate-500">{money(item.unitPrice)}</td>
+                          <td className="py-3 text-right text-slate-500">{Number(item.taxRate || 0).toFixed(2)}%</td>
+                          <td className="py-3 text-right text-slate-500">{money(getVatAmount(item.lineTotal, item.taxRate))}</td>
                           <td className="py-3 text-right font-semibold text-slate-800 dark:text-slate-200">{money(item.lineTotal)}</td>
                         </tr>
                       ))}
@@ -2226,23 +2323,29 @@ export default function Services() {
                 <div className="border-t border-slate-200/70 dark:border-slate-800/70 px-8 py-6">
                   <div className="ml-auto max-w-xs space-y-2 text-sm">
                     <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                      <span>Labor Total</span><span>{money(invoiceOrder.laborTotal)}</span>
+                      <span>{t('services.subTotal')}</span><span>{money(invoiceTotals.subTotal)}</span>
                     </div>
                     <div className="flex justify-between text-slate-500 dark:text-slate-400">
-                      <span>Parts Total</span><span>{money(invoiceOrder.partsTotal)}</span>
+                      <span>{t('services.laborTotal')}</span><span>{money(invoiceTotals.laborTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>{t('services.partsTotal')}</span><span>{money(invoiceTotals.partsTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <span>{t('services.taxTotal')}</span><span>{money(invoiceTotals.taxTotal)}</span>
                     </div>
                     <div className="flex justify-between border-t border-slate-200/70 pt-3 font-bold text-slate-900 dark:border-slate-700 dark:text-white">
-                      <span className="text-base">Grand Total</span>
-                      <span className="text-lg">{money(invoiceOrder.grandTotal)}</span>
+                      <span className="text-base">{t('services.grandTotal')}</span>
+                      <span className="text-lg">{money(invoiceTotals.grandTotal)}</span>
                     </div>
                     <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
-                      <span>Amount Received</span>
+                      <span>{t('services.amountReceived')}</span>
                       <span className="font-semibold">{money(invoiceOrder.receivedTotal)}</span>
                     </div>
-                    {Math.max(Number(invoiceOrder.grandTotal || 0) - Number(invoiceOrder.receivedTotal || 0), 0) > 0 && (
+                    {Math.max(Number(invoiceTotals.grandTotal || 0) - Number(invoiceOrder.receivedTotal || 0), 0) > 0 && (
                       <div className="flex justify-between rounded-xl bg-rose-50 px-4 py-2.5 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">
-                        <span className="font-semibold">Due Amount</span>
-                        <span className="font-bold">{money(Math.max(Number(invoiceOrder.grandTotal || 0) - Number(invoiceOrder.receivedTotal || 0), 0))}</span>
+                        <span className="font-semibold">{t('services.dueAmount')}</span>
+                        <span className="font-bold">{money(Math.max(Number(invoiceTotals.grandTotal || 0) - Number(invoiceOrder.receivedTotal || 0), 0))}</span>
                       </div>
                     )}
                   </div>

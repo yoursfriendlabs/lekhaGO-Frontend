@@ -18,6 +18,7 @@ function getInitialFlow(locationState) {
   return {
     email,
     code: stored?.code || '',
+    verified: Boolean(locationState?.verified ?? stored?.verified),
     resendAvailableAt: Number(locationState?.resendAvailableAt || stored?.resendAvailableAt || 0),
   };
 }
@@ -89,10 +90,11 @@ export default function ForgotPasswordOtp() {
     setStatus({ type: 'info', message: '' });
 
     try {
-      await api.verifyPasswordResetOtp({ email, code: otpCode });
+      const verification = await api.verifyPasswordResetOtp({ email, code: otpCode });
       setPasswordResetFlow({
         email,
         code: otpCode,
+        verified: verification?.verified ?? true,
         resendAvailableAt: flow?.resendAvailableAt || 0,
       });
       navigate('/forgot-password/reset', {
@@ -100,6 +102,7 @@ export default function ForgotPasswordOtp() {
         state: {
           email,
           code: otpCode,
+          verified: verification?.verified ?? true,
           notice: {
             type: 'success',
             message: t('auth.passwordResetOtpVerified'),
@@ -122,7 +125,7 @@ export default function ForgotPasswordOtp() {
     try {
       await api.requestPasswordReset({ email });
       const resendAvailableAt = Date.now() + RESEND_COOLDOWN_SECONDS * 1000;
-      setFlow((previous) => (previous ? { ...previous, resendAvailableAt, code: '' } : previous));
+      setFlow((previous) => (previous ? { ...previous, resendAvailableAt, code: '', verified: false } : previous));
       setDigits(Array.from({ length: OTP_LENGTH }, () => ''));
       setStatus({ type: 'success', message: t('auth.passwordResetResent') });
     } catch (error) {
