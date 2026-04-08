@@ -8,6 +8,7 @@ import StaffManagement from '../components/StaffManagement';
 import BanksSettingsPanel from '../components/settings/BanksSettingsPanel.jsx';
 import CategoriesSettingsPanel from '../components/settings/CategoriesSettingsPanel.jsx';
 import OrderAttributesSettingsPanel from '../components/settings/OrderAttributesSettingsPanel.jsx';
+import UnitsSettingsPanel from '../components/settings/UnitsSettingsPanel.jsx';
 import { api, API_BASE } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
@@ -19,6 +20,7 @@ import {
   GENERAL_SETTINGS_TAB,
   ORDER_ATTRIBUTES_SETTINGS_TAB,
   STAFF_SETTINGS_TAB,
+  UNITS_SETTINGS_TAB,
 } from '../lib/settingsTabs';
 
 const EMPTY = {
@@ -73,6 +75,11 @@ export default function Settings() {
         key: CATEGORIES_SETTINGS_TAB,
         label: t('settingsPage.tabs.categories'),
         description: t('settingsPage.descriptions.categories'),
+      },
+      {
+        key: UNITS_SETTINGS_TAB,
+        label: t('settingsPage.tabs.units'),
+        description: t('settingsPage.descriptions.units'),
       },
       {
         key: BANKS_SETTINGS_TAB,
@@ -372,6 +379,7 @@ export default function Settings() {
       {activeTab === ACCOUNT_SETTINGS_TAB ? <AccountSecurityPanel /> : null}
       {activeTab === STAFF_SETTINGS_TAB ? <StaffManagement businessId={businessId} /> : null}
       {activeTab === CATEGORIES_SETTINGS_TAB ? <CategoriesSettingsPanel /> : null}
+      {activeTab === UNITS_SETTINGS_TAB ? <UnitsSettingsPanel /> : null}
       {activeTab === BANKS_SETTINGS_TAB ? <BanksSettingsPanel /> : null}
       {activeTab === ORDER_ATTRIBUTES_SETTINGS_TAB ? <OrderAttributesSettingsPanel /> : null}
     </div>

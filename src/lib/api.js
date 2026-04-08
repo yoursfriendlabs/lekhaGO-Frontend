@@ -436,6 +436,19 @@ export const api = {
   deleteCategory: (id) =>
     request(`/api/categories/${id}`, { method: 'DELETE' }, mutationConfig([detailTags('category', id), 'categories', 'products'])),
 
+  listUnits: (params = {}) =>
+    collectionRequest('/api/units', params, listCache(['units'], CACHE_TTL.settings)),
+  createUnit: (data) =>
+    request('/api/units', { method: 'POST', body: JSON.stringify(data) }, mutationConfig(['units', 'products'])),
+  getUnit: (id) =>
+    request(`/api/units/${id}`, {}, listCache(detailTags('unit', id), CACHE_TTL.settings)),
+  updateUnit: (id, data) =>
+    request(`/api/units/${id}`, { method: 'PUT', body: JSON.stringify(data) }, mutationConfig([detailTags('unit', id), 'units', 'products'])),
+  patchUnit: (id, data) =>
+    request(`/api/units/${id}`, { method: 'PATCH', body: JSON.stringify(data) }, mutationConfig([detailTags('unit', id), 'units', 'products'])),
+  deleteUnit: (id) =>
+    request(`/api/units/${id}`, { method: 'DELETE' }, mutationConfig([detailTags('unit', id), 'units', 'products'])),
+
   createPurchase: (data) =>
     request('/api/purchases', { method: 'POST', body: JSON.stringify(data) }, mutationConfig(['purchases', 'products', 'reports', 'dashboard', 'parties', 'party-statements', 'banks'])),
   listPurchases: (params = {}) => collectionRequest('/api/purchases', params, listCache(['purchases', 'reports', 'dashboard'])),

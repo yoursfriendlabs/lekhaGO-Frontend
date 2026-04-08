@@ -11,6 +11,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { useI18n } from '../lib/i18n.jsx';
+import { useIsMobile } from '../hooks/useIsMobile.js';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
 import { getCurrentCreatorValue } from '../lib/records';
 import { mergeLookupEntities, normalizeLookupProduct, toProductLookupOption } from '../lib/lookups.js';
@@ -74,6 +75,7 @@ export default function CafeOrders() {
   const { businessId, user } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const { t } = useI18n();
+  const isCompactLayout = useIsMobile('(max-width: 1180px)');
   const { invalidate: invalidateProducts } = useProductStore();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +90,7 @@ export default function CafeOrders() {
   const [productDirectory, setProductDirectory] = useState({});
   const [isPaid, setIsPaid] = useState(false);
   const [attributeSnapshot, setAttributeSnapshot] = useState({});
+  const [activeDialogStep, setActiveDialogStep] = useState('details');
   const [orderFields, setOrderFields] = useState({
     saleDate: todayISODate(),
     notes: '',
@@ -141,6 +144,11 @@ export default function CafeOrders() {
   useEffect(() => {
     loadOrders();
   }, [businessId]);
+
+  useEffect(() => {
+    if (!dialogOpen) return;
+    setActiveDialogStep('details');
+  }, [dialogOpen]);
 
   const totals = useMemo(() => {
     const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
@@ -446,6 +454,36 @@ export default function CafeOrders() {
   const completedCount = orderCounts.completed || 0;
   const openCount = activeOrders.length;
   const readyCount = orderCounts.ready || 0;
+  const visibleBoardColumns = selectedStatusFilter === 'all'
+    ? groupedOrders
+    : groupedOrders.filter((column) => column.value === selectedStatusFilter);
+  const dialogSteps = useMemo(() => ([
+    { id: 'details', label: 'Details' },
+    { id: 'items', label: 'Items' },
+    { id: 'payment', label: 'Payment' },
+  ]), []);
+  const activeDialogStepIndex = dialogSteps.findIndex((step) => step.id === activeDialogStep);
+  const nextDialogStep = activeDialogStepIndex >= 0 ? dialogSteps[activeDialogStepIndex + 1] : null;
+  const canGoBackStep = activeDialogStepIndex > 0;
+  const canGoForwardStep = activeDialogStepIndex >= 0 && activeDialogStepIndex < dialogSteps.length - 1;
+  const showDetailsStep = !isCompactLayout || activeDialogStep === 'details';
+  const showItemsStep = !isCompactLayout || activeDialogStep === 'items';
+  const showPaymentStep = !isCompactLayout || activeDialogStep === 'payment';
+  const dialogOrderLabel = String(orderFields.invoiceNo || suggestedInvoiceNo || (editingId ? editingId.slice(0, 8) : 'Draft order')).trim();
+  const dialogSecondaryLabel = orderFields.orderType === 'dine_in'
+    ? (orderFields.tableNo ? `Table ${orderFields.tableNo}` : 'No table selected')
+    : getCafeOrderTypeLabel(orderFields.orderType);
+  const dialogPrimaryActionLabel = canGoForwardStep
+    ? `Continue to ${nextDialogStep?.label || 'Next'}`
+    : (formMode === 'edit' ? 'Update Order' : 'Save Order');
+  const handleGoToNextDialogStep = () => {
+    if (!canGoForwardStep || !nextDialogStep) return;
+    setActiveDialogStep(nextDialogStep.id);
+  };
+  const handleGoToPreviousDialogStep = () => {
+    if (!canGoBackStep) return;
+    setActiveDialogStep(dialogSteps[activeDialogStepIndex - 1].id);
+  };
 
   return (
     <div className="space-y-6">
@@ -467,12 +505,13 @@ export default function CafeOrders() {
 
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-sm">
+      <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9b6835]">Floor View</p>
-              <h2 className="mt-2 text-2xl font-semibold text-slate-900">Tables</h2>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900 sm:text-2xl">Tables</h2>
+              <p className="mt-1 text-sm text-slate-500">Tap a table to focus the active orders for that seating area.</p>
             </div>
             {selectedTableFilter ? (
               <button
@@ -485,7 +524,7 @@ export default function CafeOrders() {
             ) : null}
           </div>
 
-          <div className="mt-6 grid grid-cols-3 gap-4 lg:grid-cols-4">
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {tableMap.map((table) => {
               const isActive = selectedTableFilter === table.id;
               const statusMeta = table.statusMeta;
@@ -495,7 +534,7 @@ export default function CafeOrders() {
                   key={table.id}
                   type="button"
                   onClick={() => setSelectedTableFilter((current) => (current === table.id ? '' : table.id))}
-                  className={`rounded-3xl border p-4 text-left transition ${
+                  className={`rounded-3xl border p-3.5 text-left transition sm:p-4 ${
                     isActive
                       ? 'border-[#9b6835] bg-[#9b6835]/8 shadow-sm'
                       : table.occupied
@@ -519,8 +558,8 @@ export default function CafeOrders() {
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-slate-200/80 bg-gradient-to-br from-[#fff8f1] via-white to-slate-50 p-6 shadow-sm">
-          <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
+        <div className="rounded-[28px] border border-slate-200/80 bg-gradient-to-br from-[#fff8f1] via-white to-slate-50 p-4 shadow-sm sm:p-6">
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-1">
             <div className="rounded-3xl border border-white/70 bg-white/80 p-5">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-slate-900">Open Orders</p>
@@ -550,12 +589,24 @@ export default function CafeOrders() {
           </div>
 
           <div className="mt-5 rounded-3xl border border-slate-200/70 bg-white/80 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Board Filters</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Board Filters</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedStatusFilter === 'all' ? 'Showing all kitchen stages.' : `Focused on ${CAFE_ORDER_STATUSES.find((column) => column.value === selectedStatusFilter)?.label || 'selected'} orders.`}
+                </p>
+              </div>
+              {selectedTableFilter ? (
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
+                  Table {selectedTableFilter}
+                </span>
+              ) : null}
+            </div>
+            <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar pb-1 sm:flex-wrap">
               <button
                 type="button"
                 onClick={() => setSelectedStatusFilter('all')}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
+                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition ${
                   selectedStatusFilter === 'all'
                     ? 'bg-slate-900 text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -568,7 +619,7 @@ export default function CafeOrders() {
                   key={column.value}
                   type="button"
                   onClick={() => setSelectedStatusFilter(column.value)}
-                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition ${
                     selectedStatusFilter === column.value
                       ? `${column.tone} shadow-sm`
                       : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
@@ -582,12 +633,11 @@ export default function CafeOrders() {
         </div>
       </div>
 
-      <div className="overflow-x-auto pb-2">
-        <div className="grid min-w-[1120px] gap-4 xl:grid-cols-4">
-          {groupedOrders.map((column) => (
+      <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+        {visibleBoardColumns.map((column) => (
             <section
               key={column.value}
-              className="rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm"
+              className="rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-5"
             >
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
@@ -647,6 +697,10 @@ export default function CafeOrders() {
                             <Store size={14} className="text-slate-400" />
                             <span>{meta.waiterName || 'No waiter assigned'}</span>
                           </div>
+                          <div className="flex items-center gap-2">
+                            <ShoppingCart size={14} className="text-slate-400" />
+                            <span>{Array.isArray(order.SaleItems) ? `${order.SaleItems.length} items` : 'Items loading from invoice'}</span>
+                          </div>
                         </div>
 
                         {order.notes ? (
@@ -694,7 +748,6 @@ export default function CafeOrders() {
               </div>
             </section>
           ))}
-        </div>
       </div>
 
       <Dialog
@@ -704,260 +757,421 @@ export default function CafeOrders() {
         size="full"
       >
         <form className="space-y-5" onSubmit={saveOrder}>
-          <FormSectionCard hint="Keep the kitchen team and counter synced with order type, table, and waiter details.">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div>
-                <label className="label">Order No</label>
-                <input
-                  className="input mt-1"
-                  name="invoiceNo"
-                  value={orderFields.invoiceNo}
-                  onChange={(event) => setOrderFields((prev) => ({ ...prev, invoiceNo: event.target.value }))}
-                  placeholder={formMode === 'create' ? suggestedInvoiceNo : ''}
-                />
-              </div>
-              <div>
-                <label className="label">Date</label>
-                <input
-                  className="input mt-1"
-                  type="date"
-                  value={orderFields.saleDate}
-                  onChange={(event) => setOrderFields((prev) => ({ ...prev, saleDate: event.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="label">Stage</label>
-                <select
-                  className="input mt-1"
-                  value={orderFields.orderStatus}
-                  onChange={(event) => setOrderFields((prev) => ({ ...prev, orderStatus: event.target.value }))}
-                >
-                  {CAFE_ORDER_STATUSES.map((statusOption) => (
-                    <option key={statusOption.value} value={statusOption.value}>{statusOption.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label">Order Type</label>
-                <select
-                  className="input mt-1"
-                  value={orderFields.orderType}
-                  onChange={(event) => setOrderFields((prev) => ({
-                    ...prev,
-                    orderType: event.target.value,
-                    tableNo: event.target.value === 'dine_in' ? prev.tableNo : '',
-                  }))}
-                >
-                  <option value="dine_in">Dine In</option>
-                  <option value="takeaway">Takeaway</option>
-                  <option value="delivery">Delivery</option>
-                </select>
-              </div>
-              <div>
-                <label className="label">Table No</label>
-                <input
-                  className="input mt-1"
-                  value={orderFields.tableNo}
-                  disabled={orderFields.orderType !== 'dine_in'}
-                  onChange={(event) => setOrderFields((prev) => ({ ...prev, tableNo: event.target.value }))}
-                  placeholder={orderFields.orderType === 'dine_in' ? '1' : 'Not required'}
-                />
-              </div>
-              <div>
-                <label className="label">Waiter</label>
-                <input
-                  className="input mt-1"
-                  value={orderFields.waiterName}
-                  onChange={(event) => setOrderFields((prev) => ({ ...prev, waiterName: event.target.value }))}
-                  placeholder="Staff name"
-                />
-              </div>
-              <div>
-                <label className="label">Guest Count</label>
-                <input
-                  className="input mt-1"
-                  type="number"
-                  min="1"
-                  value={orderFields.guestCount}
-                  onChange={(event) => setOrderFields((prev) => ({ ...prev, guestCount: event.target.value }))}
-                />
-              </div>
-              <div className="md:col-span-2 xl:col-span-1">
-                <label className="label">Notes</label>
-                <input
-                  className="input mt-1"
-                  value={orderFields.notes}
-                  onChange={(event) => setOrderFields((prev) => ({ ...prev, notes: event.target.value }))}
-                  placeholder="Special instructions"
-                />
-              </div>
-            </div>
-          </FormSectionCard>
+          {isCompactLayout ? (
+            <>
+              <div className="rounded-[28px] border border-slate-200/80 bg-gradient-to-br from-[#fff8f1] via-white to-slate-50 p-4 shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9b6835]">Order Draft</p>
+                    <h3 className="mt-2 truncate text-xl font-semibold text-slate-900">{dialogOrderLabel}</h3>
+                    <p className="mt-1 text-sm text-slate-500">{dialogSecondaryLabel}</p>
+                  </div>
+                  <span className={`inline-flex w-fit rounded-full border px-3 py-1.5 text-xs font-semibold ${getCafePaymentMeta({ dueAmount, grandTotal: totals.grandTotal }).tone}`}>
+                    {getCafePaymentMeta({ dueAmount, grandTotal: totals.grandTotal }).label}
+                  </span>
+                </div>
 
-          <FormSectionCard
-            title="Items"
-            action={<button className="btn-ghost w-full sm:w-auto" type="button" onClick={() => setItems((prev) => [...prev, { ...emptyItem }])}>Add Item</button>}
-          >
-            <div className="space-y-4">
-              {items.map((item, index) => {
-                const product = getProductById(item.productId);
-                const vatAmount = getVatAmount(item.lineTotal, item.taxRate);
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-2xl bg-white/85 px-3 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Items</p>
+                    <p className="mt-1 text-base font-semibold text-slate-900">{items.length}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/85 px-3 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Guests</p>
+                    <p className="mt-1 text-base font-semibold text-slate-900">{orderFields.guestCount || '1'}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/85 px-3 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Total</p>
+                    <p className="mt-1 text-base font-semibold text-slate-900">{formatMoney(totals.grandTotal)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/85 px-3 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Due</p>
+                    <p className={`mt-1 text-base font-semibold ${dueAmount > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                      {formatMoney(dueAmount)}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-                return (
-                  <div key={`cafe-item-${index}`} className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4">
-                    <div className="mb-4 flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                          {product?.name || `Menu Item ${index + 1}`}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {formatMoney(item.lineTotal)} total · {formatMoney(vatAmount)} tax
-                        </p>
-                      </div>
-                      {items.length > 1 ? (
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                {dialogSteps.map((step) => (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => setActiveDialogStep(step.id)}
+                    className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      activeDialogStep === step.id
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {step.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
+
+          {showDetailsStep ? (
+            <FormSectionCard hint="Keep the kitchen team and counter synced with order type, table, and waiter details.">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div>
+                  <label className="label">Order No</label>
+                  <input
+                    className="input mt-1"
+                    name="invoiceNo"
+                    value={orderFields.invoiceNo}
+                    onChange={(event) => setOrderFields((prev) => ({ ...prev, invoiceNo: event.target.value }))}
+                    placeholder={formMode === 'create' ? suggestedInvoiceNo : ''}
+                  />
+                </div>
+                <div>
+                  <label className="label">Date</label>
+                  <input
+                    className="input mt-1"
+                    type="date"
+                    value={orderFields.saleDate}
+                    onChange={(event) => setOrderFields((prev) => ({ ...prev, saleDate: event.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label">Stage</label>
+                  <select
+                    className="input mt-1"
+                    value={orderFields.orderStatus}
+                    onChange={(event) => setOrderFields((prev) => ({ ...prev, orderStatus: event.target.value }))}
+                  >
+                    {CAFE_ORDER_STATUSES.map((statusOption) => (
+                      <option key={statusOption.value} value={statusOption.value}>{statusOption.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Guest Count</label>
+                  <input
+                    className="input mt-1"
+                    type="number"
+                    min="1"
+                    value={orderFields.guestCount}
+                    onChange={(event) => setOrderFields((prev) => ({ ...prev, guestCount: event.target.value }))}
+                  />
+                </div>
+
+                <div className="sm:col-span-2 xl:col-span-2">
+                  <label className="label">Order Type</label>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'dine_in', label: 'Dine In' },
+                      { value: 'takeaway', label: 'Takeaway' },
+                      { value: 'delivery', label: 'Delivery' },
+                    ].map((typeOption) => (
+                      <button
+                        key={typeOption.value}
+                        type="button"
+                        onClick={() => setOrderFields((prev) => ({
+                          ...prev,
+                          orderType: typeOption.value,
+                          tableNo: typeOption.value === 'dine_in' ? prev.tableNo : '',
+                        }))}
+                        className={`${orderFields.orderType === typeOption.value ? 'btn-primary' : 'btn-ghost'} w-full justify-center`}
+                      >
+                        {typeOption.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2 xl:col-span-2">
+                  <label className="label">Waiter</label>
+                  <input
+                    className="input mt-1"
+                    value={orderFields.waiterName}
+                    onChange={(event) => setOrderFields((prev) => ({ ...prev, waiterName: event.target.value }))}
+                    placeholder="Staff name"
+                  />
+                </div>
+
+                <div className="sm:col-span-2 xl:col-span-4">
+                  <label className="label">Notes</label>
+                  <textarea
+                    className="input mt-1 h-24 resize-none"
+                    value={orderFields.notes}
+                    onChange={(event) => setOrderFields((prev) => ({ ...prev, notes: event.target.value }))}
+                    placeholder="Special instructions"
+                  />
+                </div>
+              </div>
+
+              {orderFields.orderType === 'dine_in' ? (
+                <div className="mt-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="label">Table Selection</p>
+                      <p className="mt-1 text-xs text-slate-500">Choose the table for this order.</p>
+                    </div>
+                    {orderFields.tableNo ? (
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        onClick={() => setOrderFields((prev) => ({ ...prev, tableNo: '' }))}
+                      >
+                        Clear table
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                    {tableMap.map((table) => {
+                      const selected = orderFields.tableNo === table.id || orderFields.tableNo === table.label;
+                      const occupiedByOther = table.occupied && !selected;
+
+                      return (
                         <button
-                          className="btn-ghost"
+                          key={`dialog-table-${table.id}`}
                           type="button"
-                          onClick={() => {
-                            setItems((previous) => {
-                              const target = previous[index];
-                              if (target?.id) {
-                                setDeletedItemIds((current) => [...current, target.id]);
-                              }
-                              return previous.filter((_, itemIndex) => itemIndex !== index);
-                            });
-                          }}
+                          onClick={() => setOrderFields((prev) => ({ ...prev, tableNo: table.id }))}
+                          className={`rounded-2xl border px-3 py-3 text-left transition ${
+                            selected
+                              ? 'border-[#9b6835] bg-[#9b6835]/10 shadow-sm'
+                              : occupiedByOther
+                                ? 'border-amber-200 bg-amber-50 text-amber-800'
+                                : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                          }`}
                         >
-                          Remove
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-slate-900">{table.label}</span>
+                            <span className={`h-2.5 w-2.5 rounded-full ${table.statusMeta?.accent || 'bg-slate-300'}`} />
+                          </div>
+                          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                            {selected ? 'Selected' : occupiedByOther ? (table.statusMeta?.label || 'Occupied') : 'Available'}
+                          </p>
                         </button>
-                      ) : null}
-                    </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-slate-200/70 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  {getCafeOrderTypeLabel(orderFields.orderType)} orders do not need a table assignment.
+                </div>
+              )}
+            </FormSectionCard>
+          ) : null}
 
-                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                      <div className="md:col-span-2 xl:col-span-2">
-                        <label className="label">Menu Item</label>
-                        <AsyncSearchableSelect
-                          className="mt-1"
-                          value={item.productId}
-                          selectedOption={product ? toProductLookupOption(product) : null}
-                          onChange={(option) => handleProductSelection(index, option)}
-                          loadOptions={loadProductOptions}
-                          placeholder="Search menu items"
-                          searchPlaceholder="Search menu items"
-                          noResultsLabel="No menu items found"
-                          loadingLabel="Loading menu items..."
-                        />
+          {showItemsStep ? (
+            <FormSectionCard
+              title="Items"
+              action={<button className="btn-ghost w-full sm:w-auto" type="button" onClick={() => setItems((prev) => [...prev, { ...emptyItem }])}>Add Item</button>}
+            >
+              <div className="space-y-4">
+                {items.map((item, index) => {
+                  const product = getProductById(item.productId);
+                  const vatAmount = getVatAmount(item.lineTotal, item.taxRate);
+
+                  return (
+                    <div key={`cafe-item-${index}`} className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4">
+                      <div className="mb-4 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                            {product?.name || `Menu Item ${index + 1}`}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {formatMoney(item.lineTotal)} total · {formatMoney(vatAmount)} tax
+                          </p>
+                        </div>
+                        {items.length > 1 ? (
+                          <button
+                            className="btn-ghost"
+                            type="button"
+                            onClick={() => {
+                              setItems((previous) => {
+                                const target = previous[index];
+                                if (target?.id) {
+                                  setDeletedItemIds((current) => [...current, target.id]);
+                                }
+                                return previous.filter((_, itemIndex) => itemIndex !== index);
+                              });
+                            }}
+                          >
+                            Remove
+                          </button>
+                        ) : null}
                       </div>
-                      <div>
-                        <label className="label">Qty</label>
-                        <input
-                          className="input mt-1"
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={item.quantity}
-                          onChange={(event) => handleItemChange(index, 'quantity', event.target.value)}
-                        />
-                        <p className="mt-1 text-xs text-slate-500">{getProductUnitLabel(product, item.unitType)}</p>
-                      </div>
-                      <div>
-                        <label className="label">Unit Type</label>
-                        <select
-                          className="input mt-1"
-                          value={item.unitType}
-                          onChange={(event) => {
-                            handleItemChange(index, 'unitType', event.target.value);
-                            syncItemDefaults(index, getProductById(item.productId), event.target.value);
-                          }}
-                        >
-                          <option value="primary">Primary</option>
-                          <option value="secondary">Secondary</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="label">Unit Price</label>
-                        <input
-                          className="input mt-1"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.unitPrice}
-                          onChange={(event) => handleItemChange(index, 'unitPrice', event.target.value)}
-                        />
+
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                        <div className="sm:col-span-2 xl:col-span-2">
+                          <label className="label">Menu Item</label>
+                          <AsyncSearchableSelect
+                            className="mt-1"
+                            value={item.productId}
+                            selectedOption={product ? toProductLookupOption(product) : null}
+                            onChange={(option) => handleProductSelection(index, option)}
+                            loadOptions={loadProductOptions}
+                            placeholder="Search menu items"
+                            searchPlaceholder="Search menu items"
+                            noResultsLabel="No menu items found"
+                            loadingLabel="Loading menu items..."
+                          />
+                        </div>
+                        <div>
+                          <label className="label">Qty</label>
+                          <input
+                            className="input mt-1"
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={item.quantity}
+                            onChange={(event) => handleItemChange(index, 'quantity', event.target.value)}
+                          />
+                          <p className="mt-1 text-xs text-slate-500">{getProductUnitLabel(product, item.unitType)}</p>
+                        </div>
+                        <div>
+                          <label className="label">Unit Type</label>
+                          <select
+                            className="input mt-1"
+                            value={item.unitType}
+                            onChange={(event) => {
+                              handleItemChange(index, 'unitType', event.target.value);
+                              syncItemDefaults(index, getProductById(item.productId), event.target.value);
+                            }}
+                          >
+                            <option value="primary">Primary</option>
+                            <option value="secondary">Secondary</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="label">Unit Price</label>
+                          <input
+                            className="input mt-1"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.unitPrice}
+                            onChange={(event) => handleItemChange(index, 'unitPrice', event.target.value)}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </FormSectionCard>
+                  );
+                })}
+              </div>
+            </FormSectionCard>
+          ) : null}
 
-          <FormSectionCard title="Payment">
-            <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-              <div className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Subtotal</p>
-                    <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoney(totals.subTotal)}</p>
+          {showPaymentStep ? (
+            <FormSectionCard title="Payment">
+              <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+                <div className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Subtotal</p>
+                      <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoney(totals.subTotal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Tax</p>
+                      <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoney(totals.taxTotal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Grand Total</p>
+                      <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoney(totals.grandTotal)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Tax</p>
-                    <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoney(totals.taxTotal)}</p>
+
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="flex-1">
+                      <label className="label">Amount Received</label>
+                      <input
+                        className="input mt-1"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        disabled={isPaid}
+                        value={isPaid ? totals.grandTotal.toFixed(2) : orderFields.amountReceived}
+                        onChange={(event) => setOrderFields((prev) => ({ ...prev, amountReceived: event.target.value }))}
+                      />
+                    </div>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded accent-primary-600"
+                        checked={isPaid}
+                        onChange={(event) => setIsPaid(event.target.checked)}
+                      />
+                      Fully paid
+                    </label>
                   </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Grand Total</p>
-                    <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoney(totals.grandTotal)}</p>
+
+                  <div className={`mt-4 rounded-2xl px-3 py-2 text-sm ${dueAmount > 0 ? 'border border-amber-200 bg-amber-50 text-amber-700' : 'border border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                    {dueAmount > 0 ? (
+                      <>Remaining due: <span className="font-semibold">{formatMoney(dueAmount)}</span></>
+                    ) : (
+                      <>This order is fully paid.</>
+                    )}
                   </div>
                 </div>
 
-                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="flex-1">
-                    <label className="label">Amount Received</label>
-                    <input
-                      className="input mt-1"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      disabled={isPaid}
-                      value={isPaid ? totals.grandTotal.toFixed(2) : orderFields.amountReceived}
-                      onChange={(event) => setOrderFields((prev) => ({ ...prev, amountReceived: event.target.value }))}
-                    />
-                  </div>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded accent-primary-600"
-                      checked={isPaid}
-                      onChange={(event) => setIsPaid(event.target.checked)}
-                    />
-                    Fully paid
-                  </label>
+                <div className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4">
+                  <PaymentMethodFields
+                    value={orderFields}
+                    onChange={(patch) => setOrderFields((prev) => ({ ...prev, ...patch }))}
+                  />
                 </div>
+              </div>
+            </FormSectionCard>
+          ) : null}
 
-                {dueAmount > 0 ? (
-                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                    Remaining due: <span className="font-semibold">{formatMoney(dueAmount)}</span>
-                  </div>
+          {isCompactLayout ? (
+            <div className="mobile-sticky-actions space-y-3">
+              <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-100/90 px-4 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    {dialogSteps[activeDialogStepIndex]?.label || 'Details'}
+                  </p>
+                  <p className="mt-1 truncate font-semibold text-slate-700">{dialogOrderLabel}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    {dueAmount > 0 ? 'Due' : 'Total'}
+                  </p>
+                  <p className={`mt-1 font-semibold ${dueAmount > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                    {formatMoney(dueAmount > 0 ? dueAmount : totals.grandTotal)}
+                  </p>
+                </div>
+              </div>
+
+              <div className={`grid gap-2 ${canGoBackStep ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                {canGoBackStep ? (
+                  <button className="btn-ghost w-full" type="button" onClick={handleGoToPreviousDialogStep}>
+                    Back
+                  </button>
                 ) : null}
+
+                {canGoForwardStep ? (
+                  <button className="btn-primary w-full" type="button" onClick={handleGoToNextDialogStep}>
+                    {dialogPrimaryActionLabel}
+                    <ArrowRight size={14} className="ml-1.5" />
+                  </button>
+                ) : (
+                  <button className="btn-primary w-full" type="submit">
+                    {dialogPrimaryActionLabel}
+                  </button>
+                )}
               </div>
 
-              <div className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4">
-                <PaymentMethodFields
-                  value={orderFields}
-                  onChange={(patch) => setOrderFields((prev) => ({ ...prev, ...patch }))}
-                />
-              </div>
+              <button className="btn-secondary w-full" type="button" onClick={closeDialog}>
+                Cancel
+              </button>
             </div>
-          </FormSectionCard>
-
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button className="btn-secondary w-full sm:w-auto" type="button" onClick={closeDialog}>
-              Cancel
-            </button>
-            <button className="btn-primary w-full sm:w-auto" type="submit">
-              {formMode === 'edit' ? 'Update Order' : 'Save Order'}
-            </button>
-          </div>
+          ) : (
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button className="btn-secondary w-full sm:w-auto" type="button" onClick={closeDialog}>
+                Cancel
+              </button>
+              <button className="btn-primary w-full sm:w-auto" type="submit">
+                {formMode === 'edit' ? 'Update Order' : 'Save Order'}
+              </button>
+            </div>
+          )}
         </form>
       </Dialog>
     </div>

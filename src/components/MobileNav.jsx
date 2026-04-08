@@ -47,8 +47,8 @@ export default function MobileNav() {
     .concat(role === 'owner' ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }] : []);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200/70 bg-white/95 px-2 py-3 shadow-lg backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/90 md:hidden">
-      <div className="flex items-center justify-between gap-1 overflow-x-auto no-scrollbar scroll-smooth">
+    <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200/70 bg-white/95 px-2 py-2 shadow-lg backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/90 md:hidden">
+      <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar scroll-smooth pb-[max(env(safe-area-inset-bottom),0px)]">
         {visibleNavItems.map((item) => {
           const Icon = ICON_MAP[item.key] || Briefcase;
 
@@ -58,7 +58,7 @@ export default function MobileNav() {
               to={item.route}
               end={item.route === '/app'}
               className={({ isActive }) =>
-                `flex min-w-[70px] flex-1 flex-col items-center gap-1 rounded-2xl px-2 py-2 text-center transition-all ${
+                `flex min-w-[82px] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2.5 text-center transition-all ${
                   isActive
                     ? 'bg-primary-50 text-primary-700 shadow-sm dark:bg-primary-900/30 dark:text-primary-300'
                     : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/60'
@@ -66,7 +66,7 @@ export default function MobileNav() {
               }
             >
               <Icon size={20} strokeWidth={2} />
-              <span className="text-[10px] font-medium leading-tight">{item.label}</span>
+              <span className="text-[11px] font-medium leading-tight">{item.label}</span>
             </NavLink>
           );
         })}

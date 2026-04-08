@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
@@ -9,12 +10,14 @@ import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 import { getPurityOptionsForMetal, METAL_TYPE_OPTIONS } from '../lib/jewellery.js';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
+import { buildSettingsTabPath, UNITS_SETTINGS_TAB } from '../lib/settingsTabs.js';
 import { useProductStore } from '../stores/products';
 import { ArrowUpDown, Pencil, Plus } from 'lucide-react';
 
 const makeEmptyItem = () => ({
   name: '',
   categoryId: '',
+  unitId: '',
   itemCode: '',
   itemType: 'goods',
   metalType: '',
@@ -49,6 +52,7 @@ const buildProductPayload = (form) => ({
   metalType: form.metalType,
   purity: form.purity,
   ...(form.categoryId ? { categoryId: form.categoryId } : {}),
+  unitId: form.unitId || null,
   primaryUnit: form.primaryUnit,
   secondaryUnit: form.secondaryUnit,
   conversionRate: parseNumber(form.conversionRate),
@@ -76,6 +80,7 @@ function productToForm(product = {}) {
   return {
     name: product.name || '',
     categoryId: String(product.categoryId ?? product.category?.id ?? ''),
+    unitId: String(product.unitId ?? product.unit?.id ?? ''),
     itemCode: product.sku || '',
     itemType: product.itemType || 'goods',
     metalType: product.metalType || '',
@@ -96,6 +101,19 @@ function productToForm(product = {}) {
 
 function getCurrentStock(product = {}) {
   return Number(product.stockOnHand ?? product.openingStock ?? 0);
+}
+
+function getUnitText(unit = {}) {
+  return String(unit.symbol || unit.name || '').trim();
+}
+
+function getUnitOptionLabel(unit = {}) {
+  const name = String(unit.name || '').trim();
+  const symbol = String(unit.symbol || '').trim();
+  if (name && symbol && name.toLowerCase() !== symbol.toLowerCase()) {
+    return `${name} (${symbol})`;
+  }
+  return name || symbol;
 }
 
 function isRestockableProduct(product = {}) {
@@ -128,38 +146,6 @@ export default function Inventory() {
     addProduct,
     patchProduct,
   } = useProductStore();
-
-  const unitOptions = useMemo(() => ([
-    t('products.units.piece'),
-    t('products.units.box'),
-    t('products.units.pack'),
-    t('products.units.set'),
-    t('products.units.pair'),
-    t('products.units.dozen'),
-    t('products.units.bundle'),
-    t('products.units.bottle'),
-    t('products.units.carton'),
-    t('products.units.tray'),
-    t('products.units.bag'),
-    t('products.units.sack'),
-    t('products.units.kg'),
-    t('products.units.g'),
-    t('products.units.litre'),
-    t('products.units.ml'),
-    t('products.units.meter'),
-    t('products.units.cm'),
-    t('products.units.mm'),
-    t('products.units.inch'),
-    t('products.units.foot'),
-    t('products.units.yard'),
-    t('products.units.roll'),
-    t('products.units.sheet'),
-    t('products.units.unit'),
-    t('products.units.hour'),
-    t('products.units.day'),
-    t('products.units.month'),
-  ]), [t]);
-  const unitListId = 'inventory-unit-options';
   const inventoryProfile = businessProfile?.inventory || {};
   const itemTypeOptions = Array.isArray(inventoryProfile.itemTypes) && inventoryProfile.itemTypes.length
     ? inventoryProfile.itemTypes
@@ -192,6 +178,9 @@ export default function Inventory() {
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoriesError, setCategoriesError] = useState('');
+  const [unitOptions, setUnitOptions] = useState([]);
+  const [unitsLoading, setUnitsLoading] = useState(false);
+  const [unitsError, setUnitsError] = useState('');
 
   useEffect(() => {
     fetchProducts();
@@ -225,6 +214,33 @@ export default function Inventory() {
     loadCategories();
   }, [loadCategories]);
 
+  const loadUnits = useCallback(async () => {
+    setUnitsLoading(true);
+
+    try {
+      const response = await api.listUnits({
+        limit: 200,
+        offset: 0,
+      });
+
+      const nextUnits = (response.items || [])
+        .filter((unit) => unit?.id && unit?.name)
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+
+      setUnitOptions(nextUnits);
+      setUnitsError('');
+    } catch (error) {
+      setUnitOptions([]);
+      setUnitsError(error.message);
+    } finally {
+      setUnitsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUnits();
+  }, [loadUnits]);
+
   useEffect(() => {
     if (!itemTypeOptions.some((option) => option.value === form.itemType)) {
       setForm((previous) => ({
@@ -256,7 +272,7 @@ export default function Inventory() {
       salePrice: Number(product.salePrice ?? 0),
       purchasePrice: Number(product.purchasePrice ?? 0),
       quantity: Number(product.stockOnHand ?? product.openingStock ?? 0),
-      unit: product.primaryUnit || '',
+      unit: product.primaryUnit || getUnitText(product.unit) || '',
     }));
   }, [products]);
 
@@ -272,7 +288,69 @@ export default function Inventory() {
     () => categoryOptions.find((category) => String(category.id) === String(form.categoryId)),
     [categoryOptions, form.categoryId]
   );
+  const unitOptionsById = useMemo(
+    () => new Map(unitOptions.map((unit) => [String(unit.id), unit])),
+    [unitOptions],
+  );
   const purityOptions = useMemo(() => getPurityOptionsForMetal(form.metalType), [form.metalType]);
+  const primaryUnitChoices = useMemo(() => {
+    const choices = unitOptions.map((unit) => ({
+      value: `id:${unit.id}`,
+      label: getUnitOptionLabel(unit),
+      text: getUnitText(unit),
+    }));
+    const current = String(form.primaryUnit || '').trim();
+    const hasManagedSelection = form.unitId && unitOptionsById.has(String(form.unitId));
+    const matchesExisting = current
+      ? unitOptions.some((unit) => getUnitText(unit).toLowerCase() === current.toLowerCase())
+      : true;
+
+    if (current && !hasManagedSelection && !matchesExisting) {
+      choices.unshift({
+        value: `legacy:${current}`,
+        label: `${current} (${t('unitsManagement.legacyValue')})`,
+        text: current,
+      });
+    }
+
+    return choices;
+  }, [form.primaryUnit, form.unitId, t, unitOptions, unitOptionsById]);
+  const secondaryUnitChoices = useMemo(() => {
+    const choices = unitOptions.map((unit) => ({
+      value: `id:${unit.id}`,
+      label: getUnitOptionLabel(unit),
+      text: getUnitText(unit),
+    }));
+    const current = String(form.secondaryUnit || '').trim();
+    const matchesExisting = current
+      ? unitOptions.some((unit) => getUnitText(unit).toLowerCase() === current.toLowerCase())
+      : true;
+
+    if (current && !matchesExisting) {
+      choices.unshift({
+        value: `legacy:${current}`,
+        label: `${current} (${t('unitsManagement.legacyValue')})`,
+        text: current,
+      });
+    }
+
+    return choices;
+  }, [form.secondaryUnit, t, unitOptions]);
+  const primaryUnitSelectValue = useMemo(() => {
+    if (form.unitId && unitOptionsById.has(String(form.unitId))) {
+      return `id:${form.unitId}`;
+    }
+
+    const current = String(form.primaryUnit || '').trim();
+    return current ? `legacy:${current}` : '';
+  }, [form.primaryUnit, form.unitId, unitOptionsById]);
+  const secondaryUnitSelectValue = useMemo(() => {
+    const current = String(form.secondaryUnit || '').trim();
+    if (!current) return '';
+
+    const match = unitOptions.find((unit) => getUnitText(unit).toLowerCase() === current.toLowerCase());
+    return match ? `id:${match.id}` : `legacy:${current}`;
+  }, [form.secondaryUnit, unitOptions]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -323,6 +401,61 @@ export default function Inventory() {
         purity: nextPurityOptions.length > 0 && !nextPurityOptions.includes(prev.purity) ? '' : prev.purity,
       };
     });
+  };
+
+  const handlePrimaryUnitChange = (event) => {
+    const { value } = event.target;
+
+    if (!value) {
+      setForm((previous) => ({
+        ...previous,
+        unitId: '',
+        primaryUnit: '',
+      }));
+      return;
+    }
+
+    if (value.startsWith('id:')) {
+      const unit = unitOptionsById.get(value.slice(3));
+      setForm((previous) => ({
+        ...previous,
+        unitId: unit?.id ? String(unit.id) : '',
+        primaryUnit: getUnitText(unit),
+      }));
+      return;
+    }
+
+    setForm((previous) => ({
+      ...previous,
+      unitId: '',
+      primaryUnit: value.slice('legacy:'.length),
+    }));
+  };
+
+  const handleSecondaryUnitChange = (event) => {
+    const { value } = event.target;
+
+    if (!value) {
+      setForm((previous) => ({
+        ...previous,
+        secondaryUnit: '',
+      }));
+      return;
+    }
+
+    if (value.startsWith('id:')) {
+      const unit = unitOptionsById.get(value.slice(3));
+      setForm((previous) => ({
+        ...previous,
+        secondaryUnit: getUnitText(unit),
+      }));
+      return;
+    }
+
+    setForm((previous) => ({
+      ...previous,
+      secondaryUnit: value.slice('legacy:'.length),
+    }));
   };
 
   const openCreateDialog = () => {
@@ -784,11 +917,6 @@ export default function Inventory() {
         title={editingId ? `${t('common.edit')} ${t('inventory.itemName').toLowerCase()}` : t('inventory.addNewItem')}
         size="xl"
       >
-        <datalist id={unitListId}>
-          {unitOptions.map((option) => (
-            <option key={option} value={option} />
-          ))}
-        </datalist>
         <form className="space-y-5" onSubmit={handleSubmit}>
           <FormSectionCard hint={t('inventory.help')}>
             <div className="space-y-4">
@@ -930,7 +1058,26 @@ export default function Inventory() {
                 </div>
                 <div>
                   <label className="label">{t('inventory.measuringUnit')}</label>
-                  <input className="input mt-1" name="primaryUnit" list={unitListId} value={form.primaryUnit} onChange={handleFormChange} />
+                  <select
+                    className="input mt-1"
+                    value={primaryUnitSelectValue}
+                    onChange={handlePrimaryUnitChange}
+                  >
+                    <option value="">{t('unitsManagement.selectPrimary')}</option>
+                    {primaryUnitChoices.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  {unitsError ? <p className="mt-2 text-xs text-rose-600">{unitsError}</p> : null}
+                  {!unitsError && unitsLoading ? <p className="mt-2 text-xs text-slate-500">{t('common.loading')}</p> : null}
+                  {!unitsError && !unitsLoading && unitOptions.length === 0 ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span>{t('unitsManagement.manageHint')}</span>
+                      <Link className="font-semibold text-emerald-600 hover:text-emerald-700" to={buildSettingsTabPath(UNITS_SETTINGS_TAB)}>
+                        {t('unitsManagement.manageCta')}
+                      </Link>
+                    </div>
+                  ) : null}
                 </div>
                 <div>
                   <label className="label">{t('products.salePrice')}</label>
@@ -957,7 +1104,16 @@ export default function Inventory() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="label">{t('products.secondaryUnit')}</label>
-                  <input className="input mt-1" name="secondaryUnit" list={unitListId} value={form.secondaryUnit} onChange={handleFormChange} />
+                  <select
+                    className="input mt-1"
+                    value={secondaryUnitSelectValue}
+                    onChange={handleSecondaryUnitChange}
+                  >
+                    <option value="">{t('unitsManagement.selectSecondary')}</option>
+                    {secondaryUnitChoices.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="label">{t('products.conversionRate')}</label>
