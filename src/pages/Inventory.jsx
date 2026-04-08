@@ -7,6 +7,8 @@ import CategorySearchCreateField from '../components/CategorySearchCreateField.j
 import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
+import { getPurityOptionsForMetal, METAL_TYPE_OPTIONS } from '../lib/jewellery.js';
+import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { useProductStore } from '../stores/products';
 import { ArrowUpDown, Pencil, Plus } from 'lucide-react';
 
@@ -15,6 +17,8 @@ const makeEmptyItem = () => ({
   categoryId: '',
   itemCode: '',
   itemType: 'goods',
+  metalType: '',
+  purity: '',
   openingStock: '',
   primaryUnit: '',
   secondaryUnit: '',
@@ -42,6 +46,8 @@ const buildProductPayload = (form) => ({
   name: form.name,
   sku: form.itemCode.trim(),
   itemType: form.itemType,
+  metalType: form.metalType,
+  purity: form.purity,
   ...(form.categoryId ? { categoryId: form.categoryId } : {}),
   primaryUnit: form.primaryUnit,
   secondaryUnit: form.secondaryUnit,
@@ -72,6 +78,8 @@ function productToForm(product = {}) {
     categoryId: String(product.categoryId ?? product.category?.id ?? ''),
     itemCode: product.sku || '',
     itemType: product.itemType || 'goods',
+    metalType: product.metalType || '',
+    purity: product.purity || '',
     openingStock: String(product.openingStock ?? product.stockOnHand ?? ''),
     primaryUnit: product.primaryUnit || '',
     secondaryUnit: product.secondaryUnit || '',
@@ -101,8 +109,17 @@ function formatQuantity(value) {
   });
 }
 
+function getItemTypeLabel(itemType, itemTypeOptions, t) {
+  const match = itemTypeOptions.find((option) => option.value === itemType);
+  if (match?.label) return match.label;
+  if (itemType === 'service') return t('products.service');
+  if (itemType === 'part') return t('products.part');
+  return t('products.goods');
+}
+
 export default function Inventory() {
   const { t } = useI18n();
+  const { businessProfile } = useBusinessSettings();
   const {
     products,
     loading: productsLoading,
@@ -143,6 +160,16 @@ export default function Inventory() {
     t('products.units.month'),
   ]), [t]);
   const unitListId = 'inventory-unit-options';
+  const inventoryProfile = businessProfile?.inventory || {};
+  const itemTypeOptions = Array.isArray(inventoryProfile.itemTypes) && inventoryProfile.itemTypes.length
+    ? inventoryProfile.itemTypes
+    : [
+        { value: 'goods', label: t('products.goods') },
+        { value: 'service', label: t('products.service') },
+      ];
+  const showJewelleryFields = inventoryProfile.showJewelleryFields === true;
+  const inventoryTitle = inventoryProfile.title || t('inventory.itemsTitle');
+  const inventorySubtitle = inventoryProfile.subtitle || t('inventory.itemsSubtitle');
 
   const [status, setStatus] = useState({ type: 'info', message: '' });
   const [toast, setToast] = useState({ type: '', message: '' });
@@ -199,6 +226,15 @@ export default function Inventory() {
   }, [loadCategories]);
 
   useEffect(() => {
+    if (!itemTypeOptions.some((option) => option.value === form.itemType)) {
+      setForm((previous) => ({
+        ...previous,
+        itemType: itemTypeOptions[0]?.value || 'goods',
+      }));
+    }
+  }, [form.itemType, itemTypeOptions]);
+
+  useEffect(() => {
     if (productsError) setStatus({ type: 'error', message: productsError });
   }, [productsError]);
 
@@ -213,6 +249,8 @@ export default function Inventory() {
       id: product.id,
       name: product.name,
       itemType: product.itemType || 'goods',
+      metalType: product.metalType || '',
+      purity: product.purity || '',
       category: getProductCategoryName(product) || '-',
       itemCode: product.sku || '-',
       salePrice: Number(product.salePrice ?? 0),
@@ -234,6 +272,7 @@ export default function Inventory() {
     () => categoryOptions.find((category) => String(category.id) === String(form.categoryId)),
     [categoryOptions, form.categoryId]
   );
+  const purityOptions = useMemo(() => getPurityOptionsForMetal(form.metalType), [form.metalType]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -244,7 +283,7 @@ export default function Inventory() {
       if (stockFilter === 'out' && item.quantity > 0) return false;
       if (stockFilter === 'low' && item.quantity > 5) return false;
       if (!normalizedQuery) return true;
-      return [item.name, item.itemCode, item.category]
+      return [item.name, item.itemCode, item.category, item.metalType, item.purity]
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(normalizedQuery));
     });
@@ -271,12 +310,27 @@ export default function Inventory() {
 
   const handleFormChange = (event) => {
     const { name, value, type, checked } = event.target;
-    setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    setForm((prev) => {
+      const nextValue = type === 'checkbox' ? checked : value;
+      if (name !== 'metalType') {
+        return { ...prev, [name]: nextValue };
+      }
+
+      const nextPurityOptions = getPurityOptionsForMetal(nextValue);
+      return {
+        ...prev,
+        metalType: nextValue,
+        purity: nextPurityOptions.length > 0 && !nextPurityOptions.includes(prev.purity) ? '' : prev.purity,
+      };
+    });
   };
 
   const openCreateDialog = () => {
     setEditingId(null);
-    setForm(makeEmptyItem());
+    setForm({
+      ...makeEmptyItem(),
+      itemType: itemTypeOptions[0]?.value || 'goods',
+    });
     setActiveTab('stock');
     setIsOpen(true);
   };
@@ -444,8 +498,8 @@ export default function Inventory() {
       ) : null}
 
       <PageHeader
-        title={t('inventory.itemsTitle')}
-        subtitle={t('inventory.itemsSubtitle')}
+        title={inventoryTitle}
+        subtitle={inventorySubtitle}
         action={(
           <div className="flex flex-wrap gap-2">
             {/*<button className="btn-secondary w-full sm:w-auto" type="button">*/}
@@ -504,9 +558,9 @@ export default function Inventory() {
             onChange={(event) => setTypeFilter(event.target.value)}
           >
             <option value="all">{t('inventory.allItems')}</option>
-            <option value="goods">{t('products.goods')}</option>
-            <option value="service">{t('products.service')}</option>
-            <option value="part">{t('products.part')}</option>
+            {itemTypeOptions.map((type) => (
+              <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
           </select>
           <button
             className="btn-ghost w-full justify-center xl:w-auto"
@@ -532,7 +586,11 @@ export default function Inventory() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-slate-900 dark:text-white truncate">{item.name}</p>
-                    <p className="text-xs text-slate-500">{item.category} · {item.unit || t('inventory.noUnit')}</p>
+                    <p className="text-xs text-slate-500">
+                      {[item.category, showJewelleryFields ? (item.metalType && item.purity ? `${item.metalType} ${item.purity}` : item.metalType || item.purity) : null, item.unit || t('inventory.noUnit')]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className={`text-xs font-semibold rounded-full px-2 py-0.5 ${item.quantity <= 0 ? 'bg-rose-100 text-rose-700' : item.quantity <= 5 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -600,16 +658,16 @@ export default function Inventory() {
                         </div>
                         <div>
                           <p className="font-semibold text-slate-900 dark:text-white">{item.name}</p>
-                          <p className="text-xs text-slate-500">{item.unit || t('inventory.noUnit')}</p>
+                          <p className="text-xs text-slate-500">
+                            {[showJewelleryFields ? (item.metalType && item.purity ? `${item.metalType} ${item.purity}` : item.metalType || item.purity) : null, item.unit || t('inventory.noUnit')]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
                         </div>
                       </div>
                     </td>
                     <td className="py-3 capitalize">
-                      {item.itemType === 'service'
-                        ? t('products.service')
-                        : item.itemType === 'part'
-                          ? t('products.part')
-                          : t('products.goods')}
+                      {getItemTypeLabel(item.itemType, itemTypeOptions, t)}
                     </td>
                     <td className="py-3">{item.category}</td>
                     <td className="py-3">{item.itemCode}</td>
@@ -778,23 +836,36 @@ export default function Inventory() {
                 </div>
                 <div>
                   <label className="label">{t('inventory.itemType')}</label>
-                  <div className="mt-1 grid grid-cols-3 gap-2">
-                    {['goods', 'service',].map((type) => (
+                  <div className={`mt-1 grid gap-2 ${itemTypeOptions.length > 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                    {itemTypeOptions.map((type) => (
                       <button
-                        key={type}
+                        key={type.value}
                         type="button"
-                        onClick={() => setForm((prev) => ({ ...prev, itemType: type }))}
-                        className={`${form.itemType === type ? 'btn-primary' : 'btn-ghost'} w-full justify-center`}
+                        onClick={() => setForm((prev) => ({ ...prev, itemType: type.value }))}
+                        className={`${form.itemType === type.value ? 'btn-primary' : 'btn-ghost'} w-full justify-center`}
+                        title={type.description || type.label}
                       >
-                        {type === 'goods'
-                          ? t('products.goods')
-                          : type === 'service'
-                            ? t('products.service')
-                            : t('products.part')}
+                        {type.label}
                       </button>
                     ))}
                   </div>
                 </div>
+                {showJewelleryFields ? (
+                  <div>
+                    <label className="label">Metal type</label>
+                    <select
+                      className="input mt-1"
+                      name="metalType"
+                      value={form.metalType}
+                      onChange={handleFormChange}
+                    >
+                      <option value="">Select metal</option>
+                      {METAL_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
               </div>
             </div>
           </FormSectionCard>
@@ -827,6 +898,32 @@ export default function Inventory() {
           <FormSectionCard title={activeTab === 'stock' ? t('inventory.stockDetails') : t('inventory.otherDetails')}>
             {activeTab === 'stock' ? (
               <div className="grid gap-4 sm:grid-cols-2">
+                {showJewelleryFields ? (
+                  <div>
+                    <label className="label">Purity</label>
+                    {purityOptions.length > 0 ? (
+                      <select
+                        className="input mt-1"
+                        name="purity"
+                        value={form.purity}
+                        onChange={handleFormChange}
+                      >
+                        <option value="">Select purity</option>
+                        {purityOptions.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        className="input mt-1"
+                        name="purity"
+                        value={form.purity}
+                        onChange={handleFormChange}
+                        placeholder="e.g. 22K or 925"
+                      />
+                    )}
+                  </div>
+                ) : null}
                 <div>
                   <label className="label">{t('inventory.openingStock')}</label>
                   <input className="input mt-1" name="openingStock" type="number" min="0" step="0.1" value={form.openingStock} onChange={handleFormChange} />

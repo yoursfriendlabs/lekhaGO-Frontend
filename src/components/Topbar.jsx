@@ -1,9 +1,11 @@
 import { RefreshCw } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
+import { useBusinessSettings } from '../lib/businessSettings.jsx';
 
 export default function Topbar() {
   const { user, logout } = useAuth();
+  const { businessProfile } = useBusinessSettings();
 
   const { locale, setLocale, t } = useI18n();
   const refreshWorkspace = () => {
@@ -17,6 +19,9 @@ export default function Topbar() {
         <div>
           <p className="text-[10px] uppercase tracking-[0.2em] text-secondary-500">{t('topbar.workspace')}</p>
           <h2 className="font-serif text-xl text-ink">{user?.name || t('topbar.welcome')}</h2>
+          {businessProfile?.label ? (
+            <p className="mt-1 text-xs font-medium text-secondary-500">{businessProfile.label}</p>
+          ) : null}
         </div>
         <div className="flex gap-2 items-center md:hidden">
           <button

@@ -1,8 +1,8 @@
 import { clearSession, getBusinessId, getToken, setSessionNotice } from './storage';
 import { toQueryKey, toQueryString } from './queryKey';
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://api.yoursfriend.com';
-// export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+// export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://api.yoursfriend.com';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 const INACTIVE_USER_REGEX = /user is inactive/i;
 const SESSION_EXPIRED_MESSAGE = 'Your session expired. Please log in again.';
@@ -505,8 +505,10 @@ export const api = {
 
   getBusinessSettings: () => request('/api/business-settings', {}, listCache(['business-settings'], CACHE_TTL.settings)),
   updateBusinessSettings: (data) =>
-    request('/api/business-settings', { method: 'PUT', body: JSON.stringify(data) }, mutationConfig(['business-settings'])),
+    request('/api/business-settings', { method: 'PUT', body: JSON.stringify(data) }, mutationConfig(['business-settings', 'business-profile'])),
 
+  getBusinessTypes: () => request('/api/meta/business-types', {}, listCache(['business-types'], CACHE_TTL.settings)),
+  getBusinessProfile: () => request('/api/meta/business-profile', {}, listCache(['business-profile'], CACHE_TTL.settings)),
   getNextSequences: () => request('/api/meta/next-sequences', {}, listCache(['meta', 'sequences'], CACHE_TTL.short)),
   getDashboardSummary: (params = {}) => listRequest('/api/dashboard/summary', params, listCache(['dashboard'], CACHE_TTL.short)),
   getAnalyticsSummary: (params = {}) => listRequest('/api/analytics/summary', params, listCache(['analytics'], CACHE_TTL.short)),

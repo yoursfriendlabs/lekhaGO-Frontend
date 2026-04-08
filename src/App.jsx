@@ -3,7 +3,7 @@ import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-rou
 import { AuthProvider, useAuth } from './lib/auth';
 import { ThemeProvider } from './lib/theme';
 import { I18nProvider, useI18n } from './lib/i18n.jsx';
-import { BusinessSettingsProvider } from './lib/businessSettings';
+import { BusinessSettingsProvider, useBusinessSettings } from './lib/businessSettings';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import MobileNav from './components/MobileNav';
@@ -17,6 +17,8 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Admin = lazy(() => import('./pages/Admin'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Purchases = lazy(() => import('./pages/Purchases'));
+const Sales = lazy(() => import('./pages/Sales'));
+const CafeOrders = lazy(() => import('./pages/CafeOrders'));
 const Services = lazy(() => import('./pages/Services'));
 const Parties = lazy(() => import('./pages/Parties'));
 const Ledger = lazy(() => import('./pages/Ledger'));
@@ -94,8 +96,12 @@ function InvoiceAccessRoute({ children }) {
 function AppShell() {
   const { businessId, role, user } = useAuth();
   const { t } = useI18n();
+  const { businessProfile } = useBusinessSettings();
   const showVerificationBanner = hasUnverifiedEmail(user);
   const requiresActivation = isStaffActivationRequired(user, role);
+  const servicesEnabled = businessProfile?.modules?.services !== false;
+  const cafeOrdersEnabled = businessProfile?.modules?.orders === true || businessProfile?.type === 'cafe';
+  const salesRoute = businessProfile?.salesFlow?.route || '/app/sales';
 
   return (
     <div className="min-h-screen gradient-bg bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 md:h-screen md:overflow-hidden">
@@ -146,8 +152,28 @@ function AppShell() {
                 <Route path="products" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to="/app/inventory" replace /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route path="inventory" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Inventory /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route path="purchases" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Purchases /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to="/app/services" replace /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="services" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Services /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route
+                  path="orders"
+                  element={(
+                    <EmailActivationRequiredRoute>
+                      <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
+                        {cafeOrdersEnabled ? <CafeOrders /> : <Navigate to={salesRoute} replace />}
+                      </RoleGuard>
+                    </EmailActivationRequiredRoute>
+                  )}
+                />
+                <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Sales /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="pos" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Sales /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route
+                  path="services"
+                  element={(
+                    <EmailActivationRequiredRoute>
+                      <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
+                        {servicesEnabled ? <Services /> : <Navigate to={salesRoute} replace />}
+                      </RoleGuard>
+                    </EmailActivationRequiredRoute>
+                  )}
+                />
                 <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Parties /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route path="banks" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to={buildSettingsTabPath(BANKS_SETTINGS_TAB)} replace /></RoleGuard></EmailActivationRequiredRoute>} />
                 <Route path="ledger" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Ledger /></RoleGuard></EmailActivationRequiredRoute>} />

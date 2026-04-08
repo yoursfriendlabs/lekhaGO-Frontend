@@ -16,6 +16,13 @@ import { useI18n } from '../lib/i18n.jsx';
 import FileUpload from '../components/FileUpload';
 import DynamicAttributes from '../components/DynamicAttributes';
 import {
+  getJewelleryBreakdown,
+  getPurityOptionsForMetal,
+  JEWELLERY_ATTRIBUTE_KEYS,
+  METAL_TYPE_OPTIONS,
+  normalizeJewelleryAttributes,
+} from '../lib/jewellery.js';
+import {
   X,
   Plus,
   Clock,
@@ -112,6 +119,18 @@ function isPdfAttachment(url) {
 
 function AttachmentPreview({ url, onOpen, size = 'sm' }) {
   const sizeClass = size === 'lg' ? 'h-24 w-24' : size === 'md' ? 'h-14 w-14' : 'h-9 w-9';
+
+  if (!servicesEnabled) {
+    return (
+      <div className="space-y-6">
+        <Notice
+          title="This business type does not use the service workflow."
+          description="Switch to the sales/POS flow for billing, or change the business type if this workspace should track repairs."
+          tone="warn"
+        />
+      </div>
+    );
+  }
 
   return (
     <button
@@ -223,15 +242,18 @@ function getServiceItems(record) {
   return [];
 }
 
-function getComputedServiceTotals(items) {
+function getComputedServiceTotals(items, attributes = {}) {
+  const jewellery = getJewelleryBreakdown(attributes);
   const laborTotal = items
     .filter((item) => item.itemType === 'labor')
-    .reduce((sum, item) => sum + toFiniteNumber(item.lineTotal, 0), 0);
+    .reduce((sum, item) => sum + toFiniteNumber(item.lineTotal, 0), 0)
+    + jewellery.diamondChargeNumber;
   const partsTotal = items
     .filter((item) => item.itemType === 'part')
     .reduce((sum, item) => sum + toFiniteNumber(item.lineTotal, 0), 0);
   const subTotal = laborTotal + partsTotal;
-  const taxTotal = items.reduce((sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate), 0);
+  const taxTotal = items.reduce((sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate), 0)
+    + jewellery.additionalTaxNumber;
   const grandTotal = subTotal + taxTotal;
 
   return {
@@ -245,7 +267,7 @@ function getComputedServiceTotals(items) {
 
 function getServiceOrderTotals(record) {
   const items = getServiceItems(record);
-  const computed = getComputedServiceTotals(items);
+  const computed = getComputedServiceTotals(items, record?.attributes || {});
   const laborTotal = toFiniteNumber(record?.laborTotal, computed.laborTotal);
   const partsTotal = toFiniteNumber(record?.partsTotal, computed.partsTotal);
   const subTotal = toFiniteNumber(record?.subTotal, laborTotal + partsTotal);
@@ -265,10 +287,12 @@ function normalizeServiceOrder(record) {
   if (!record || typeof record !== 'object' || Array.isArray(record)) return record;
 
   const items = getServiceItems(record);
-  const totals = getServiceOrderTotals({ ...record, items });
+  const normalizedAttributes = normalizeJewelleryAttributes(record.attributes || {});
+  const totals = getServiceOrderTotals({ ...record, items, attributes: normalizedAttributes });
 
   return {
     ...record,
+    attributes: normalizedAttributes,
     items,
     ServiceItems: Array.isArray(record.ServiceItems) ? record.ServiceItems : items,
     ...totals,
@@ -402,7 +426,12 @@ export default function Services() {
   const { t } = useI18n();
   const { businessId, user } = useAuth();
   const isMobile = useIsMobile();
-  const { settings: bizSettings } = useBusinessSettings();
+  const { settings: bizSettings, businessProfile } = useBusinessSettings();
+  const servicesFlow = businessProfile?.servicesFlow || {};
+  const servicesEnabled = servicesFlow.enabled !== false;
+  const servicesTitle = servicesFlow.title || t('services.title');
+  const servicesSubtitle = servicesFlow.attributeSectionHint || t('services.subtitle');
+  const newOrderLabel = businessProfile?.type === 'jewellery' ? 'New Repair Order' : t('services.newOrder');
 
   const { upsert: upsertParty } = usePartyStore();
   const { services: serviceList, loading: listLoading, fetch: fetchServices, invalidate: invalidateServices } = useServiceStore();
@@ -475,6 +504,12 @@ export default function Services() {
   const [editingItemIdx, setEditingItemIdx] = useState(null);
   const [mobileStep, setMobileStep] = useState('details');
   const [mobileSummaryExpanded, setMobileSummaryExpanded] = useState(false);
+  const jewelleryAttributes = useMemo(() => normalizeJewelleryAttributes(header.attributes), [header.attributes]);
+  const jewelleryDetails = useMemo(() => getJewelleryBreakdown(jewelleryAttributes), [jewelleryAttributes]);
+  const jewelleryPurityOptions = useMemo(
+    () => getPurityOptionsForMetal(jewelleryAttributes.metalType),
+    [jewelleryAttributes.metalType]
+  );
   const listParams = useMemo(() => ({
     limit: 50,
     ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
@@ -537,17 +572,29 @@ export default function Services() {
   const totals = useMemo(() => {
     const laborTotal = chargeableItems
       .filter((i) => i.itemType === 'labor')
-      .reduce((s, i) => s + Number(i.lineTotal || 0), 0);
+      .reduce((s, i) => s + Number(i.lineTotal || 0), 0)
+      + jewelleryDetails.diamondChargeNumber;
     const partsTotal = chargeableItems
       .filter((i) => i.itemType === 'part')
       .reduce((s, i) => s + Number(i.lineTotal || 0), 0);
     const subTotal = laborTotal + partsTotal;
-    const taxTotal = chargeableItems.reduce((sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate), 0);
+    const taxTotal = chargeableItems.reduce((sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate), 0)
+      + jewelleryDetails.additionalTaxNumber;
     const grandTotal = subTotal + taxTotal;
     const received = isPaid ? grandTotal : Math.min(Number(amountReceived || 0), grandTotal);
     const due = Math.max(grandTotal - received, 0);
-    return { laborTotal, partsTotal, subTotal, taxTotal, grandTotal, received, due };
-  }, [chargeableItems, amountReceived, isPaid]);
+    return {
+      laborTotal,
+      partsTotal,
+      subTotal,
+      taxTotal,
+      grandTotal,
+      received,
+      due,
+      diamondCharge: jewelleryDetails.diamondChargeNumber,
+      additionalTax: jewelleryDetails.additionalTaxNumber,
+    };
+  }, [chargeableItems, amountReceived, isPaid, jewelleryDetails.additionalTaxNumber, jewelleryDetails.diamondChargeNumber]);
 
   const visibleItems = useMemo(() => {
     if (items.length === 1 && isPlaceholderItem(items[0])) return [];
@@ -653,6 +700,27 @@ export default function Services() {
   const handleHeaderChange = (e) => {
     const { name, value } = e.target;
     setHeader((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const updateJewelleryAttribute = (key, value) => {
+    setHeader((prev) => {
+      const nextAttributes = {
+        ...(prev.attributes || {}),
+        [key]: value,
+      };
+
+      if (key === 'metalType') {
+        const nextPurityOptions = getPurityOptionsForMetal(value);
+        if (nextPurityOptions.length > 0 && !nextPurityOptions.includes(nextAttributes.metalPurity)) {
+          nextAttributes.metalPurity = '';
+        }
+      }
+
+      return {
+        ...prev,
+        attributes: normalizeJewelleryAttributes(nextAttributes),
+      };
+    });
   };
 
   const handleItemChange = (index, field, value) => {
@@ -907,7 +975,7 @@ export default function Services() {
         ...normalizePaymentFields(full),
         attachment: normalizeAttachmentUrls(full.attachments, full.attachment)[0] || '',
         attachments: normalizeAttachmentUrls(full.attachments, full.attachment),
-        attributes: full.attributes || {},
+        attributes: normalizeJewelleryAttributes(full.attributes || {}),
       });
       cacheProducts(hydratedProducts);
       setSuggestedOrderNo(full.orderNo || '');
@@ -967,6 +1035,12 @@ export default function Services() {
     });
     if (invalidConversion) { setFormNotice({ type: 'error', message: t('errors.conversionRequired') }); return; }
     if (!chargeableItems.length) { setFormNotice({ type: 'error', message: t('services.addFirstItem') }); return; }
+    const normalizedAttributes = normalizeJewelleryAttributes(header.attributes);
+    const wastagePercent = Number(normalizedAttributes.wastagePercent || 0);
+    if (normalizedAttributes.wastagePercent && (wastagePercent < 5 || wastagePercent > 15)) {
+      setFormNotice({ type: 'error', message: 'Wastage percent must be between 5 and 15.' });
+      return;
+    }
     if (requiresBankSelection(header, totals.received)) {
       setFormNotice({ type: 'error', message: t('payments.bankRequired') });
       return;
@@ -977,6 +1051,7 @@ export default function Services() {
       const attachmentUrls = normalizeAttachmentUrls(header.attachments, header.attachment);
       const payload = {
         ...headerFields,
+        attributes: normalizedAttributes,
         attachments: attachmentUrls,
         ...(attachmentUrls[0] ? { attachment: attachmentUrls[0] } : {}),
         laborTotal: totals.laborTotal,
@@ -1153,11 +1228,15 @@ export default function Services() {
   const showDetailsStep = !isMobile || mobileStep === 'details';
   const showItemsStep = !isMobile || mobileStep === 'items';
   const showPaymentStep = !isMobile || mobileStep === 'payment';
-  const dialogTitle = editingId ? t('services.editOrder') : t('services.newOrder');
+  const dialogTitle = editingId ? t('services.editOrder') : newOrderLabel;
   const summaryOrderNo = header.orderNo || suggestedOrderNo || '—';
   const summaryDeliveryDate = header.deliveryDate ? formatMaybeDate(header.deliveryDate, 'D MMM YYYY') : '—';
   const invoiceAttachmentUrls = invoiceOrder ? getServiceAttachmentUrls(invoiceOrder) : [];
   const invoiceItems = invoiceOrder ? getServiceItems(invoiceOrder) : [];
+  const invoiceJewellery = invoiceOrder ? getJewelleryBreakdown(invoiceOrder.attributes || {}) : getJewelleryBreakdown({});
+  const invoiceExtraAttributes = invoiceOrder?.attributes
+    ? Object.entries(invoiceOrder.attributes).filter(([key]) => !JEWELLERY_ATTRIBUTE_KEYS.includes(key))
+    : [];
   const invoiceTotals = invoiceOrder
     ? getServiceOrderTotals(invoiceOrder)
     : { laborTotal: 0, partsTotal: 0, subTotal: 0, taxTotal: 0, grandTotal: 0 };
@@ -1172,15 +1251,15 @@ export default function Services() {
         <div className="p-5 md:p-8">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl">
-              <h1 className="mt-4 font-serif text-3xl text-slate-900 dark:text-white md:text-4xl">{t('services.title')}</h1>
+              <h1 className="mt-4 font-serif text-3xl text-slate-900 dark:text-white md:text-4xl">{servicesTitle}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 md:text-base">
-                {t('services.subtitle')}
+                {servicesSubtitle}
               </p>
             </div>
 
             <button className="btn-primary w-full sm:w-auto" type="button" onClick={openDialog}>
               <Plus size={16} className="mr-1.5 inline" />
-              {t('services.newOrder')}
+              {newOrderLabel}
             </button>
           </div>
 
@@ -1788,12 +1867,166 @@ export default function Services() {
                         </FormSectionCard>
 
                         <FormSectionCard
+                          title="Jewellery details"
+                          hint="Track metal purity, wastage, total weight, and simple diamond charges for jewellery orders."
+                          className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                        >
+                          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            <div>
+                              <label className="label">Metal type</label>
+                              <select
+                                className="input mt-1"
+                                value={jewelleryAttributes.metalType}
+                                onChange={(event) => updateJewelleryAttribute('metalType', event.target.value)}
+                              >
+                                <option value="">Select metal</option>
+                                {METAL_TYPE_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>{option.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="label">Purity</label>
+                              {jewelleryPurityOptions.length > 0 ? (
+                                <select
+                                  className="input mt-1"
+                                  value={jewelleryAttributes.metalPurity}
+                                  onChange={(event) => updateJewelleryAttribute('metalPurity', event.target.value)}
+                                >
+                                  <option value="">Select purity</option>
+                                  {jewelleryPurityOptions.map((option) => (
+                                    <option key={option} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  className="input mt-1"
+                                  value={jewelleryAttributes.metalPurity}
+                                  onChange={(event) => updateJewelleryAttribute('metalPurity', event.target.value)}
+                                  placeholder="e.g. 22K or 925"
+                                />
+                              )}
+                            </div>
+                            <div>
+                              <label className="label">Actual weight</label>
+                              <input
+                                className="input mt-1"
+                                type="number"
+                                min="0"
+                                step="0.001"
+                                value={jewelleryAttributes.actualWeight}
+                                onChange={(event) => updateJewelleryAttribute('actualWeight', event.target.value)}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <label className="label">Wastage %</label>
+                              <input
+                                className="input mt-1"
+                                type="number"
+                                min="5"
+                                max="15"
+                                step="0.01"
+                                value={jewelleryAttributes.wastagePercent}
+                                onChange={(event) => updateJewelleryAttribute('wastagePercent', event.target.value)}
+                                placeholder="5 - 15"
+                              />
+                            </div>
+                            <div>
+                              <label className="label">Wastage weight</label>
+                              <input
+                                className="input mt-1 bg-slate-50"
+                                value={jewelleryAttributes.wastageWeight}
+                                placeholder="Auto calculated"
+                                readOnly
+                              />
+                            </div>
+                            <div>
+                              <label className="label">Total weight</label>
+                              <input
+                                className="input mt-1 bg-slate-50"
+                                value={jewelleryAttributes.totalWeight}
+                                placeholder="Actual + wastage"
+                                readOnly
+                              />
+                            </div>
+                            <div>
+                              <label className="label">Diamond type</label>
+                              <input
+                                className="input mt-1"
+                                value={jewelleryAttributes.diamondType}
+                                onChange={(event) => updateJewelleryAttribute('diamondType', event.target.value)}
+                                placeholder="e.g. VVS, round"
+                              />
+                            </div>
+                            <div>
+                              <label className="label">Diamond weight</label>
+                              <input
+                                className="input mt-1"
+                                type="number"
+                                min="0"
+                                step="0.001"
+                                value={jewelleryAttributes.diamondWeight}
+                                onChange={(event) => updateJewelleryAttribute('diamondWeight', event.target.value)}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <label className="label">Diamond carat</label>
+                              <input
+                                className="input mt-1"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={jewelleryAttributes.diamondCarat}
+                                onChange={(event) => updateJewelleryAttribute('diamondCarat', event.target.value)}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <label className="label">Diamond purity / grade</label>
+                              <input
+                                className="input mt-1"
+                                value={jewelleryAttributes.diamondPurity}
+                                onChange={(event) => updateJewelleryAttribute('diamondPurity', event.target.value)}
+                                placeholder="Optional"
+                              />
+                            </div>
+                            <div>
+                              <label className="label">Diamond charge</label>
+                              <input
+                                className="input mt-1"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={jewelleryAttributes.diamondCharge}
+                                onChange={(event) => updateJewelleryAttribute('diamondCharge', event.target.value)}
+                                placeholder="0"
+                              />
+                            </div>
+                            <div>
+                              <label className="label">Additional tax</label>
+                              <input
+                                className="input mt-1"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={jewelleryAttributes.additionalTax}
+                                onChange={(event) => updateJewelleryAttribute('additionalTax', event.target.value)}
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                        </FormSectionCard>
+
+                        <FormSectionCard
                           title={t('services.orderInformation')}
                           className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                         >
                           <DynamicAttributes
                             entityType="service"
                             attributes={header.attributes}
+                            hiddenKeys={JEWELLERY_ATTRIBUTE_KEYS}
                             onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))}
                           />
                         </FormSectionCard>
@@ -2064,8 +2297,16 @@ export default function Services() {
                                 <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.partsTotal)}</p>
                               </div>
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Diamond Charge</p>
+                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.diamondCharge)}</p>
+                              </div>
+                              <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.taxTotal')}</p>
                                 <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.taxTotal)}</p>
+                              </div>
+                              <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Additional Tax</p>
+                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.additionalTax)}</p>
                               </div>
                               <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white dark:bg-primary-900/70">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">{t('services.grandTotal')}</p>
@@ -2261,9 +2502,55 @@ export default function Services() {
                       </div>
                     )}
                   </div>
-                  {invoiceOrder.attributes && Object.keys(invoiceOrder.attributes).length > 0 && (
+                  {(invoiceJewellery.metalType || invoiceJewellery.metalPurity || invoiceJewellery.actualWeight || invoiceJewellery.wastagePercent || invoiceJewellery.totalWeight || invoiceJewellery.diamondType || invoiceJewellery.diamondWeight || invoiceJewellery.diamondCarat || invoiceJewellery.diamondCharge) && (
                     <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5">
-                      {Object.entries(invoiceOrder.attributes).map(([key, val]) => {
+                      {invoiceJewellery.metalType ? (
+                        <div className="text-sm">
+                          <span className="text-slate-400">Metal: </span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">{invoiceJewellery.metalType}</span>
+                        </div>
+                      ) : null}
+                      {invoiceJewellery.metalPurity ? (
+                        <div className="text-sm">
+                          <span className="text-slate-400">Purity: </span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">{invoiceJewellery.metalPurity}</span>
+                        </div>
+                      ) : null}
+                      {invoiceJewellery.actualWeight ? (
+                        <div className="text-sm">
+                          <span className="text-slate-400">Actual weight: </span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">{invoiceJewellery.actualWeight}</span>
+                        </div>
+                      ) : null}
+                      {invoiceJewellery.wastagePercent ? (
+                        <div className="text-sm">
+                          <span className="text-slate-400">Wastage: </span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            {invoiceJewellery.wastagePercent}% ({invoiceJewellery.wastageWeight || '0'})
+                          </span>
+                        </div>
+                      ) : null}
+                      {invoiceJewellery.totalWeight ? (
+                        <div className="text-sm">
+                          <span className="text-slate-400">Total weight: </span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">{invoiceJewellery.totalWeight}</span>
+                        </div>
+                      ) : null}
+                      {invoiceJewellery.diamondType ? (
+                        <div className="text-sm">
+                          <span className="text-slate-400">Diamond: </span>
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            {[invoiceJewellery.diamondType, invoiceJewellery.diamondWeight && `${invoiceJewellery.diamondWeight} wt`, invoiceJewellery.diamondCarat && `${invoiceJewellery.diamondCarat} ct`, invoiceJewellery.diamondPurity]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                  {invoiceExtraAttributes.length > 0 && (
+                    <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5">
+                      {invoiceExtraAttributes.map(([key, val]) => {
                         const def = safeAttributeDefs.find((d) => d.key === key);
                         const attrLabel = def?.name || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
                         return (
@@ -2331,9 +2618,19 @@ export default function Services() {
                     <div className="flex justify-between text-slate-500 dark:text-slate-400">
                       <span>Product Total</span><span>{money(invoiceTotals.partsTotal)}</span>
                     </div>
+                    {invoiceJewellery.diamondChargeNumber > 0 ? (
+                      <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                        <span>Diamond Charge</span><span>{money(invoiceJewellery.diamondChargeNumber)}</span>
+                      </div>
+                    ) : null}
                     <div className="flex justify-between text-slate-500 dark:text-slate-400">
                       <span>{t('services.taxTotal')}</span><span>{money(invoiceTotals.taxTotal)}</span>
                     </div>
+                    {invoiceJewellery.additionalTaxNumber > 0 ? (
+                      <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                        <span>Additional Tax</span><span>{money(invoiceJewellery.additionalTaxNumber)}</span>
+                      </div>
+                    ) : null}
                     <div className="flex justify-between border-t border-slate-200/70 pt-3 font-bold text-slate-900 dark:border-slate-700 dark:text-white">
                       <span className="text-base">{t('services.grandTotal')}</span>
                       <span className="text-lg">{money(invoiceTotals.grandTotal)}</span>

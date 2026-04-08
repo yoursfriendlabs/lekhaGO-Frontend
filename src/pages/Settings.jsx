@@ -33,7 +33,7 @@ const EMPTY = {
 export default function Settings() {
   const { t } = useI18n();
   const { businessId, role } = useAuth();
-  const { settings, loading: settingsLoading, saveSettings, reloadSettings } = useBusinessSettings();
+  const { settings, businessProfile, loading: settingsLoading, saveSettings, reloadSettings } = useBusinessSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [form, setForm] = useState({ ...EMPTY, ...settings });
   const [saving, setSaving] = useState(false);
@@ -202,6 +202,26 @@ export default function Settings() {
 
       {activeTab === GENERAL_SETTINGS_TAB ? (
         <>
+          {businessProfile ? (
+            <div className="card space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Business Type</p>
+                <h2 className="mt-2 font-serif text-xl text-slate-900 dark:text-white">{businessProfile.label}</h2>
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{businessProfile.description}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(businessProfile.settings?.enabledModules || []).map((moduleKey) => (
+                  <span
+                    key={moduleKey}
+                    className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-600 dark:bg-slate-900/70 dark:text-slate-300"
+                  >
+                    {moduleKey.replace(/_/g, ' ')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {error ? <Notice title={error} tone="error" /> : null}
 
           {settingsLoading && !form.companyName ? (
