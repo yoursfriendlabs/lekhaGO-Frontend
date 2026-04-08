@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
@@ -7,14 +8,20 @@ import CategorySearchCreateField from '../components/CategorySearchCreateField.j
 import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
+import { getPurityOptionsForMetal, METAL_TYPE_OPTIONS } from '../lib/jewellery.js';
+import { useBusinessSettings } from '../lib/businessSettings.jsx';
+import { buildSettingsTabPath, UNITS_SETTINGS_TAB } from '../lib/settingsTabs.js';
 import { useProductStore } from '../stores/products';
 import { ArrowUpDown, Pencil, Plus } from 'lucide-react';
 
 const makeEmptyItem = () => ({
   name: '',
   categoryId: '',
+  unitId: '',
   itemCode: '',
   itemType: 'goods',
+  metalType: '',
+  purity: '',
   openingStock: '',
   primaryUnit: '',
   secondaryUnit: '',
@@ -42,7 +49,10 @@ const buildProductPayload = (form) => ({
   name: form.name,
   sku: form.itemCode.trim(),
   itemType: form.itemType,
+  metalType: form.metalType,
+  purity: form.purity,
   ...(form.categoryId ? { categoryId: form.categoryId } : {}),
+  unitId: form.unitId || null,
   primaryUnit: form.primaryUnit,
   secondaryUnit: form.secondaryUnit,
   conversionRate: parseNumber(form.conversionRate),
@@ -70,8 +80,11 @@ function productToForm(product = {}) {
   return {
     name: product.name || '',
     categoryId: String(product.categoryId ?? product.category?.id ?? ''),
+    unitId: String(product.unitId ?? product.unit?.id ?? ''),
     itemCode: product.sku || '',
     itemType: product.itemType || 'goods',
+    metalType: product.metalType || '',
+    purity: product.purity || '',
     openingStock: String(product.openingStock ?? product.stockOnHand ?? ''),
     primaryUnit: product.primaryUnit || '',
     secondaryUnit: product.secondaryUnit || '',
@@ -90,6 +103,19 @@ function getCurrentStock(product = {}) {
   return Number(product.stockOnHand ?? product.openingStock ?? 0);
 }
 
+function getUnitText(unit = {}) {
+  return String(unit.symbol || unit.name || '').trim();
+}
+
+function getUnitOptionLabel(unit = {}) {
+  const name = String(unit.name || '').trim();
+  const symbol = String(unit.symbol || '').trim();
+  if (name && symbol && name.toLowerCase() !== symbol.toLowerCase()) {
+    return `${name} (${symbol})`;
+  }
+  return name || symbol;
+}
+
 function isRestockableProduct(product = {}) {
   return String(product.itemType || '').toLowerCase() !== 'service';
 }
@@ -101,8 +127,17 @@ function formatQuantity(value) {
   });
 }
 
+function getItemTypeLabel(itemType, itemTypeOptions, t) {
+  const match = itemTypeOptions.find((option) => option.value === itemType);
+  if (match?.label) return match.label;
+  if (itemType === 'service') return t('products.service');
+  if (itemType === 'part') return t('products.part');
+  return t('products.goods');
+}
+
 export default function Inventory() {
   const { t } = useI18n();
+  const { businessProfile } = useBusinessSettings();
   const {
     products,
     loading: productsLoading,
@@ -111,38 +146,16 @@ export default function Inventory() {
     addProduct,
     patchProduct,
   } = useProductStore();
-
-  const unitOptions = useMemo(() => ([
-    t('products.units.piece'),
-    t('products.units.box'),
-    t('products.units.pack'),
-    t('products.units.set'),
-    t('products.units.pair'),
-    t('products.units.dozen'),
-    t('products.units.bundle'),
-    t('products.units.bottle'),
-    t('products.units.carton'),
-    t('products.units.tray'),
-    t('products.units.bag'),
-    t('products.units.sack'),
-    t('products.units.kg'),
-    t('products.units.g'),
-    t('products.units.litre'),
-    t('products.units.ml'),
-    t('products.units.meter'),
-    t('products.units.cm'),
-    t('products.units.mm'),
-    t('products.units.inch'),
-    t('products.units.foot'),
-    t('products.units.yard'),
-    t('products.units.roll'),
-    t('products.units.sheet'),
-    t('products.units.unit'),
-    t('products.units.hour'),
-    t('products.units.day'),
-    t('products.units.month'),
-  ]), [t]);
-  const unitListId = 'inventory-unit-options';
+  const inventoryProfile = businessProfile?.inventory || {};
+  const itemTypeOptions = Array.isArray(inventoryProfile.itemTypes) && inventoryProfile.itemTypes.length
+    ? inventoryProfile.itemTypes
+    : [
+        { value: 'goods', label: t('products.goods') },
+        { value: 'service', label: t('products.service') },
+      ];
+  const showJewelleryFields = inventoryProfile.showJewelleryFields === true;
+  const inventoryTitle = inventoryProfile.title || t('inventory.itemsTitle');
+  const inventorySubtitle = inventoryProfile.subtitle || t('inventory.itemsSubtitle');
 
   const [status, setStatus] = useState({ type: 'info', message: '' });
   const [toast, setToast] = useState({ type: '', message: '' });
@@ -165,6 +178,9 @@ export default function Inventory() {
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoriesError, setCategoriesError] = useState('');
+  const [unitOptions, setUnitOptions] = useState([]);
+  const [unitsLoading, setUnitsLoading] = useState(false);
+  const [unitsError, setUnitsError] = useState('');
 
   useEffect(() => {
     fetchProducts();
@@ -198,6 +214,42 @@ export default function Inventory() {
     loadCategories();
   }, [loadCategories]);
 
+  const loadUnits = useCallback(async () => {
+    setUnitsLoading(true);
+
+    try {
+      const response = await api.listUnits({
+        limit: 200,
+        offset: 0,
+      });
+
+      const nextUnits = (response.items || [])
+        .filter((unit) => unit?.id && unit?.name)
+        .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+
+      setUnitOptions(nextUnits);
+      setUnitsError('');
+    } catch (error) {
+      setUnitOptions([]);
+      setUnitsError(error.message);
+    } finally {
+      setUnitsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadUnits();
+  }, [loadUnits]);
+
+  useEffect(() => {
+    if (!itemTypeOptions.some((option) => option.value === form.itemType)) {
+      setForm((previous) => ({
+        ...previous,
+        itemType: itemTypeOptions[0]?.value || 'goods',
+      }));
+    }
+  }, [form.itemType, itemTypeOptions]);
+
   useEffect(() => {
     if (productsError) setStatus({ type: 'error', message: productsError });
   }, [productsError]);
@@ -213,12 +265,14 @@ export default function Inventory() {
       id: product.id,
       name: product.name,
       itemType: product.itemType || 'goods',
+      metalType: product.metalType || '',
+      purity: product.purity || '',
       category: getProductCategoryName(product) || '-',
       itemCode: product.sku || '-',
       salePrice: Number(product.salePrice ?? 0),
       purchasePrice: Number(product.purchasePrice ?? 0),
       quantity: Number(product.stockOnHand ?? product.openingStock ?? 0),
-      unit: product.primaryUnit || '',
+      unit: product.primaryUnit || getUnitText(product.unit) || '',
     }));
   }, [products]);
 
@@ -234,6 +288,69 @@ export default function Inventory() {
     () => categoryOptions.find((category) => String(category.id) === String(form.categoryId)),
     [categoryOptions, form.categoryId]
   );
+  const unitOptionsById = useMemo(
+    () => new Map(unitOptions.map((unit) => [String(unit.id), unit])),
+    [unitOptions],
+  );
+  const purityOptions = useMemo(() => getPurityOptionsForMetal(form.metalType), [form.metalType]);
+  const primaryUnitChoices = useMemo(() => {
+    const choices = unitOptions.map((unit) => ({
+      value: `id:${unit.id}`,
+      label: getUnitOptionLabel(unit),
+      text: getUnitText(unit),
+    }));
+    const current = String(form.primaryUnit || '').trim();
+    const hasManagedSelection = form.unitId && unitOptionsById.has(String(form.unitId));
+    const matchesExisting = current
+      ? unitOptions.some((unit) => getUnitText(unit).toLowerCase() === current.toLowerCase())
+      : true;
+
+    if (current && !hasManagedSelection && !matchesExisting) {
+      choices.unshift({
+        value: `legacy:${current}`,
+        label: `${current} (${t('unitsManagement.legacyValue')})`,
+        text: current,
+      });
+    }
+
+    return choices;
+  }, [form.primaryUnit, form.unitId, t, unitOptions, unitOptionsById]);
+  const secondaryUnitChoices = useMemo(() => {
+    const choices = unitOptions.map((unit) => ({
+      value: `id:${unit.id}`,
+      label: getUnitOptionLabel(unit),
+      text: getUnitText(unit),
+    }));
+    const current = String(form.secondaryUnit || '').trim();
+    const matchesExisting = current
+      ? unitOptions.some((unit) => getUnitText(unit).toLowerCase() === current.toLowerCase())
+      : true;
+
+    if (current && !matchesExisting) {
+      choices.unshift({
+        value: `legacy:${current}`,
+        label: `${current} (${t('unitsManagement.legacyValue')})`,
+        text: current,
+      });
+    }
+
+    return choices;
+  }, [form.secondaryUnit, t, unitOptions]);
+  const primaryUnitSelectValue = useMemo(() => {
+    if (form.unitId && unitOptionsById.has(String(form.unitId))) {
+      return `id:${form.unitId}`;
+    }
+
+    const current = String(form.primaryUnit || '').trim();
+    return current ? `legacy:${current}` : '';
+  }, [form.primaryUnit, form.unitId, unitOptionsById]);
+  const secondaryUnitSelectValue = useMemo(() => {
+    const current = String(form.secondaryUnit || '').trim();
+    if (!current) return '';
+
+    const match = unitOptions.find((unit) => getUnitText(unit).toLowerCase() === current.toLowerCase());
+    return match ? `id:${match.id}` : `legacy:${current}`;
+  }, [form.secondaryUnit, unitOptions]);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -244,7 +361,7 @@ export default function Inventory() {
       if (stockFilter === 'out' && item.quantity > 0) return false;
       if (stockFilter === 'low' && item.quantity > 5) return false;
       if (!normalizedQuery) return true;
-      return [item.name, item.itemCode, item.category]
+      return [item.name, item.itemCode, item.category, item.metalType, item.purity]
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(normalizedQuery));
     });
@@ -271,12 +388,82 @@ export default function Inventory() {
 
   const handleFormChange = (event) => {
     const { name, value, type, checked } = event.target;
-    setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    setForm((prev) => {
+      const nextValue = type === 'checkbox' ? checked : value;
+      if (name !== 'metalType') {
+        return { ...prev, [name]: nextValue };
+      }
+
+      const nextPurityOptions = getPurityOptionsForMetal(nextValue);
+      return {
+        ...prev,
+        metalType: nextValue,
+        purity: nextPurityOptions.length > 0 && !nextPurityOptions.includes(prev.purity) ? '' : prev.purity,
+      };
+    });
+  };
+
+  const handlePrimaryUnitChange = (event) => {
+    const { value } = event.target;
+
+    if (!value) {
+      setForm((previous) => ({
+        ...previous,
+        unitId: '',
+        primaryUnit: '',
+      }));
+      return;
+    }
+
+    if (value.startsWith('id:')) {
+      const unit = unitOptionsById.get(value.slice(3));
+      setForm((previous) => ({
+        ...previous,
+        unitId: unit?.id ? String(unit.id) : '',
+        primaryUnit: getUnitText(unit),
+      }));
+      return;
+    }
+
+    setForm((previous) => ({
+      ...previous,
+      unitId: '',
+      primaryUnit: value.slice('legacy:'.length),
+    }));
+  };
+
+  const handleSecondaryUnitChange = (event) => {
+    const { value } = event.target;
+
+    if (!value) {
+      setForm((previous) => ({
+        ...previous,
+        secondaryUnit: '',
+      }));
+      return;
+    }
+
+    if (value.startsWith('id:')) {
+      const unit = unitOptionsById.get(value.slice(3));
+      setForm((previous) => ({
+        ...previous,
+        secondaryUnit: getUnitText(unit),
+      }));
+      return;
+    }
+
+    setForm((previous) => ({
+      ...previous,
+      secondaryUnit: value.slice('legacy:'.length),
+    }));
   };
 
   const openCreateDialog = () => {
     setEditingId(null);
-    setForm(makeEmptyItem());
+    setForm({
+      ...makeEmptyItem(),
+      itemType: itemTypeOptions[0]?.value || 'goods',
+    });
     setActiveTab('stock');
     setIsOpen(true);
   };
@@ -444,8 +631,8 @@ export default function Inventory() {
       ) : null}
 
       <PageHeader
-        title={t('inventory.itemsTitle')}
-        subtitle={t('inventory.itemsSubtitle')}
+        title={inventoryTitle}
+        subtitle={inventorySubtitle}
         action={(
           <div className="flex flex-wrap gap-2">
             {/*<button className="btn-secondary w-full sm:w-auto" type="button">*/}
@@ -504,9 +691,9 @@ export default function Inventory() {
             onChange={(event) => setTypeFilter(event.target.value)}
           >
             <option value="all">{t('inventory.allItems')}</option>
-            <option value="goods">{t('products.goods')}</option>
-            <option value="service">{t('products.service')}</option>
-            <option value="part">{t('products.part')}</option>
+            {itemTypeOptions.map((type) => (
+              <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
           </select>
           <button
             className="btn-ghost w-full justify-center xl:w-auto"
@@ -532,7 +719,11 @@ export default function Inventory() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-slate-900 dark:text-white truncate">{item.name}</p>
-                    <p className="text-xs text-slate-500">{item.category} · {item.unit || t('inventory.noUnit')}</p>
+                    <p className="text-xs text-slate-500">
+                      {[item.category, showJewelleryFields ? (item.metalType && item.purity ? `${item.metalType} ${item.purity}` : item.metalType || item.purity) : null, item.unit || t('inventory.noUnit')]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className={`text-xs font-semibold rounded-full px-2 py-0.5 ${item.quantity <= 0 ? 'bg-rose-100 text-rose-700' : item.quantity <= 5 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -600,16 +791,16 @@ export default function Inventory() {
                         </div>
                         <div>
                           <p className="font-semibold text-slate-900 dark:text-white">{item.name}</p>
-                          <p className="text-xs text-slate-500">{item.unit || t('inventory.noUnit')}</p>
+                          <p className="text-xs text-slate-500">
+                            {[showJewelleryFields ? (item.metalType && item.purity ? `${item.metalType} ${item.purity}` : item.metalType || item.purity) : null, item.unit || t('inventory.noUnit')]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
                         </div>
                       </div>
                     </td>
                     <td className="py-3 capitalize">
-                      {item.itemType === 'service'
-                        ? t('products.service')
-                        : item.itemType === 'part'
-                          ? t('products.part')
-                          : t('products.goods')}
+                      {getItemTypeLabel(item.itemType, itemTypeOptions, t)}
                     </td>
                     <td className="py-3">{item.category}</td>
                     <td className="py-3">{item.itemCode}</td>
@@ -726,11 +917,6 @@ export default function Inventory() {
         title={editingId ? `${t('common.edit')} ${t('inventory.itemName').toLowerCase()}` : t('inventory.addNewItem')}
         size="xl"
       >
-        <datalist id={unitListId}>
-          {unitOptions.map((option) => (
-            <option key={option} value={option} />
-          ))}
-        </datalist>
         <form className="space-y-5" onSubmit={handleSubmit}>
           <FormSectionCard hint={t('inventory.help')}>
             <div className="space-y-4">
@@ -778,23 +964,36 @@ export default function Inventory() {
                 </div>
                 <div>
                   <label className="label">{t('inventory.itemType')}</label>
-                  <div className="mt-1 grid grid-cols-3 gap-2">
-                    {['goods', 'service',].map((type) => (
+                  <div className={`mt-1 grid gap-2 ${itemTypeOptions.length > 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                    {itemTypeOptions.map((type) => (
                       <button
-                        key={type}
+                        key={type.value}
                         type="button"
-                        onClick={() => setForm((prev) => ({ ...prev, itemType: type }))}
-                        className={`${form.itemType === type ? 'btn-primary' : 'btn-ghost'} w-full justify-center`}
+                        onClick={() => setForm((prev) => ({ ...prev, itemType: type.value }))}
+                        className={`${form.itemType === type.value ? 'btn-primary' : 'btn-ghost'} w-full justify-center`}
+                        title={type.description || type.label}
                       >
-                        {type === 'goods'
-                          ? t('products.goods')
-                          : type === 'service'
-                            ? t('products.service')
-                            : t('products.part')}
+                        {type.label}
                       </button>
                     ))}
                   </div>
                 </div>
+                {showJewelleryFields ? (
+                  <div>
+                    <label className="label">Metal type</label>
+                    <select
+                      className="input mt-1"
+                      name="metalType"
+                      value={form.metalType}
+                      onChange={handleFormChange}
+                    >
+                      <option value="">Select metal</option>
+                      {METAL_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
               </div>
             </div>
           </FormSectionCard>
@@ -827,13 +1026,58 @@ export default function Inventory() {
           <FormSectionCard title={activeTab === 'stock' ? t('inventory.stockDetails') : t('inventory.otherDetails')}>
             {activeTab === 'stock' ? (
               <div className="grid gap-4 sm:grid-cols-2">
+                {showJewelleryFields ? (
+                  <div>
+                    <label className="label">Purity</label>
+                    {purityOptions.length > 0 ? (
+                      <select
+                        className="input mt-1"
+                        name="purity"
+                        value={form.purity}
+                        onChange={handleFormChange}
+                      >
+                        <option value="">Select purity</option>
+                        {purityOptions.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        className="input mt-1"
+                        name="purity"
+                        value={form.purity}
+                        onChange={handleFormChange}
+                        placeholder="e.g. 22K or 925"
+                      />
+                    )}
+                  </div>
+                ) : null}
                 <div>
                   <label className="label">{t('inventory.openingStock')}</label>
                   <input className="input mt-1" name="openingStock" type="number" min="0" step="0.1" value={form.openingStock} onChange={handleFormChange} />
                 </div>
                 <div>
                   <label className="label">{t('inventory.measuringUnit')}</label>
-                  <input className="input mt-1" name="primaryUnit" list={unitListId} value={form.primaryUnit} onChange={handleFormChange} />
+                  <select
+                    className="input mt-1"
+                    value={primaryUnitSelectValue}
+                    onChange={handlePrimaryUnitChange}
+                  >
+                    <option value="">{t('unitsManagement.selectPrimary')}</option>
+                    {primaryUnitChoices.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  {unitsError ? <p className="mt-2 text-xs text-rose-600">{unitsError}</p> : null}
+                  {!unitsError && unitsLoading ? <p className="mt-2 text-xs text-slate-500">{t('common.loading')}</p> : null}
+                  {!unitsError && !unitsLoading && unitOptions.length === 0 ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span>{t('unitsManagement.manageHint')}</span>
+                      <Link className="font-semibold text-emerald-600 hover:text-emerald-700" to={buildSettingsTabPath(UNITS_SETTINGS_TAB)}>
+                        {t('unitsManagement.manageCta')}
+                      </Link>
+                    </div>
+                  ) : null}
                 </div>
                 <div>
                   <label className="label">{t('products.salePrice')}</label>
@@ -860,7 +1104,16 @@ export default function Inventory() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="label">{t('products.secondaryUnit')}</label>
-                  <input className="input mt-1" name="secondaryUnit" list={unitListId} value={form.secondaryUnit} onChange={handleFormChange} />
+                  <select
+                    className="input mt-1"
+                    value={secondaryUnitSelectValue}
+                    onChange={handleSecondaryUnitChange}
+                  >
+                    <option value="">{t('unitsManagement.selectSecondary')}</option>
+                    {secondaryUnitChoices.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="label">{t('products.conversionRate')}</label>

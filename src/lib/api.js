@@ -1,8 +1,8 @@
 import { clearSession, getBusinessId, getToken, setSessionNotice } from './storage';
 import { toQueryKey, toQueryString } from './queryKey';
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://api.yoursfriend.com';
-// export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+// export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://api.yoursfriend.com';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 const INACTIVE_USER_REGEX = /user is inactive/i;
 const SESSION_EXPIRED_MESSAGE = 'Your session expired. Please log in again.';
@@ -436,6 +436,19 @@ export const api = {
   deleteCategory: (id) =>
     request(`/api/categories/${id}`, { method: 'DELETE' }, mutationConfig([detailTags('category', id), 'categories', 'products'])),
 
+  listUnits: (params = {}) =>
+    collectionRequest('/api/units', params, listCache(['units'], CACHE_TTL.settings)),
+  createUnit: (data) =>
+    request('/api/units', { method: 'POST', body: JSON.stringify(data) }, mutationConfig(['units', 'products'])),
+  getUnit: (id) =>
+    request(`/api/units/${id}`, {}, listCache(detailTags('unit', id), CACHE_TTL.settings)),
+  updateUnit: (id, data) =>
+    request(`/api/units/${id}`, { method: 'PUT', body: JSON.stringify(data) }, mutationConfig([detailTags('unit', id), 'units', 'products'])),
+  patchUnit: (id, data) =>
+    request(`/api/units/${id}`, { method: 'PATCH', body: JSON.stringify(data) }, mutationConfig([detailTags('unit', id), 'units', 'products'])),
+  deleteUnit: (id) =>
+    request(`/api/units/${id}`, { method: 'DELETE' }, mutationConfig([detailTags('unit', id), 'units', 'products'])),
+
   createPurchase: (data) =>
     request('/api/purchases', { method: 'POST', body: JSON.stringify(data) }, mutationConfig(['purchases', 'products', 'reports', 'dashboard', 'parties', 'party-statements', 'banks'])),
   listPurchases: (params = {}) => collectionRequest('/api/purchases', params, listCache(['purchases', 'reports', 'dashboard'])),
@@ -505,8 +518,10 @@ export const api = {
 
   getBusinessSettings: () => request('/api/business-settings', {}, listCache(['business-settings'], CACHE_TTL.settings)),
   updateBusinessSettings: (data) =>
-    request('/api/business-settings', { method: 'PUT', body: JSON.stringify(data) }, mutationConfig(['business-settings'])),
+    request('/api/business-settings', { method: 'PUT', body: JSON.stringify(data) }, mutationConfig(['business-settings', 'business-profile'])),
 
+  getBusinessTypes: () => request('/api/meta/business-types', {}, listCache(['business-types'], CACHE_TTL.settings)),
+  getBusinessProfile: () => request('/api/meta/business-profile', {}, listCache(['business-profile'], CACHE_TTL.settings)),
   getNextSequences: () => request('/api/meta/next-sequences', {}, listCache(['meta', 'sequences'], CACHE_TTL.short)),
   getDashboardSummary: (params = {}) => listRequest('/api/dashboard/summary', params, listCache(['dashboard'], CACHE_TTL.short)),
   getAnalyticsSummary: (params = {}) => listRequest('/api/analytics/summary', params, listCache(['analytics'], CACHE_TTL.short)),

@@ -4,6 +4,7 @@ import { BarChart3, Boxes, Clock, Package, ShoppingCart, UserCheck } from 'lucid
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import { api } from '../lib/api';
+import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import dayjs, { formatMaybeDate } from '../lib/datetime';
 
@@ -111,6 +112,7 @@ function getRangeStart(range) {
 
 export default function Dashboard() {
   const { t } = useI18n();
+  const { businessProfile } = useBusinessSettings();
   const [summary, setSummary] = useState(() => EMPTY_SUMMARY);
   const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -173,6 +175,10 @@ export default function Dashboard() {
   const recentPurchases = summary.recentPurchases.slice(0, 5);
   const upcomingDeliveries = summary.upcomingServiceDeliveries.slice(0, 6);
   const lowStockItems = summary.lowStockItems.slice(0, 5);
+  const dashboardProfile = businessProfile?.dashboard || {};
+  const servicesEnabled = businessProfile?.modules?.services === true;
+  const salesLabel = dashboardProfile.salesLabel || t('dashboard.salesTotal');
+  const servicesLabel = dashboardProfile.servicesLabel || t('dashboard.serviceRevenue');
 
   return (
     <div className="space-y-6 pb-28 md:pb-0">
@@ -225,17 +231,19 @@ export default function Dashboard() {
               <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.pendingAmount)}</p>
             </div>
             <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
-              <p className="text-xs uppercase text-slate-500">{t('dashboard.salesTotal')}</p>
+              <p className="text-xs uppercase text-slate-500">{salesLabel}</p>
               <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.salesTotal)}</p>
             </div>
             <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-slate-500">{t('dashboard.purchaseSpend')}</p>
               <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.purchaseTotal)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
-              <p className="text-xs uppercase text-slate-500">{t('dashboard.serviceRevenue')}</p>
-              <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.serviceTotal)}</p>
-            </div>
+            {servicesEnabled ? (
+              <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
+                <p className="text-xs uppercase text-slate-500">{servicesLabel}</p>
+                <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.serviceTotal)}</p>
+              </div>
+            ) : null}
           </div>
 
           <p className="mt-4 text-xs text-slate-500">
@@ -275,7 +283,7 @@ export default function Dashboard() {
               <Package size={18} className="text-slate-400" />
             </div>
             <div className="mt-4 grid gap-2">
-              <Link className="btn-primary w-full justify-center" to="/app/services">{t('dashboard.newSale')}</Link>
+              <Link className="btn-primary w-full justify-center" to={businessProfile?.salesFlow?.route || '/app/sales'}>{t('dashboard.newSale')}</Link>
               <Link className="btn-secondary w-full justify-center" to="/app/purchases">{t('dashboard.newPurchase')}</Link>
               <Link className="btn-ghost w-full justify-center" to="/app/inventory">{t('dashboard.addProduct')}</Link>
             </div>
@@ -284,6 +292,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        {servicesEnabled ? (
         <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
             <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.upcomingDeliveries')}</h3>
@@ -331,6 +340,7 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+        ) : null}
 
         <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">

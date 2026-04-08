@@ -57,6 +57,8 @@ export function normalizeLookupProduct(raw = {}) {
     id,
     name,
     companyName: String(pickFirstDefined(raw.companyName, product.companyName)).trim(),
+    metalType: String(pickFirstDefined(raw.metalType, product.metalType)).trim(),
+    purity: String(pickFirstDefined(raw.purity, product.purity)).trim(),
     primaryUnit,
     secondaryUnit,
     salePrice: Number(pickFirstDefined(raw.salePrice, product.salePrice, 0)),
@@ -86,8 +88,11 @@ export function normalizeLookupParty(raw = {}) {
 }
 
 export function formatProductLookupLabel(product = {}) {
+  const jewelleryMeta = [product.metalType, product.purity].filter(Boolean).join(' ');
+
   return [
     product.name || '—',
+    jewelleryMeta,
     product.companyName || '',
     product.primaryUnit || '',
   ]

@@ -12,6 +12,7 @@ import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
 import CreatorFilterSelect from '../components/CreatorFilterSelect.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import Pagination from '../components/Pagination';
 import { useI18n } from '../lib/i18n.jsx';
@@ -77,7 +78,17 @@ function getCustomerName(sale) {
 export default function Sales() {
   const { t } = useI18n();
   const { businessId, user } = useAuth();
+  const { businessProfile } = useBusinessSettings();
   const isMobile = useIsMobile();
+  const salesFlow = businessProfile?.salesFlow || {};
+  const salesTitle = salesFlow.title || t('sales.title');
+  const salesSubtitle = salesFlow.attributeSectionHint || t('sales.subtitle');
+  const createSaleLabel = salesFlow.createLabel || t('sales.newSale');
+  const orderInfoTitle = salesFlow.attributeSectionTitle || t('services.orderInformation');
+  const hiddenSaleAttributeKeys = useMemo(
+    () => (businessProfile?.type === 'cafe' ? ['order_status'] : []),
+    [businessProfile?.type]
+  );
 
   // ── Stores ──
   const { sales: salesList, loading: salesLoading, fetch: fetchSales, invalidate: invalidateSales } = useSaleStore();
@@ -494,18 +505,18 @@ export default function Sales() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title={t('sales.title')}
-        subtitle={t('sales.subtitle')}
+        title={salesTitle}
+        subtitle={salesSubtitle}
         action={
           <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate}>
             <Plus size={16} className="mr-1.5 inline" />
-            {t('sales.newSale')}
+            {createSaleLabel}
           </button>
         }
       />
 
       {/* ── Form Dialog ── */}
-      <Dialog isOpen={isOpen} onClose={closeDialog} title={formMode === 'edit' ? t('sales.editSale') : t('sales.newSale')} size="full">
+      <Dialog isOpen={isOpen} onClose={closeDialog} title={formMode === 'edit' ? t('sales.editSale') : createSaleLabel} size="full">
         <form className="space-y-5" onSubmit={handleSubmit}>
           {status.message ? <Notice title={status.message} tone={status.type} /> : null}
           {isMobile ? (
@@ -571,8 +582,13 @@ export default function Sales() {
                 </div>
               </FormSectionCard>
 
-              <FormSectionCard title={t('services.orderInformation')}>
-                <DynamicAttributes entityType="sale" attributes={header.attributes} onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))} />
+              <FormSectionCard title={orderInfoTitle} hint={salesFlow.attributeSectionHint || undefined}>
+                <DynamicAttributes
+                  entityType="sale"
+                  attributes={header.attributes}
+                  hiddenKeys={hiddenSaleAttributeKeys}
+                  onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))}
+                />
               </FormSectionCard>
             </>
           ) : null}

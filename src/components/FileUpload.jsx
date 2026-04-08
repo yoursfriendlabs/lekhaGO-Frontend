@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, API_BASE } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
+
+const EMPTY_URLS = [];
 
 function toAbsoluteUrl(url) {
   if (!url) return '';
@@ -35,21 +37,35 @@ function isPdfUrl(url) {
   return /\.pdf(?:$|[?#])/i.test(String(url || ''));
 }
 
+function areUrlListsEqual(left, right) {
+  if (left === right) return true;
+  if (!Array.isArray(left) || !Array.isArray(right)) return false;
+  if (left.length !== right.length) return false;
+  return left.every((value, index) => value === right[index]);
+}
+
 export default function FileUpload({
   onUpload,
   initialUrl = '',
-  initialUrls = [],
+  initialUrls = EMPTY_URLS,
   label,
   multiple = false,
 }) {
   const { t } = useI18n();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
-  const [uploadedUrls, setUploadedUrls] = useState(() => normalizeUrls(multiple ? initialUrls : initialUrl));
+  const normalizedInitialUrls = useMemo(
+    () => normalizeUrls(multiple ? initialUrls : initialUrl),
+    [initialUrl, initialUrls, multiple]
+  );
+  const normalizedInitialUrlsSignature = normalizedInitialUrls.join('|');
+  const [uploadedUrls, setUploadedUrls] = useState(() => normalizedInitialUrls);
 
   useEffect(() => {
-    setUploadedUrls(normalizeUrls(multiple ? initialUrls : initialUrl));
-  }, [initialUrl, initialUrls, multiple]);
+    setUploadedUrls((previous) => (
+      areUrlListsEqual(previous, normalizedInitialUrls) ? previous : normalizedInitialUrls
+    ));
+  }, [normalizedInitialUrlsSignature]);
 
   const handleFileChange = async (e) => {
     const files = Array.from(e.target.files || []);

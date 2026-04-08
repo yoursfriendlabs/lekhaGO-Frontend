@@ -1,24 +1,43 @@
 import { NavLink } from 'react-router-dom';
 import { useI18n } from '../lib/i18n.jsx';
 import { useAuth } from '../lib/auth.jsx';
+import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import BrandLogo from './BrandLogo.jsx';
 
-const navItems = [
-  { to: '/app', key: 'nav.dashboard' },
-  { to: '/app/inventory', key: 'nav.items', role: ['owner','staff'] },
-  { to: '/app/services', key: 'nav.services', role: ['owner','staff'] },
-  { to: '/app/purchases', key: 'nav.purchases', role: ['owner'] },
-  { to: '/app/parties', key: 'nav.parties', role: ['owner']  },
-  { to: '/app/ledger', key: 'nav.ledger', role: ['owner','staff'] },
-  { to: '/app/analytics', key: 'nav.analytics', role: ['owner'] },
-  { to: '/app/admin', key: 'nav.admin', role: ['owner'] },
-  { to: '/app/settings', key: 'nav.settings', role: ['owner','staff'] },
-];
+const NAV_ROLE_MAP = {
+  dashboard: ['owner', 'staff'],
+  orders: ['owner', 'staff'],
+  inventory: ['owner', 'staff'],
+  sales: ['owner', 'staff'],
+  services: ['owner', 'staff'],
+  purchases: ['owner'],
+  parties: ['owner'],
+  ledger: ['owner', 'staff'],
+  analytics: ['owner'],
+  settings: ['owner', 'staff'],
+  admin: ['owner'],
+};
 
 export default function Sidebar() {
   const { t } = useI18n();
   const { role } = useAuth();
-  const visibleNavItems = navItems.filter((item) => !item.role || item.role.includes(role));
+  const { businessProfile } = useBusinessSettings();
+  const navigation = Array.isArray(businessProfile?.navigation) && businessProfile.navigation.length
+    ? businessProfile.navigation
+    : [
+        { key: 'dashboard', label: t('nav.dashboard'), route: '/app' },
+        { key: 'inventory', label: t('nav.items'), route: '/app/inventory' },
+        { key: 'sales', label: t('nav.sales'), route: '/app/sales' },
+        { key: 'purchases', label: t('nav.purchases'), route: '/app/purchases' },
+        { key: 'parties', label: t('nav.parties'), route: '/app/parties' },
+        { key: 'ledger', label: t('nav.ledger'), route: '/app/ledger' },
+        { key: 'analytics', label: t('nav.analytics'), route: '/app/analytics' },
+        { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
+      ];
+
+  const visibleNavItems = navigation
+    .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
+    .concat(role === 'owner' ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }] : []);
 
   return (
     <aside className="hidden h-full w-64 flex-col gap-6 border-r border-slate-200/70 bg-white/80 p-6 dark:border-slate-800/70 dark:bg-slate-950/70 md:fixed md:inset-y-0 md:left-0 md:flex md:overflow-y-auto">
@@ -28,9 +47,9 @@ export default function Sidebar() {
       <nav className="flex flex-col gap-2">
         {visibleNavItems.map((item) => (
           <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === '/app'}
+            key={item.route}
+            to={item.route}
+            end={item.route === '/app'}
             className={({ isActive }) =>
               `rounded-xl px-3 py-2 text-sm font-semibold transition ${
                 isActive
@@ -39,7 +58,7 @@ export default function Sidebar() {
               }`
             }
           >
-            {item.label ?? t(item.key)}
+            {item.label}
           </NavLink>
         ))}
       </nav>

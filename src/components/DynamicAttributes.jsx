@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '../lib/i18n.jsx';
 import { api } from '../lib/api';
+
+const EMPTY_HIDDEN_KEYS = [];
 
 function getAttributeItems(payload) {
   if (Array.isArray(payload)) return payload;
@@ -9,21 +11,39 @@ function getAttributeItems(payload) {
   return [];
 }
 
-export default function DynamicAttributes({ entityType, attributes, onChange }) {
+export default function DynamicAttributes({ entityType, attributes, onChange, hiddenKeys = EMPTY_HIDDEN_KEYS }) {
   const { t } = useI18n();
   const [definedAttributes, setDefinedAttributes] = useState([]);
   const [newKey, setNewKey] = useState('');
   const safeAttributes = attributes && typeof attributes === 'object' ? attributes : {};
+  const hiddenKeySignature = useMemo(
+    () => (Array.isArray(hiddenKeys) ? [...hiddenKeys].sort().join('|') : ''),
+    [hiddenKeys]
+  );
+  const hiddenKeySet = useMemo(
+    () => new Set(Array.isArray(hiddenKeys) ? hiddenKeys : EMPTY_HIDDEN_KEYS),
+    [hiddenKeySignature]
+  );
 
   useEffect(() => {
+    let active = true;
+
     api.listOrderAttributes({ entityType })
       .then((data) => {
+        if (!active) return;
         setDefinedAttributes(
-          getAttributeItems(data).filter((attr) => attr.entityType === 'all' || attr.entityType === entityType)
+          getAttributeItems(data).filter((attr) => (
+            (attr.entityType === 'all' || attr.entityType === entityType)
+            && !hiddenKeySet.has(attr.key)
+          ))
         );
       })
       .catch(() => null);
-  }, [entityType]);
+
+    return () => {
+      active = false;
+    };
+  }, [entityType, hiddenKeySet]);
 
   const handleChange = (key, value) => {
     onChange({
@@ -49,7 +69,7 @@ export default function DynamicAttributes({ entityType, attributes, onChange }) 
 
   // Predefined ones from API first, then any extra manual ones in attributes
   const definedKeys = definedAttributes.map((attribute) => attribute.key);
-  const extraKeys = Object.keys(safeAttributes).filter((key) => !definedKeys.includes(key));
+  const extraKeys = Object.keys(safeAttributes).filter((key) => !definedKeys.includes(key) && !hiddenKeySet.has(key));
 
   return (
     <div className="space-y-4">

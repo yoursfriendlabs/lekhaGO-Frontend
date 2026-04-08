@@ -164,7 +164,7 @@ export default function AsyncSearchableSelect({
       </button>
 
       {open ? (
-        <div className="absolute left-0 top-full z-[100] mt-1 w-full min-w-[200px] max-h-[300px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900 md:max-h-56">
+        <div className="absolute left-0 top-full z-[100] mt-1 w-full min-w-0 max-w-full max-h-[300px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900 md:max-h-56">
           <div className="border-b border-slate-100 p-2 dark:border-slate-800">
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-800">
               <Search size={13} className="shrink-0 text-slate-400" />
