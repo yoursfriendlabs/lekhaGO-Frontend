@@ -11,6 +11,7 @@ import Notice from './components/Notice';
 import RouteFallback from './components/RouteFallback';
 import PwaLifecycle from './components/PwaLifecycle';
 import { hasUnverifiedEmail, isStaffActivationRequired } from './lib/authFlow';
+import { isRetailBusinessType } from './lib/businessTypeConfig.js';
 import { BANKS_SETTINGS_TAB, buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB } from './lib/settingsTabs';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -102,6 +103,9 @@ function AppShell() {
   const servicesEnabled = businessProfile?.modules?.services !== false;
   const cafeOrdersEnabled = businessProfile?.modules?.orders === true || businessProfile?.type === 'cafe';
   const salesRoute = businessProfile?.salesFlow?.route || '/app/sales';
+  const hideSalesPage = isRetailBusinessType(businessProfile);
+  const retailSalesRedirect = servicesEnabled ? '/app/services' : '/app';
+  const salesPageElement = hideSalesPage ? <Navigate to={retailSalesRedirect} replace /> : <Sales />;
 
   return (
     <div className="min-h-screen gradient-bg bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 md:h-screen md:overflow-hidden">
@@ -162,8 +166,8 @@ function AppShell() {
                     </EmailActivationRequiredRoute>
                   )}
                 />
-                <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Sales /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="pos" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Sales /></RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>{salesPageElement}</RoleGuard></EmailActivationRequiredRoute>} />
+                <Route path="pos" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>{salesPageElement}</RoleGuard></EmailActivationRequiredRoute>} />
                 <Route
                   path="services"
                   element={(
