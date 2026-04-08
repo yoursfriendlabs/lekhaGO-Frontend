@@ -3,6 +3,7 @@ import { LayoutDashboard, Boxes, Users, ShoppingCart, Briefcase, Settings2, Shie
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
+import { getNavigationForBusinessType } from '../lib/businessTypeConfig.js';
 
 const NAV_ROLE_MAP = {
   dashboard: ['owner', 'staff'],
@@ -32,8 +33,9 @@ export default function MobileNav() {
   const { t } = useI18n();
   const { role } = useAuth();
   const { businessProfile } = useBusinessSettings();
-  const navigation = Array.isArray(businessProfile?.navigation) && businessProfile.navigation.length
-    ? businessProfile.navigation
+  const navigation = getNavigationForBusinessType(
+    Array.isArray(businessProfile?.navigation) && businessProfile.navigation.length
+      ? businessProfile.navigation
     : [
         { key: 'dashboard', label: t('nav.home'), route: '/app' },
         { key: 'inventory', label: t('nav.items'), route: '/app/inventory' },
@@ -41,7 +43,9 @@ export default function MobileNav() {
         { key: 'purchases', label: t('nav.buy'), route: '/app/purchases' },
         { key: 'parties', label: t('nav.parties'), route: '/app/parties' },
         { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
-      ];
+      ],
+    businessProfile,
+  );
   const visibleNavItems = navigation
     .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
     .concat(role === 'owner' ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }] : []);

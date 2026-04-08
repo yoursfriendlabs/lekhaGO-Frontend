@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useI18n } from '../lib/i18n.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
+import { getNavigationForBusinessType } from '../lib/businessTypeConfig.js';
 import BrandLogo from './BrandLogo.jsx';
 
 const NAV_ROLE_MAP = {
@@ -22,8 +23,9 @@ export default function Sidebar() {
   const { t } = useI18n();
   const { role } = useAuth();
   const { businessProfile } = useBusinessSettings();
-  const navigation = Array.isArray(businessProfile?.navigation) && businessProfile.navigation.length
-    ? businessProfile.navigation
+  const navigation = getNavigationForBusinessType(
+    Array.isArray(businessProfile?.navigation) && businessProfile.navigation.length
+      ? businessProfile.navigation
     : [
         { key: 'dashboard', label: t('nav.dashboard'), route: '/app' },
         { key: 'inventory', label: t('nav.items'), route: '/app/inventory' },
@@ -33,7 +35,9 @@ export default function Sidebar() {
         { key: 'ledger', label: t('nav.ledger'), route: '/app/ledger' },
         { key: 'analytics', label: t('nav.analytics'), route: '/app/analytics' },
         { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
-      ];
+      ],
+    businessProfile,
+  );
 
   const visibleNavItems = navigation
     .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))

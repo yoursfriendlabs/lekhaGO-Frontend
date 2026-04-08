@@ -12,6 +12,7 @@ import CreatorFilterSelect from '../components/CreatorFilterSelect.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
+import { getServicesDisplayLabel } from '../lib/businessTypeConfig.js';
 import { useI18n } from '../lib/i18n.jsx';
 import FileUpload from '../components/FileUpload';
 import DynamicAttributes from '../components/DynamicAttributes';
@@ -429,7 +430,7 @@ export default function Services() {
   const { settings: bizSettings, businessProfile } = useBusinessSettings();
   const servicesFlow = businessProfile?.servicesFlow || {};
   const servicesEnabled = servicesFlow.enabled !== false;
-  const servicesTitle = servicesFlow.title || t('services.title');
+  const servicesTitle = getServicesDisplayLabel(businessProfile, servicesFlow.title || t('services.title'));
   const servicesSubtitle = servicesFlow.attributeSectionHint || t('services.subtitle');
   const newOrderLabel = businessProfile?.type === 'jewellery' ? 'New Repair Order' : t('services.newOrder');
 
