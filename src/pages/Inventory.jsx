@@ -104,12 +104,12 @@ function getCurrentStock(product = {}) {
 }
 
 function getUnitText(unit = {}) {
-  return String(unit.symbol || unit.name || '').trim();
+  return String(unit?.symbol || unit?.name || '').trim();
 }
 
 function getUnitOptionLabel(unit = {}) {
-  const name = String(unit.name || '').trim();
-  const symbol = String(unit.symbol || '').trim();
+  const name = String(unit?.name || '').trim();
+  const symbol = String(unit?.symbol || '').trim();
   if (name && symbol && name.toLowerCase() !== symbol.toLowerCase()) {
     return `${name} (${symbol})`;
   }
