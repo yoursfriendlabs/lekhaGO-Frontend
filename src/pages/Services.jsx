@@ -120,6 +120,9 @@ function isPdfAttachment(url) {
 
 function AttachmentPreview({ url, onOpen, size = 'sm' }) {
   const sizeClass = size === 'lg' ? 'h-24 w-24' : size === 'md' ? 'h-14 w-14' : 'h-9 w-9';
+  const { businessProfile } = useBusinessSettings();
+  const servicesFlow = businessProfile?.servicesFlow || {};
+  const servicesEnabled = servicesFlow.enabled !== false;
 
   if (!servicesEnabled) {
     return (
