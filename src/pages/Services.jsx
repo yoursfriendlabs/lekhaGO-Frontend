@@ -1870,7 +1870,7 @@ export default function Services() {
                           </div>
                         </FormSectionCard>
 
-                        <FormSectionCard
+                        {/* <FormSectionCard
                           title="Jewellery details"
                           hint="Track metal purity, wastage, total weight, and simple diamond charges for jewellery orders."
                           className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
@@ -2021,7 +2021,7 @@ export default function Services() {
                               />
                             </div>
                           </div>
-                        </FormSectionCard>
+                        </FormSectionCard> */}
 
                         <FormSectionCard
                           title={t('services.orderInformation')}
