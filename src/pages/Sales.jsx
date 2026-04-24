@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Pencil, FileText, Plus } from 'lucide-react';
+import { Pencil, FileText, Package, Plus } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
@@ -115,7 +115,10 @@ export default function Sales() {
     attachment: '',
     attributes: {},
   });
-  const [items, setItems] = useState([{ ...emptyItem }]);
+  const [items, setItems] = useState([]);
+  const [showItemDialog, setShowItemDialog] = useState(false);
+  const [itemDraft, setItemDraft] = useState({ ...emptyItem });
+  const [editingItemIdx, setEditingItemIdx] = useState(null);
   const [status, setStatus] = useState({ type: 'info', message: '' });
   const [isOpen, setIsOpen] = useState(false);
   const [formMode, setFormMode] = useState('create');
@@ -150,6 +153,10 @@ export default function Sales() {
 
     return '—';
   };
+
+  const money = (value) => (
+    t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(value || 0).toFixed(2) })
+  );
 
   // ── Totals ──
   const totals = useMemo(() => {
@@ -189,17 +196,6 @@ export default function Sales() {
     setHeader((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleItemChange = (index, field, value) => {
-    setItems((prev) =>
-      prev.map((item, idx) => {
-        if (idx !== index) return item;
-        const next = { ...item, [field]: value };
-        next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
-        return next;
-      })
-    );
-  };
-
   const getProductById = (id) => {
     if (id === null || id === undefined || id === '') return null;
     return productDirectory[String(id)] || null;
@@ -226,34 +222,16 @@ export default function Sales() {
     setSelectedPartyFilterOption(option || null);
   };
 
-  const handleProductSelection = (index, option) => {
-    const product = option?.entity ? normalizeLookupProduct(option.entity) : null;
-
-    if (product?.id) {
-      cacheProducts([product]);
-      setItems((prev) => prev.map((item, idx) => (
-        idx === index ? { ...item, taxRate: String(product.taxRate || 0) } : item
-      )));
-    }
-
-    handleItemChange(index, 'productId', option?.value || '');
-
-    if (product) {
-      syncItemDefaults(index, product);
-    }
-  };
-
   const getUnitLabel = (product, unitType) => {
     if (!product) return '';
     if (unitType === 'secondary') return product.secondaryUnit || product.primaryUnit || '';
     return product.primaryUnit || product.secondaryUnit || '';
   };
 
-  const syncItemDefaults = (index, product) => {
+  const syncDraftDefaults = (product) => {
     if (!product) return;
-    setItems((prev) => prev.map((item, idx) => {
-      if (idx !== index) return item;
-      const next = { ...item };
+    setItemDraft((prev) => {
+      const next = { ...prev };
       if (!next.unitType) next.unitType = 'primary';
       if (next.unitType === 'secondary') {
         const explicitSecondary = Number(product.secondarySalePrice || 0);
@@ -271,10 +249,118 @@ export default function Sales() {
       }
       next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
       return next;
-    }));
+    });
   };
 
-  const addItem = () => setItems((prev) => [...prev, { ...emptyItem }]);
+  const handleDraftProductSelection = (option) => {
+    const product = option?.entity ? normalizeLookupProduct(option.entity) : null;
+
+    if (product?.id) {
+      cacheProducts([product]);
+    }
+
+    setItemDraft((prev) => ({
+      ...prev,
+      productId: option?.value || '',
+      taxRate: String(product?.taxRate || 0),
+    }));
+
+    if (product) {
+      syncDraftDefaults(product);
+    }
+  };
+
+  const handleDraftChange = (field, value) => {
+    if (field === 'unitType') {
+      const product = getProductById(itemDraft.productId);
+      setItemDraft((prev) => {
+        const next = { ...prev, unitType: value };
+        if (product) {
+          if (value === 'secondary') {
+            const explicitSecondary = Number(product.secondarySalePrice || 0);
+            if (explicitSecondary > 0) {
+              next.unitPrice = String(explicitSecondary);
+            } else {
+              const conversionRate = Number(product.conversionRate || 0);
+              const primaryPrice = Number(product.salePrice || 0);
+              if (conversionRate > 0 && primaryPrice > 0) {
+                next.unitPrice = String((primaryPrice / conversionRate).toFixed(4));
+              }
+            }
+          } else if (Number(product.salePrice || 0) > 0) {
+            next.unitPrice = String(product.salePrice || 0);
+          }
+        }
+        next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
+        return next;
+      });
+      return;
+    }
+
+    setItemDraft((prev) => {
+      const next = { ...prev, [field]: value };
+      next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
+      return next;
+    });
+
+    if (field === 'productId') {
+      const product = getProductById(value);
+      if (product) {
+        window.setTimeout(() => syncDraftDefaults(product), 0);
+      }
+    }
+  };
+
+  const openItemDialogForCreate = () => {
+    setStatus({ type: 'info', message: '' });
+    setItemDraft({ ...emptyItem });
+    setEditingItemIdx(null);
+    setShowItemDialog(true);
+    setMobileStep('items');
+  };
+
+  const openItemDialogForEdit = (index) => {
+    setStatus({ type: 'info', message: '' });
+    setItemDraft({ ...items[index] });
+    setEditingItemIdx(index);
+    setShowItemDialog(true);
+    setMobileStep('items');
+  };
+
+  const closeItemDialog = () => {
+    setShowItemDialog(false);
+    setEditingItemIdx(null);
+    setItemDraft({ ...emptyItem });
+  };
+
+  const confirmItem = () => {
+    if (!itemDraft.productId) {
+      setStatus({ type: 'error', message: t('errors.selectProductSale') });
+      return;
+    }
+
+    if (
+      itemDraft.unitType === 'secondary'
+      && Number(getProductById(itemDraft.productId)?.conversionRate || 0) <= 0
+    ) {
+      setStatus({ type: 'error', message: t('errors.conversionRequired') });
+      return;
+    }
+
+    const draft = {
+      ...itemDraft,
+      lineTotal: (Number(itemDraft.quantity || 0) * Number(itemDraft.unitPrice || 0)).toFixed(2),
+    };
+
+    if (editingItemIdx !== null) {
+      setItems((prev) => prev.map((item, index) => (index === editingItemIdx ? draft : item)));
+    } else {
+      setItems((prev) => [...prev, draft]);
+    }
+
+    setStatus({ type: 'info', message: '' });
+    closeItemDialog();
+  };
 
   const removeItem = (index) => {
     setItems((prev) => {
@@ -329,7 +415,7 @@ export default function Sales() {
       attachment: '',
       attributes: {},
     });
-    setItems([{ ...emptyItem }]);
+    setItems([]);
     setDeletedItemIds([]);
     setEditingId(null);
     setFormMode('create');
@@ -338,11 +424,16 @@ export default function Sales() {
     setMobileStep('details');
     setProductDirectory({});
     setSelectedCustomer(null);
+    setShowItemDialog(false);
+    setItemDraft({ ...emptyItem });
+    setEditingItemIdx(null);
+    setStatus({ type: 'info', message: '' });
   };
 
   const closeDialog = () => {
     setIsOpen(false);
     setMobileStep('details');
+    setShowItemDialog(false);
   };
 
   const openCreate = async () => {
@@ -360,6 +451,7 @@ export default function Sales() {
   };
 
   const openEdit = async (saleId) => {
+    setStatus({ type: 'info', message: '' });
     try {
       const sale = await api.getSale(saleId);
       const saleItems = sale?.SaleItems || [];
@@ -395,7 +487,7 @@ export default function Sales() {
         taxRate: String(item.taxRate ?? '0'),
         lineTotal: String(item.lineTotal ?? '0'),
       }));
-      setItems(mappedItems.length ? mappedItems : [{ ...emptyItem }]);
+      setItems(mappedItems);
       setDeletedItemIds([]);
       setEditingId(saleId);
       setFormMode('edit');
@@ -413,6 +505,7 @@ export default function Sales() {
     event.preventDefault();
     if (!businessId) { setStatus({ type: 'error', message: t('errors.businessIdRequired') }); return; }
     if (!header.saleDate) { setStatus({ type: 'error', message: t('errors.saleDateRequired') }); return; }
+    if (!items.length) { setStatus({ type: 'error', message: t('sales.addFirstItem') }); return; }
     const invalidItem = items.find((item) => !item.productId);
     if (invalidItem) { setStatus({ type: 'error', message: t('errors.selectProductSale') }); return; }
     const invalidConversion = items.find((item) => {
@@ -483,7 +576,6 @@ export default function Sales() {
   // Validation for proceeding to next step
   const canProceedToItems = header.saleDate && (!header.partyId || true); // Customer is optional (walk-in)
   const hasValidItems = items.length > 0 && items.every((item) => item.productId && Number(item.lineTotal || 0) > 0);
-  const canProceedToPayment = mobileStep === 'details' ? canProceedToItems : true;
 
   const goToNextMobileStep = () => {
     if (!isMobile) return;
@@ -501,6 +593,10 @@ export default function Sales() {
     const previousStep = saleSteps[currentStepIndex - 1];
     if (previousStep) setMobileStep(previousStep.id);
   };
+
+  const itemDraftProduct = getProductById(itemDraft.productId);
+  const itemDraftVatAmount = getVatAmount(itemDraft.lineTotal, itemDraft.taxRate);
+  const canSaveDraftItem = Boolean(itemDraft.productId) && Number(itemDraft.lineTotal || 0) > 0;
 
   return (
     <div className="space-y-8">
@@ -596,81 +692,195 @@ export default function Sales() {
           {showItemsStep ? (
             <FormSectionCard
               title={t('sales.items')}
-              action={<button className="btn-ghost w-full sm:w-auto" type="button" onClick={addItem}>{t('sales.addItem')}</button>}
+              action={(
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <span className="text-sm font-semibold text-slate-500">{items.length} {t('sales.items')}</span>
+                  <button className="btn-ghost w-full sm:w-auto" type="button" onClick={openItemDialogForCreate}>
+                    {t('sales.addItem')}
+                  </button>
+                </div>
+              )}
             >
               <div className="space-y-4">
-                {items.map((item, idx) => {
+                {items.length ? items.map((item, idx) => {
                   const product = getProductById(item.productId);
                   const itemHeading = product?.name || `${t('sales.product')} ${idx + 1}`;
-                  const itemVatAmount = getVatAmount(item.lineTotal, item.taxRate);
+                  const unitLabel = getUnitLabel(product, item.unitType);
 
                   return (
-                    <div key={`item-${idx}`} className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
-                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{itemHeading}</p>
-                          <p className="mt-1 text-sm text-slate-500">{t('sales.lineTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.lineTotal })}</p>
-                          <p className="mt-1 text-xs text-slate-500">{t('sales.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: itemVatAmount.toFixed(2) })}</p>
+                    <div key={`item-${idx}`} className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-3.5 dark:border-slate-800/60 dark:bg-slate-900/40">
+                      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200">
+                              <Package size={18} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="truncate font-semibold text-slate-900 dark:text-white">{itemHeading}</p>
+                                {unitLabel ? (
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                    {unitLabel}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                  {t('sales.qty')}: {item.quantity}
+                                </span>
+                                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                  {t('sales.unitPrice')}: {money(item.unitPrice)}
+                                </span>
+                                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                  {t('sales.tax')}: {Number(item.taxRate || 0).toFixed(2)}%
+                                </span>
+                                <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white dark:bg-primary-900/70">
+                                  {t('common.total')}: {money(item.lineTotal)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        {items.length > 1 ? (
-                          <button className="btn-ghost w-full justify-center sm:w-auto" type="button" onClick={() => removeItem(idx)}>
+                        <div className="flex gap-2 xl:pl-4">
+                          <button className="btn-ghost flex-1 text-sm xl:flex-none" type="button" onClick={() => openItemDialogForEdit(idx)}>
+                            <Pencil size={14} className="mr-1.5 inline" />
+                            {t('common.edit')}
+                          </button>
+                          <button
+                            className="btn-ghost flex-1 border-rose-200 text-sm text-rose-600 hover:bg-rose-50 xl:flex-none dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/20"
+                            type="button"
+                            onClick={() => removeItem(idx)}
+                          >
                             {t('common.remove')}
                           </button>
-                        ) : null}
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-                        <div className="sm:col-span-2 xl:col-span-2">
-                          <label className="label">{t('sales.product')}</label>
-                          <AsyncSearchableSelect
-                            className="mt-1"
-                            value={item.productId}
-                            selectedOption={product ? toProductLookupOption(product) : null}
-                            onChange={(option) => handleProductSelection(idx, option)}
-                            loadOptions={loadProductOptions}
-                            placeholder={t('purchases.selectProduct')}
-                            searchPlaceholder={t('purchases.selectProduct')}
-                            noResultsLabel={t('common.noData')}
-                            loadingLabel={t('common.loading')}
-                          />
-                        </div>
-                        <div>
-                          <label className="label">{t('sales.qty')}</label>
-                          <input className="input mt-1" type="number" step="1" min={0} value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
-                          <p className="mt-1 text-xs text-slate-500">{getUnitLabel(product, item.unitType)}</p>
-                        </div>
-                        <div>
-                          <label className="label">{t('products.unitType')}</label>
-                          <select
-                            className="input mt-1"
-                            value={item.unitType}
-                            onChange={(event) => {
-                              handleItemChange(idx, 'unitType', event.target.value);
-                              syncItemDefaults(idx, getProductById(item.productId));
-                            }}
-                          >
-                            <option value="primary">{t('products.primaryUnit')}</option>
-                            <option value="secondary">{t('products.secondaryUnit')}</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="label">{t('sales.unitPrice')}</label>
-                          <input className="input mt-1" type="number" step="0.01" value={item.unitPrice} onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)} />
-                        </div>
-                        <div>
-                          <label className="label">{t('sales.tax')}</label>
-                          <input className="input mt-1" type="number" step="1" min={0} value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
-                          <p className="mt-1 text-xs text-slate-500">
-                            {t('sales.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: itemVatAmount.toFixed(2) })}
-                          </p>
                         </div>
                       </div>
                     </div>
                   );
-                })}
+                }) : (
+                  <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50/70 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-900/30">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{t('sales.addFirstItem')}</p>
+                    <button className="btn-primary mt-4 w-full sm:w-auto" type="button" onClick={openItemDialogForCreate}>
+                      <Plus size={15} className="mr-1.5 inline" />
+                      {t('sales.addItem')}
+                    </button>
+                  </div>
+                )}
               </div>
             </FormSectionCard>
           ) : null}
+
+          <Dialog
+            isOpen={showItemDialog}
+            onClose={closeItemDialog}
+            title={editingItemIdx !== null ? t('sales.editItem') : t('sales.addItem')}
+            size="xl"
+            footer={(
+              <>
+                <button className="btn-secondary w-full sm:w-auto" type="button" onClick={closeItemDialog}>
+                  {t('common.cancel')}
+                </button>
+                <button className="btn-primary w-full sm:w-auto" type="button" onClick={confirmItem} disabled={!canSaveDraftItem}>
+                  {editingItemIdx !== null ? t('common.update') : t('common.add')}
+                </button>
+              </>
+            )}
+          >
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_290px]">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-200">
+                    {t('sales.itemComposerTitle')}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    {t('sales.itemComposerHint')}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="label">{t('sales.product')}</label>
+                  <AsyncSearchableSelect
+                    className="mt-1"
+                    value={itemDraft.productId}
+                    selectedOption={itemDraftProduct ? toProductLookupOption(itemDraftProduct) : null}
+                    onChange={handleDraftProductSelection}
+                    loadOptions={loadProductOptions}
+                    placeholder={t('purchases.selectProduct')}
+                    searchPlaceholder={t('purchases.selectProduct')}
+                    noResultsLabel={t('common.noData')}
+                    loadingLabel={t('common.loading')}
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="label">{t('sales.qty')}</label>
+                    <input
+                      className="input mt-1"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={itemDraft.quantity}
+                      onChange={(event) => handleDraftChange('quantity', event.target.value)}
+                    />
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{getUnitLabel(itemDraftProduct, itemDraft.unitType)}</p>
+                  </div>
+                  <div>
+                    <label className="label">{t('products.unitType')}</label>
+                    <select
+                      className="input mt-1"
+                      value={itemDraft.unitType}
+                      onChange={(event) => handleDraftChange('unitType', event.target.value)}
+                    >
+                      <option value="primary">{t('products.primaryUnit')}</option>
+                      <option value="secondary">{t('products.secondaryUnit')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">{t('sales.unitPrice')}</label>
+                    <input
+                      className="input mt-1"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={itemDraft.unitPrice}
+                      onChange={(event) => handleDraftChange('unitPrice', event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">{t('sales.tax')}</label>
+                    <input
+                      className="input mt-1"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={itemDraft.taxRate}
+                      onChange={(event) => handleDraftChange('taxRate', event.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-primary-200 bg-primary-50/60 p-4 shadow-sm dark:border-primary-900/40 dark:bg-primary-900/15">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-200">{t('common.total')}</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</p>
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('sales.taxTotal')}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{money(itemDraftVatAmount)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('sales.product')}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{itemDraftProduct?.name || '—'}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('products.unitType')}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{getUnitLabel(itemDraftProduct, itemDraft.unitType) || t('products.primaryUnit')}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Dialog>
 
           {showPaymentStep ? (
             <FormSectionCard title={t('payments.summaryTitle')}>

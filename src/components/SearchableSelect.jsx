@@ -5,6 +5,19 @@ function ensureArray(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function normalizeOption(option) {
+  if (!option || typeof option !== 'object') return null;
+
+  const value = option.value;
+  if (value === null || value === undefined || value === '') return null;
+
+  return {
+    ...option,
+    value: String(value),
+    label: String(option.label ?? value),
+  };
+}
+
 /**
  * SearchableSelect - a filterable dropdown select.
  *
@@ -26,9 +39,9 @@ export default function SearchableSelect({
   const [query, setQuery] = useState('');
   const containerRef = useRef(null);
   const searchRef = useRef(null);
-  const safeOptions = ensureArray(options);
+  const safeOptions = ensureArray(options).map(normalizeOption).filter(Boolean);
 
-  const selected = safeOptions.find((o) => o.value === value && o.value !== '');
+  const selected = safeOptions.find((o) => o.value === String(value) && o.value !== '');
 
   const filtered = query.trim()
     ? safeOptions.filter((o) => o.label.toLowerCase().includes(query.toLowerCase().trim()))
@@ -126,7 +139,7 @@ export default function SearchableSelect({
                 <li
                   key={opt.value}
                   className={`cursor-pointer px-3 py-2 text-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 ${
-                    opt.value === value
+                    opt.value === String(value)
                       ? 'font-semibold text-primary-700 dark:text-primary-400'
                       : 'text-slate-700 dark:text-slate-300'
                   }`}

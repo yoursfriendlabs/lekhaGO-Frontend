@@ -459,9 +459,35 @@ export default function Inventory() {
   };
 
   const openCreateDialog = () => {
+    // Generate a unique item code (SKU)
+    // We check existing products to find the highest numeric suffix if they follow a pattern like ITEM-001
+    // Otherwise, we can use a timestamp or a simple increment.
+    const generateItemCode = () => {
+      const prefix = 'ITEM-';
+      const existingCodes = products
+        .map((p) => p.sku || '')
+        .filter((sku) => sku.startsWith(prefix));
+
+      if (existingCodes.length === 0) {
+        return `${prefix}001`;
+      }
+
+      const numbers = existingCodes
+        .map((sku) => parseInt(sku.replace(prefix, ''), 10))
+        .filter((num) => !isNaN(num));
+
+      if (numbers.length === 0) {
+        return `${prefix}${String(existingCodes.length + 1).padStart(3, '0')}`;
+      }
+
+      const nextNumber = Math.max(...numbers) + 1;
+      return `${prefix}${String(nextNumber).padStart(3, '0')}`;
+    };
+
     setEditingId(null);
     setForm({
       ...makeEmptyItem(),
+      itemCode: generateItemCode(),
       itemType: itemTypeOptions[0]?.value || 'goods',
     });
     setActiveTab('stock');
@@ -953,7 +979,10 @@ export default function Inventory() {
                   ) : null}
                 </div>
                 <div>
-                  <label className="label">{t('inventory.itemCode')}</label>
+                  <label className="label">
+                    {t('inventory.itemCode')}
+                    <span className="ml-1 text-[10px] text-slate-400 font-normal">(barcode ready)</span>
+                  </label>
                   <input
                     className="input mt-1"
                     name="itemCode"

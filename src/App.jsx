@@ -7,6 +7,7 @@ import { BusinessSettingsProvider, useBusinessSettings } from './lib/businessSet
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import MobileNav from './components/MobileNav';
+import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import Notice from './components/Notice';
 import RouteFallback from './components/RouteFallback';
 import PwaLifecycle from './components/PwaLifecycle';
@@ -94,6 +95,16 @@ function InvoiceAccessRoute({ children }) {
   );
 }
 
+function ScopedRouteBoundary({ children, scope = 'page' }) {
+  const location = useLocation();
+
+  return (
+    <AppErrorBoundary scope={scope} resetKeys={[location.pathname, location.search]}>
+      {children}
+    </AppErrorBoundary>
+  );
+}
+
 function AppShell() {
   const { businessId, role, user } = useAuth();
   const { t } = useI18n();
@@ -151,46 +162,48 @@ function AppShell() {
                 />
               )}
             >
-              <Routes>
-                <Route path="/" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Dashboard /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="products" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to="/app/inventory" replace /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="inventory" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Inventory /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="purchases" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Purchases /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route
-                  path="orders"
-                  element={(
-                    <EmailActivationRequiredRoute>
-                      <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
-                        {cafeOrdersEnabled ? <CafeOrders /> : <Navigate to={salesRoute} replace />}
-                      </RoleGuard>
-                    </EmailActivationRequiredRoute>
-                  )}
-                />
-                <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>{salesPageElement}</RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="pos" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>{salesPageElement}</RoleGuard></EmailActivationRequiredRoute>} />
-                <Route
-                  path="services"
-                  element={(
-                    <EmailActivationRequiredRoute>
-                      <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
-                        {servicesEnabled ? <Services /> : <Navigate to={salesRoute} replace />}
-                      </RoleGuard>
-                    </EmailActivationRequiredRoute>
-                  )}
-                />
-                <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Parties /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="banks" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to={buildSettingsTabPath(BANKS_SETTINGS_TAB)} replace /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="ledger" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Ledger /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="analytics" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Analytics /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="admin" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Admin /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route
-                  path="order-attributes"
-                  element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to={buildSettingsTabPath(ORDER_ATTRIBUTES_SETTINGS_TAB)} replace /></RoleGuard></EmailActivationRequiredRoute>}
-                />
-                <Route path="settings" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Settings /></RoleGuard></EmailActivationRequiredRoute>} />
-                <Route path="invoice/:type/:id" element={<EmailActivationRequiredRoute><InvoiceAccessRoute><Invoice /></InvoiceAccessRoute></EmailActivationRequiredRoute>} />
-                <Route path="activate-account" element={<ActivationOnlyRoute><ActivateAccount /></ActivationOnlyRoute>} />
-              </Routes>
+              <ScopedRouteBoundary>
+                <Routes>
+                  <Route path="/" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Dashboard /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="products" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to="/app/inventory" replace /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="inventory" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Inventory /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="purchases" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Purchases /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route
+                    path="orders"
+                    element={(
+                      <EmailActivationRequiredRoute>
+                        <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
+                          {cafeOrdersEnabled ? <CafeOrders /> : <Navigate to={salesRoute} replace />}
+                        </RoleGuard>
+                      </EmailActivationRequiredRoute>
+                    )}
+                  />
+                  <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>{salesPageElement}</RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="pos" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>{salesPageElement}</RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route
+                    path="services"
+                    element={(
+                      <EmailActivationRequiredRoute>
+                        <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
+                          {servicesEnabled ? <Services /> : <Navigate to={salesRoute} replace />}
+                        </RoleGuard>
+                      </EmailActivationRequiredRoute>
+                    )}
+                  />
+                  <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Parties /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="banks" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to={buildSettingsTabPath(BANKS_SETTINGS_TAB)} replace /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="ledger" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Ledger /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="analytics" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Analytics /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="admin" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><Admin /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route
+                    path="order-attributes"
+                    element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Navigate to={buildSettingsTabPath(ORDER_ATTRIBUTES_SETTINGS_TAB)} replace /></RoleGuard></EmailActivationRequiredRoute>}
+                  />
+                  <Route path="settings" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Settings /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="invoice/:type/:id" element={<EmailActivationRequiredRoute><InvoiceAccessRoute><Invoice /></InvoiceAccessRoute></EmailActivationRequiredRoute>} />
+                  <Route path="activate-account" element={<ActivationOnlyRoute><ActivateAccount /></ActivationOnlyRoute>} />
+                </Routes>
+              </ScopedRouteBoundary>
             </Suspense>
           </main>
         </div>
@@ -214,65 +227,67 @@ export default function App() {
                 />
               )}
             >
-              <Routes>
-                <Route path="/" element={<IndexRoute />} />
-                <Route
-                  path="/login"
-                  element={(
-                    <PublicOnlyRoute>
-                      <Login />
-                    </PublicOnlyRoute>
-                  )}
-                />
-                <Route
-                  path="/register"
-                  element={(
-                    <PublicOnlyRoute>
-                      <Register />
-                    </PublicOnlyRoute>
-                  )}
-                />
-                <Route
-                  path="/verify-email"
-                  element={(
-                    <PublicOnlyRoute>
-                      <VerifyEmail />
-                    </PublicOnlyRoute>
-                  )}
-                />
-                <Route
-                  path="/forgot-password"
-                  element={(
-                    <PublicOnlyRoute>
-                      <ForgotPassword />
-                    </PublicOnlyRoute>
-                  )}
-                />
-                <Route
-                  path="/forgot-password/otp"
-                  element={(
-                    <PublicOnlyRoute>
-                      <ForgotPasswordOtp />
-                    </PublicOnlyRoute>
-                  )}
-                />
-                <Route
-                  path="/forgot-password/reset"
-                  element={(
-                    <PublicOnlyRoute>
-                      <ResetPassword />
-                    </PublicOnlyRoute>
-                  )}
-                />
-                <Route
-                  path="/app/*"
-                  element={(
-                    <ProtectedRoute>
-                      <AppShell />
-                    </ProtectedRoute>
-                  )}
-                />
-              </Routes>
+              <ScopedRouteBoundary>
+                <Routes>
+                  <Route path="/" element={<IndexRoute />} />
+                  <Route
+                    path="/login"
+                    element={(
+                      <PublicOnlyRoute>
+                        <Login />
+                      </PublicOnlyRoute>
+                    )}
+                  />
+                  <Route
+                    path="/register"
+                    element={(
+                      <PublicOnlyRoute>
+                        <Register />
+                      </PublicOnlyRoute>
+                    )}
+                  />
+                  <Route
+                    path="/verify-email"
+                    element={(
+                      <PublicOnlyRoute>
+                        <VerifyEmail />
+                      </PublicOnlyRoute>
+                    )}
+                  />
+                  <Route
+                    path="/forgot-password"
+                    element={(
+                      <PublicOnlyRoute>
+                        <ForgotPassword />
+                      </PublicOnlyRoute>
+                    )}
+                  />
+                  <Route
+                    path="/forgot-password/otp"
+                    element={(
+                      <PublicOnlyRoute>
+                        <ForgotPasswordOtp />
+                      </PublicOnlyRoute>
+                    )}
+                  />
+                  <Route
+                    path="/forgot-password/reset"
+                    element={(
+                      <PublicOnlyRoute>
+                        <ResetPassword />
+                      </PublicOnlyRoute>
+                    )}
+                  />
+                  <Route
+                    path="/app/*"
+                    element={(
+                      <ProtectedRoute>
+                        <AppShell />
+                      </ProtectedRoute>
+                    )}
+                  />
+                </Routes>
+              </ScopedRouteBoundary>
             </Suspense>
             <PwaLifecycle />
           </BusinessSettingsProvider>

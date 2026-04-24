@@ -2,14 +2,28 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
+function normalizeOption(option) {
+  if (!option || typeof option !== 'object') return null;
+
+  const value = option.value;
+  if (value === null || value === undefined || value === '') return null;
+
+  return {
+    ...option,
+    value: String(value),
+    label: String(option.label ?? value),
+  };
+}
+
 function mergeOptions(selectedOption, options = []) {
   const seen = new Set();
   const merged = [];
 
   [selectedOption, ...options].forEach((option) => {
-    if (!option?.value || seen.has(String(option.value))) return;
-    seen.add(String(option.value));
-    merged.push(option);
+    const normalized = normalizeOption(option);
+    if (!normalized?.value || seen.has(normalized.value)) return;
+    seen.add(normalized.value);
+    merged.push(normalized);
   });
 
   return merged;
@@ -47,7 +61,7 @@ export default function AsyncSearchableSelect({
     loadOptionsRef.current = loadOptions;
   }, [loadOptions]);
 
-  const safeOptions = ensureArray(options);
+  const safeOptions = ensureArray(options).map(normalizeOption).filter(Boolean);
 
   const selected = useMemo(() => {
     if (selectedOption && String(selectedOption.value) === String(value) && value !== '') {
