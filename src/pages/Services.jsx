@@ -9,6 +9,7 @@ import InvoiceHeader from '../components/InvoiceHeader';
 import MobileFormStepper from '../components/MobileFormStepper.jsx';
 import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
 import CreatorFilterSelect from '../components/CreatorFilterSelect.jsx';
+import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
@@ -431,11 +432,15 @@ export default function Services() {
   const { businessId, user } = useAuth();
   const isMobile = useIsMobile();
   const { settings: bizSettings, businessProfile } = useBusinessSettings();
+  const businessType = String(businessProfile?.type || '').toLowerCase();
+  const showGoldJewelleryDetails = businessType === 'gold';
   const servicesFlow = businessProfile?.servicesFlow || {};
   const servicesEnabled = servicesFlow.enabled !== false;
   const servicesTitle = getServicesDisplayLabel(businessProfile, servicesFlow.title || t('services.title'));
   const servicesSubtitle = servicesFlow.attributeSectionHint || t('services.subtitle');
-  const newOrderLabel = businessProfile?.type === 'jewellery' ? 'New Repair Order' : t('services.newOrder');
+  const newOrderLabel = businessType === 'jewellery' || businessType === 'gold'
+    ? 'New Repair Order'
+    : t('services.newOrder');
 
   const { upsert: upsertParty } = usePartyStore();
   const { services: serviceList, loading: listLoading, fetch: fetchServices, invalidate: invalidateServices } = useServiceStore();
@@ -499,7 +504,7 @@ export default function Services() {
   const [newPartyPhone, setNewPartyPhone] = useState('');
   const [creatingParty, setCreatingParty] = useState(false);
   const [header, setHeader] = useState(() => makeEmptyHeader());
-  const [items, setItems] = useState([{ ...emptyItem }]);
+  const [items, setItems] = useState([]);
   const [amountReceived, setAmountReceived] = useState('0');
   const [isPaid, setIsPaid] = useState(false);
 
@@ -511,6 +516,10 @@ export default function Services() {
   const [mobileSummaryExpanded, setMobileSummaryExpanded] = useState(false);
   const jewelleryAttributes = useMemo(() => normalizeJewelleryAttributes(header.attributes), [header.attributes]);
   const jewelleryDetails = useMemo(() => getJewelleryBreakdown(jewelleryAttributes), [jewelleryAttributes]);
+  const activeJewelleryDetails = useMemo(
+    () => (showGoldJewelleryDetails ? jewelleryDetails : getJewelleryBreakdown({})),
+    [jewelleryDetails, showGoldJewelleryDetails]
+  );
   const jewelleryPurityOptions = useMemo(
     () => getPurityOptionsForMetal(jewelleryAttributes.metalType),
     [jewelleryAttributes.metalType]
@@ -578,13 +587,13 @@ export default function Services() {
     const laborTotal = chargeableItems
       .filter((i) => i.itemType === 'labor')
       .reduce((s, i) => s + Number(i.lineTotal || 0), 0)
-      + jewelleryDetails.diamondChargeNumber;
+      + activeJewelleryDetails.diamondChargeNumber;
     const partsTotal = chargeableItems
       .filter((i) => i.itemType === 'part')
       .reduce((s, i) => s + Number(i.lineTotal || 0), 0);
     const subTotal = laborTotal + partsTotal;
     const taxTotal = chargeableItems.reduce((sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate), 0)
-      + jewelleryDetails.additionalTaxNumber;
+      + activeJewelleryDetails.additionalTaxNumber;
     const grandTotal = subTotal + taxTotal;
     const received = isPaid ? grandTotal : Math.min(Number(amountReceived || 0), grandTotal);
     const due = Math.max(grandTotal - received, 0);
@@ -596,15 +605,12 @@ export default function Services() {
       grandTotal,
       received,
       due,
-      diamondCharge: jewelleryDetails.diamondChargeNumber,
-      additionalTax: jewelleryDetails.additionalTaxNumber,
+      diamondCharge: activeJewelleryDetails.diamondChargeNumber,
+      additionalTax: activeJewelleryDetails.additionalTaxNumber,
     };
-  }, [chargeableItems, amountReceived, isPaid, jewelleryDetails.additionalTaxNumber, jewelleryDetails.diamondChargeNumber]);
+  }, [activeJewelleryDetails.additionalTaxNumber, activeJewelleryDetails.diamondChargeNumber, amountReceived, chargeableItems, isPaid]);
 
-  const visibleItems = useMemo(() => {
-    if (items.length === 1 && isPlaceholderItem(items[0])) return [];
-    return items;
-  }, [items]);
+  const visibleItems = useMemo(() => items.filter((item) => !isPlaceholderItem(item)), [items]);
 
   const formSteps = useMemo(() => ([
     { id: 'details', label: t('services.detailStep') },
@@ -813,6 +819,7 @@ export default function Services() {
   };
 
   const startAddItem = () => {
+    setFormNotice({ type: '', message: '' });
     setItemDraft({ ...emptyItem });
     setEditingItemIdx(null);
     setShowItemForm(true);
@@ -820,6 +827,7 @@ export default function Services() {
   };
 
   const startEditItem = (idx) => {
+    setFormNotice({ type: '', message: '' });
     setItemDraft({ ...items[idx] });
     setEditingItemIdx(idx);
     setShowItemForm(true);
@@ -829,9 +837,24 @@ export default function Services() {
   const cancelItemForm = () => {
     setShowItemForm(false);
     setEditingItemIdx(null);
+    setItemDraft({ ...emptyItem });
   };
 
   const confirmItem = () => {
+    if (itemDraft.itemType === 'part' && !itemDraft.productId) {
+      setFormNotice({ type: 'error', message: t('errors.selectProductPart') });
+      return;
+    }
+
+    if (
+      itemDraft.itemType === 'part'
+      && itemDraft.unitType === 'secondary'
+      && Number(getProductById(itemDraft.productId)?.conversionRate || 0) <= 0
+    ) {
+      setFormNotice({ type: 'error', message: t('errors.conversionRequired') });
+      return;
+    }
+
     const draft = {
       ...itemDraft,
       lineTotal: (Number(itemDraft.quantity || 0) * Number(itemDraft.unitPrice || 0)).toFixed(2),
@@ -839,10 +862,12 @@ export default function Services() {
     if (editingItemIdx !== null) {
       setItems((prev) => prev.map((item, idx) => (idx === editingItemIdx ? draft : item)));
     } else {
-      setItems((prev) => (prev.length === 1 && isPlaceholderItem(prev[0]) ? [draft] : [...prev, draft]));
+      setItems((prev) => [...prev, draft]);
     }
+    setFormNotice({ type: '', message: '' });
     setShowItemForm(false);
     setEditingItemIdx(null);
+    setItemDraft({ ...emptyItem });
   };
 
   // ── Party helpers ──
@@ -929,7 +954,7 @@ export default function Services() {
   // ── Reset & open/close dialog ──
   const resetForm = () => {
     setHeader({ ...makeEmptyHeader(), orderNo: '' });
-    setItems([{ ...emptyItem }]);
+    setItems([]);
     setPartyQuery('');
     setSelectedParty(null);
     setPartyDropdownOpen(false);
@@ -1007,7 +1032,7 @@ export default function Services() {
         unitPrice: String(i.unitPrice ?? '0'),
         taxRate: String(i.taxRate ?? '0'),
         lineTotal: String(i.lineTotal ?? '0'),
-      })) : [{ ...emptyItem }]);
+      })) : []);
 
       // Set selected party if we have party data
       if (partyData.partyId && partyData.partyName) {
@@ -1051,9 +1076,13 @@ export default function Services() {
     });
     if (invalidConversion) { setFormNotice({ type: 'error', message: t('errors.conversionRequired') }); return; }
     if (!chargeableItems.length) { setFormNotice({ type: 'error', message: t('services.addFirstItem') }); return; }
-    const normalizedAttributes = normalizeJewelleryAttributes(header.attributes);
+    const normalizedAttributes = showGoldJewelleryDetails
+      ? normalizeJewelleryAttributes(header.attributes)
+      : Object.fromEntries(
+          Object.entries(header.attributes || {}).filter(([key]) => !JEWELLERY_ATTRIBUTE_KEYS.includes(key))
+        );
     const wastagePercent = Number(normalizedAttributes.wastagePercent || 0);
-    if (normalizedAttributes.wastagePercent && (wastagePercent < 5 || wastagePercent > 15)) {
+    if (showGoldJewelleryDetails && normalizedAttributes.wastagePercent && (wastagePercent < 5 || wastagePercent > 15)) {
       setFormNotice({ type: 'error', message: 'Wastage percent must be between 5 and 15.' });
       return;
     }
@@ -1244,6 +1273,11 @@ export default function Services() {
   const showDetailsStep = !isMobile || mobileStep === 'details';
   const showItemsStep = !isMobile || mobileStep === 'items';
   const showPaymentStep = !isMobile || mobileStep === 'payment';
+  const itemDraftProduct = getProductById(itemDraft.productId);
+  const itemDraftVatAmount = getVatAmount(itemDraft.lineTotal, itemDraft.taxRate);
+  const canSaveDraftItem = itemDraft.itemType === 'part'
+    ? Boolean(itemDraft.productId) && Number(itemDraft.lineTotal || 0) > 0
+    : Number(itemDraft.lineTotal || 0) > 0 || Boolean(String(itemDraft.description || '').trim());
   const dialogTitle = editingId ? t('services.editOrder') : newOrderLabel;
   const summaryOrderNo = header.orderNo || suggestedOrderNo || '—';
   const summaryDeliveryDate = header.deliveryDate ? formatMaybeDate(header.deliveryDate, 'D MMM YYYY') : '—';
@@ -2056,26 +2090,31 @@ export default function Services() {
                       <FormSectionCard
                         title={t('services.items')}
                         hint={t('services.itemsSectionHint')}
-                        action={<span className="text-sm font-semibold text-slate-500">{visibleItems.length} {t('services.items')}</span>}
+                        action={(
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <span className="text-sm font-semibold text-slate-500">{visibleItems.length} {t('services.items')}</span>
+                            <button className="btn-ghost w-full sm:w-auto" type="button" onClick={startAddItem}>
+                              {t('services.addLine')}
+                            </button>
+                          </div>
+                        )}
                         className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                       >
                         {visibleItems.length > 0 ? (
                           <div className="mb-4 space-y-3">
-                            {items.map((item, idx) => {
+                            {visibleItems.map((item, idx) => {
                               const product = getProductById(item.productId);
-                              const displayName = item.description || (product ? product.name : '') || '—';
+                              const displayName = item.itemType === 'part'
+                                ? product?.name || item.description || t('services.productLine')
+                                : item.description || t('services.serviceLine');
                               const unitLabel = item.itemType === 'part' ? getUnitLabel(product, item.unitType) : '';
-                              const itemVatAmount = getVatAmount(item.lineTotal, item.taxRate);
-
-                              if (editingItemIdx === idx && showItemForm) return null;
-                              if (isPlaceholderItem(item)) return null;
 
                               return (
                                 <div
                                   key={`item-row-${idx}`}
-                                  className="rounded-[24px] border border-slate-200/70 bg-slate-50/60 p-4 dark:border-slate-800/60 dark:bg-slate-900/40"
+                                  className="rounded-[24px] border border-slate-200/70 bg-slate-50/60 p-3.5 dark:border-slate-800/60 dark:bg-slate-900/40"
                                 >
-                                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                  <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-start gap-3">
                                         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}>
@@ -2088,50 +2127,43 @@ export default function Services() {
                                             </span>
                                             <p className="truncate font-semibold text-slate-900 dark:text-white">{displayName}</p>
                                           </div>
-                                          <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                                            <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-slate-950/50">
-                                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.qty')}</p>
-                                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{item.quantity}{unitLabel ? ` ${unitLabel}` : ''}</p>
-                                            </div>
-                                            <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-slate-950/50">
-                                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.unitPrice')}</p>
-                                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{money(item.unitPrice)}</p>
-                                            </div>
-                                            <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-slate-950/50">
-                                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.tax')}</p>
-                                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{Number(item.taxRate || 0).toFixed(2)}%</p>
-                                            </div>
-                                            <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-slate-950/50">
-                                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.taxTotal')}</p>
-                                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{money(itemVatAmount)}</p>
-                                            </div>
-                                            <div className="rounded-2xl bg-white/80 px-3 py-2 dark:bg-slate-950/50">
-                                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.total')}</p>
-                                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{money(item.lineTotal)}</p>
-                                            </div>
+                                          {item.itemType === 'part' && item.description && product?.name && item.description !== product.name ? (
+                                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.description}</p>
+                                          ) : null}
+                                          <div className="mt-2 flex flex-wrap gap-2">
+                                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                              {t('services.qty')}: {item.quantity}{unitLabel ? ` ${unitLabel}` : ''}
+                                            </span>
+                                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                              {t('services.unitPrice')}: {money(item.unitPrice)}
+                                            </span>
+                                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                              {t('services.tax')}: {Number(item.taxRate || 0).toFixed(2)}%
+                                            </span>
+                                            <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white dark:bg-primary-900/70">
+                                              {t('common.total')}: {money(item.lineTotal)}
+                                            </span>
                                           </div>
                                         </div>
                                       </div>
                                     </div>
-                                    <div className="flex gap-2 md:pl-4">
+                                    <div className="flex gap-2 xl:pl-4">
                                       <button
                                         type="button"
-                                        className="btn-ghost flex-1 text-sm md:flex-none"
+                                        className="btn-ghost flex-1 text-sm xl:flex-none"
                                         onClick={() => startEditItem(idx)}
                                       >
                                         <Pencil size={14} className="mr-1.5 inline" />
                                         {t('common.edit')}
                                       </button>
-                                      {items.length > 1 ? (
-                                        <button
-                                          type="button"
-                                          className="btn-ghost flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 md:flex-none dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/20"
-                                          onClick={() => removeItem(idx)}
-                                        >
-                                          <X size={14} className="mr-1.5 inline" />
-                                          {t('common.remove')}
-                                        </button>
-                                      ) : null}
+                                      <button
+                                        type="button"
+                                        className="btn-ghost flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 xl:flex-none dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/20"
+                                        onClick={() => removeItem(idx)}
+                                      >
+                                        <X size={14} className="mr-1.5 inline" />
+                                        {t('common.remove')}
+                                      </button>
                                     </div>
                                   </div>
                                 </div>
@@ -2139,160 +2171,171 @@ export default function Services() {
                             })}
                           </div>
                         ) : (
-                          <div className="mb-4 rounded-[24px] border border-dashed border-slate-300 bg-slate-50/70 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/30 dark:text-slate-400">
-                            {t('services.addFirstItem')}
+                          <div className="mb-4 rounded-[24px] border border-dashed border-slate-300 bg-slate-50/70 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-900/30">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{t('services.addFirstItem')}</p>
+                            <button type="button" className="btn-primary mt-4 w-full sm:w-auto" onClick={startAddItem}>
+                              <Plus size={15} className="mr-1.5 inline" />
+                              {t('services.addLine')}
+                            </button>
                           </div>
                         )}
-
-                        {showItemForm ? (
-                          <div className="mb-4 rounded-[28px] border border-primary-200 bg-primary-50/55 p-4 shadow-sm dark:border-primary-900/40 dark:bg-primary-900/15">
-                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                              <div className="max-w-2xl">
-                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-200">{t('services.itemComposerTitle')}</p>
-                                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{t('services.itemComposerHint')}</p>
-                              </div>
-                              <div className="rounded-[22px] border border-white/70 bg-white/80 px-4 py-3 text-right dark:border-slate-800/60 dark:bg-slate-950/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.total')}</p>
-                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</p>
-                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                  {t('services.taxTotal')}: {money(getVatAmount(itemDraft.lineTotal, itemDraft.taxRate))}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                              <div>
-                                <label className="label">{t('services.type')}</label>
-                                <select
-                                  className="input mt-1"
-                                  value={itemDraft.itemType}
-                                  onChange={(e) => handleDraftChange('itemType', e.target.value)}
-                                >
-                                  <option value="labor">{t('services.serviceLine')}</option>
-                                  <option value="part">{t('services.productLine')}</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="label">{t('services.description')}</label>
-                                <input
-                                  className="input mt-1"
-                                  value={itemDraft.description}
-                                  onChange={(e) => handleDraftChange('description', e.target.value)}
-                                  placeholder={t('services.placeholderService')}
-                                />
-                              </div>
-
-                              {itemDraft.itemType === 'part' ? (
-                                <div className="sm:col-span-2">
-                                  <label className="label">{t('services.productParts')}</label>
-                                  <AsyncSearchableSelect
-                                    className="mt-1"
-                                    value={itemDraft.productId}
-                                    selectedOption={getProductById(itemDraft.productId) ? toProductLookupOption(getProductById(itemDraft.productId)) : null}
-                                    onChange={handleDraftProductSelection}
-                                    loadOptions={loadProductOptions}
-                                    placeholder={t('purchases.selectProduct')}
-                                    searchPlaceholder={t('purchases.selectProduct')}
-                                    noResultsLabel={t('common.noData')}
-                                    loadingLabel={t('common.loading')}
-                                  />
-                                </div>
-                              ) : null}
-
-                              {itemDraft.itemType === 'part' && (() => {
-                                const prod = getProductById(itemDraft.productId);
-                                return prod?.secondaryUnit ? (
-                                  <div className="sm:col-span-2">
-                                    <label className="label">{t('products.unitType')}</label>
-                                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDraftChange('unitType', 'primary', prod.primaryUnit)}
-                                        className={itemDraft.unitType === 'primary' ? 'btn-primary w-full text-sm' : 'btn-ghost w-full text-sm'}
-                                      >
-                                        {prod.primaryUnit || t('products.primaryUnit')}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDraftChange('unitType', 'secondary', prod.secondaryUnit)}
-                                        className={itemDraft.unitType === 'secondary' ? 'btn-primary w-full text-sm' : 'btn-ghost w-full text-sm'}
-                                      >
-                                        {prod.secondaryUnit} <span className="ml-1 text-xs opacity-70">({t('products.secondaryUnit')})</span>
-                                      </button>
-                                    </div>
-                                    {prod.conversionRate > 0 ? (
-                                      <p className="mt-2 text-xs text-slate-500">
-                                        1 {prod.primaryUnit} = {prod.conversionRate} {prod.secondaryUnit}
-                                      </p>
-                                    ) : null}
-                                  </div>
-                                ) : null;
-                              })()}
-
-                              <div>
-                                <label className="label">{t('services.qty')}</label>
-                                <input
-                                  className="input mt-1"
-                                  type="number"
-                                  min="0"
-                                  step="0.1"
-                                  value={itemDraft.quantity}
-                                  onChange={(e) => handleDraftChange('quantity', e.target.value)}
-                                />
-                                {itemDraft.itemType === 'part' ? (
-                                  <p className="mt-1 text-xs text-slate-500">{getUnitLabel(getProductById(itemDraft.productId), itemDraft.unitType)}</p>
-                                ) : null}
-                              </div>
-                              <div>
-                                <label className="label">{t('services.unitPrice')}</label>
-                                <input
-                                  className="input mt-1"
-                                  type="number"
-                                  min="0"
-                                  step="0.1"
-                                  value={itemDraft.unitPrice}
-                                  onChange={(e) => handleDraftChange('unitPrice', e.target.value)}
-                                />
-                              </div>
-                              <div>
-                                <label className="label">{t('services.tax')}</label>
-                                <input
-                                  className="input mt-1"
-                                  type="number"
-                                  min="0"
-                                  step="1"
-                                  value={itemDraft.taxRate}
-                                  onChange={(e) => handleDraftChange('taxRate', e.target.value)}
-                                />
-                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                  {t('services.taxTotal')}: {money(getVatAmount(itemDraft.lineTotal, itemDraft.taxRate))}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-                              <button type="button" className="btn-ghost text-sm" onClick={cancelItemForm}>
-                                {t('common.cancel')}
-                              </button>
-                              <button type="button" className="btn-primary text-sm" onClick={confirmItem}>
-                                {editingItemIdx !== null ? t('common.update') : t('common.add')}
-                              </button>
-                            </div>
-                          </div>
-                        ) : null}
-
-                        {!showItemForm ? (
-                          <button
-                            type="button"
-                            className="btn-ghost w-full border-2 border-dashed border-slate-300 py-3 text-slate-600 hover:border-primary-300 hover:text-primary-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-primary-600"
-                            onClick={startAddItem}
-                          >
-                            <Plus size={15} className="mr-1.5 inline" />
-                            {t('services.addLine')}
-                          </button>
-                        ) : null}
                       </FormSectionCard>
                     ) : null}
+
+                    <Dialog
+                      isOpen={showItemForm}
+                      onClose={cancelItemForm}
+                      title={editingItemIdx !== null ? t('services.editLine') : t('services.addLine')}
+                      size="xl"
+                      footer={(
+                        <>
+                          <button type="button" className="btn-secondary w-full sm:w-auto" onClick={cancelItemForm}>
+                            {t('common.cancel')}
+                          </button>
+                          <button type="button" className="btn-primary w-full sm:w-auto" onClick={confirmItem} disabled={!canSaveDraftItem}>
+                            {editingItemIdx !== null ? t('common.update') : t('common.add')}
+                          </button>
+                        </>
+                      )}
+                    >
+                      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-200">{t('services.itemComposerTitle')}</p>
+                            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{t('services.itemComposerHint')}</p>
+                          </div>
+
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <div>
+                              <label className="label">{t('services.type')}</label>
+                              <select
+                                className="input mt-1"
+                                value={itemDraft.itemType}
+                                onChange={(e) => handleDraftChange('itemType', e.target.value)}
+                              >
+                                <option value="labor">{t('services.serviceLine')}</option>
+                                <option value="part">{t('services.productLine')}</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="label">{t('services.description')}</label>
+                              <input
+                                className="input mt-1"
+                                value={itemDraft.description}
+                                onChange={(e) => handleDraftChange('description', e.target.value)}
+                                placeholder={t('services.placeholderService')}
+                              />
+                            </div>
+
+                            {itemDraft.itemType === 'part' ? (
+                              <div className="sm:col-span-2">
+                                <label className="label">{t('services.productParts')}</label>
+                                <AsyncSearchableSelect
+                                  className="mt-1"
+                                  value={itemDraft.productId}
+                                  selectedOption={itemDraftProduct ? toProductLookupOption(itemDraftProduct) : null}
+                                  onChange={handleDraftProductSelection}
+                                  loadOptions={loadProductOptions}
+                                  placeholder={t('purchases.selectProduct')}
+                                  searchPlaceholder={t('purchases.selectProduct')}
+                                  noResultsLabel={t('common.noData')}
+                                  loadingLabel={t('common.loading')}
+                                />
+                              </div>
+                            ) : null}
+
+                            {itemDraft.itemType === 'part' && itemDraftProduct?.secondaryUnit ? (
+                              <div className="sm:col-span-2">
+                                <label className="label">{t('products.unitType')}</label>
+                                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDraftChange('unitType', 'primary', itemDraftProduct.primaryUnit)}
+                                    className={itemDraft.unitType === 'primary' ? 'btn-primary w-full text-sm' : 'btn-ghost w-full text-sm'}
+                                  >
+                                    {itemDraftProduct.primaryUnit || t('products.primaryUnit')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDraftChange('unitType', 'secondary', itemDraftProduct.secondaryUnit)}
+                                    className={itemDraft.unitType === 'secondary' ? 'btn-primary w-full text-sm' : 'btn-ghost w-full text-sm'}
+                                  >
+                                    {itemDraftProduct.secondaryUnit} <span className="ml-1 text-xs opacity-70">({t('products.secondaryUnit')})</span>
+                                  </button>
+                                </div>
+                                {itemDraftProduct.conversionRate > 0 ? (
+                                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                    1 {itemDraftProduct.primaryUnit} = {itemDraftProduct.conversionRate} {itemDraftProduct.secondaryUnit}
+                                  </p>
+                                ) : null}
+                              </div>
+                            ) : null}
+
+                            <div>
+                              <label className="label">{t('services.qty')}</label>
+                              <input
+                                className="input mt-1"
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={itemDraft.quantity}
+                                onChange={(e) => handleDraftChange('quantity', e.target.value)}
+                              />
+                              {itemDraft.itemType === 'part' ? (
+                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{getUnitLabel(itemDraftProduct, itemDraft.unitType)}</p>
+                              ) : null}
+                            </div>
+                            <div>
+                              <label className="label">{t('services.unitPrice')}</label>
+                              <input
+                                className="input mt-1"
+                                type="number"
+                                min="0"
+                                step="0.1"
+                                value={itemDraft.unitPrice}
+                                onChange={(e) => handleDraftChange('unitPrice', e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="label">{t('services.tax')}</label>
+                              <input
+                                className="input mt-1"
+                                type="number"
+                                min="0"
+                                step="1"
+                                value={itemDraft.taxRate}
+                                onChange={(e) => handleDraftChange('taxRate', e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-[28px] border border-primary-200 bg-primary-50/60 p-4 shadow-sm dark:border-primary-900/40 dark:bg-primary-900/15">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-200">{t('common.total')}</p>
+                          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</p>
+                          <div className="mt-4 space-y-3">
+                            <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.taxTotal')}</p>
+                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{money(itemDraftVatAmount)}</p>
+                            </div>
+                            <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.type')}</p>
+                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{itemDraft.itemType === 'labor' ? t('services.serviceLine') : t('services.productLine')}</p>
+                            </div>
+                            <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.description')}</p>
+                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                {itemDraft.itemType === 'part' ? itemDraftProduct?.name || itemDraft.description || '—' : itemDraft.description || '—'}
+                              </p>
+                            </div>
+                            <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('products.unitType')}</p>
+                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{getUnitLabel(itemDraftProduct, itemDraft.unitType) || t('products.primaryUnit')}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Dialog>
 
                     {showPaymentStep ? (
                       <FormSectionCard
@@ -2315,18 +2358,22 @@ export default function Services() {
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Product Total</p>
                                 <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.partsTotal)}</p>
                               </div>
-                              <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Diamond Charge</p>
-                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.diamondCharge)}</p>
-                              </div>
+                              {showGoldJewelleryDetails ? (
+                                <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Diamond Charge</p>
+                                  <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.diamondCharge)}</p>
+                                </div>
+                              ) : null}
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.taxTotal')}</p>
                                 <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.taxTotal)}</p>
                               </div>
-                              <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Additional Tax</p>
-                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.additionalTax)}</p>
-                              </div>
+                              {showGoldJewelleryDetails ? (
+                                <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Additional Tax</p>
+                                  <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.additionalTax)}</p>
+                                </div>
+                              ) : null}
                               <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white dark:bg-primary-900/70">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">{t('services.grandTotal')}</p>
                                 <p className="mt-1 text-xl font-semibold">{money(totals.grandTotal)}</p>
@@ -2521,7 +2568,7 @@ export default function Services() {
                       </div>
                     )}
                   </div>
-                  {(invoiceJewellery.metalType || invoiceJewellery.metalPurity || invoiceJewellery.actualWeight || invoiceJewellery.wastagePercent || invoiceJewellery.totalWeight || invoiceJewellery.diamondType || invoiceJewellery.diamondWeight || invoiceJewellery.diamondCarat || invoiceJewellery.diamondCharge) && (
+                  {showGoldJewelleryDetails && (invoiceJewellery.metalType || invoiceJewellery.metalPurity || invoiceJewellery.actualWeight || invoiceJewellery.wastagePercent || invoiceJewellery.totalWeight || invoiceJewellery.diamondType || invoiceJewellery.diamondWeight || invoiceJewellery.diamondCarat || invoiceJewellery.diamondCharge) && (
                     <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5">
                       {invoiceJewellery.metalType ? (
                         <div className="text-sm">
@@ -2637,7 +2684,7 @@ export default function Services() {
                     <div className="flex justify-between text-slate-500 dark:text-slate-400">
                       <span>Product Total</span><span>{money(invoiceTotals.partsTotal)}</span>
                     </div>
-                    {invoiceJewellery.diamondChargeNumber > 0 ? (
+                    {showGoldJewelleryDetails && invoiceJewellery.diamondChargeNumber > 0 ? (
                       <div className="flex justify-between text-slate-500 dark:text-slate-400">
                         <span>Diamond Charge</span><span>{money(invoiceJewellery.diamondChargeNumber)}</span>
                       </div>
@@ -2645,7 +2692,7 @@ export default function Services() {
                     <div className="flex justify-between text-slate-500 dark:text-slate-400">
                       <span>{t('services.taxTotal')}</span><span>{money(invoiceTotals.taxTotal)}</span>
                     </div>
-                    {invoiceJewellery.additionalTaxNumber > 0 ? (
+                    {showGoldJewelleryDetails && invoiceJewellery.additionalTaxNumber > 0 ? (
                       <div className="flex justify-between text-slate-500 dark:text-slate-400">
                         <span>Additional Tax</span><span>{money(invoiceJewellery.additionalTaxNumber)}</span>
                       </div>

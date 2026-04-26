@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Pencil, FileText, Plus } from 'lucide-react';
+import { Pencil, FileText, Package, Plus, Wallet, Wrench, X } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
@@ -57,6 +57,12 @@ function getSupplierName(purchase) {
   );
 }
 
+function getPurchaseEntryType(purchase) {
+  return String(purchase?.entryType || purchase?.type || 'purchase').toLowerCase() === 'expense'
+    ? 'expense'
+    : 'purchase';
+}
+
 const emptyPurchaseItem = {
   productId: '',
   quantity: '1',
@@ -98,6 +104,7 @@ export default function Purchases() {
 
   // ── UI state ──
   const [statusFilter, setStatusFilter] = useState('all');
+  const [entryTypeFilter, setEntryTypeFilter] = useState('all');
   const [isPaid, setIsPaid] = useState(false);
   const [header, setHeader] = useState({
     entryType: 'purchase',
@@ -112,8 +119,12 @@ export default function Purchases() {
     bankId: '',
     paymentNote: '',
   });
-  const [items, setItems] = useState([getEmptyItem('purchase')]);
+  const [items, setItems] = useState([]);
+  const [showItemDialog, setShowItemDialog] = useState(false);
+  const [itemDraft, setItemDraft] = useState(getEmptyItem('purchase'));
+  const [editingItemIdx, setEditingItemIdx] = useState(null);
   const [status, setStatus] = useState({ type: 'info', message: '' });
+  const [itemStatus, setItemStatus] = useState({ type: 'info', message: '' });
   const [isOpen, setIsOpen] = useState(false);
   const [formMode, setFormMode] = useState('create');
   const [editingId, setEditingId] = useState(null);
@@ -123,18 +134,24 @@ export default function Purchases() {
   const [mobileStep, setMobileStep] = useState('details');
 
   const isExpense = header.entryType === 'expense';
+  const money = (value) => (
+    t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(value || 0).toFixed(2) })
+  );
+  const listParams = useMemo(() => ({
+    limit: 50,
+    ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+    ...(entryTypeFilter !== 'all' ? { entryType: entryTypeFilter } : {}),
+  }), [entryTypeFilter, statusFilter]);
 
   // ── Load purchases list (page-specific) ──
   useEffect(() => {
     if (!businessId) return;
-    const params = { limit: 50 };
-    if (statusFilter !== 'all') params.status = statusFilter;
-    fetchPurchases(params);
-  }, [businessId, fetchPurchases, statusFilter]);
+    fetchPurchases(listParams);
+  }, [businessId, fetchPurchases, listParams]);
 
   useEffect(() => {
     setPage(1);
-  }, [statusFilter]);
+  }, [entryTypeFilter, statusFilter]);
 
   const totals = useMemo(() => {
     const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
@@ -194,31 +211,22 @@ export default function Purchases() {
     setHeader((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleEntryTypeChange = (event) => {
-    const value = event.target.value;
-    if (value === 'expense') {
-      setSelectedSupplier(null);
-    }
+  const handleEntryTypeChange = (eventOrValue) => {
+    const value = typeof eventOrValue === 'string' ? eventOrValue : eventOrValue.target.value;
+    setStatus({ type: 'info', message: '' });
+    setItemStatus({ type: 'info', message: '' });
+    if (value === 'expense') setSelectedSupplier(null);
     setHeader((prev) => ({
       ...prev,
       entryType: value,
       partyId: value === 'expense' ? '' : prev.partyId,
       partyName: value === 'expense' ? prev.partyName : '',
     }));
-    setItems([getEmptyItem(value)]);
+    setItems([]);
     setDeletedItemIds([]);
-  };
-
-  const handleItemChange = (index, field, value) => {
-    setItems((prev) =>
-      prev.map((item, idx) => {
-        if (idx !== index) return item;
-        const next = { ...item, [field]: value };
-        if (field === 'itemType' && value !== 'part') next.productId = '';
-        next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
-        return next;
-      })
-    );
+    setShowItemDialog(false);
+    setItemDraft(getEmptyItem(value));
+    setEditingItemIdx(null);
   };
 
   const getProductById = (id) => {
@@ -246,34 +254,16 @@ export default function Purchases() {
     }));
   };
 
-  const handleProductSelection = (index, option) => {
-    const product = option?.entity ? normalizeLookupProduct(option.entity) : null;
-
-    if (product?.id) {
-      cacheProducts([product]);
-      setItems((prev) => prev.map((item, idx) => (
-        idx === index ? { ...item, taxRate: String(product.taxRate || 0) } : item
-      )));
-    }
-
-    handleItemChange(index, 'productId', option?.value || '');
-
-    if (product) {
-      syncItemDefaults(index, product);
-    }
-  };
-
   const getUnitLabel = (product, unitType) => {
     if (!product) return '';
     if (unitType === 'secondary') return product.secondaryUnit || product.primaryUnit || '';
     return product.primaryUnit || product.secondaryUnit || '';
   };
 
-  const syncItemDefaults = (index, product) => {
+  const syncDraftDefaults = (product) => {
     if (!product) return;
-    setItems((prev) => prev.map((item, idx) => {
-      if (idx !== index) return item;
-      const next = { ...item };
+    setItemDraft((prev) => {
+      const next = { ...prev };
       if (!next.unitType) next.unitType = 'primary';
       if (next.unitType === 'secondary') {
         const explicitSecondary = Number(product.secondarySalePrice || 0);
@@ -291,10 +281,137 @@ export default function Purchases() {
       }
       next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
       return next;
-    }));
+    });
   };
 
-  const addItem = () => setItems((prev) => [...prev, getEmptyItem(header.entryType)]);
+  const handleDraftProductSelection = (option) => {
+    const product = option?.entity ? normalizeLookupProduct(option.entity) : null;
+
+    if (product?.id) {
+      cacheProducts([product]);
+    }
+
+    setItemDraft((prev) => ({
+      ...prev,
+      productId: option?.value || '',
+      taxRate: String(product?.taxRate || 0),
+    }));
+
+    if (product) {
+      syncDraftDefaults(product);
+    }
+  };
+
+  const handleDraftChange = (field, value) => {
+    if (field === 'unitType') {
+      const product = getProductById(itemDraft.productId);
+      setItemDraft((prev) => {
+        const next = { ...prev, unitType: value };
+        if (product) {
+          if (value === 'secondary') {
+            const explicitSecondary = Number(product.secondarySalePrice || 0);
+            if (explicitSecondary > 0) {
+              next.unitPrice = String(explicitSecondary);
+            } else {
+              const conversionRate = Number(product.conversionRate || 0);
+              const primaryPrice = Number(product.purchasePrice || 0);
+              if (conversionRate > 0 && primaryPrice > 0) {
+                next.unitPrice = String((primaryPrice / conversionRate).toFixed(4));
+              }
+            }
+          } else if (Number(product.purchasePrice || 0) > 0) {
+            next.unitPrice = String(product.purchasePrice || 0);
+          }
+        }
+        next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
+        return next;
+      });
+      return;
+    }
+
+    setItemDraft((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === 'itemType' && value !== 'part') {
+        next.productId = '';
+        next.unitType = 'primary';
+      }
+      next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
+      return next;
+    });
+
+    if (field === 'productId') {
+      const product = getProductById(value);
+      if (product) {
+        window.setTimeout(() => syncDraftDefaults(product), 0);
+      }
+    }
+  };
+
+  const openItemDialogForCreate = () => {
+    setStatus({ type: 'info', message: '' });
+    setItemStatus({ type: 'info', message: '' });
+    setItemDraft(getEmptyItem(header.entryType));
+    setEditingItemIdx(null);
+    setShowItemDialog(true);
+    setMobileStep('items');
+  };
+
+  const openItemDialogForEdit = (index) => {
+    setStatus({ type: 'info', message: '' });
+    setItemStatus({ type: 'info', message: '' });
+    setItemDraft({ ...items[index] });
+    setEditingItemIdx(index);
+    setShowItemDialog(true);
+    setMobileStep('items');
+  };
+
+  const closeItemDialog = () => {
+    setShowItemDialog(false);
+    setEditingItemIdx(null);
+    setItemDraft(getEmptyItem(header.entryType));
+    setItemStatus({ type: 'info', message: '' });
+  };
+
+  const confirmItem = () => {
+    if (header.entryType === 'expense') {
+      if (itemDraft.itemType === 'part' && !itemDraft.productId) {
+        setItemStatus({ type: 'error', message: t('errors.selectProductPart') });
+        return;
+      }
+      if (Number(itemDraft.lineTotal || 0) <= 0) {
+        setItemStatus({ type: 'error', message: t('errors.expenseLineRequired') });
+        return;
+      }
+    } else if (!itemDraft.productId) {
+      setItemStatus({ type: 'error', message: t('errors.selectProductPurchase') });
+      return;
+    }
+
+    if (
+      itemDraft.productId
+      && itemDraft.unitType === 'secondary'
+      && Number(getProductById(itemDraft.productId)?.conversionRate || 0) <= 0
+    ) {
+      setItemStatus({ type: 'error', message: t('errors.conversionRequired') });
+      return;
+    }
+
+    const draft = {
+      ...itemDraft,
+      lineTotal: (Number(itemDraft.quantity || 0) * Number(itemDraft.unitPrice || 0)).toFixed(2),
+    };
+
+    if (editingItemIdx !== null) {
+      setItems((prev) => prev.map((item, index) => (index === editingItemIdx ? draft : item)));
+    } else {
+      setItems((prev) => [...prev, draft]);
+    }
+
+    setStatus({ type: 'info', message: '' });
+    setItemStatus({ type: 'info', message: '' });
+    closeItemDialog();
+  };
+
   const removeItem = (index) => {
     setItems((prev) => {
       const target = prev[index];
@@ -303,11 +420,18 @@ export default function Purchases() {
     });
   };
 
-  const totalPurchases = purchaseList.length;
+  const filteredPurchases = useMemo(() => purchaseList.filter((purchase) => {
+    const purchaseEntryType = getPurchaseEntryType(purchase);
+    if (entryTypeFilter !== 'all' && purchaseEntryType !== entryTypeFilter) return false;
+    if (statusFilter !== 'all' && String(purchase.status || '').toLowerCase() !== statusFilter) return false;
+    return true;
+  }), [entryTypeFilter, purchaseList, statusFilter]);
+
+  const totalPurchases = filteredPurchases.length;
   const pagedPurchases = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return purchaseList.slice(start, start + pageSize);
-  }, [page, pageSize, purchaseList]);
+    return filteredPurchases.slice(start, start + pageSize);
+  }, [filteredPurchases, page, pageSize]);
 
   const resetForm = () => {
     setHeader({
@@ -323,7 +447,7 @@ export default function Purchases() {
       bankId: '',
       paymentNote: '',
     });
-    setItems([getEmptyItem('purchase')]);
+    setItems([]);
     setDeletedItemIds([]);
     setEditingId(null);
     setFormMode('create');
@@ -332,6 +456,10 @@ export default function Purchases() {
     setMobileStep('details');
     setProductDirectory({});
     setSelectedSupplier(null);
+    setShowItemDialog(false);
+    setEditingItemIdx(null);
+    setItemDraft(getEmptyItem('purchase'));
+    setItemStatus({ type: 'info', message: '' });
   };
 
   const closeDialog = () => {
@@ -341,6 +469,7 @@ export default function Purchases() {
 
   const openCreate = async () => {
     resetForm();
+    setStatus({ type: 'info', message: '' });
     setIsOpen(true);
 
     if (businessId) {
@@ -355,6 +484,7 @@ export default function Purchases() {
 
   const openEdit = async (purchaseId) => {
     try {
+      setStatus({ type: 'info', message: '' });
       const purchase = await api.getPurchase(purchaseId);
       const purchaseItems = purchase?.PurchaseItems || [];
       const entryType = purchase.entryType || purchase.type || 'purchase';
@@ -392,7 +522,7 @@ export default function Purchases() {
         itemType: item.itemType || (entryType === 'expense' ? 'expense' : 'part'),
         description: item.description || '',
       }));
-      setItems(mappedItems.length ? mappedItems : [getEmptyItem(entryType)]);
+      setItems(mappedItems);
       setDeletedItemIds([]);
       setEditingId(purchaseId);
       setFormMode('edit');
@@ -400,6 +530,10 @@ export default function Purchases() {
       const computedDue = Number(purchase.dueAmount ?? Math.max(Number(purchase.grandTotal || 0) - Number(purchase.amountReceived || 0), 0));
       setIsPaid(computedDue <= 0 && String(purchase.status || '').toLowerCase() !== 'ordered');
       setMobileStep('details');
+      setShowItemDialog(false);
+      setEditingItemIdx(null);
+      setItemDraft(getEmptyItem(entryType));
+      setItemStatus({ type: 'info', message: '' });
       setIsOpen(true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
@@ -413,6 +547,17 @@ export default function Purchases() {
 
   const goToNextMobileStep = () => {
     if (!isMobile) return;
+    if (mobileStep === 'details' && !header.purchaseDate) {
+      setStatus({ type: 'error', message: t('errors.purchaseDateRequired') });
+      return;
+    }
+    if (mobileStep === 'items' && items.length === 0) {
+      setStatus({
+        type: 'error',
+        message: isExpense ? t('errors.expenseLineRequired') : t('purchases.addFirstItem'),
+      });
+      return;
+    }
     const nextStep = purchaseSteps[currentStepIndex + 1];
     if (nextStep) setMobileStep(nextStep.id);
   };
@@ -435,6 +580,7 @@ export default function Purchases() {
       const invalidPart = items.find((item) => item.itemType === 'part' && !item.productId);
       if (invalidPart) { setStatus({ type: 'error', message: t('errors.selectProductPart') }); return; }
     } else {
+      if (!items.length) { setStatus({ type: 'error', message: t('purchases.addFirstItem') }); return; }
       const invalidItem = items.find((item) => !item.productId);
       if (invalidItem) { setStatus({ type: 'error', message: t('errors.selectProductPurchase') }); return; }
     }
@@ -489,22 +635,122 @@ export default function Purchases() {
       setIsOpen(false);
       useProductStore.getState().invalidate();
       invalidatePurchases();
-      const params = { limit: 50 };
-      if (statusFilter !== 'all') params.status = statusFilter;
-      fetchPurchases(params, true);
+      fetchPurchases(listParams, true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     }
   };
+
+  const itemDraftProduct = getProductById(itemDraft.productId);
+  const itemDraftVatAmount = getVatAmount(itemDraft.lineTotal, itemDraft.taxRate);
+  const canSaveDraftItem = (() => {
+    if (Number(itemDraft.lineTotal || 0) <= 0) return false;
+    if (header.entryType === 'expense') {
+      if (itemDraft.itemType === 'part' && !itemDraft.productId) return false;
+      if (
+        itemDraft.itemType === 'part'
+        && itemDraft.unitType === 'secondary'
+        && Number(itemDraftProduct?.conversionRate || 0) <= 0
+      ) return false;
+      return true;
+    }
+    if (!itemDraft.productId) return false;
+    if (
+      itemDraft.unitType === 'secondary'
+      && Number(itemDraftProduct?.conversionRate || 0) <= 0
+    ) return false;
+    return true;
+  })();
+
+  const getTransactionMeta = (entryType) => (
+    entryType === 'expense'
+      ? {
+          label: t('purchases.expense'),
+          icon: Wallet,
+          badgeClassName: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+          panelClassName: 'border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-900/40 dark:bg-emerald-950/30',
+          iconWrapClassName: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+        }
+      : {
+          label: t('purchases.purchase'),
+          icon: Package,
+          badgeClassName: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+          panelClassName: 'border-amber-200/70 bg-amber-50/70 dark:border-amber-900/40 dark:bg-amber-950/30',
+          iconWrapClassName: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+        }
+  );
+
+  const getLineMeta = (item, entryType = header.entryType) => {
+    if (entryType !== 'expense') {
+      return {
+        label: t('purchases.purchaseLine'),
+        icon: Package,
+        badgeClassName: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+        iconWrapClassName: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+      };
+    }
+
+    if (item.itemType === 'labor') {
+      return {
+        label: t('purchases.labor'),
+        icon: Wrench,
+        badgeClassName: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+        iconWrapClassName: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+      };
+    }
+
+    if (item.itemType === 'part') {
+      return {
+        label: t('purchases.part'),
+        icon: Package,
+        badgeClassName: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+        iconWrapClassName: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+      };
+    }
+
+    return {
+      label: t('purchases.expenseLine'),
+      icon: Wallet,
+      badgeClassName: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+      iconWrapClassName: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+    };
+  };
+
+  const transactionMeta = getTransactionMeta(header.entryType);
+  const TransactionIcon = transactionMeta.icon;
+  const draftLineMeta = getLineMeta(itemDraft);
+  const DraftLineIcon = draftLineMeta.icon;
+  const inactiveFilterClass = 'rounded-full border border-slate-200/80 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700/80 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-900/40';
+  const statusFilterOptions = [
+    { value: 'all', label: t('purchases.allStatuses'), activeClassName: 'rounded-full border border-slate-900 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900' },
+    { value: 'received', label: t('purchases.received'), activeClassName: 'rounded-full border border-emerald-500 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:border-emerald-700/70 dark:bg-emerald-900/30 dark:text-emerald-300' },
+    { value: 'ordered', label: t('purchases.ordered'), activeClassName: 'rounded-full border border-amber-500 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-700 dark:border-amber-700/70 dark:bg-amber-900/30 dark:text-amber-300' },
+    { value: 'due', label: t('purchases.due'), activeClassName: 'rounded-full border border-rose-500 bg-rose-50 px-3 py-1.5 text-sm font-semibold text-rose-700 dark:border-rose-700/70 dark:bg-rose-900/30 dark:text-rose-300' },
+  ];
+  const entryTypeFilterOptions = [
+    { value: 'all', label: t('purchases.allEntries'), activeClassName: 'rounded-full border border-slate-900 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900' },
+    { value: 'purchase', label: t('purchases.purchaseEntries'), activeClassName: 'rounded-full border border-amber-500 bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-700 dark:border-amber-700/70 dark:bg-amber-900/30 dark:text-amber-300' },
+    { value: 'expense', label: t('purchases.expenseEntries'), activeClassName: 'rounded-full border border-emerald-500 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:border-emerald-700/70 dark:bg-emerald-900/30 dark:text-emerald-300' },
+  ];
 
   return (
     <div className="space-y-8">
       <PageHeader
         title={t('purchases.title')}
         subtitle={t('purchases.subtitle')}
-        action={<button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate}>{t('purchases.newPurchase')}</button>}
+        action={(
+          <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate}>
+            {t('purchases.newPurchase')}
+          </button>
+        )}
       />
-      <Dialog isOpen={isOpen} onClose={closeDialog} title={formMode === 'edit' ? t('purchases.editPurchase') : t('purchases.newPurchase')} size="full">
+
+      <Dialog
+        isOpen={isOpen}
+        onClose={closeDialog}
+        title={formMode === 'edit' ? t('purchases.editPurchase') : t('purchases.newPurchase')}
+        size="full"
+      >
         <form className="space-y-5" onSubmit={handleSubmit}>
           {status.message ? <Notice title={status.message} tone={status.type} /> : null}
           {isMobile ? (
@@ -515,216 +761,461 @@ export default function Purchases() {
             />
           ) : null}
 
-          {showDetailsStep ? (
-            <FormSectionCard hint={t('purchases.supplierOptional')}>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+            <div className={`rounded-[28px] border p-5 shadow-sm ${transactionMeta.panelClassName}`}>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <label className="label">{t('purchases.entryType')}</label>
-                  <select className="input mt-1" name="entryType" value={header.entryType} onChange={handleEntryTypeChange}>
-                    <option value="purchase">{t('purchases.purchase')}</option>
-                    <option value="expense">{t('purchases.expense')}</option>
-                  </select>
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-300">
+                    {t('purchases.entryType')}
+                  </p>
+                  <h3 className="mt-2 font-serif text-2xl text-slate-900 dark:text-white">{transactionMeta.label}</h3>
+                  <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">{t('purchases.subtitle')}</p>
                 </div>
-                <div className="sm:col-span-2 lg:col-span-1">
-                  <label className="label">{t('purchases.supplier')}</label>
-                  <div className="mt-1">
-                    <PartySearchCreateField
-                      type="supplier"
-                      selectedParty={selectedSupplier}
-                      onSelect={handleSupplierSelect}
-                      placeholder={t('purchases.selectSupplier')}
-                      searchPlaceholder={t('purchases.selectSupplier')}
-                      entityLabel={t('purchases.supplier')}
+                <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${transactionMeta.iconWrapClassName}`}>
+                  <TransactionIcon size={22} />
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {['purchase', 'expense'].map((entryType) => {
+                  const optionMeta = getTransactionMeta(entryType);
+                  const OptionIcon = optionMeta.icon;
+                  const isActive = header.entryType === entryType;
+
+                  return (
+                    <button
+                      key={entryType}
+                      type="button"
+                      aria-pressed={isActive}
+                      className={`rounded-[22px] border px-4 py-4 text-left transition ${
+                        isActive
+                          ? optionMeta.panelClassName
+                          : 'border-slate-200/80 bg-white/90 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700/80 dark:bg-slate-950/40 dark:hover:border-slate-600 dark:hover:bg-slate-900/40'
+                      }`}
+                      onClick={() => handleEntryTypeChange(entryType)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${optionMeta.iconWrapClassName}`}>
+                          <OptionIcon size={18} />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-white">{optionMeta.label}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{t('purchases.items')}</p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 dark:shadow-none">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('purchases.items')}</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{items.length}</p>
+                </div>
+                <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('purchases.grandTotal')}</p>
+                  <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.grandTotal)}</p>
+                </div>
+                <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('purchases.dueLabel')}</p>
+                  <p className={`mt-2 text-lg font-semibold ${dueAmount > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
+                    {money(dueAmount)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {showDetailsStep ? (
+            <>
+              <FormSectionCard
+                title={t('common.details')}
+                hint={t('purchases.supplierOptional')}
+                className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+              >
+                <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                  <div className="xl:col-span-2">
+                    <label className="label">{t('purchases.supplier')}</label>
+                    <div className="mt-1">
+                      <PartySearchCreateField
+                        type="supplier"
+                        selectedParty={selectedSupplier}
+                        onSelect={handleSupplierSelect}
+                        placeholder={t('purchases.selectSupplier')}
+                        searchPlaceholder={t('purchases.selectSupplier')}
+                        entityLabel={t('purchases.supplier')}
+                      />
+                    </div>
+                  </div>
+
+                  {isExpense ? (
+                    <div>
+                      <label className="label">{t('purchases.payeeName')}</label>
+                      <input
+                        className="input mt-1"
+                        name="partyName"
+                        value={header.partyName}
+                        onChange={handleHeaderChange}
+                        placeholder={t('purchases.payeeHint')}
+                      />
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <label className="label">{t('purchases.invoiceNo')}</label>
+                    <input
+                      className="input mt-1"
+                      name="invoiceNo"
+                      value={header.invoiceNo}
+                      onChange={handleHeaderChange}
+                      placeholder={formMode === 'create' ? suggestedInvoiceNo : ''}
                     />
                   </div>
-                </div>
-                <div>
-                  <label className="label">{t('purchases.invoiceNo')}</label>
-                  <input
-                    className="input mt-1"
-                    name="invoiceNo"
-                    value={header.invoiceNo}
-                    onChange={handleHeaderChange}
-                    placeholder={formMode === 'create' ? suggestedInvoiceNo : ''}
-                  />
-                </div>
-                <div>
-                  <label className="label">{t('purchases.purchaseDate')}</label>
-                  <input type="date" className="input mt-1" name="purchaseDate" value={header.purchaseDate} onChange={handleHeaderChange} />
-                </div>
-                <div>
-                  <label className="label">{t('purchases.status')}</label>
-                  <select className="input mt-1" name="status" value={header.status} onChange={handleHeaderChange}>
-                    <option value="received">{t('purchases.received')}</option>
-                    <option value="ordered">{t('purchases.ordered')}</option>
-                    <option value="due">{t('purchases.due')}</option>
-                  </select>
-                </div>
-                <div className="sm:col-span-2 lg:col-span-3">
-                  <label className="label">{t('purchases.notes')}</label>
-                  <input className="input mt-1" name="notes" value={header.notes} onChange={handleHeaderChange} />
-                </div>
-                {isExpense ? (
-                  <div className="sm:col-span-2 lg:col-span-2">
-                    <label className="label">{t('purchases.supplier')}</label>
-                    <input className="input mt-1" name="partyName" value={header.partyName} onChange={handleHeaderChange} placeholder={t('purchases.payeeHint')} />
+                  <div>
+                    <label className="label">{t('purchases.purchaseDate')}</label>
+                    <input
+                      type="date"
+                      className="input mt-1"
+                      name="purchaseDate"
+                      value={header.purchaseDate}
+                      onChange={handleHeaderChange}
+                    />
                   </div>
-                ) : null}
-              </div>
-            </FormSectionCard>
+                  <div>
+                    <label className="label">{t('purchases.status')}</label>
+                    <select className="input mt-1" name="status" value={header.status} onChange={handleHeaderChange}>
+                      <option value="received">{t('purchases.received')}</option>
+                      <option value="ordered">{t('purchases.ordered')}</option>
+                      <option value="due">{t('purchases.due')}</option>
+                    </select>
+                  </div>
+                </div>
+              </FormSectionCard>
+
+              <FormSectionCard
+                title={t('purchases.notes')}
+                className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+              >
+                <textarea
+                  className="input h-28 resize-none"
+                  name="notes"
+                  value={header.notes}
+                  onChange={handleHeaderChange}
+                />
+              </FormSectionCard>
+            </>
           ) : null}
 
           {showItemsStep ? (
             <FormSectionCard
               title={t('purchases.items')}
-              action={<button className="btn-ghost w-full sm:w-auto" type="button" onClick={addItem}>{isExpense ? t('purchases.addExpenseLine') : t('common.addItem')}</button>}
+              hint={t('purchases.itemComposerHint')}
+              action={(
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <span className="text-sm font-semibold text-slate-500">{items.length} {t('purchases.items')}</span>
+                  <button className="btn-ghost w-full sm:w-auto" type="button" onClick={openItemDialogForCreate}>
+                    <Plus size={15} className="mr-1.5 inline" />
+                    {isExpense ? t('purchases.addExpenseLine') : t('common.addItem')}
+                  </button>
+                </div>
+              )}
+              className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
             >
-              <div className="space-y-4">
-                {items.map((item, idx) => {
-                  const product = getProductById(item.productId);
-                  const itemVatAmount = getVatAmount(item.lineTotal, item.taxRate);
-                  const itemHeading = isExpense
-                    ? item.description || `${t('purchases.expenseDescription')} ${idx + 1}`
-                    : product?.name || `${t('purchases.product')} ${idx + 1}`;
+              {items.length > 0 ? (
+                <div className="space-y-3">
+                  {items.map((item, idx) => {
+                    const product = getProductById(item.productId);
+                    const itemVatAmount = getVatAmount(item.lineTotal, item.taxRate);
+                    const lineMeta = getLineMeta(item);
+                    const LineIcon = lineMeta.icon;
+                    const unitLabel = getUnitLabel(product, item.unitType);
+                    const displayName = (
+                      header.entryType === 'expense'
+                        ? (item.itemType === 'part' ? product?.name || item.description || t('purchases.part') : item.description || lineMeta.label)
+                        : product?.name || item.description || `${t('purchases.product')} ${idx + 1}`
+                    );
 
-                  return (
-                    <div key={`item-${idx}`} className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
-                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{itemHeading}</p>
-                          <p className="mt-1 text-sm text-slate-500">{t('common.lineTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.lineTotal })}</p>
-                          <p className="mt-1 text-xs text-slate-500">{t('purchases.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: itemVatAmount.toFixed(2) })}</p>
+                    return (
+                      <div
+                        key={item.id || `purchase-item-${idx}`}
+                        className="rounded-[24px] border border-slate-200/70 bg-slate-50/60 p-3.5 dark:border-slate-800/60 dark:bg-slate-900/40"
+                      >
+                        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start gap-3">
+                              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${lineMeta.iconWrapClassName}`}>
+                                <LineIcon size={18} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${lineMeta.badgeClassName}`}>
+                                    {lineMeta.label}
+                                  </span>
+                                  <p className="truncate font-semibold text-slate-900 dark:text-white">{displayName}</p>
+                                </div>
+                                {item.description && product?.name && item.description !== product.name ? (
+                                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.description}</p>
+                                ) : null}
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                    {t('purchases.qty')}: {item.quantity}{unitLabel ? ` ${unitLabel}` : ''}
+                                  </span>
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                    {t('purchases.unitPrice')}: {money(item.unitPrice)}
+                                  </span>
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                    {t('purchases.tax')}: {Number(item.taxRate || 0).toFixed(2)}%
+                                  </span>
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                    {t('purchases.taxTotal')}: {money(itemVatAmount)}
+                                  </span>
+                                  <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white dark:bg-primary-900/70">
+                                    {t('common.total')}: {money(item.lineTotal)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 xl:pl-4">
+                            <button
+                              type="button"
+                              className="btn-ghost flex-1 text-sm xl:flex-none"
+                              onClick={() => openItemDialogForEdit(idx)}
+                            >
+                              <Pencil size={14} className="mr-1.5 inline" />
+                              {t('common.edit')}
+                            </button>
+                            <button
+                              type="button"
+                              className="btn-ghost flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 xl:flex-none dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/20"
+                              onClick={() => removeItem(idx)}
+                            >
+                              <X size={14} className="mr-1.5 inline" />
+                              {t('common.remove')}
+                            </button>
+                          </div>
                         </div>
-                        {items.length > 1 ? (
-                          <button className="btn-ghost w-full justify-center sm:w-auto" type="button" onClick={() => removeItem(idx)}>{t('common.remove')}</button>
-                        ) : null}
                       </div>
-
-                      {isExpense ? (
-                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-                          <div>
-                            <label className="label">{t('purchases.expenseCategory')}</label>
-                            <select className="input mt-1" value={item.itemType} onChange={(event) => handleItemChange(idx, 'itemType', event.target.value)}>
-                              <option value="expense">{t('purchases.normalExpense')}</option>
-                              <option value="labor">{t('purchases.labor')}</option>
-                              <option value="part">{t('purchases.part')}</option>
-                            </select>
-                          </div>
-                          <div className="sm:col-span-2 xl:col-span-2">
-                            <label className="label">{t('purchases.expenseDescription')}</label>
-                            <input className="input mt-1" value={item.description} onChange={(event) => handleItemChange(idx, 'description', event.target.value)} />
-                          </div>
-                          <div className="sm:col-span-2 xl:col-span-2">
-                            <label className="label">{t('purchases.product')}</label>
-                            <AsyncSearchableSelect
-                              className="mt-1"
-                              value={item.productId}
-                              selectedOption={product ? toProductLookupOption(product) : null}
-                              onChange={(option) => handleProductSelection(idx, option)}
-                              loadOptions={loadProductOptions}
-                              placeholder={t('purchases.selectProduct')}
-                              searchPlaceholder={t('purchases.selectProduct')}
-                              noResultsLabel={t('common.noData')}
-                              loadingLabel={t('common.loading')}
-                              disabled={item.itemType !== 'part'}
-                            />
-                          </div>
-                          <div>
-                            <label className="label">{t('purchases.qty')}</label>
-                            <input className="input mt-1" type="number" step="1" min="0" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
-                            <p className="mt-1 text-xs text-slate-500">{getUnitLabel(product, item.unitType)}</p>
-                          </div>
-                          <div>
-                            <label className="label">{t('products.unitType')}</label>
-                            <select className="input mt-1" value={item.unitType} onChange={(event) => { handleItemChange(idx, 'unitType', event.target.value); syncItemDefaults(idx, getProductById(item.productId)); }} disabled={item.itemType !== 'part'}>
-                              <option value="primary">{t('products.primaryUnit')}</option>
-                              <option value="secondary">{t('products.secondaryUnit')}</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="label">{t('purchases.unitPrice')}</label>
-                            <input className="input mt-1" type="number" step="0.01" value={item.unitPrice} onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)} />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-                          <div className="sm:col-span-2 xl:col-span-2">
-                            <label className="label">{t('purchases.product')}</label>
-                            <AsyncSearchableSelect
-                              className="mt-1"
-                              value={item.productId}
-                              selectedOption={product ? toProductLookupOption(product) : null}
-                              onChange={(option) => handleProductSelection(idx, option)}
-                              loadOptions={loadProductOptions}
-                              placeholder={t('purchases.selectProduct')}
-                              searchPlaceholder={t('purchases.selectProduct')}
-                              noResultsLabel={t('common.noData')}
-                              loadingLabel={t('common.loading')}
-                            />
-                          </div>
-                          <div>
-                            <label className="label">{t('purchases.qty')}</label>
-                            <input className="input mt-1" type="number" step="1" min="0" value={item.quantity} onChange={(event) => handleItemChange(idx, 'quantity', event.target.value)} />
-                            <p className="mt-1 text-xs text-slate-500">{getUnitLabel(product, item.unitType)}</p>
-                          </div>
-                          <div>
-                            <label className="label">{t('products.unitType')}</label>
-                            <select className="input mt-1" value={item.unitType} onChange={(event) => { handleItemChange(idx, 'unitType', event.target.value); syncItemDefaults(idx, getProductById(item.productId)); }}>
-                              <option value="primary">{t('products.primaryUnit')}</option>
-                              <option value="secondary">{t('products.secondaryUnit')}</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="label">{t('purchases.unitPrice')}</label>
-                            <input className="input mt-1" type="number" step="0.01" value={item.unitPrice} onChange={(event) => handleItemChange(idx, 'unitPrice', event.target.value)} />
-                          </div>
-                          <div>
-                            <label className="label">{t('purchases.tax')}</label>
-                            <input className="input mt-1" type="number" step="1" min={0} value={item.taxRate} onChange={(event) => handleItemChange(idx, 'taxRate', event.target.value)} />
-                            <p className="mt-1 text-xs text-slate-500">
-                              {t('purchases.taxTotal')}: {t('currency.formatted', { symbol: t('currency.symbol'), amount: itemVatAmount.toFixed(2) })}
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50/70 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-900/30">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{t('purchases.addFirstItem')}</p>
+                  <button type="button" className="btn-primary mt-4 w-full sm:w-auto" onClick={openItemDialogForCreate}>
+                    <Plus size={15} className="mr-1.5 inline" />
+                    {isExpense ? t('purchases.addExpenseLine') : t('common.addItem')}
+                  </button>
+                </div>
+              )}
             </FormSectionCard>
           ) : null}
 
+          <Dialog
+            isOpen={showItemDialog}
+            onClose={closeItemDialog}
+            title={editingItemIdx !== null ? t('common.edit') : (isExpense ? t('purchases.addExpenseLine') : t('common.addItem'))}
+            size="xl"
+            footer={(
+              <>
+                <button type="button" className="btn-secondary w-full sm:w-auto" onClick={closeItemDialog}>
+                  {t('common.cancel')}
+                </button>
+                <button type="button" className="btn-primary w-full sm:w-auto" onClick={confirmItem} disabled={!canSaveDraftItem}>
+                  {editingItemIdx !== null ? t('common.update') : t('common.add')}
+                </button>
+              </>
+            )}
+          >
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-200">{t('purchases.itemComposerTitle')}</p>
+                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{t('purchases.itemComposerHint')}</p>
+                </div>
+
+                {itemStatus.message ? <Notice title={itemStatus.message} tone={itemStatus.type} /> : null}
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {isExpense ? (
+                    <div>
+                      <label className="label">{t('purchases.lineType')}</label>
+                      <select
+                        className="input mt-1"
+                        value={itemDraft.itemType}
+                        onChange={(e) => handleDraftChange('itemType', e.target.value)}
+                      >
+                        <option value="expense">{t('purchases.normalExpense')}</option>
+                        <option value="labor">{t('purchases.labor')}</option>
+                        <option value="part">{t('purchases.part')}</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/70 px-4 py-3 dark:border-slate-800/60 dark:bg-slate-900/30">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('purchases.lineType')}</p>
+                      <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">{t('purchases.purchaseLine')}</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="label">{t('purchases.expenseDescription')}</label>
+                    <input
+                      className="input mt-1"
+                      value={itemDraft.description}
+                      onChange={(e) => handleDraftChange('description', e.target.value)}
+                      placeholder={t('purchases.expenseDescription')}
+                    />
+                  </div>
+
+                  {(!isExpense || itemDraft.itemType === 'part') ? (
+                    <div className="sm:col-span-2">
+                      <label className="label">{t('purchases.product')}</label>
+                      <AsyncSearchableSelect
+                        className="mt-1"
+                        value={itemDraft.productId}
+                        selectedOption={itemDraftProduct ? toProductLookupOption(itemDraftProduct) : null}
+                        onChange={handleDraftProductSelection}
+                        loadOptions={loadProductOptions}
+                        placeholder={t('purchases.selectProduct')}
+                        searchPlaceholder={t('purchases.selectProduct')}
+                        noResultsLabel={t('common.noData')}
+                        loadingLabel={t('common.loading')}
+                      />
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <label className="label">{t('purchases.qty')}</label>
+                    <input
+                      className="input mt-1"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={itemDraft.quantity}
+                      onChange={(e) => handleDraftChange('quantity', e.target.value)}
+                    />
+                    {itemDraftProduct ? (
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{getUnitLabel(itemDraftProduct, itemDraft.unitType)}</p>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <label className="label">{t('products.unitType')}</label>
+                    <select
+                      className="input mt-1"
+                      value={itemDraft.unitType}
+                      onChange={(e) => handleDraftChange('unitType', e.target.value)}
+                      disabled={isExpense && itemDraft.itemType !== 'part'}
+                    >
+                      <option value="primary">{t('products.primaryUnit')}</option>
+                      <option value="secondary">{t('products.secondaryUnit')}</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label">{t('purchases.unitPrice')}</label>
+                    <input
+                      className="input mt-1"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={itemDraft.unitPrice}
+                      onChange={(e) => handleDraftChange('unitPrice', e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">{t('purchases.tax')}</label>
+                    <input
+                      className="input mt-1"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={itemDraft.taxRate}
+                      onChange={(e) => handleDraftChange('taxRate', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
+                <div className="flex items-center gap-3">
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${draftLineMeta.iconWrapClassName}`}>
+                    <DraftLineIcon size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('purchases.transactionType')}</p>
+                    <p className="font-semibold text-slate-900 dark:text-white">{draftLineMeta.label}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-[20px] bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-950/50 dark:ring-slate-700/70">
+                    <p className="truncate font-semibold text-slate-900 dark:text-white">
+                      {itemDraftProduct?.name || itemDraft.description || draftLineMeta.label}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                      {t('purchases.qty')}: {Number(itemDraft.quantity || 0).toFixed(2)}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 rounded-[20px] bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-950/50 dark:ring-slate-700/70">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500 dark:text-slate-400">{t('purchases.unitPrice')}</span>
+                      <span className="font-semibold text-slate-900 dark:text-white">{money(itemDraft.unitPrice)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500 dark:text-slate-400">{t('purchases.taxTotal')}</span>
+                      <span className="font-semibold text-slate-900 dark:text-white">{money(itemDraftVatAmount)}</span>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-sm dark:border-slate-700">
+                      <span className="font-medium text-slate-600 dark:text-slate-300">{t('common.total')}</span>
+                      <span className="text-lg font-bold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Dialog>
+
           {showPaymentStep ? (
-            <FormSectionCard title={t('payments.summaryTitle')}>
+            <FormSectionCard
+              title={t('payments.summaryTitle')}
+              className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+            >
               <div className="grid gap-3 text-sm sm:grid-cols-3">
                 {isExpense ? (
                   <>
-                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                    <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
                       <span className="text-slate-500">{t('purchases.normalExpense')}</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.expense.toFixed(2) })}</span>
+                      <p className="mt-2 font-semibold text-slate-800 dark:text-slate-200">{money(expenseTotals.expense)}</p>
                     </div>
-                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                    <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
                       <span className="text-slate-500">{t('purchases.labor')}</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.labor.toFixed(2) })}</span>
+                      <p className="mt-2 font-semibold text-slate-800 dark:text-slate-200">{money(expenseTotals.labor)}</p>
                     </div>
-                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                    <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
                       <span className="text-slate-500">{t('purchases.part')}</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{t('currency.formatted', { symbol: t('currency.symbol'), amount: expenseTotals.part.toFixed(2) })}</span>
+                      <p className="mt-2 font-semibold text-slate-800 dark:text-slate-200">{money(expenseTotals.part)}</p>
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                    <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
                       <span className="text-slate-500">{t('purchases.subTotal')}</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</span>
+                      <p className="mt-2 font-semibold text-slate-800 dark:text-slate-200">{money(totals.subTotal)}</p>
                     </div>
-                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                    <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
                       <span className="text-slate-500">{t('purchases.taxTotal')}</span>
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</span>
+                      <p className="mt-2 font-semibold text-slate-800 dark:text-slate-200">{money(totals.taxTotal)}</p>
                     </div>
-                    <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                    <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
                       <span className="text-slate-500">{t('purchases.grandTotal')}</span>
-                      <span className="text-lg font-bold text-slate-900 dark:text-slate-100">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</span>
+                      <p className="mt-2 text-lg font-bold text-slate-900 dark:text-white">{money(totals.grandTotal)}</p>
                     </div>
                   </>
                 )}
@@ -733,7 +1224,7 @@ export default function Purchases() {
               {isExpense ? (
                 <div className="mt-3 flex justify-between border-t border-slate-200/70 pt-3 text-sm dark:border-slate-700/60">
                   <span className="font-medium text-slate-500">{t('purchases.grandTotal')}</span>
-                  <span className="text-lg font-bold text-slate-900 dark:text-slate-100">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</span>
+                  <span className="text-lg font-bold text-slate-900 dark:text-slate-100">{money(totals.grandTotal)}</span>
                 </div>
               ) : null}
 
@@ -762,14 +1253,12 @@ export default function Purchases() {
                   </label>
                 </div>
 
-                {dueAmount > 0 && (
+                {dueAmount > 0 ? (
                   <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-2.5 text-sm dark:border-rose-800/40 dark:bg-rose-900/20">
                     <span className="text-rose-500 dark:text-rose-400">{t('services.dueAmount')}:</span>
-                    <span className="font-bold text-rose-700 dark:text-rose-300">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: dueAmount.toFixed(2) })}
-                    </span>
+                    <span className="font-bold text-rose-700 dark:text-rose-300">{money(dueAmount)}</span>
                   </div>
-                )}
+                ) : null}
 
                 <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-700/60">
                   <PaymentMethodFields
@@ -787,7 +1276,9 @@ export default function Purchases() {
                 {t('common.back')}
               </button>
             ) : (
-              <button className="btn-secondary w-full sm:w-auto" type="button" onClick={closeDialog}>{t('common.cancel')}</button>
+              <button className="btn-secondary w-full sm:w-auto" type="button" onClick={closeDialog}>
+                {t('common.cancel')}
+              </button>
             )}
 
             {isMobile && mobileStep !== 'payment' ? (
@@ -795,112 +1286,119 @@ export default function Purchases() {
                 {t('common.continue')}
               </button>
             ) : (
-              <button className="btn-primary w-full sm:w-auto" type="submit">{formMode === 'edit' ? t('purchases.updatePurchase') : t('purchases.savePurchase')}</button>
+              <button className="btn-primary w-full sm:w-auto" type="submit">
+                {formMode === 'edit' ? t('purchases.updatePurchase') : t('purchases.savePurchase')}
+              </button>
             )}
           </div>
         </form>
       </Dialog>
 
       <div className="card">
-
-        {/* Header: title + pill filters on left */}
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-col items-start gap-2">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+          <div>
             <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('purchases.recentPurchases')}</h3>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setStatusFilter('all')}
-                className={statusFilter === 'all'
-                  ? 'bg-blue-50 border border-blue-500 text-blue-500 px-2 py-0.5 rounded text-sm'
-                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
-              >
-                {t('purchases.allStatuses')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter('received')}
-                className={statusFilter === 'received'
-                  ? 'bg-emerald-50 border border-emerald-500 text-emerald-600 px-2 py-0.5 rounded text-sm'
-                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
-              >
-                {t('purchases.received')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter('ordered')}
-                className={statusFilter === 'ordered'
-                  ? 'bg-amber-50 border border-amber-500 text-amber-600 px-2 py-0.5 rounded text-sm'
-                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
-              >
-                {t('purchases.ordered')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusFilter('due')}
-                className={statusFilter === 'due'
-                  ? 'bg-rose-50 border border-rose-500 text-rose-600 px-2 py-0.5 rounded text-sm'
-                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
-              >
-                {t('purchases.due')}
-              </button>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('purchases.subtitle')}</p>
+          </div>
+
+
+        </div>
+        <div className="flex gap-3 my-7 xl:min-w-[420px]">
+          <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('purchases.transactionType')}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {entryTypeFilterOptions.map((option) => (
+                  <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setEntryTypeFilter(option.value)}
+                      className={entryTypeFilter === option.value ? option.activeClassName : inactiveFilterClass}
+                  >
+                    {option.label}
+                  </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.status')}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {statusFilterOptions.map((option) => (
+                  <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setStatusFilter(option.value)}
+                      className={statusFilter === option.value ? option.activeClassName : inactiveFilterClass}
+                  >
+                    {option.label}
+                  </button>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* ── Mobile card view ── */}
-        <div className="mt-4 md:hidden space-y-3">
-          {purchasesLoading && purchaseList.length === 0 ? (
+        <div className="mt-4 space-y-3 md:hidden">
+          {purchasesLoading && filteredPurchases.length === 0 ? (
             <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
           ) : pagedPurchases.length === 0 ? (
             <p className="py-3 text-sm text-slate-500">{t('purchases.noPurchases')}</p>
           ) : (
-            pagedPurchases.map((p) => {
-              const supplierName = getSupplierName(p);
-              const due = Number(p.dueAmount || 0);
+            pagedPurchases.map((purchase) => {
+              const supplierName = getSupplierName(purchase);
+              const due = Number(purchase.dueAmount || 0);
+              const purchaseEntryType = getPurchaseEntryType(purchase);
+              const purchaseMeta = getTransactionMeta(purchaseEntryType);
+              const PurchaseTypeIcon = purchaseMeta.icon;
+
               return (
-                <div key={p.id} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+                <div key={purchase.id} className="rounded-[24px] border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
-                        {p.invoiceNo || p.id.slice(0, 8)}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${purchaseMeta.badgeClassName}`}>
+                          <PurchaseTypeIcon size={12} />
+                          {purchaseMeta.label}
+                        </span>
+                        <StatusBadge status={purchase.status} />
+                      </div>
+                      <p className="mt-2 truncate font-semibold text-slate-800 dark:text-slate-100">
+                        {purchase.invoiceNo || purchase.id.slice(0, 8)}
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5">{formatDate(p.purchaseDate)}</p>
-                      <p className="mt-1 text-xs text-slate-500 truncate">{supplierName || '—'}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">{formatDate(purchase.purchaseDate)}</p>
+                      <p className="mt-1 truncate text-xs text-slate-500">{supplierName || '—'}</p>
                       <PaymentTypeSummary
-                        source={p}
-                        className="mt-1"
+                        source={purchase}
+                        className="mt-2"
                         labelClassName="text-xs font-medium"
                         metaClassName="text-[11px]"
                       />
                     </div>
-                    <div className="text-right shrink-0">
-                      <StatusBadge status={p.status} />
-                      <p className="mt-1.5 font-semibold text-slate-800 dark:text-slate-200">
-                        {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(p.grandTotal || 0).toFixed(2) })}
-                      </p>
+
+                    <div className="shrink-0 text-right">
+                      <p className="font-semibold text-slate-800 dark:text-slate-200">{money(purchase.grandTotal)}</p>
                       {due > 0 ? (
-                        <span className="mt-0.5 inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-                          {t('currency.formatted', { symbol: t('currency.symbol'), amount: due.toFixed(2) })} due
+                        <span className="mt-1 inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                          {money(due)} {t('common.due')}
                         </span>
                       ) : (
-                        <p className="mt-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">Paid</p>
+                        <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">{t('common.paid')}</p>
                       )}
                     </div>
                   </div>
+
                   <div className="mt-3 flex items-center justify-end gap-1 border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
                     <button
                       type="button"
                       title={t('common.edit')}
                       className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-                      onClick={() => openEdit(p.id)}
+                      onClick={() => openEdit(purchase.id)}
                     >
                       <Pencil size={14} />
                     </button>
                     <Link
                       title={t('common.view')}
                       className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800"
-                      to={`/app/invoice/purchases/${p.id}`}
+                      to={`/app/invoice/purchases/${purchase.id}`}
                     >
                       <FileText size={14} />
                     </Link>
@@ -911,12 +1409,12 @@ export default function Purchases() {
           )}
         </div>
 
-        {/* ── Desktop table ── */}
-        <div className="mt-4 overflow-x-auto hidden md:block">
+        <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
             <thead className="text-xs uppercase text-slate-400">
               <tr>
                 <th className="py-2 pr-4 text-left">{t('common.invoice')}</th>
+                <th className="py-2 pr-4 text-left">{t('purchases.transactionType')}</th>
                 <th className="py-2 pr-4 text-left">{t('common.date')}</th>
                 <th className="py-2 pr-4 text-left">{t('common.status')}</th>
                 <th className="py-2 pr-4 text-left">{t('purchases.supplier')}</th>
@@ -924,67 +1422,64 @@ export default function Purchases() {
                 <th className="py-2 pr-4 text-right">{t('common.total')}</th>
                 <th className="py-2 pr-4 text-right">{t('purchases.totalPaid')}</th>
                 <th className="py-2 pr-4 text-right">{t('purchases.dueLabel')}</th>
-                <th className="py-2 text-right">Actions</th>
+                <th className="py-2 text-right">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {purchasesLoading && purchaseList.length === 0 ? (
-                <tr><td colSpan={9} className="py-3 text-slate-500">{t('common.loading')}</td></tr>
+              {purchasesLoading && filteredPurchases.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="py-3 text-slate-500">{t('common.loading')}</td>
+                </tr>
               ) : pagedPurchases.length === 0 ? (
-                <tr><td colSpan={9} className="py-3 text-slate-500">{t('purchases.noPurchases')}</td></tr>
+                <tr>
+                  <td colSpan={10} className="py-3 text-slate-500">{t('purchases.noPurchases')}</td>
+                </tr>
               ) : (
                 pagedPurchases.map((purchase) => {
                   const supplierName = getSupplierName(purchase);
                   const due = Number(purchase.dueAmount || 0);
+                  const purchaseEntryType = getPurchaseEntryType(purchase);
+                  const purchaseMeta = getTransactionMeta(purchaseEntryType);
+                  const PurchaseTypeIcon = purchaseMeta.icon;
+
                   return (
                     <tr key={purchase.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
-
-                      {/* Invoice No */}
                       <td className="py-2.5 pr-4 font-medium text-slate-800 dark:text-slate-200">
                         {purchase.invoiceNo || purchase.id.slice(0, 8)}
                       </td>
-
-                      {/* Date — formatted like Sales "22 Mar" */}
+                      <td className="py-2.5 pr-4">
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${purchaseMeta.badgeClassName}`}>
+                          <PurchaseTypeIcon size={12} />
+                          {purchaseMeta.label}
+                        </span>
+                      </td>
                       <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
                         {formatDate(purchase.purchaseDate)}
                       </td>
-
-                      {/* Status — colored badge */}
                       <td className="py-2.5 pr-4">
                         <StatusBadge status={purchase.status} />
                       </td>
-
-                      {/* Supplier */}
                       <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
                         {supplierName || <span className="text-slate-400">—</span>}
                       </td>
-
                       <td className="py-2.5 pr-4">
                         <PaymentTypeSummary source={purchase} />
                       </td>
-
-                      {/* Grand total */}
                       <td className="py-2.5 pr-4 text-right font-semibold text-slate-800 dark:text-slate-200">
-                        {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.grandTotal || 0).toFixed(2) })}
+                        {money(purchase.grandTotal)}
                       </td>
-
-                      {/* Amount received */}
                       <td className="py-2.5 pr-4 text-right text-emerald-700 dark:text-emerald-400">
-                        {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(purchase.amountReceived || 0).toFixed(2) })}
+                        {money(purchase.amountReceived)}
                       </td>
-
-                      {/* Due — rose pill or green "Paid" exactly like Sales */}
                       <td className="py-2.5 pr-4 text-right">
                         {due > 0 ? (
                           <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-                            {t('currency.formatted', { symbol: t('currency.symbol'), amount: due.toFixed(2) })} due
+                            {money(due)} {t('common.due')}
                           </span>
                         ) : (
-                          <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Paid</span>
+                          <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{t('common.paid')}</span>
                         )}
                       </td>
-
-                      {/* Actions — icon buttons matching Sales exactly */}
                       <td className="py-2.5 text-right">
                         <div className="inline-flex items-center gap-1">
                           <button

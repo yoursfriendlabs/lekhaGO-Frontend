@@ -98,11 +98,23 @@ export function installChunkLoadRecovery() {
 
   preloadRecoveryInstalled = true;
 
-  window.addEventListener('vite:preloadError', (event) => {
-    if (!isChunkOrCacheError(event?.payload) || !canAutoRecoverChunkError()) return;
+  const attemptChunkRecovery = (payload, event) => {
+    if (!isChunkOrCacheError(payload) || !canAutoRecoverChunkError()) return;
 
-    event.preventDefault?.();
+    event?.preventDefault?.();
     void recoverFromChunkError();
+  };
+
+  window.addEventListener('vite:preloadError', (event) => {
+    attemptChunkRecovery(event?.payload, event);
+  });
+
+  window.addEventListener('error', (event) => {
+    attemptChunkRecovery(event?.error || event?.message, event);
+  });
+
+  window.addEventListener('unhandledrejection', (event) => {
+    attemptChunkRecovery(event?.reason, event);
   });
 }
 

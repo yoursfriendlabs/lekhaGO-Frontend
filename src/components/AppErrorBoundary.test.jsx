@@ -27,6 +27,10 @@ function GenericErrorThrower() {
   throw new Error('Unexpected payment reconciliation failure');
 }
 
+function HealthyScreen() {
+  return <div>Recovered screen</div>;
+}
+
 describe('AppErrorBoundary', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -86,5 +90,35 @@ describe('AppErrorBoundary', () => {
     expect(screen.queryByRole('button', { name: /Reset app and refresh/i })).not.toBeInTheDocument();
     expect(screen.getByText(/Show technical details/i)).toBeInTheDocument();
     expect(appRecoveryMocks.recoverFromChunkError).not.toHaveBeenCalled();
+  });
+
+  it('shows a contained retry UI for page-scoped failures', async () => {
+    render(
+      <AppErrorBoundary scope="page">
+        <GenericErrorThrower />
+      </AppErrorBoundary>
+    );
+
+    expect(await screen.findByText(/This screen ran into a problem\./i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Try this screen again/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Refresh app/i })).toBeInTheDocument();
+  });
+
+  it('resets the boundary when route reset keys change', async () => {
+    const { rerender } = render(
+      <AppErrorBoundary scope="page" resetKeys={['/app/sales']}>
+        <GenericErrorThrower />
+      </AppErrorBoundary>
+    );
+
+    expect(await screen.findByText(/This screen ran into a problem\./i)).toBeInTheDocument();
+
+    rerender(
+      <AppErrorBoundary scope="page" resetKeys={['/app/services']}>
+        <HealthyScreen />
+      </AppErrorBoundary>
+    );
+
+    expect(await screen.findByText(/Recovered screen/i)).toBeInTheDocument();
   });
 });

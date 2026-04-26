@@ -22,7 +22,7 @@ export const Dialog = ({
                            showCloseButton = true,
                            closeOnOverlayClick = true,
                            footer,
-                       }: DialogProps) => {
+}: DialogProps) => {
     const dialogRef = useRef<HTMLDivElement>(null);
 
     // Close on Escape key
@@ -36,15 +36,28 @@ export const Dialog = ({
         return () => document.removeEventListener('keydown', handleEscape);
     }, [isOpen, onClose]);
 
-    // Prevent body scroll when dialog is open
+    // Keep body scroll locked while one or more dialogs are open.
     useEffect(() => {
-        if (isOpen) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'unset';
+        if (!isOpen) return undefined;
+
+        const body = document.body;
+        const currentCount = Number(body.dataset.dialogOpenCount || '0');
+        body.dataset.dialogOpenCount = String(currentCount + 1);
+
+        if (currentCount === 0) {
+            body.style.overflow = 'hidden';
         }
+
         return () => {
-            document.body.style.overflow = 'unset';
+            const nextCount = Math.max(Number(body.dataset.dialogOpenCount || '1') - 1, 0);
+
+            if (nextCount === 0) {
+                delete body.dataset.dialogOpenCount;
+                body.style.overflow = 'unset';
+                return;
+            }
+
+            body.dataset.dialogOpenCount = String(nextCount);
         };
     }, [isOpen]);
 
