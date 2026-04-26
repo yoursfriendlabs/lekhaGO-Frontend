@@ -37,6 +37,7 @@ export default function PartySearchCreateField({
   const [newPartyPhone, setNewPartyPhone] = useState('');
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState('');
+  const createRequestRef = useRef(false);
   const selected = normalizeSelectedParty(selectedParty);
   const debouncedQuery = useDebouncedValue(query, 250);
   const visibleResults = useMemo(() => results.slice(0, 6), [results]);
@@ -116,6 +117,8 @@ export default function PartySearchCreateField({
   };
 
   const handleCreate = async () => {
+    if (createRequestRef.current) return;
+
     const name = query.trim().replace(/\s*\(.*\)\s*$/, '').trim();
     if (!name) return;
 
@@ -125,6 +128,7 @@ export default function PartySearchCreateField({
       return;
     }
 
+    createRequestRef.current = true;
     setCreating(true);
     setMessage('');
 
@@ -138,6 +142,7 @@ export default function PartySearchCreateField({
     } catch (error) {
       setMessage(error.message);
     } finally {
+      createRequestRef.current = false;
       setCreating(false);
     }
   };
@@ -279,6 +284,7 @@ export default function PartySearchCreateField({
                       inputMode="numeric"
                       placeholder={t('parties.phonePlaceholder')}
                       value={newPartyPhone}
+                      disabled={creating}
                       onChange={(event) => setNewPartyPhone(event.target.value)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
@@ -290,7 +296,7 @@ export default function PartySearchCreateField({
                   </div>
                   {message ? <p className="mt-2 text-xs text-rose-600">{message}</p> : null}
                   <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                    <button type="button" className="btn-ghost text-xs" onClick={() => setShowCreate(false)}>
+                    <button type="button" className="btn-ghost text-xs" onClick={() => setShowCreate(false)} disabled={creating}>
                       {t('common.cancel')}
                     </button>
                     <button type="button" className="btn-primary text-xs" onClick={handleCreate} disabled={creating}>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
@@ -135,6 +135,7 @@ export default function Parties() {
   const [pendingServices, setPendingServices] = useState([]);
   const [pendingServicesLoading, setPendingServicesLoading] = useState(false);
   const [txPage, setTxPage] = useState(1);
+  const submitPartyRequestRef = useRef(false);
 
   useEffect(() => {
     let isActive = true;
@@ -358,6 +359,8 @@ export default function Parties() {
   };
 
   const submitParty = async (keepOpen = false) => {
+    if (submitPartyRequestRef.current) return;
+
     const phoneDigits = String(form.phone || '').replace(/\D/g, '');
     if (!editingId) {
       if (phoneDigits.length < 10) {
@@ -369,6 +372,7 @@ export default function Parties() {
       return;
     }
 
+    submitPartyRequestRef.current = true;
     setLoading(true);
     setStatus({ type: 'info', message: '' });
 
@@ -397,6 +401,7 @@ export default function Parties() {
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     } finally {
+      submitPartyRequestRef.current = false;
       setLoading(false);
     }
   };
@@ -845,9 +850,11 @@ export default function Parties() {
           )}
 
           <div className="flex flex-wrap justify-end gap-2">
-            <button className="btn-secondary" type="button" onClick={closeDialog}>{t('common.close')}</button>
+            <button className="btn-secondary" type="button" onClick={closeDialog} disabled={loading}>{t('common.close')}</button>
             {!editingId ? (
-              <button className="btn-ghost" type="button" onClick={() => submitParty(true)} disabled={loading}>{t('parties.saveAndNew')}</button>
+              <button className="btn-ghost" type="button" onClick={() => submitParty(true)} disabled={loading}>
+                {loading ? t('common.loading') : t('parties.saveAndNew')}
+              </button>
             ) : null}
             <button className="btn-primary" type="submit" disabled={loading}>
               {loading ? t('common.loading') : editingId ? t('common.update') : t('common.save')}

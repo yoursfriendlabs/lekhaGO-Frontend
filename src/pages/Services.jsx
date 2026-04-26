@@ -497,6 +497,7 @@ export default function Services() {
   const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
   const [showAddNew, setShowAddNew] = useState(false);
   const [newPartyPhone, setNewPartyPhone] = useState('');
+  const [creatingParty, setCreatingParty] = useState(false);
   const [header, setHeader] = useState(() => makeEmptyHeader());
   const [items, setItems] = useState([{ ...emptyItem }]);
   const [amountReceived, setAmountReceived] = useState('0');
@@ -861,6 +862,7 @@ export default function Services() {
       : '',
   );
   const selectedPartyWhatsAppLink = getWhatsAppLink(selectedParty?.phone, selectedPartyWhatsAppMessage);
+  const createPartyRequestRef = useRef(false);
 
   const selectParty = (party) => {
     setSelectedParty(party);
@@ -893,6 +895,8 @@ export default function Services() {
   };
 
   const createAndSelectParty = async () => {
+    if (createPartyRequestRef.current) return;
+
     const name = partyQuery.trim().replace(/\s*\(.*\)\s*$/, '').trim();
     if (!name) {
       setFormNotice({ type: 'error', message: t('errors.customerRequired') });
@@ -903,6 +907,11 @@ export default function Services() {
       setFormNotice({ type: 'error', message: t('errors.phoneMinDigits') });
       return;
     }
+
+    createPartyRequestRef.current = true;
+    setCreatingParty(true);
+    setFormNotice({ type: '', message: '' });
+
     try {
       const createdParty = await api.createParty({ name, phone: newPartyPhone.trim(), type: 'customer' });
       const party = normalizeLookupParty(createdParty);
@@ -911,6 +920,9 @@ export default function Services() {
       setFormNotice({ type: 'success', message: t('parties.messages.created') });
     } catch (err) {
       setFormNotice({ type: 'error', message: err.message });
+    } finally {
+      createPartyRequestRef.current = false;
+      setCreatingParty(false);
     }
   };
 
@@ -1798,12 +1810,15 @@ export default function Services() {
                                             inputMode="numeric"
                                             placeholder={t('parties.phonePlaceholder')}
                                             value={newPartyPhone}
+                                            disabled={creatingParty}
                                             onChange={(e) => setNewPartyPhone(e.target.value)}
                                           />
                                         </div>
                                         <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                                          <button type="button" className="btn-ghost text-xs" onClick={() => setShowAddNew(false)}>{t('common.cancel')}</button>
-                                          <button type="button" className="btn-primary text-xs" onClick={createAndSelectParty}>{t('services.addSelect')}</button>
+                                          <button type="button" className="btn-ghost text-xs" onClick={() => setShowAddNew(false)} disabled={creatingParty}>{t('common.cancel')}</button>
+                                          <button type="button" className="btn-primary text-xs" onClick={createAndSelectParty} disabled={creatingParty}>
+                                            {creatingParty ? t('common.loading') : t('services.addSelect')}
+                                          </button>
                                         </div>
                                       </div>
                                     )}
