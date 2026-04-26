@@ -3,6 +3,7 @@ import { api, API_BASE } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 
 const EMPTY_URLS = [];
+const IMAGE_FILE_EXTENSION_PATTERN = /\.(avif|bmp|gif|heic|heif|jpe?g|png|svg|webp)$/i;
 
 function toAbsoluteUrl(url) {
   if (!url) return '';
@@ -35,6 +36,15 @@ function normalizeUrls(...values) {
 
 function isPdfUrl(url) {
   return /\.pdf(?:$|[?#])/i.test(String(url || ''));
+}
+
+function isImageFile(file) {
+  if (!file) return false;
+
+  const mimeType = String(file.type || '').toLowerCase();
+  if (mimeType.startsWith('image/')) return true;
+
+  return IMAGE_FILE_EXTENSION_PATTERN.test(String(file.name || ''));
 }
 
 function areUrlListsEqual(left, right) {
@@ -71,8 +81,15 @@ export default function FileUpload({
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    setUploading(true);
     setError('');
+
+    if (files.some((file) => !isImageFile(file))) {
+      setError(t('common.imageOnlyUploadError') || 'Only image files can be uploaded.');
+      e.target.value = '';
+      return;
+    }
+
+    setUploading(true);
     try {
       if (multiple) {
         const response = await api.uploadAttachments(files);
@@ -132,13 +149,13 @@ export default function FileUpload({
               {uploading ? t('common.loading') : t('common.add')}
             </span>
             <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {uploading ? (t('common.uploading') || 'Uploading...') : (t('common.uploadHint') || 'Tap to upload image or document')}
+              {uploading ? (t('common.uploading') || 'Uploading...') : (t('common.uploadHint') || 'Tap to upload image')}
             </span>
             <input
               type="file"
               className="absolute inset-0 cursor-pointer opacity-0"
               onChange={handleFileChange}
-              accept="image/*,.pdf"
+              accept="image/*"
               disabled={uploading}
               multiple
               aria-label={label || 'Upload files'}
@@ -179,14 +196,14 @@ export default function FileUpload({
             type="file"
             className="absolute inset-0 cursor-pointer opacity-0"
             onChange={handleFileChange}
-            accept="image/*,.pdf"
+            accept="image/*"
             disabled={uploading}
             aria-label={label || 'Upload file'}
           />
         </div>
         <div className="flex-1">
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            {uploading ? t('common.uploading') || 'Uploading...' : t('common.uploadHint') || 'Tap to upload image or document'}
+            {uploading ? t('common.uploading') || 'Uploading...' : t('common.uploadHint') || 'Tap to upload image'}
           </p>
           {previewUrls[0] ? (
             <button type="button" className="mt-2 text-xs font-medium text-primary-700 hover:text-primary-600" onClick={() => handleRemove(uploadedUrls[0])}>

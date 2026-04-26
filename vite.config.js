@@ -97,6 +97,12 @@ export default defineConfig(({ mode }) => ({
   ].filter(Boolean),
   server: {
     port: 5173,
+    watch: {
+      ignored: [
+        "**/*.{test,spec}.{js,jsx,ts,tsx}",
+        "**/src/test/**",
+      ],
+    },
   },
   test: {
     environment: "jsdom",

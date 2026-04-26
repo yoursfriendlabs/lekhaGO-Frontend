@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { api } from '../lib/api';
 import FileUpload from './FileUpload';
 
 vi.mock('../lib/api', () => ({
@@ -12,11 +13,17 @@ vi.mock('../lib/api', () => ({
 
 vi.mock('../lib/i18n.jsx', () => ({
   useI18n: () => ({
-    t: (key) => key,
+    t: (key) => ({
+      'common.imageOnlyUploadError': 'Only image files can be uploaded.',
+    }[key] || key),
   }),
 }));
 
 describe('FileUpload', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('does not enter a render loop in single-file mode when initialUrls is omitted', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -39,5 +46,31 @@ describe('FileUpload', () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  it('rejects pdf uploads before calling the attachments API', async () => {
+    const onUpload = vi.fn();
+
+    render(
+      <FileUpload
+        label="Attachment"
+        multiple
+        onUpload={onUpload}
+      />
+    );
+
+    const input = screen.getByLabelText('Attachment');
+    const pdfFile = new File(['%PDF-1.4'], 'invoice.pdf', { type: '' });
+
+    fireEvent.change(input, {
+      target: {
+        files: [pdfFile],
+      },
+    });
+
+    expect(input).toHaveAttribute('accept', 'image/*');
+    expect(await screen.findByText('Only image files can be uploaded.')).toBeInTheDocument();
+    expect(api.uploadAttachments).not.toHaveBeenCalled();
+    expect(onUpload).not.toHaveBeenCalled();
   });
 });
