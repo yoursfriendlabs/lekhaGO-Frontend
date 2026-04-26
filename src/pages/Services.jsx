@@ -332,7 +332,7 @@ function OverviewMetric({ icon: Icon, label, value, tone = 'slate' }) {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{label}</p>
-          <p className="mt-2 truncate text-2xl font-semibold text-slate-900 dark:text-white">{value}</p>
+          <p className="mt-2 whitespace-nowrap text-lg font-semibold leading-tight text-slate-900 dark:text-white sm:text-xl xl:text-xl">{value}</p>
         </div>
         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${palette.icon}`}>
           <Icon size={18} />
@@ -1249,7 +1249,7 @@ export default function Services() {
   };
 
   const money = (val) =>
-    t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(val || 0).toFixed(2) });
+    t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(val || 0).toFixed(2) }).replace(' ', '\u00a0');
 
   const formScrollRef = useRef(null);
   const invoicePrintRef = useRef(null);
