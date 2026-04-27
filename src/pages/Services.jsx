@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
@@ -441,6 +442,8 @@ export default function Services() {
   const { t } = useI18n();
   const { businessId, user } = useAuth();
   const isMobile = useIsMobile();
+  const partyPickerRef = useRef(null);
+  const partyDropdownRef = useRef(null);
   const { settings: bizSettings, businessProfile } = useBusinessSettings();
   const businessType = String(businessProfile?.type || '').toLowerCase();
   const showGoldJewelleryDetails = businessType === 'gold';
@@ -510,6 +513,7 @@ export default function Services() {
   const [partySearchResults, setPartySearchResults] = useState([]);
   const [selectedParty, setSelectedParty] = useState(null);
   const [partyDropdownOpen, setPartyDropdownOpen] = useState(false);
+  const [partyDropdownStyle, setPartyDropdownStyle] = useState(null);
   const [showAddNew, setShowAddNew] = useState(false);
   const [newPartyPhone, setNewPartyPhone] = useState('');
   const [creatingParty, setCreatingParty] = useState(false);
@@ -541,6 +545,28 @@ export default function Services() {
     ...(partyFilterId ? { partyId: partyFilterId } : {}),
     ...(createdByFilterId ? { createdBy: createdByFilterId } : {}),
   }), [createdByFilterId, partyFilterId, statusFilter]);
+
+  const updatePartyDropdownPosition = useCallback(() => {
+    const trigger = partyPickerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const margin = 8;
+    const width = Math.min(viewportWidth - margin * 2, Math.max(rect.width, 360));
+    const left = Math.min(Math.max(rect.left, margin), Math.max(margin, viewportWidth - width - margin));
+    const dropdownMaxHeight = 380;
+    const minHeight = 180;
+    const belowSpace = viewportHeight - rect.bottom - margin - 8;
+    const aboveSpace = rect.top - margin - 8;
+    const opensAbove = belowSpace < minHeight && aboveSpace > belowSpace;
+    const availableHeight = opensAbove ? aboveSpace : belowSpace;
+    const maxHeight = Math.max(minHeight, Math.min(dropdownMaxHeight, availableHeight));
+    const top = opensAbove ? Math.max(margin, rect.top - maxHeight - 8) : rect.bottom + 8;
+
+    setPartyDropdownStyle({ left, top, width, maxHeight });
+  }, []);
 
   // ── Load services list ──
   const loadServices = () => {
@@ -581,6 +607,34 @@ export default function Services() {
       isActive = false;
     };
   }, [debouncedPartyQuery, selectedParty]);
+
+  useEffect(() => {
+    function handleMouseDown(event) {
+      const clickedTrigger = partyPickerRef.current?.contains(event.target);
+      const clickedDropdown = partyDropdownRef.current?.contains(event.target);
+
+      if (!clickedTrigger && !clickedDropdown) {
+        setPartyDropdownOpen(false);
+        setShowAddNew(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  }, []);
+
+  useEffect(() => {
+    if (!partyDropdownOpen || !partyQuery.trim() || selectedParty) return undefined;
+
+    updatePartyDropdownPosition();
+    window.addEventListener('resize', updatePartyDropdownPosition);
+    window.addEventListener('scroll', updatePartyDropdownPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updatePartyDropdownPosition);
+      window.removeEventListener('scroll', updatePartyDropdownPosition, true);
+    };
+  }, [partyDropdownOpen, partyQuery, selectedParty, updatePartyDropdownPosition]);
 
   useEffect(() => {
     api.listOrderAttributes({ entityType: 'service' })
@@ -1753,7 +1807,7 @@ export default function Services() {
                           <label className="label">
                             {t('services.customer')} <span className="ml-1 text-rose-500">*</span>
                           </label>
-                          <div className="relative mt-2">
+                          <div ref={partyPickerRef} className="relative mt-2">
                             {selectedParty ? (
                               <div className="flex items-center gap-3 rounded-[24px] border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-900/10">
                                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-sm font-bold text-white">
@@ -1824,8 +1878,12 @@ export default function Services() {
                                   ) : null}
                                 </div>
 
-                                {partyDropdownOpen && partyQuery.trim() ? (
-                                  <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900">
+                                {partyDropdownOpen && partyQuery.trim() && partyDropdownStyle ? createPortal(
+                                  <div
+                                    ref={partyDropdownRef}
+                                    className="fixed z-[1000] overflow-y-auto rounded-[24px] border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+                                    style={partyDropdownStyle}
+                                  >
                                     {filteredParties.length > 0 ? filteredParties.map((party) => (
                                       <button
                                         key={party.id}
@@ -1836,9 +1894,9 @@ export default function Services() {
                                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                                           {party.name.slice(0, 2).toUpperCase()}
                                         </div>
-                                        <div>
-                                          <p className="font-semibold text-slate-800 dark:text-slate-200">{party.name}</p>
-                                          {party.phone ? <p className="text-xs text-slate-500">{party.phone}</p> : null}
+                                        <div className="min-w-0 flex-1">
+                                          <p className="truncate font-semibold text-slate-800 dark:text-slate-200">{party.name}</p>
+                                          {party.phone ? <p className="truncate text-xs text-slate-500">{party.phone}</p> : null}
                                         </div>
                                       </button>
                                     )) : null}
@@ -1875,7 +1933,8 @@ export default function Services() {
                                         </div>
                                       </div>
                                     )}
-                                  </div>
+                                  </div>,
+                                  document.body
                                 ) : null}
                               </div>
                             )}

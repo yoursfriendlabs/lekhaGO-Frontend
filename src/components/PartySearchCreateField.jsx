@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MessageCircle, Phone, Plus, Search, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
@@ -30,7 +31,9 @@ export default function PartySearchCreateField({
 }) {
   const { t } = useI18n();
   const containerRef = useRef(null);
+  const dropdownRef = useRef(null);
   const [query, setQuery] = useState('');
+  const [dropdownStyle, setDropdownStyle] = useState(null);
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -64,6 +67,28 @@ export default function PartySearchCreateField({
     setMessage('');
   };
 
+  const updateDropdownPosition = useCallback(() => {
+    const trigger = containerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const margin = 8;
+    const width = Math.min(viewportWidth - margin * 2, Math.max(rect.width, 340));
+    const left = Math.min(Math.max(rect.left, margin), Math.max(margin, viewportWidth - width - margin));
+    const dropdownMaxHeight = 360;
+    const minHeight = 180;
+    const belowSpace = viewportHeight - rect.bottom - margin - 4;
+    const aboveSpace = rect.top - margin - 4;
+    const opensAbove = belowSpace < minHeight && aboveSpace > belowSpace;
+    const availableHeight = opensAbove ? aboveSpace : belowSpace;
+    const maxHeight = Math.max(minHeight, Math.min(dropdownMaxHeight, availableHeight));
+    const top = opensAbove ? Math.max(margin, rect.top - maxHeight - 4) : rect.bottom + 4;
+
+    setDropdownStyle({ left, top, width, maxHeight });
+  }, []);
+
   useEffect(() => {
     if (!selected) return;
     resetLocalState();
@@ -71,7 +96,10 @@ export default function PartySearchCreateField({
 
   useEffect(() => {
     function handleMouseDown(event) {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      const clickedTrigger = containerRef.current?.contains(event.target);
+      const clickedDropdown = dropdownRef.current?.contains(event.target);
+
+      if (!clickedTrigger && !clickedDropdown) {
         setOpen(false);
         setShowCreate(false);
       }
@@ -80,6 +108,19 @@ export default function PartySearchCreateField({
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, []);
+
+  useEffect(() => {
+    if (!open || !query.trim() || selected) return undefined;
+
+    updateDropdownPosition();
+    window.addEventListener('resize', updateDropdownPosition);
+    window.addEventListener('scroll', updateDropdownPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateDropdownPosition);
+      window.removeEventListener('scroll', updateDropdownPosition, true);
+    };
+  }, [open, query, selected, updateDropdownPosition]);
 
   useEffect(() => {
     const search = debouncedQuery.trim();
@@ -239,8 +280,12 @@ export default function PartySearchCreateField({
             ) : null}
           </div>
 
-          {open && query.trim() ? (
-            <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+          {open && query.trim() && dropdownStyle ? createPortal(
+            <div
+              ref={dropdownRef}
+              className="fixed z-[1000] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+              style={dropdownStyle}
+            >
               {visibleResults.length > 0 ? (
                 visibleResults.map((party) => (
                   <button
@@ -252,8 +297,8 @@ export default function PartySearchCreateField({
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                       {getInitials(party.name)}
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-slate-800 dark:text-slate-200">{party.name}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-slate-800 dark:text-slate-200">{party.name}</p>
                       {party.phone ? <p className="text-xs text-slate-500">{party.phone}</p> : null}
                     </div>
                   </button>
@@ -305,7 +350,8 @@ export default function PartySearchCreateField({
                   </div>
                 </div>
               )}
-            </div>
+            </div>,
+            document.body
           ) : null}
         </div>
       )}

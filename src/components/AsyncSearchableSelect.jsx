@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
@@ -47,13 +48,16 @@ export default function AsyncSearchableSelect({
   loadingLabel = 'Loading...',
   minQueryLength = 0,
   renderOption,
+  dropdownMinWidth = 0,
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [dropdownStyle, setDropdownStyle] = useState(null);
   const debouncedQuery = useDebouncedValue(query, 250);
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef(null);
+  const dropdownRef = useRef(null);
   const searchRef = useRef(null);
   const loadOptionsRef = useRef(loadOptions);
 
@@ -76,9 +80,37 @@ export default function AsyncSearchableSelect({
     setOptions((previous) => mergeOptions(selected, previous));
   }, [selected]);
 
+  const updateDropdownPosition = useCallback(() => {
+    const trigger = containerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const margin = 8;
+    const width = Math.min(
+      viewportWidth - margin * 2,
+      Math.max(rect.width, Number(dropdownMinWidth) || 0)
+    );
+    const left = Math.min(Math.max(rect.left, margin), Math.max(margin, viewportWidth - width - margin));
+    const dropdownMaxHeight = 320;
+    const minHeight = 160;
+    const belowSpace = viewportHeight - rect.bottom - margin - 4;
+    const aboveSpace = rect.top - margin - 4;
+    const opensAbove = belowSpace < minHeight && aboveSpace > belowSpace;
+    const availableHeight = opensAbove ? aboveSpace : belowSpace;
+    const maxHeight = Math.max(minHeight, Math.min(dropdownMaxHeight, availableHeight));
+    const top = opensAbove ? Math.max(margin, rect.top - maxHeight - 4) : rect.bottom + 4;
+
+    setDropdownStyle({ left, top, width, maxHeight });
+  }, [dropdownMinWidth]);
+
   useEffect(() => {
     function onMouseDown(event) {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      const clickedTrigger = containerRef.current?.contains(event.target);
+      const clickedDropdown = dropdownRef.current?.contains(event.target);
+
+      if (!clickedTrigger && !clickedDropdown) {
         setOpen(false);
         setQuery('');
       }
@@ -89,10 +121,23 @@ export default function AsyncSearchableSelect({
   }, []);
 
   useEffect(() => {
-    if (open && searchRef.current) {
+    if (open && dropdownStyle && searchRef.current) {
       searchRef.current.focus();
     }
-  }, [open]);
+  }, [open, dropdownStyle]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    updateDropdownPosition();
+    window.addEventListener('resize', updateDropdownPosition);
+    window.addEventListener('scroll', updateDropdownPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateDropdownPosition);
+      window.removeEventListener('scroll', updateDropdownPosition, true);
+    };
+  }, [open, updateDropdownPosition]);
 
   useEffect(() => {
     if (!open || typeof loadOptionsRef.current !== 'function') return undefined;
@@ -177,8 +222,12 @@ export default function AsyncSearchableSelect({
         )}
       </button>
 
-      {open ? (
-        <div className="absolute left-0 top-full z-[100] mt-1 w-full min-w-0 max-w-full max-h-[300px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900 md:max-h-56">
+      {open && dropdownStyle ? createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-[1000] min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+          style={dropdownStyle}
+        >
           <div className="border-b border-slate-100 p-2 dark:border-slate-800">
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-800">
               <Search size={13} className="shrink-0 text-slate-400" />
@@ -203,7 +252,7 @@ export default function AsyncSearchableSelect({
             </div>
           </div>
 
-          <ul className="max-h-[200px] overflow-y-auto py-1 md:max-h-56">
+          <ul className="overflow-y-auto py-1" style={{ maxHeight: Math.max(96, dropdownStyle.maxHeight - 57) }}>
             {loading ? (
               <li className="px-3 py-2.5 text-sm text-slate-400">{loadingLabel}</li>
             ) : showPrompt ? (
@@ -214,7 +263,7 @@ export default function AsyncSearchableSelect({
               safeOptions.map((option) => (
                 <li
                   key={option.value}
-                  className={`cursor-pointer px-3 py-3 text-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                  className={`min-w-0 cursor-pointer px-3 py-3 text-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 ${
                     String(option.value) === String(value)
                       ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
                       : 'text-slate-700 dark:text-slate-300'
@@ -226,7 +275,8 @@ export default function AsyncSearchableSelect({
               ))
             )}
           </ul>
-        </div>
+        </div>,
+        document.body
       ) : null}
     </div>
   );

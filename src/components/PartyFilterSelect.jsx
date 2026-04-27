@@ -26,6 +26,19 @@ export default function PartyFilterSelect({
     return (fallback?.items || []).map((party) => toPartyLookupOption(party));
   };
 
+  const renderPartyOption = (option) => {
+    const party = option?.entity || {};
+    const name = party.name || option.label;
+    const phone = party.phone || '';
+
+    return (
+      <div className="min-w-0">
+        <p className="truncate font-semibold text-slate-800 dark:text-slate-100">{name}</p>
+        {phone ? <p className="truncate text-xs text-slate-500">{phone}</p> : null}
+      </div>
+    );
+  };
+
   return (
     <AsyncSearchableSelect
       className={className}
@@ -38,6 +51,8 @@ export default function PartyFilterSelect({
       noResultsLabel={t('common.noData')}
       loadingLabel={t('common.loading')}
       minQueryLength={0}
+      dropdownMinWidth={320}
+      renderOption={renderPartyOption}
     />
   );
 }

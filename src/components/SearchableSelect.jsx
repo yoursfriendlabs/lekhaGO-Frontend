@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, X, ChevronDown } from 'lucide-react';
 
 function ensureArray(value) {
@@ -34,10 +35,13 @@ export default function SearchableSelect({
   onChange,
   placeholder = 'Select…',
   className = '',
+  dropdownMinWidth = 0,
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [dropdownStyle, setDropdownStyle] = useState(null);
   const containerRef = useRef(null);
+  const dropdownRef = useRef(null);
   const searchRef = useRef(null);
   const safeOptions = ensureArray(options).map(normalizeOption).filter(Boolean);
 
@@ -47,10 +51,38 @@ export default function SearchableSelect({
     ? safeOptions.filter((o) => o.label.toLowerCase().includes(query.toLowerCase().trim()))
     : safeOptions;
 
+  const updateDropdownPosition = useCallback(() => {
+    const trigger = containerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const margin = 8;
+    const width = Math.min(
+      viewportWidth - margin * 2,
+      Math.max(rect.width, Number(dropdownMinWidth) || 0)
+    );
+    const left = Math.min(Math.max(rect.left, margin), Math.max(margin, viewportWidth - width - margin));
+    const dropdownMaxHeight = 320;
+    const minHeight = 160;
+    const belowSpace = viewportHeight - rect.bottom - margin - 4;
+    const aboveSpace = rect.top - margin - 4;
+    const opensAbove = belowSpace < minHeight && aboveSpace > belowSpace;
+    const availableHeight = opensAbove ? aboveSpace : belowSpace;
+    const maxHeight = Math.max(minHeight, Math.min(dropdownMaxHeight, availableHeight));
+    const top = opensAbove ? Math.max(margin, rect.top - maxHeight - 4) : rect.bottom + 4;
+
+    setDropdownStyle({ left, top, width, maxHeight });
+  }, [dropdownMinWidth]);
+
   // Close on outside click
   useEffect(() => {
     function onMouseDown(e) {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
+      const clickedTrigger = containerRef.current?.contains(e.target);
+      const clickedDropdown = dropdownRef.current?.contains(e.target);
+
+      if (!clickedTrigger && !clickedDropdown) {
         setOpen(false);
         setQuery('');
       }
@@ -61,10 +93,23 @@ export default function SearchableSelect({
 
   // Auto-focus search when opened
   useEffect(() => {
-    if (open && searchRef.current) {
+    if (open && dropdownStyle && searchRef.current) {
       searchRef.current.focus();
     }
-  }, [open]);
+  }, [open, dropdownStyle]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    updateDropdownPosition();
+    window.addEventListener('resize', updateDropdownPosition);
+    window.addEventListener('scroll', updateDropdownPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateDropdownPosition);
+      window.removeEventListener('scroll', updateDropdownPosition, true);
+    };
+  }, [open, updateDropdownPosition]);
 
   const handleSelect = (opt) => {
     onChange(opt.value);
@@ -105,8 +150,12 @@ export default function SearchableSelect({
       </button>
 
       {/* Dropdown */}
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-0 max-w-full rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+      {open && dropdownStyle && createPortal(
+        <div
+          ref={dropdownRef}
+          className="fixed z-[1000] min-w-0 max-w-full rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+          style={dropdownStyle}
+        >
           {/* Search input */}
           <div className="p-2 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-800">
@@ -131,7 +180,7 @@ export default function SearchableSelect({
           </div>
 
           {/* Options list */}
-          <ul className="max-h-56 overflow-y-auto py-1">
+          <ul className="overflow-y-auto py-1" style={{ maxHeight: Math.max(96, dropdownStyle.maxHeight - 57) }}>
             {filtered.length === 0 ? (
               <li className="px-3 py-2.5 text-sm text-slate-400">No results</li>
             ) : (
@@ -150,7 +199,8 @@ export default function SearchableSelect({
               ))
             )}
           </ul>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
