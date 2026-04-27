@@ -906,7 +906,7 @@ export default function Parties() {
                 <option value="">— none —</option>
                 {pendingServices.map((service) => (
                   <option key={service.id} value={service.id}>
-                    {(service.referenceNo || service.id.slice(0, 8))} — Rs {toAmount(service.dueAmount).toFixed(2)} due
+                    {(service.referenceNo || service.id.slice(0, 8))} — {t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(service.dueAmount).toFixed(2) })} due
                   </option>
                 ))}
               </select>

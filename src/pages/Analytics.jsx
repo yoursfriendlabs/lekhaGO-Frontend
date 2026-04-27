@@ -6,6 +6,7 @@ import PieChart from '../components/PieChart';
 import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
 import CreatorFilterSelect from '../components/CreatorFilterSelect.jsx';
 import { api } from '../lib/api';
+import { formatCurrency } from '../lib/currency';
 import { useI18n } from '../lib/i18n.jsx';
 import dayjs, { todayISODate } from '../lib/datetime';
 
@@ -279,11 +280,7 @@ export default function Analytics() {
   };
 
   const formatCompactMoney = (value) => {
-    const amount = asNumber(value);
-    return `${t('currency.symbol')} ${amount.toLocaleString(undefined, {
-      notation: 'compact',
-      maximumFractionDigits: 1,
-    })}`;
+    return formatCurrency(asNumber(value), { symbol: t('currency.symbol'), compact: true });
   };
 
   const renderSummaryLines = (items) => (

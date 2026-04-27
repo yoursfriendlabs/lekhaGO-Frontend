@@ -720,7 +720,6 @@ export default function Purchases() {
   const TransactionIcon = transactionMeta.icon;
   const draftLineMeta = getLineMeta(itemDraft);
   const DraftLineIcon = draftLineMeta.icon;
-  const inactiveFilterClass = 'rounded-full border border-slate-200/80 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700/80 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-900/40';
   const statusFilterOptions = [
     { value: 'all', label: t('purchases.allStatuses'), activeClassName: 'rounded-full border border-slate-900 bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900' },
     { value: 'received', label: t('purchases.received'), activeClassName: 'rounded-full border border-emerald-500 bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-700 dark:border-emerald-700/70 dark:bg-emerald-900/30 dark:text-emerald-300' },
@@ -1303,37 +1302,35 @@ export default function Purchases() {
 
 
         </div>
-        <div className="flex gap-3 my-7 xl:min-w-[420px]">
-          <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('purchases.transactionType')}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+        <div className="my-7 grid gap-3 sm:grid-cols-2 xl:max-w-xl">
+          <div>
+            <label className="label">{t('inventory.itemType')}</label>
+            <select
+              className="input mt-1"
+              value={entryTypeFilter}
+              onChange={(event) => setEntryTypeFilter(event.target.value)}
+            >
               {entryTypeFilterOptions.map((option) => (
-                  <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setEntryTypeFilter(option.value)}
-                      className={entryTypeFilter === option.value ? option.activeClassName : inactiveFilterClass}
-                  >
-                    {option.label}
-                  </button>
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
               ))}
-            </div>
+            </select>
           </div>
 
-          <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('common.status')}</p>
-            <div className="mt-3 flex flex-wrap gap-2">
+          <div>
+            <label className="label">{t('common.status')}</label>
+            <select
+              className="input mt-1"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
               {statusFilterOptions.map((option) => (
-                  <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setStatusFilter(option.value)}
-                      className={statusFilter === option.value ? option.activeClassName : inactiveFilterClass}
-                  >
-                    {option.label}
-                  </button>
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
               ))}
-            </div>
+            </select>
           </div>
         </div>
 

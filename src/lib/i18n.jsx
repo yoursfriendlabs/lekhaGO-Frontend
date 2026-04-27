@@ -672,6 +672,8 @@ const dictionaries = {
       tax: 'VAT %',
       subTotal: 'Sub total',
       taxTotal: 'VAT total',
+      discount: 'Discount',
+      discountInvalid: 'Discount cannot be negative.',
       batch: 'Batch',
       laborTotal: 'Labor total',
       partsTotal: 'Parts total',
@@ -1759,6 +1761,8 @@ const dictionaries = {
       tax: 'भ्याट %',
       subTotal: 'उप-जम्मा',
       taxTotal: 'भ्याट जम्मा',
+      discount: 'छुट',
+      discountInvalid: 'छुट ऋणात्मक हुन सक्दैन।',
       batch: 'ब्याच',
       laborTotal: 'श्रम जम्मा',
       partsTotal: 'पार्ट जम्मा',
@@ -2201,6 +2205,27 @@ const getNestedValue = (obj, key) => {
   return key.split('.').reduce((acc, part) => (acc && acc[part] !== undefined ? acc[part] : undefined), obj);
 };
 
+const formatCurrencyAmount = (amount, locale) => {
+  const normalized = typeof amount === 'string' ? amount.replace(/,/g, '') : amount;
+  const numeric = Number(normalized);
+
+  if (!Number.isFinite(numeric)) return amount ?? '';
+
+  return numeric.toLocaleString(locale === 'ne' ? 'ne-NP' : 'en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+const normalizeInterpolationVars = (key, vars = {}, locale) => {
+  if (key !== 'currency.formatted') return vars;
+
+  return {
+    ...vars,
+    amount: formatCurrencyAmount(vars.amount, locale),
+  };
+};
+
 const interpolate = (value, vars = {}) =>
   String(value).replace(/\{\{(\w+)\}\}/g, (_, token) => (vars[token] !== undefined ? vars[token] : ''));
 
@@ -2219,7 +2244,7 @@ export function I18nProvider({ children }) {
     (key, vars) => {
       const dictionary = dictionaries[locale] || dictionaries.en;
       const value = getNestedValue(dictionary, key) ?? getNestedValue(dictionaries.en, key) ?? key;
-      return interpolate(value, vars);
+      return interpolate(value, normalizeInterpolationVars(key, vars, locale));
     },
     [locale]
   );

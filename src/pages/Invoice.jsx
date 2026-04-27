@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { useBusinessSettings } from '../lib/businessSettings';
 import InvoiceHeader from '../components/InvoiceHeader';
 import Notice from '../components/Notice';
+import { formatCurrency } from '../lib/currency';
 import { getCreatorDisplayName } from '../lib/records';
 import dayjs, { formatMaybeDate } from '../lib/datetime';
 
@@ -12,7 +13,7 @@ function fmt(dateStr) {
 }
 
 function money(val) {
-  return `Rs ${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatCurrency(val);
 }
 
 export default function Invoice() {

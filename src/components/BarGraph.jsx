@@ -1,11 +1,12 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { formatCurrency } from '../lib/currency';
 
 function defaultValueFormatter(value) {
-  return `Rs ${Number(value || 0).toFixed(2)}`;
+  return formatCurrency(value);
 }
 
 function defaultAxisFormatter(value) {
-  return `Rs ${Number(value || 0)}`;
+  return formatCurrency(value, { compact: true });
 }
 
 function BarGraph({

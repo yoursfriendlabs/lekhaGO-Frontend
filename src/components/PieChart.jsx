@@ -1,4 +1,5 @@
 import { PieChart as RePieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { formatCurrency } from '../lib/currency';
 
 function PieChart({ data, height = 300 }) {
   const colors = ['#10b981', '#3b82f6', '#f59e0b'];
@@ -29,7 +30,7 @@ function PieChart({ data, height = 300 }) {
           <Tooltip
             formatter={(value, name, props) => {
               const percentage = props?.payload?.percentage || 0;
-              return [`Rs ${Number(value).toFixed(2)} (${percentage}%)`, name];
+              return [`${formatCurrency(value)} (${percentage}%)`, name];
             }}
             contentStyle={{
               backgroundColor: '#fff',

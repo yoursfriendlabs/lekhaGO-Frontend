@@ -675,14 +675,14 @@ export default function Inventory() {
 
       <div className="card">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
+          <h3 className="font-serif text-2xl text-slate-900 dark:text-white ">
             {t('inventory.itemsList', { count: totalItems })}
           </h3>
 
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.8fr)_repeat(4,minmax(0,1fr))]">
-          <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm focus-within:border-emerald-300 dark:border-slate-800 dark:bg-slate-950 sm:col-span-2 xl:col-span-1">
+          <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white  text-sm text-slate-600 shadow-sm focus-within:border-emerald-300 dark:border-slate-800 dark:bg-slate-950 sm:col-span-2 xl:col-span-1">
             <span className="text-slate-400">🔍</span>
             <input
               className="w-full bg-transparent focus:border-none focus:ring-0 border-none"
@@ -692,7 +692,7 @@ export default function Inventory() {
             />
           </div>
           <select
-            className="input border-none min-w-[160px]"
+            className="input border-none min-w-[150px]"
             value={categoryFilter}
             onChange={(event) => setCategoryFilter(event.target.value)}
           >
@@ -993,13 +993,17 @@ export default function Inventory() {
                 </div>
                 <div>
                   <label className="label">{t('inventory.itemType')}</label>
-                  <div className={`mt-1 grid gap-2 ${itemTypeOptions.length > 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                  <div className="mt-1 grid grid-cols-2 gap-2">
                     {itemTypeOptions.map((type) => (
                       <button
                         key={type.value}
                         type="button"
                         onClick={() => setForm((prev) => ({ ...prev, itemType: type.value }))}
-                        className={`${form.itemType === type.value ? 'btn-primary' : 'btn-ghost'} w-full justify-center`}
+                        className={`h-10 rounded-2xl border px-3 text-center text-xs font-semibold transition ${
+                          form.itemType === type.value
+                            ? 'border-primary bg-primary text-white shadow-sm'
+                            : 'border-slate-200 bg-white text-slate-600 hover:border-primary-200 hover:bg-primary-50/40 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-slate-800 dark:hover:text-white'
+                        }`}
                         title={type.description || type.label}
                       >
                         {type.label}

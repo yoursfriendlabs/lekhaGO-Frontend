@@ -259,13 +259,18 @@ function getComputedServiceTotals(items, attributes = {}) {
   const subTotal = laborTotal + partsTotal;
   const taxTotal = items.reduce((sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate), 0)
     + jewellery.additionalTaxNumber;
-  const grandTotal = subTotal + taxTotal;
+  const discountTotal = Math.min(
+    Math.max(toFiniteNumber(attributes?.discountTotal ?? attributes?.discount, 0), 0),
+    subTotal + taxTotal
+  );
+  const grandTotal = Math.max(subTotal + taxTotal - discountTotal, 0);
 
   return {
     laborTotal,
     partsTotal,
     subTotal,
     taxTotal,
+    discountTotal,
     grandTotal,
   };
 }
@@ -277,13 +282,18 @@ function getServiceOrderTotals(record) {
   const partsTotal = toFiniteNumber(record?.partsTotal, computed.partsTotal);
   const subTotal = toFiniteNumber(record?.subTotal, laborTotal + partsTotal);
   const taxTotal = toFiniteNumber(record?.taxTotal, computed.taxTotal);
-  const grandTotal = toFiniteNumber(record?.grandTotal, subTotal + taxTotal);
+  const discountTotal = Math.min(
+    Math.max(toFiniteNumber(record?.discountTotal ?? record?.discount, computed.discountTotal), 0),
+    subTotal + taxTotal
+  );
+  const grandTotal = toFiniteNumber(record?.grandTotal, Math.max(subTotal + taxTotal - discountTotal, 0));
 
   return {
     laborTotal,
     partsTotal,
     subTotal,
     taxTotal,
+    discountTotal,
     grandTotal,
   };
 }
@@ -328,14 +338,14 @@ function OverviewMetric({ icon: Icon, label, value, tone = 'slate' }) {
   const palette = styles[tone] || styles.slate;
 
   return (
-    <div className={`rounded-[24px] border p-4 shadow-sm shadow-slate-200/20 ${palette.wrapper}`}>
-      <div className="flex items-center justify-between gap-3">
+    <div className={`rounded-2xl border px-3 py-2.5 shadow-sm shadow-slate-200/20 ${palette.wrapper}`}>
+      <div className="flex items-center justify-between gap-2.5">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{label}</p>
-          <p className="mt-2 whitespace-nowrap text-lg font-semibold leading-tight text-slate-900 dark:text-white sm:text-xl xl:text-xl">{value}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">{label}</p>
+          <p className="mt-1 whitespace-nowrap text-base font-semibold leading-tight text-slate-900 dark:text-white">{value}</p>
         </div>
-        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${palette.icon}`}>
-          <Icon size={18} />
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${palette.icon}`}>
+          <Icon size={15} />
         </div>
       </div>
     </div>
@@ -505,6 +515,7 @@ export default function Services() {
   const [creatingParty, setCreatingParty] = useState(false);
   const [header, setHeader] = useState(() => makeEmptyHeader());
   const [items, setItems] = useState([]);
+  const [discount, setDiscount] = useState('0');
   const [amountReceived, setAmountReceived] = useState('0');
   const [isPaid, setIsPaid] = useState(false);
 
@@ -594,7 +605,9 @@ export default function Services() {
     const subTotal = laborTotal + partsTotal;
     const taxTotal = chargeableItems.reduce((sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate), 0)
       + activeJewelleryDetails.additionalTaxNumber;
-    const grandTotal = subTotal + taxTotal;
+    const preDiscountTotal = subTotal + taxTotal;
+    const discountTotal = Math.min(Math.max(Number(discount || 0), 0), preDiscountTotal);
+    const grandTotal = Math.max(preDiscountTotal - discountTotal, 0);
     const received = isPaid ? grandTotal : Math.min(Number(amountReceived || 0), grandTotal);
     const due = Math.max(grandTotal - received, 0);
     return {
@@ -602,13 +615,14 @@ export default function Services() {
       partsTotal,
       subTotal,
       taxTotal,
+      discountTotal,
       grandTotal,
       received,
       due,
       diamondCharge: activeJewelleryDetails.diamondChargeNumber,
       additionalTax: activeJewelleryDetails.additionalTaxNumber,
     };
-  }, [activeJewelleryDetails.additionalTaxNumber, activeJewelleryDetails.diamondChargeNumber, amountReceived, chargeableItems, isPaid]);
+  }, [activeJewelleryDetails.additionalTaxNumber, activeJewelleryDetails.diamondChargeNumber, amountReceived, chargeableItems, discount, isPaid]);
 
   const visibleItems = useMemo(() => items.filter((item) => !isPlaceholderItem(item)), [items]);
 
@@ -955,6 +969,7 @@ export default function Services() {
   const resetForm = () => {
     setHeader({ ...makeEmptyHeader(), orderNo: '' });
     setItems([]);
+    setDiscount('0');
     setPartyQuery('');
     setSelectedParty(null);
     setPartyDropdownOpen(false);
@@ -1021,6 +1036,7 @@ export default function Services() {
       cacheProducts(hydratedProducts);
       setSuggestedOrderNo(full.orderNo || '');
       setAmountReceived(String(full.receivedTotal ?? 0));
+      setDiscount(String(full.discountTotal ?? full.discount ?? 0));
       const computedIsPaid = Math.max(Number(full.grandTotal || 0) - Number(full.receivedTotal || 0), 0) <= 0;
       setIsPaid(computedIsPaid);
       setItems(rawItems.length > 0 ? rawItems.map((i) => ({
@@ -1076,6 +1092,7 @@ export default function Services() {
     });
     if (invalidConversion) { setFormNotice({ type: 'error', message: t('errors.conversionRequired') }); return; }
     if (!chargeableItems.length) { setFormNotice({ type: 'error', message: t('services.addFirstItem') }); return; }
+    if (Number(discount || 0) < 0) { setFormNotice({ type: 'error', message: t('services.discountInvalid') }); return; }
     const normalizedAttributes = showGoldJewelleryDetails
       ? normalizeJewelleryAttributes(header.attributes)
       : Object.fromEntries(
@@ -1103,6 +1120,8 @@ export default function Services() {
         partsTotal: totals.partsTotal,
         subTotal: totals.subTotal,
         taxTotal: totals.taxTotal,
+        discount: totals.discountTotal,
+        discountTotal: totals.discountTotal,
         grandTotal: totals.grandTotal,
         receivedTotal: totals.received,
         ...(Number(totals.received || 0) > 0 ? buildPaymentPayload({ paymentMethod, bankId, paymentNote }) : { paymentMethod: 'cash' }),
@@ -1313,7 +1332,7 @@ export default function Services() {
             </button>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             <OverviewMetric icon={LayoutList} label={t('services.totalOrders')} value={serviceOverview.totalOrders} />
             <OverviewMetric icon={Wrench} label={t('services.open')} value={serviceOverview.openCount} tone="blue" />
             <OverviewMetric icon={CalendarDays} label={t('services.activeJobs')} value={serviceOverview.inProgressCount} tone="amber" />
@@ -2374,6 +2393,10 @@ export default function Services() {
                                   <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.additionalTax)}</p>
                                 </div>
                               ) : null}
+                              <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.discount')}</p>
+                                <p className="mt-1 text-lg font-semibold text-rose-700 dark:text-rose-300">-{money(totals.discountTotal)}</p>
+                              </div>
                               <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white dark:bg-primary-900/70">
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">{t('services.grandTotal')}</p>
                                 <p className="mt-1 text-xl font-semibold">{money(totals.grandTotal)}</p>
@@ -2382,6 +2405,19 @@ export default function Services() {
                           </div>
 
                           <div className="space-y-4">
+                            <div>
+                              <label className="label">{t('services.discount')}</label>
+                              <input
+                                className="input mt-1"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max={(totals.subTotal + totals.taxTotal).toFixed(2)}
+                                value={discount}
+                                onChange={(e) => setDiscount(e.target.value)}
+                              />
+                            </div>
+
                             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                               <div>
                                 <label className="label">{t('services.amountReceived')}</label>
@@ -2695,6 +2731,11 @@ export default function Services() {
                     {showGoldJewelleryDetails && invoiceJewellery.additionalTaxNumber > 0 ? (
                       <div className="flex justify-between text-slate-500 dark:text-slate-400">
                         <span>Additional Tax</span><span>{money(invoiceJewellery.additionalTaxNumber)}</span>
+                      </div>
+                    ) : null}
+                    {Number(invoiceTotals.discountTotal || 0) > 0 ? (
+                      <div className="flex justify-between text-rose-600 dark:text-rose-300">
+                        <span>{t('services.discount')}</span><span>-{money(invoiceTotals.discountTotal)}</span>
                       </div>
                     ) : null}
                     <div className="flex justify-between border-t border-slate-200/70 pt-3 font-bold text-slate-900 dark:border-slate-700 dark:text-white">
