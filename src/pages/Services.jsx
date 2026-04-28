@@ -2648,18 +2648,18 @@ export default function Services() {
                 <div className="border-b border-slate-200/70 bg-slate-50/60 px-8 py-5 dark:border-slate-800/70 dark:bg-slate-900/30">
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Bill To</p>
-                      <p className="font-semibold text-slate-800 dark:text-slate-200">{invoiceOrder.Party?.name || invoiceOrder.partyName || '—'}</p>
-                      {invoiceOrder.Party?.phone && <p className="mt-0.5 text-sm text-slate-500">{invoiceOrder.Party?.phone}</p>}
-                      <p className="mt-2 text-sm text-slate-500">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">Bill To</p>
+                      <p className="font-semibold text-slate-900">{invoiceOrder.Party?.name || invoiceOrder.partyName || '—'}</p>
+                      {invoiceOrder.Party?.phone && <p className="mt-0.5 text-sm text-slate-900">{invoiceOrder.Party?.phone}</p>}
+                      <p className="mt-2 text-sm text-slate-900">
                         Created By:{' '}
-                        <span className="font-medium text-slate-700 dark:text-slate-300">{getCreatorDisplayName(invoiceOrder)}</span>
+                        <span className="font-medium text-slate-900">{getCreatorDisplayName(invoiceOrder)}</span>
                       </p>
                     </div>
                     {invoiceOrder.notes && (
                       <div>
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Notes</p>
-                        <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-400">{invoiceOrder.notes}</p>
+                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">Notes</p>
+                        <p className="whitespace-pre-wrap text-sm text-slate-900">{invoiceOrder.notes}</p>
                       </div>
                     )}
                   </div>
@@ -2667,40 +2667,40 @@ export default function Services() {
                     <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5">
                       {invoiceJewellery.metalType ? (
                         <div className="text-sm">
-                          <span className="text-slate-400">Metal: </span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">{invoiceJewellery.metalType}</span>
+                          <span className="text-slate-900">Metal: </span>
+                          <span className="font-medium text-slate-900">{invoiceJewellery.metalType}</span>
                         </div>
                       ) : null}
                       {invoiceJewellery.metalPurity ? (
                         <div className="text-sm">
-                          <span className="text-slate-400">Purity: </span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">{invoiceJewellery.metalPurity}</span>
+                          <span className="text-slate-900">Purity: </span>
+                          <span className="font-medium text-slate-900">{invoiceJewellery.metalPurity}</span>
                         </div>
                       ) : null}
                       {invoiceJewellery.actualWeight ? (
                         <div className="text-sm">
-                          <span className="text-slate-400">Actual weight: </span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">{invoiceJewellery.actualWeight}</span>
+                          <span className="text-slate-900">Actual weight: </span>
+                          <span className="font-medium text-slate-900">{invoiceJewellery.actualWeight}</span>
                         </div>
                       ) : null}
                       {invoiceJewellery.wastagePercent ? (
                         <div className="text-sm">
-                          <span className="text-slate-400">Wastage: </span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                          <span className="text-slate-900">Wastage: </span>
+                          <span className="font-medium text-slate-900">
                             {invoiceJewellery.wastagePercent}% ({invoiceJewellery.wastageWeight || '0'})
                           </span>
                         </div>
                       ) : null}
                       {invoiceJewellery.totalWeight ? (
                         <div className="text-sm">
-                          <span className="text-slate-400">Total weight: </span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">{invoiceJewellery.totalWeight}</span>
+                          <span className="text-slate-900">Total weight: </span>
+                          <span className="font-medium text-slate-900">{invoiceJewellery.totalWeight}</span>
                         </div>
                       ) : null}
                       {invoiceJewellery.diamondType ? (
                         <div className="text-sm">
-                          <span className="text-slate-400">Diamond: </span>
-                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                          <span className="text-slate-900">Diamond: </span>
+                          <span className="font-medium text-slate-900">
                             {[invoiceJewellery.diamondType, invoiceJewellery.diamondWeight && `${invoiceJewellery.diamondWeight} wt`, invoiceJewellery.diamondCarat && `${invoiceJewellery.diamondCarat} ct`, invoiceJewellery.diamondPurity]
                               .filter(Boolean)
                               .join(' · ')}
@@ -2716,8 +2716,8 @@ export default function Services() {
                         const attrLabel = def?.name || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
                         return (
                           <div key={key} className="text-sm">
-                            <span className="text-slate-400">{attrLabel}: </span>
-                            <span className="font-medium text-slate-700 dark:text-slate-300">{String(val || '—')}</span>
+                            <span className="text-slate-900">{attrLabel}: </span>
+                            <span className="font-medium text-slate-900">{String(val || '—')}</span>
                           </div>
                         );
                       })}
@@ -2730,14 +2730,14 @@ export default function Services() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b-2 border-slate-200/70 dark:border-slate-700/70">
-                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400 w-8"></th>
-                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Description</th>
-                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Product Name</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Qty</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Unit Price</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('services.tax')}</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('services.taxTotal')}</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Amount</th>
+                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-900 w-8"></th>
+                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-900">Description</th>
+                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-900">Product Name</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-900">Qty</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-900">Unit Price</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-900">{t('services.tax')}</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-900">{t('services.taxTotal')}</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-900">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
@@ -2748,19 +2748,19 @@ export default function Services() {
                               {item.itemType === 'labor' ? 'Service' : 'Product'}
                             </span>
                           </td>
-                          <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                          <td className="py-3 pr-4 font-medium text-slate-900">
                             {item.description || item.productName || '—'}
                           </td>
-                          <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                          <td className="py-3 pr-4 font-medium text-slate-900">
                             { item.productName || '—'}
                           </td>
-                          <td className="py-3 text-right text-slate-500">
+                          <td className="py-3 text-right text-slate-900">
                             {Number(item.quantity || 0).toFixed(item.quantity % 1 ? 3 : 0)}
                           </td>
-                          <td className="py-3 text-right text-slate-500">{money(item.unitPrice)}</td>
-                          <td className="py-3 text-right text-slate-500">{Number(item.taxRate || 0).toFixed(2)}%</td>
-                          <td className="py-3 text-right text-slate-500">{money(getVatAmount(item.lineTotal, item.taxRate))}</td>
-                          <td className="py-3 text-right font-semibold text-slate-800 dark:text-slate-200">{money(item.lineTotal)}</td>
+                          <td className="py-3 text-right text-slate-900">{money(item.unitPrice)}</td>
+                          <td className="py-3 text-right text-slate-900">{Number(item.taxRate || 0).toFixed(2)}%</td>
+                          <td className="py-3 text-right text-slate-900">{money(getVatAmount(item.lineTotal, item.taxRate))}</td>
+                          <td className="py-3 text-right font-semibold text-slate-900">{money(item.lineTotal)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2770,25 +2770,25 @@ export default function Services() {
                 {/* ── Totals ── */}
                 <div className="border-t border-slate-200/70 dark:border-slate-800/70 px-8 py-6">
                   <div className="ml-auto max-w-xs space-y-2 text-sm">
-                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                    <div className="flex justify-between text-slate-900">
                       <span>{t('services.subTotal')}</span><span>{money(invoiceTotals.subTotal)}</span>
                     </div>
-                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                    <div className="flex justify-between text-slate-900">
                       <span>Service Total</span><span>{money(invoiceTotals.laborTotal)}</span>
                     </div>
-                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                    <div className="flex justify-between text-slate-900">
                       <span>Product Total</span><span>{money(invoiceTotals.partsTotal)}</span>
                     </div>
                     {showGoldJewelleryDetails && invoiceJewellery.diamondChargeNumber > 0 ? (
-                      <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <div className="flex justify-between text-slate-900">
                         <span>Diamond Charge</span><span>{money(invoiceJewellery.diamondChargeNumber)}</span>
                       </div>
                     ) : null}
-                    <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                    <div className="flex justify-between text-slate-900">
                       <span>{t('services.taxTotal')}</span><span>{money(invoiceTotals.taxTotal)}</span>
                     </div>
                     {showGoldJewelleryDetails && invoiceJewellery.additionalTaxNumber > 0 ? (
-                      <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                      <div className="flex justify-between text-slate-900">
                         <span>Additional Tax</span><span>{money(invoiceJewellery.additionalTaxNumber)}</span>
                       </div>
                     ) : null}
@@ -2817,15 +2817,15 @@ export default function Services() {
                 {/* ── Attachment ── */}
                 {invoiceAttachmentUrls.length > 0 && (
                   <div className="border-t border-slate-200/70 px-8 py-5 dark:border-slate-800/70">
-                    <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Attachment</p>
+                    <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-slate-900">Attachment</p>
                     <AttachmentStrip urls={invoiceAttachmentUrls} onOpen={setLightboxUrl} maxVisible={4} size="lg" />
                   </div>
                 )}
 
                 {/* ── Footer ── */}
                 <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-8 py-4 dark:border-slate-800/70 dark:bg-slate-900/30">
-                  <p className="text-xs text-slate-400">Thank you for your business!</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-900">Thank you for your business!</p>
+                  <p className="text-xs text-slate-900">
                     Printed {dayjs().format('D MMM YYYY')}
                   </p>
                 </div>
