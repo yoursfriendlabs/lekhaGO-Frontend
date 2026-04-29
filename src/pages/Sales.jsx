@@ -666,7 +666,9 @@ export default function Sales() {
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="order-2 lg:order-1">
                     <label className="label">{t('sales.notes')}</label>
-                    <textarea className="input mt-1 h-24 resize-none" name="notes" value={header.notes} onChange={handleHeaderChange} placeholder={t('sales.notesPlaceholder')} />
+                    <textarea className="input mt-1 h-24 resize-none" name="notes" value={header.notes}
+                    maxLength={10000}
+                    onChange={handleHeaderChange} placeholder={t('sales.notesPlaceholder')} />
                   </div>
                   <div className="order-1 lg:order-2">
                     <FileUpload

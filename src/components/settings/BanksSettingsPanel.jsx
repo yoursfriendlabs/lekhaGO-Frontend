@@ -433,6 +433,7 @@ export default function BanksSettingsPanel() {
               className="input mt-1 h-24 resize-none"
               name="notes"
               value={form.notes}
+              maxLength={10000}
               onChange={handleChange}
             />
           </div>

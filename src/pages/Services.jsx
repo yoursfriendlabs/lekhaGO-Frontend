@@ -1978,6 +1978,7 @@ export default function Services() {
                                 className="input mt-1 h-32 resize-none"
                                 name="notes"
                                 value={header.notes}
+                                maxLength={10000}
                                 onChange={handleHeaderChange}
                                 placeholder={t('services.notesPlaceholder')}
                               />
@@ -2658,7 +2659,7 @@ export default function Services() {
                     </div>
                     {invoiceOrder.notes && (
                       <div>
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-black">Notes</p>
+                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-black" >Notes</p>
                         <p className="whitespace-pre-wrap text-sm text-black">{invoiceOrder.notes}</p>
                       </div>
                     )}

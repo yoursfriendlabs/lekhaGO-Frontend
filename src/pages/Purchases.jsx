@@ -902,6 +902,7 @@ export default function Purchases() {
                   className="input h-28 resize-none"
                   name="notes"
                   value={header.notes}
+                  maxLength={10000}
                   onChange={handleHeaderChange}
                 />
               </FormSectionCard>

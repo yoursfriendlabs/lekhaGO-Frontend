@@ -896,6 +896,7 @@ export default function CafeOrders() {
                   <textarea
                     className="input mt-1 h-24 resize-none"
                     value={orderFields.notes}
+                    maxLength={10000}
                     onChange={(event) => setOrderFields((prev) => ({ ...prev, notes: event.target.value }))}
                     placeholder="Special instructions"
                   />

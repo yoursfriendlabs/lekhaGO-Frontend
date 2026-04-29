@@ -378,7 +378,9 @@ export default function Banks() {
 
           <div>
             <label className="label">{t('common.notes')}</label>
-            <textarea className="input mt-1 h-24 resize-none" name="notes" value={form.notes} onChange={handleChange} />
+            <textarea className="input mt-1 h-24 resize-none" name="notes" value={form.notes}
+            maxLength={10000}
+             onChange={handleChange} />
           </div>
 
           <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800/40">
