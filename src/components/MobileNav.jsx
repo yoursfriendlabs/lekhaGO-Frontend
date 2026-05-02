@@ -13,6 +13,7 @@ const NAV_ROLE_MAP = {
   services: ['owner', 'staff'],
   purchases: ['owner'],
   parties: ['owner'],
+  staff: ['owner'],
   settings: ['owner', 'staff'],
   admin: ['owner'],
 };
@@ -25,6 +26,7 @@ const ICON_MAP = {
   services: Briefcase,
   purchases: ShoppingCart,
   parties: Users,
+  staff: Users,
   settings: Settings2,
   admin: ShieldCheck,
 };
@@ -47,8 +49,19 @@ export default function MobileNav() {
     businessProfile,
   );
   const visibleNavItems = navigation
-    .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
-    .concat(role === 'owner' ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }] : []);
+    .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role));
+
+  if (role === 'owner' && !visibleNavItems.some((item) => item.key === 'staff')) {
+    visibleNavItems.splice(Math.max(visibleNavItems.length - 1, 0), 0, {
+      key: 'staff',
+      label: t('nav.staff'),
+      route: '/app/staff',
+    });
+  }
+
+  if (role === 'owner') {
+    visibleNavItems.push({ key: 'admin', label: t('nav.admin'), route: '/app/admin' });
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200/70 bg-white/95 px-2 py-2 shadow-lg backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/90 md:hidden">

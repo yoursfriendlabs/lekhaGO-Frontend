@@ -13,6 +13,7 @@ const NAV_ROLE_MAP = {
   services: ['owner', 'staff'],
   purchases: ['owner'],
   parties: ['owner'],
+  staff: ['owner'],
   ledger: ['owner', 'staff'],
   analytics: ['owner'],
   settings: ['owner', 'staff'],
@@ -38,10 +39,20 @@ export default function Sidebar() {
       ],
     businessProfile,
   );
-
   const visibleNavItems = navigation
-    .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
-    .concat(role === 'owner' ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }] : []);
+    .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role));
+
+  if (role === 'owner' && !visibleNavItems.some((item) => item.key === 'staff')) {
+    visibleNavItems.splice(Math.max(visibleNavItems.length - 1, 0), 0, {
+      key: 'staff',
+      label: t('nav.staff'),
+      route: '/app/staff',
+    });
+  }
+
+  if (role === 'owner') {
+    visibleNavItems.push({ key: 'admin', label: t('nav.admin'), route: '/app/admin' });
+  }
 
   return (
     <aside className="hidden h-full w-64 flex-col gap-6 border-r border-slate-200/70 bg-white/80 p-6 dark:border-slate-800/70 dark:bg-slate-950/70 md:fixed md:inset-y-0 md:left-0 md:flex md:overflow-y-auto">

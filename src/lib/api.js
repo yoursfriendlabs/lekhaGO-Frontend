@@ -5,10 +5,16 @@ import {
   setSessionNotice,
 } from "./storage";
 import { toQueryKey, toQueryString } from "./queryKey";
+import {
+  normalizeStaffLedgerPayload,
+  normalizeStaffMembersPayload,
+  normalizeStaffRecord,
+  normalizeStaffRecordsPayload,
+} from "./staff";
 
-export const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "https://api.yoursfriend.com";
-// export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+// export const API_BASE =
+  // import.meta.env.VITE_API_BASE_URL || "https://devapi.yoursfriend.com";
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 const INACTIVE_USER_REGEX = /user is inactive/i;
 const SESSION_EXPIRED_MESSAGE = "Your session expired. Please log in again.";
@@ -449,25 +455,115 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  listStaff: () =>
-    request("/api/staff", {}, listCache(["staff"], CACHE_TTL.short)),
-  createStaff: (data) =>
+  listStaffMembers: () =>
     request(
-      "/api/staff",
+      "/api/staff/members",
+      {},
+      listCache(["staff", "staff-members"], CACHE_TTL.short),
+    ).then(normalizeStaffMembersPayload),
+  createStaffMember: (data) =>
+    request(
+      "/api/staff/members",
       { method: "POST", body: JSON.stringify(data) },
-      mutationConfig(["staff"]),
+      mutationConfig(["staff", "staff-members"]),
     ),
-  updateStaff: (membershipId, data) =>
+  updateStaffMember: (membershipId, data) =>
     request(
-      `/api/staff/${membershipId}`,
+      `/api/staff/members/${membershipId}`,
       { method: "PATCH", body: JSON.stringify(data) },
-      mutationConfig(["staff"]),
+      mutationConfig(["staff", "staff-members"]),
     ),
-  deleteStaff: (membershipId) =>
+  deleteStaffMember: (membershipId) =>
     request(
-      `/api/staff/${membershipId}`,
+      `/api/staff/members/${membershipId}`,
       { method: "DELETE" },
-      mutationConfig(["staff"]),
+      mutationConfig(["staff", "staff-members"]),
+    ),
+  listStaff: () => api.listStaffMembers(),
+  createStaff: (data) => api.createStaffMember(data),
+  updateStaff: (membershipId, data) => api.updateStaffMember(membershipId, data),
+  deleteStaff: (membershipId) => api.deleteStaffMember(membershipId),
+  listStaffRecords: (params = {}) =>
+    listRequest(
+      "/api/staff/records",
+      params,
+      listCache(["staff-records"], CACHE_TTL.short),
+    ).then(normalizeStaffRecordsPayload),
+  createStaffRecord: (data) =>
+    request(
+      "/api/staff/records",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["staff-records"]),
+    ).then(normalizeStaffRecord),
+  getStaffRecord: (staffId) =>
+    request(
+      `/api/staff/records/${staffId}`,
+      {},
+      listCache(detailTags("staff-record", staffId), CACHE_TTL.detail),
+    ).then(normalizeStaffRecord),
+  updateStaffRecord: (staffId, data) =>
+    request(
+      `/api/staff/records/${staffId}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("staff-record", staffId),
+        "staff-records",
+        "staff-ledger",
+        `staff-ledger:${staffId}`,
+      ]),
+    ).then(normalizeStaffRecord),
+  deleteStaffRecord: (staffId) =>
+    request(
+      `/api/staff/records/${staffId}`,
+      { method: "DELETE" },
+      mutationConfig([
+        detailTags("staff-record", staffId),
+        "staff-records",
+        "staff-ledger",
+        `staff-ledger:${staffId}`,
+      ]),
+    ),
+  listStaffLedger: (staffId, params = {}) =>
+    listRequest(
+      `/api/staff/records/${staffId}/ledger`,
+      params,
+      listCache(
+        ["staff-ledger", `staff-ledger:${staffId}`, ...detailTags("staff-record", staffId)],
+        CACHE_TTL.short,
+      ),
+    ).then(normalizeStaffLedgerPayload),
+  createStaffLedgerEntry: (staffId, data) =>
+    request(
+      `/api/staff/records/${staffId}/ledger`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("staff-record", staffId),
+        "staff-records",
+        "staff-ledger",
+        `staff-ledger:${staffId}`,
+      ]),
+    ),
+  updateStaffLedgerEntry: (staffId, entryId, data) =>
+    request(
+      `/api/staff/records/${staffId}/ledger/${entryId}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("staff-record", staffId),
+        "staff-records",
+        "staff-ledger",
+        `staff-ledger:${staffId}`,
+      ]),
+    ),
+  deleteStaffLedgerEntry: (staffId, entryId) =>
+    request(
+      `/api/staff/records/${staffId}/ledger/${entryId}`,
+      { method: "DELETE" },
+      mutationConfig([
+        detailTags("staff-record", staffId),
+        "staff-records",
+        "staff-ledger",
+        `staff-ledger:${staffId}`,
+      ]),
     ),
 
   listProducts: (params = {}) =>

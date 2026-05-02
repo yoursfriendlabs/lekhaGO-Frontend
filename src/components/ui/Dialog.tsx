@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -24,6 +24,7 @@ export const Dialog = ({
                            footer,
 }: DialogProps) => {
     const dialogRef = useRef<HTMLDivElement>(null);
+    const titleId = useId();
 
     // Close on Escape key
     useEffect(() => {
@@ -61,6 +62,51 @@ export const Dialog = ({
         };
     }, [isOpen]);
 
+    useEffect(() => {
+        if (!isOpen) return undefined;
+
+        const previousActive = document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
+        const dialogNode = dialogRef.current;
+        const focusable = dialogNode?.querySelector<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+
+        (focusable || dialogNode)?.focus();
+
+        const handleTabKey = (event: KeyboardEvent) => {
+            if (event.key !== 'Tab' || !dialogNode) return;
+
+            const nodes = [...dialogNode.querySelectorAll<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            )].filter((node) => !node.hasAttribute('disabled'));
+
+            if (nodes.length === 0) {
+                event.preventDefault();
+                return;
+            }
+
+            const first = nodes[0];
+            const last = nodes[nodes.length - 1];
+
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        };
+
+        document.addEventListener('keydown', handleTabKey);
+
+        return () => {
+            document.removeEventListener('keydown', handleTabKey);
+            previousActive?.focus();
+        };
+    }, [isOpen]);
+
     if (!isOpen) return null;
 
     const sizeClasses = {
@@ -84,11 +130,15 @@ export const Dialog = ({
         >
             <div
                 ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={title ? titleId : undefined}
+                tabIndex={-1}
                 className={`relative flex max-h-[100dvh] w-full flex-col bg-white shadow-2xl md:max-h-[90vh] ${sizeClasses[size]} rounded-t-3xl md:rounded-3xl`}
             >
                 {(title || showCloseButton) && (
                     <div className="flex items-center justify-between border-b border-slate-200/70 px-4 py-4 md:px-5">
-                        {title && <h2 className="font-serif text-xl text-slate-900">{title}</h2>}
+                        {title && <h2 id={titleId} className="font-serif text-xl text-slate-900">{title}</h2>}
                         {showCloseButton && (
                             <button
                                 onClick={onClose}
