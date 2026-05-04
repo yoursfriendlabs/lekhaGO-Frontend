@@ -1150,7 +1150,7 @@ export default function Inventory() {
                 </div>
                 <div>
                   <label className="label">{t('products.conversionRate')}</label>
-                  <input className="input mt-1" name="conversionRate" type="number" step="0.0001" value={form.conversionRate} onChange={handleFormChange} />
+                  <input className="input mt-1" name="conversionRate" type="number" step="1" value={form.conversionRate} onChange={handleFormChange} />
                 </div>
                 <div>
                   <label className="label">{t('products.secondaryPrice')}</label>

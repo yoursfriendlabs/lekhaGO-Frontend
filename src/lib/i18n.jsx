@@ -642,7 +642,7 @@ const dictionaries = {
       paymentSectionTitle: 'Payment & totals',
       paymentSectionHint: 'Review totals, due amount, and payment method before saving.',
       itemComposerTitle: 'Item composer',
-      itemComposerHint: 'Add or update one line at a time with a clean mobile-friendly layout.',
+      itemComposerHint: 'Add or update one line at a time with a clean user-friendly layout.',
       addFirstItem: 'Add your first line item',
       serviceLine: 'Service line',
       productLine: 'Product line',
