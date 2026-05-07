@@ -3,6 +3,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import Notice from '../Notice';
 import Pagination from '../Pagination';
 import { Dialog } from '../ui/Dialog.tsx';
+import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
@@ -39,6 +40,8 @@ export default function CategoriesSettingsPanel() {
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [deleteCategory, setDeleteCategory] = useState(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   const params = useMemo(
     () => ({
@@ -145,17 +148,24 @@ export default function CategoriesSettingsPanel() {
     }
   };
 
-  const handleDelete = async (category) => {
-    if (!window.confirm(t('categories.deleteConfirm', { name: category.name }))) {
-      return;
-    }
+  const closeDeleteDialog = () => {
+    if (deleteSubmitting) return;
+    setDeleteCategory(null);
+  };
 
+  const handleDelete = async () => {
+    if (!deleteCategory) return;
+
+    setDeleteSubmitting(true);
     try {
-      await api.deleteCategory(category.id);
+      await api.deleteCategory(deleteCategory.id);
       await loadCategories();
       setStatus({ type: 'success', message: t('categories.messages.deleted') });
     } catch (error) {
       setStatus({ type: 'error', message: resolveCategoryErrorMessage(error, t, 'delete') });
+    } finally {
+      setDeleteSubmitting(false);
+      setDeleteCategory(null);
     }
   };
 
@@ -206,7 +216,7 @@ export default function CategoriesSettingsPanel() {
                     <Pencil size={14} className="mr-1 inline" />
                     {t('common.edit')}
                   </button>
-                  <button className="btn-ghost" type="button" onClick={() => handleDelete(category)}>
+                  <button className="btn-ghost" type="button" onClick={() => setDeleteCategory(category)}>
                     <Trash2 size={14} className="mr-1 inline" />
                     {t('common.delete')}
                   </button>
@@ -244,7 +254,7 @@ export default function CategoriesSettingsPanel() {
                         <button className="btn-ghost" type="button" onClick={() => openEdit(category)}>
                           <Pencil size={14} />
                         </button>
-                        <button className="btn-ghost" type="button" onClick={() => handleDelete(category)}>
+                        <button className="btn-ghost" type="button" onClick={() => setDeleteCategory(category)}>
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -298,6 +308,14 @@ export default function CategoriesSettingsPanel() {
           </div>
         </form>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteCategory)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDelete}
+        description={deleteCategory ? t('categories.deleteConfirm', { name: deleteCategory.name }) : t('common.confirmDelete')}
+        confirming={deleteSubmitting}
+      />
     </section>
   );
 }

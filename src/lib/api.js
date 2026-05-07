@@ -678,6 +678,21 @@ export const api = {
         "banks",
       ]),
     ),
+  deleteSale: (id) =>
+    request(
+      `/api/sales/${id}`,
+      { method: "DELETE" },
+      mutationConfig([
+        detailTags("sale", id),
+        "sales",
+        "products",
+        "reports",
+        "dashboard",
+        "parties",
+        "party-statements",
+        "banks",
+      ]),
+    ),
 
   createService: (data) =>
     request(
@@ -703,6 +718,21 @@ export const api = {
     request(
       `/api/services/${id}`,
       { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("service", id),
+        "services",
+        "products",
+        "reports",
+        "dashboard",
+        "parties",
+        "party-statements",
+        "banks",
+      ]),
+    ),
+  deleteService: (id) =>
+    request(
+      `/api/services/${id}`,
+      { method: "DELETE" },
       mutationConfig([
         detailTags("service", id),
         "services",

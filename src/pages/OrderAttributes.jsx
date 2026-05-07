@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 
@@ -25,6 +26,8 @@ export default function OrderAttributes() {
   const [status, setStatus] = useState({ type: 'info', message: '' });
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [deleteAttribute, setDeleteAttribute] = useState(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   const loadAttributes = async () => {
     try {
@@ -69,14 +72,24 @@ export default function OrderAttributes() {
     setStatus({ type: 'info', message: '' });
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(t('common.confirmDelete') || 'Are you sure?')) return;
+  const closeDeleteDialog = () => {
+    if (deleteSubmitting) return;
+    setDeleteAttribute(null);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteAttribute) return;
+
+    setDeleteSubmitting(true);
     try {
-      await api.deleteOrderAttribute(id);
+      await api.deleteOrderAttribute(deleteAttribute.id);
       await loadAttributes();
       setStatus({ type: 'success', message: t('orderAttributes.messages.deleted') });
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
+    } finally {
+      setDeleteSubmitting(false);
+      setDeleteAttribute(null);
     }
   };
 
@@ -229,7 +242,7 @@ export default function OrderAttributes() {
                           {t('common.edit')}
                         </button>
                         <button
-                          onClick={() => handleDelete(attr.id)}
+                          onClick={() => setDeleteAttribute(attr)}
                           className="text-red-500 hover:text-red-600"
                         >
                           {t('common.remove')}
@@ -250,6 +263,14 @@ export default function OrderAttributes() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteAttribute)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDelete}
+        description={t('common.confirmDelete')}
+        confirming={deleteSubmitting}
+      />
     </div>
   );
 }

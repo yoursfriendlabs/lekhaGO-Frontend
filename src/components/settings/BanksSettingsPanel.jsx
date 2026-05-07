@@ -3,6 +3,7 @@ import { Pencil, Plus, Power, Trash2 } from 'lucide-react';
 import Notice from '../Notice';
 import Pagination from '../Pagination';
 import { Dialog } from '../ui/Dialog.tsx';
+import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { api } from '../../lib/api';
 import { useBankStore } from '../../stores/banks';
@@ -54,6 +55,8 @@ export default function BanksSettingsPanel() {
   const [status, setStatus] = useState({ type: 'info', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [deleteBank, setDeleteBank] = useState(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   const params = useMemo(
     () => ({
@@ -178,17 +181,24 @@ export default function BanksSettingsPanel() {
     }
   };
 
-  const handleDelete = async (bank) => {
-    if (!window.confirm(t('banks.deleteConfirm', { name: bank.name || t('banks.unnamed') }))) {
-      return;
-    }
+  const closeDeleteDialog = () => {
+    if (deleteSubmitting) return;
+    setDeleteBank(null);
+  };
 
+  const handleDelete = async () => {
+    if (!deleteBank) return;
+
+    setDeleteSubmitting(true);
     try {
-      await api.deleteBank(bank.id);
+      await api.deleteBank(deleteBank.id);
       await reloadBanks();
       setStatus({ type: 'success', message: t('banks.messages.deleted') });
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
+    } finally {
+      setDeleteSubmitting(false);
+      setDeleteBank(null);
     }
   };
 
@@ -286,7 +296,7 @@ export default function BanksSettingsPanel() {
                     <Power size={14} className="mr-1 inline" />
                     {bank.isActive ? t('banks.deactivate') : t('banks.activate')}
                   </button>
-                  <button className="btn-ghost" type="button" onClick={() => handleDelete(bank)}>
+                  <button className="btn-ghost" type="button" onClick={() => setDeleteBank(bank)}>
                     <Trash2 size={14} className="mr-1 inline" />
                     {t('common.delete')}
                   </button>
@@ -356,7 +366,7 @@ export default function BanksSettingsPanel() {
                         <button className="btn-ghost" type="button" onClick={() => handleToggleActive(bank)}>
                           <Power size={14} />
                         </button>
-                        <button className="btn-ghost" type="button" onClick={() => handleDelete(bank)}>
+                        <button className="btn-ghost" type="button" onClick={() => setDeleteBank(bank)}>
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -459,6 +469,14 @@ export default function BanksSettingsPanel() {
           </div>
         </form>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteBank)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDelete}
+        description={deleteBank ? t('banks.deleteConfirm', { name: deleteBank.name || t('banks.unnamed') }) : t('common.confirmDelete')}
+        confirming={deleteSubmitting}
+      />
     </section>
   );
 }

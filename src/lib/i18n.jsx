@@ -576,6 +576,7 @@ const dictionaries = {
       subtitle: 'Record outgoing sales and reduce stock.',
       newSale: 'New sale',
       editSale: 'Edit sale',
+      deleteConfirm: 'Delete order "{{name}}"?',
       customer: 'Customer',
       walkIn: 'Walk-in / none',
       invoiceNo: 'Invoice No',
@@ -613,12 +614,15 @@ const dictionaries = {
       messages: {
         created: 'Sale created',
         updated: 'Sale updated',
+        deleted: 'Order deleted',
+        deleteFailed: 'Unable to delete order.',
       },
     },
     services: {
       title: 'Sales & Service',
       subtitle: 'Create or update you sales and service.',
       workspaceLabel: 'Sales & service workspace',
+      deleteConfirm: 'Delete service order "{{name}}"?',
       totalOrders: 'Total orders',
       activeJobs: 'In progress',
       pendingCollection: 'Pending collection',
@@ -704,6 +708,8 @@ const dictionaries = {
       messages: {
         created: 'Service order created',
         statusUpdated: 'Status updated',
+        deleted: 'Service order deleted',
+        deleteFailed: 'Unable to delete service order.',
       },
     },
     orderAttributes: {
@@ -1665,6 +1671,7 @@ const dictionaries = {
       subtitle: 'बिक्री र स्टक कटौती रेकर्ड गर्नुहोस्।',
       newSale: 'नयाँ बिक्री',
       editSale: 'बिक्री सम्पादन',
+      deleteConfirm: '"{{name}}" अर्डर हटाउने?',
       customer: 'ग्राहक',
       walkIn: 'वाक-इन / छैन',
       invoiceNo: 'बिल नं.',
@@ -1702,12 +1709,15 @@ const dictionaries = {
       messages: {
         created: 'बिक्री सिर्जना भयो',
         updated: 'बिक्री अपडेट भयो',
+        deleted: 'अर्डर हटाइयो',
+        deleteFailed: 'अर्डर हटाउन सकिएन।',
       },
     },
     services: {
       title: 'बिक्री र सेवा',
       subtitle: 'सेवा काम र प्रोडक्ट चार्ज एउटै मोबाइल-अनुकूल कार्यक्षेत्रबाट चलाउनुहोस्।',
       workspaceLabel: 'बिक्री र सेवा कार्यक्षेत्र',
+      deleteConfirm: '"{{name}}" सेवा अर्डर हटाउने?',
       totalOrders: 'जम्मा अर्डर',
       activeJobs: 'प्रगतिमा',
       pendingCollection: 'उठाउन बाँकी',
@@ -1793,6 +1803,8 @@ const dictionaries = {
       messages: {
         created: 'सेवा अर्डर सिर्जना भयो',
         statusUpdated: 'स्थिति अपडेट भयो',
+        deleted: 'सेवा अर्डर हटाइयो',
+        deleteFailed: 'सेवा अर्डर हटाउन सकिएन।',
       },
     },
     orderAttributes: {
