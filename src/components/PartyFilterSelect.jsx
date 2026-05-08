@@ -13,17 +13,43 @@ export default function PartyFilterSelect({
   searchPlaceholder,
 }) {
   const { t } = useI18n();
+  const normalizedType = type && type !== 'both' ? type : undefined;
+
+  const mapPartyOptions = (items = []) => items
+    .map((party) => toPartyLookupOption(party))
+    .filter((option) => option?.value)
+    .sort((left, right) => left.label.localeCompare(right.label));
 
   const loadPartyOptions = async (search) => {
-    const primary = await api.lookupParties({ search, type, limit: 10 });
-    const primaryItems = Array.isArray(primary?.items) ? primary.items : [];
+    const normalizedSearch = String(search || '').trim();
 
-    if (primaryItems.length > 0 || type === 'both') {
-      return primaryItems.map((party) => toPartyLookupOption(party));
+    if (!normalizedSearch) {
+      const list = await api.listParties({
+        ...(normalizedType ? { type: normalizedType } : {}),
+      });
+      const listItems = Array.isArray(list?.items) ? list.items : [];
+
+      if (listItems.length > 0 || !normalizedType) {
+        return mapPartyOptions(listItems);
+      }
+
+      const fallbackList = await api.listParties();
+      return mapPartyOptions(Array.isArray(fallbackList?.items) ? fallbackList.items : []);
     }
 
-    const fallback = await api.lookupParties({ search, type: 'both', limit: 10 });
-    return (fallback?.items || []).map((party) => toPartyLookupOption(party));
+    const primary = await api.lookupParties({
+      search: normalizedSearch,
+      ...(normalizedType ? { type: normalizedType } : {}),
+      limit: 10,
+    });
+    const primaryItems = Array.isArray(primary?.items) ? primary.items : [];
+
+    if (primaryItems.length > 0 || !normalizedType) {
+      return mapPartyOptions(primaryItems);
+    }
+
+    const fallback = await api.lookupParties({ search: normalizedSearch, limit: 10 });
+    return mapPartyOptions(Array.isArray(fallback?.items) ? fallback.items : []);
   };
 
   const renderPartyOption = (option) => {
