@@ -5,6 +5,7 @@ import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
+import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 import dayjs, { todayISODate } from '../lib/datetime';
@@ -135,6 +136,8 @@ export default function Parties() {
   const [pendingServices, setPendingServices] = useState([]);
   const [pendingServicesLoading, setPendingServicesLoading] = useState(false);
   const [txPage, setTxPage] = useState(1);
+  const [deleteParty, setDeleteParty] = useState(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const submitPartyRequestRef = useRef(false);
 
   useEffect(() => {
@@ -344,17 +347,29 @@ export default function Parties() {
     setTxForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(t('parties.confirmDelete'))) return;
+  const closeDeleteDialog = () => {
+    if (deleteSubmitting) return;
+    setDeleteParty(null);
+  };
 
+  const handleDelete = async () => {
+    if (!deleteParty) return;
+
+    setDeleteSubmitting(true);
     try {
-      await api.deleteParty(id);
-      removeParty(id);
+      await api.deleteParty(deleteParty.id);
+      removeParty(deleteParty.id);
       invalidateParties();
       setStatus({ type: 'success', message: t('parties.messages.deleted') });
+      if (selectedId === deleteParty.id) {
+        setSelectedId(null);
+      }
       setPartyReloadKey((prev) => prev + 1);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
+    } finally {
+      setDeleteSubmitting(false);
+      setDeleteParty(null);
     }
   };
 
@@ -663,7 +678,7 @@ export default function Parties() {
                 </div>
                 <div className="flex gap-2">
 
-                  <button className="btn-ghost text-rose-600" type="button" onClick={() => handleDelete(selectedPartyView.id)}>
+                  <button className="btn-ghost text-rose-600" type="button" onClick={() => setDeleteParty(selectedPartyView)}>
                     {t('common.delete')}
                   </button>
                 </div>
@@ -935,6 +950,14 @@ export default function Parties() {
           </div>
         </form>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteParty)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDelete}
+        description={t('parties.confirmDelete')}
+        confirming={deleteSubmitting}
+      />
     </div>
   );
 }

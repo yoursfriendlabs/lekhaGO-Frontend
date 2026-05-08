@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Notice from './Notice';
 import { Dialog } from './ui/Dialog.tsx';
+import ConfirmDialog from './ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
 import { formatMaybeDate } from '../lib/datetime';
 
@@ -81,6 +82,7 @@ export default function StaffManagement({ businessId }) {
   const [createSaving, setCreateSaving] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [busyAction, setBusyAction] = useState('');
+  const [deleteMember, setDeleteMember] = useState(null);
 
   const loadStaff = async () => {
     if (!businessId) {
@@ -204,21 +206,26 @@ export default function StaffManagement({ businessId }) {
     }
   };
 
-  const handleRemove = async (member) => {
-    const label = member.user?.name || member.user?.email || 'this staff member';
-    if (!window.confirm(`Remove ${label}?`)) return;
+  const closeDeleteDialog = () => {
+    if (deleteMember && busyAction === `remove:${deleteMember.membershipId}`) return;
+    setDeleteMember(null);
+  };
 
-    setBusyAction(`remove:${member.membershipId}`);
+  const handleRemove = async () => {
+    if (!deleteMember) return;
+
+    setBusyAction(`remove:${deleteMember.membershipId}`);
     setNotice({ type: '', message: '' });
 
     try {
-      await api.deleteStaff(member.membershipId);
+      await api.deleteStaff(deleteMember.membershipId);
       await loadStaff();
       setNotice({ type: 'success', message: 'Staff member removed successfully.' });
     } catch (err) {
       setNotice({ type: 'error', message: err.message });
     } finally {
       setBusyAction('');
+      setDeleteMember(null);
     }
   };
 
@@ -326,7 +333,7 @@ export default function StaffManagement({ businessId }) {
                             <button
                               type="button"
                               className="text-rose-600 hover:text-rose-500 disabled:opacity-50"
-                              onClick={() => handleRemove(member)}
+                              onClick={() => setDeleteMember(member)}
                               disabled={toggleBusy || removeBusy}
                             >
                               {removeBusy ? 'Removing…' : 'Remove'}
@@ -454,6 +461,14 @@ export default function StaffManagement({ businessId }) {
           </div>
         </form>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteMember)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleRemove}
+        description={deleteMember ? `Remove ${deleteMember.user?.name || deleteMember.user?.email || 'this staff member'}?` : 'Remove this staff member?'}
+        confirming={Boolean(deleteMember) && busyAction === `remove:${deleteMember.membershipId}`}
+      />
     </>
   );
 }

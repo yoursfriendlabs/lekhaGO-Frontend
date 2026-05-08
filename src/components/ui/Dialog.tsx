@@ -84,6 +84,7 @@ export const Dialog = ({
         >
             <div
                 ref={dialogRef}
+                onClick={(e) => e.stopPropagation()}
                 className={`relative flex max-h-[100dvh] w-full flex-col bg-white shadow-2xl md:max-h-[90vh] ${sizeClasses[size]} rounded-t-3xl md:rounded-3xl`}
             >
                 {(title || showCloseButton) && (
@@ -91,6 +92,7 @@ export const Dialog = ({
                         {title && <h2 className="font-serif text-xl text-slate-900">{title}</h2>}
                         {showCloseButton && (
                             <button
+                                type="button"
                                 onClick={onClose}
                                 className="rounded-xl p-2 text-slate-400 hover:bg-slate-100"
                                 aria-label="Close dialog"

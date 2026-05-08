@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Clock, FileText, Pencil, Plus, ShoppingCart, Store, Users } from 'lucide-react';
+import { ArrowRight, Clock, FileText, Pencil, Plus, ShoppingCart, Store, Trash2, Users } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
+import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
@@ -91,6 +92,8 @@ export default function CafeOrders() {
   const [isPaid, setIsPaid] = useState(false);
   const [attributeSnapshot, setAttributeSnapshot] = useState({});
   const [activeDialogStep, setActiveDialogStep] = useState('details');
+  const [deletingOrderId, setDeletingOrderId] = useState('');
+  const [deleteOrder, setDeleteOrder] = useState(null);
   const [orderFields, setOrderFields] = useState({
     saleDate: todayISODate(),
     notes: '',
@@ -431,6 +434,29 @@ export default function CafeOrders() {
     }
   };
 
+  const closeDeleteDialog = () => {
+    if (deleteOrder && deletingOrderId === deleteOrder.id) return;
+    setDeleteOrder(null);
+  };
+
+  const handleDeleteOrder = async () => {
+    if (!deleteOrder) return;
+
+    setDeletingOrderId(deleteOrder.id);
+
+    try {
+      await api.deleteSale(deleteOrder.id);
+      invalidateProducts();
+      setStatus({ type: 'success', message: t('sales.messages.deleted') });
+      await loadOrders();
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || t('sales.messages.deleteFailed') });
+    } finally {
+      setDeletingOrderId('');
+      setDeleteOrder(null);
+    }
+  };
+
   const activeOrders = useMemo(() => orders.filter((order) => getCafeOrderAttributes(order).orderStatus !== 'completed'), [orders]);
   const tableMap = useMemo(() => buildCafeTableMap(activeOrders, cafeTables), [activeOrders, cafeTables]);
 
@@ -728,6 +754,15 @@ export default function CafeOrders() {
                             >
                               <FileText size={15} />
                             </Link>
+                            <button
+                              type="button"
+                              title={t('common.delete')}
+                              className="rounded-xl p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                              onClick={() => setDeleteOrder(order)}
+                              disabled={deletingOrderId === order.id}
+                            >
+                              <Trash2 size={15} />
+                            </button>
                           </div>
                         </div>
 
@@ -1175,6 +1210,14 @@ export default function CafeOrders() {
           )}
         </form>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteOrder)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteOrder}
+        description={deleteOrder ? t('sales.deleteConfirm', { name: deleteOrder.invoiceNo || deleteOrder.id.slice(0, 8) }) : t('common.confirmDelete')}
+        confirming={Boolean(deleteOrder) && deletingOrderId === deleteOrder.id}
+      />
     </div>
   );
 }
