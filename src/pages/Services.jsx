@@ -1374,7 +1374,7 @@ export default function Services() {
         <div className="p-5 md:p-8">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl">
-              <h1 className="mt-4 font-serif text-3xl text-slate-900 dark:text-white md:text-4xl">{servicesTitle}</h1>
+              <h1 className="mt-0 font-serif text-3xl text-slate-900 dark:text-white md:text-3xl">{servicesTitle}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 md:text-base">
                 {servicesSubtitle}
               </p>
