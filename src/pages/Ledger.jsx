@@ -50,6 +50,7 @@ function getLedgerTypeMeta(type, t) {
   const map = {
     sale: { label: t('ledger.sale'), className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
     purchase: { label: t('ledger.purchase'), className: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
+    expense: { label: t('purchases.expense'), className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300' },
     service: { label: t('ledger.service'), className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
     payment_in: { label: t('parties.paymentIn'), className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300' },
     payment_out: { label: t('parties.paymentOut'), className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
@@ -79,6 +80,7 @@ function buildLedgerLabel(row, t) {
 
   if (row.type === 'sale') return `${t('ledger.salesInvoice')}${reference}`;
   if (row.type === 'purchase') return `${t('ledger.purchaseInvoice')}${reference}`;
+  if (row.type === 'expense') return `${t('purchases.expense')}${reference}`;
   if (row.type === 'service') return `${t('parties.serviceOrder')}${reference}`;
   if (row.type === 'payment_in') return `${t('parties.paymentIn')}${reference}`;
   if (row.type === 'payment_out') return `${t('parties.paymentOut')}${reference}`;

@@ -56,6 +56,7 @@ function getStatementBadgeClass(type) {
     sale: 'bg-emerald-100 text-emerald-700',
     service: 'bg-sky-100 text-sky-700',
     purchase: 'bg-amber-100 text-amber-700',
+    expense: 'bg-rose-100 text-rose-700',
     payment_in: 'bg-teal-100 text-teal-700',
     payment_out: 'bg-indigo-100 text-indigo-700',
   };
@@ -73,6 +74,8 @@ function getStatementRowTitle(row, t) {
       return `${t('parties.serviceOrder')} ${reference}`;
     case 'purchase':
       return `${t('parties.purchaseBill')} ${reference}`;
+    case 'expense':
+      return `${t('purchases.expense')} ${reference}`;
     case 'payment_in':
       return `${t('parties.paymentIn')} ${reference}`;
     case 'payment_out':
@@ -272,6 +275,32 @@ export default function Parties() {
   );
   const selectedPartyWhatsAppLink = getWhatsAppLink(selectedPartyView?.phone, selectedPartyWhatsAppMessage);
   const totalTxPages = Math.max(1, Math.ceil(statementData.summary.totalRows / TX_PAGE_SIZE));
+  const partySummaryCards = [
+    {
+      key: 'sales',
+      label: t('ledger.sale'),
+      total: statementData.summary.totalSales,
+      due: statementData.summary.salesDue,
+    },
+    {
+      key: 'services',
+      label: t('ledger.service'),
+      total: statementData.summary.totalServices,
+      due: statementData.summary.servicesDue,
+    },
+    {
+      key: 'purchases',
+      label: t('ledger.purchase'),
+      total: statementData.summary.totalPurchases,
+      due: statementData.summary.purchasesDue,
+    },
+    {
+      key: 'expenses',
+      label: t('purchases.expense'),
+      total: statementData.summary.totalExpenses,
+      due: statementData.summary.expensesDue,
+    },
+  ];
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -682,6 +711,31 @@ export default function Parties() {
                     {t('common.delete')}
                   </button>
                 </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {partySummaryCards.map((card) => (
+                  <div
+                    key={card.key}
+                    className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3 dark:border-slate-800/60 dark:bg-slate-900/30"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      {card.label}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
+                      {t('common.total')}: {t('currency.formatted', {
+                        symbol: t('currency.symbol'),
+                        amount: card.total.toFixed(2),
+                      })}
+                    </p>
+                    <p className="mt-1 text-xs text-rose-500 dark:text-rose-300">
+                      {t('common.due')}: {t('currency.formatted', {
+                        symbol: t('currency.symbol'),
+                        amount: card.due.toFixed(2),
+                      })}
+                    </p>
+                  </div>
+                ))}
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2">

@@ -215,12 +215,12 @@ export default function Purchases() {
     const value = typeof eventOrValue === 'string' ? eventOrValue : eventOrValue.target.value;
     setStatus({ type: 'info', message: '' });
     setItemStatus({ type: 'info', message: '' });
-    if (value === 'expense') setSelectedSupplier(null);
     setHeader((prev) => ({
       ...prev,
       entryType: value,
-      partyId: value === 'expense' ? '' : prev.partyId,
-      partyName: value === 'expense' ? prev.partyName : '',
+      partyName: value === 'expense'
+        ? prev.partyName || selectedSupplier?.name || ''
+        : prev.partyName,
     }));
     setItems([]);
     setDeletedItemIds([]);
@@ -250,7 +250,7 @@ export default function Purchases() {
     setHeader((previous) => ({
       ...previous,
       partyId: party?.id || '',
-      partyName: party?.id ? '' : previous.partyName,
+      partyName: party?.name || previous.partyName,
     }));
   };
 
@@ -492,7 +492,7 @@ export default function Purchases() {
         id: purchase.partyId || purchase.supplierId || purchase.Party?.id || purchase.Supplier?.id,
         partyName: purchase.partyName || purchase.supplierName || purchase.Party?.name || purchase.Supplier?.name,
         phone: purchase.partyPhone || purchase.Party?.phone || purchase.Supplier?.phone,
-        currentAmount: purchase.Party?.currentAmount || purchase.Supplier?.currentAmount,
+        currentAmount: purchase.Party?.currentAmount ?? purchase.Supplier?.currentAmount ?? null,
         type: 'supplier',
       });
       const hydratedProducts = purchaseItems

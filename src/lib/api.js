@@ -6,9 +6,9 @@ import {
 } from "./storage";
 import { toQueryKey, toQueryString } from "./queryKey";
 
-export const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "https://api.yoursfriend.com";
-// export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+// export const API_BASE =
+  // import.meta.env.VITE_API_BASE_URL || "https://api.yoursfriend.com";
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 const INACTIVE_USER_REGEX = /user is inactive/i;
 const SESSION_EXPIRED_MESSAGE = "Your session expired. Please log in again.";
@@ -867,8 +867,11 @@ export const api = {
         "party-transactions",
         "parties",
         "party-statements",
+        "purchases",
+        "sales",
         "services",
         "reports",
+        "analytics",
         "banks",
       ]),
     ),
@@ -981,6 +984,12 @@ export const api = {
   getAnalyticsSummary: (params = {}) =>
     listRequest(
       "/api/analytics/summary",
+      params,
+      listCache(["analytics"], CACHE_TTL.short),
+    ),
+  getAnalyticsExpenses: (params = {}) =>
+    listRequest(
+      "/api/analytics/expenses",
       params,
       listCache(["analytics"], CACHE_TTL.short),
     ),

@@ -59,14 +59,17 @@ export function normalizePartyStatementResponse(payload) {
       totalSales: toAmount(payload?.summary?.totalSales),
       totalServices: toAmount(payload?.summary?.totalServices),
       totalPurchases: toAmount(payload?.summary?.totalPurchases),
+      totalExpenses: toAmount(payload?.summary?.totalExpenses),
       salesDue: toAmount(payload?.summary?.salesDue),
       servicesDue: toAmount(payload?.summary?.servicesDue),
       purchasesDue: toAmount(payload?.summary?.purchasesDue),
+      expensesDue: toAmount(payload?.summary?.totalExpensesDue ?? payload?.summary?.expensesDue),
       totalPaymentIn: toAmount(payload?.summary?.totalPaymentIn),
       totalPaymentOut: toAmount(payload?.summary?.totalPaymentOut),
       currentAmount: toAmount(payload?.summary?.currentAmount),
     },
     rows: items,
+    expenses: Array.isArray(payload?.expenses) ? payload.expenses : [],
     pagination: {
       limit: Number(payload?.limit ?? payload?.pagination?.limit ?? 100),
       offset: Number(payload?.offset ?? payload?.pagination?.offset ?? 0),
@@ -108,6 +111,8 @@ export function getStatementTypeLabel(type, t) {
       return t('ledger.service');
     case 'purchase':
       return t('ledger.purchase');
+    case 'expense':
+      return t('purchases.expense');
     case 'payment_in':
       return t('parties.paymentIn');
     case 'payment_out':

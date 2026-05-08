@@ -458,7 +458,13 @@ export default function Services() {
     : t('services.newOrder');
 
   const { upsert: upsertParty } = usePartyStore();
-  const { services: serviceList, loading: listLoading, fetch: fetchServices, invalidate: invalidateServices } = useServiceStore();
+  const {
+    services: serviceList,
+    loading: listLoading,
+    fetch: fetchServices,
+    invalidate: invalidateServices,
+    patch: patchService,
+  } = useServiceStore();
   const [suggestedOrderNo, setSuggestedOrderNo] = useState('');
   const [productDirectory, setProductDirectory] = useState({});
 
@@ -1328,8 +1334,26 @@ export default function Services() {
           ),
         });
       }
+      const refreshedOrder = normalizeServiceOrder(await api.getService(payDialog.id));
+      patchService(payDialog.id, refreshedOrder);
+      if (invoiceOrder?.id === refreshedOrder.id) {
+        setInvoiceOrder(refreshedOrder);
+      }
+      const refreshedParty = normalizeLookupParty({
+        partyId: refreshedOrder.partyId || refreshedOrder.Party?.id || refreshedOrder.Customer?.id || '',
+        partyName: refreshedOrder.partyName || refreshedOrder.Party?.name || refreshedOrder.Customer?.name || '',
+        partyPhone: refreshedOrder.partyPhone || refreshedOrder.Party?.phone || refreshedOrder.Customer?.phone || '',
+        currentAmount: refreshedOrder.Party?.currentAmount ?? refreshedOrder.Customer?.currentAmount ?? null,
+        type: 'customer',
+      });
+      if (refreshedParty.id) {
+        upsertParty(refreshedParty);
+        if (selectedParty?.id === refreshedParty.id) {
+          setSelectedParty(refreshedParty);
+        }
+      }
       setPayDialog(null);
-      loadServices();
+      await loadServices();
     } catch (err) {
       setPayError(err.message);
     }
