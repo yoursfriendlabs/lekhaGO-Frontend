@@ -174,7 +174,26 @@ export default function Settings() {
   return (
     <div className="min-w-0 max-w-6xl space-y-6 overflow-x-hidden">
       <PageHeader title={t('settingsPage.title')} subtitle={activeTabMeta?.description || t('settingsPage.subtitle')} />
-
+      <div>
+        <div className="grid gap-3 grid-cols-5 ">
+          <button className="rounded-[22px] border border-amber-200 bg-white p-5 text-left ">
+            <div>
+              <p className="text-xl font-bold ">Company Setting</p>
+            </div>
+          </button>
+          <button className="rounded-[22px] border border-amber-200 bg-white p-5 text-left ">
+            <div>
+              <p className="text-xl font-bold ">Profile Setting</p>
+            </div>
+          </button>
+          <button className="rounded-[22px] border border-amber-200 bg-white p-5 text-left ">
+            <div>
+              <p className="text-xl font-bold ">Plans</p>
+            </div>
+          </button>
+        </div>
+        
+      </div>
       <div className="card space-y-4">
         <div className="space-y-1">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
@@ -193,11 +212,10 @@ export default function Settings() {
                   key={tab.key}
                   type="button"
                   onClick={() => handleTabChange(tab.key)}
-                  className={`min-w-0 rounded-2xl px-3 py-3 text-center text-sm font-semibold leading-tight transition lg:w-auto lg:px-4 lg:py-2.5 lg:text-left ${
-                    isActive
+                  className={`min-w-0 rounded-2xl px-3 py-3 text-center text-sm font-semibold leading-tight transition lg:w-auto lg:px-4 lg:py-2.5 lg:text-left ${isActive
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
-                  }`}
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -209,7 +227,7 @@ export default function Settings() {
 
       {activeTab === GENERAL_SETTINGS_TAB ? (
         <>
-          
+
 
           {error ? <Notice title={error} tone="error" /> : null}
 
