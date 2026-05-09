@@ -480,16 +480,16 @@ export default function Parties() {
 
       await api.createPartyTransaction(payload);
 
-      if (txForm.serviceId) {
-        const selectedService = pendingServices.find((service) => service.id === txForm.serviceId);
-        if (selectedService) {
-          const nextPaidAmount = Math.min(
-            toAmount(selectedService.totalAmount),
-            toAmount(selectedService.paidAmount) + amount
-          );
-          await api.updateService(txForm.serviceId, { receivedTotal: nextPaidAmount });
-        }
-      }
+      // if (txForm.serviceId) {
+      //   const selectedService = pendingServices.find((service) => service.id === txForm.serviceId);
+      //   if (selectedService) {
+      //     const nextPaidAmount = Math.min(
+      //       toAmount(selectedService.totalAmount),
+      //       toAmount(selectedService.paidAmount) + amount
+      //     );
+      //     await api.updateService(txForm.serviceId, { receivedTotal: nextPaidAmount });
+      //   }
+      // }
 
       invalidateParties();
       setPartyReloadKey((prev) => prev + 1);
@@ -966,21 +966,21 @@ export default function Parties() {
             <label className="label">{t('parties.transactionDate')}</label>
             <input className="input mt-1" name="txDate" type="date" value={txForm.txDate} onChange={handleTxChange} />
           </div>
-          {pendingServicesLoading ? (
-            <p className="text-xs text-slate-500">{t('common.loading')}</p>
-          ) : pendingServices.length > 0 ? (
-            <div>
-              <label className="label">Apply to service order <span className="text-slate-400">(optional)</span></label>
-              <select className="input mt-1" name="serviceId" value={txForm.serviceId} onChange={handleTxChange}>
-                <option value="">— none —</option>
-                {pendingServices.map((service) => (
-                  <option key={service.id} value={service.id}>
-                    {(service.referenceNo || service.id.slice(0, 8))} — {t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(service.dueAmount).toFixed(2) })} due
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
+          {/*{pendingServicesLoading ? (*/}
+          {/*  <p className="text-xs text-slate-500">{t('common.loading')}</p>*/}
+          {/*) : pendingServices.length > 0 ? (*/}
+          {/*  <div>*/}
+          {/*    <label className="label">Apply to service order <span className="text-slate-400">(optional)</span></label>*/}
+          {/*    <select className="input mt-1" name="serviceId" value={txForm.serviceId} onChange={handleTxChange}>*/}
+          {/*      <option value="">— none —</option>*/}
+          {/*      {pendingServices.map((service) => (*/}
+          {/*        <option key={service.id} value={service.id}>*/}
+          {/*          {(service.referenceNo || service.id.slice(0, 8))} — {t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(service.dueAmount).toFixed(2) })} due*/}
+          {/*        </option>*/}
+          {/*      ))}*/}
+          {/*    </select>*/}
+          {/*  </div>*/}
+          {/*) : null}*/}
           <PaymentMethodFields
             value={{
               paymentMethod: txForm.paymentMethod,
