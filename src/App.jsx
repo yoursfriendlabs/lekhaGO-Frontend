@@ -35,6 +35,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const ActivateAccount = lazy(() => import('./pages/ActivateAccount'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Invoice = lazy(() => import('./pages/Invoice'));
+const Plan = lazy(() => import('./pages/Plan'));
 
 const OWNER_AND_STAFF_ROLES = ['owner', 'staff'];
 const OWNER_ONLY_ROLES = ['owner'];
@@ -230,6 +231,7 @@ export default function App() {
               <ScopedRouteBoundary>
                 <Routes>
                   <Route path="/" element={<IndexRoute />} />
+                  <Route path="/plan" element={<Plan />} />
                   <Route
                     path="/login"
                     element={(
