@@ -418,6 +418,18 @@ export const api = {
     }),
   login: (data) =>
     request("/api/auth/login", { method: "POST", body: JSON.stringify(data) }),
+  getCurrentUser: () =>
+    request(
+      "/api/auth/me",
+      {},
+      listCache(["auth-me", "subscription", "business-profile"], CACHE_TTL.short),
+    ),
+  updateCurrentUser: (data) =>
+    request(
+      "/api/auth/me",
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig(["auth-me", "subscription", "business-profile", "business-settings"]),
+    ),
   requestEmailOtp: (data) =>
     request("/api/auth/request-email-otp", {
       method: "POST",
@@ -448,6 +460,25 @@ export const api = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  getSubscription: () =>
+    request(
+      "/api/subscription",
+      {},
+      listCache(["subscription"], CACHE_TTL.short),
+    ),
+  getSubscriptionPaymentSetup: () =>
+    request(
+      "/api/subscription/payment-setup",
+      {},
+      listCache(["subscription", "subscription-payment-setup"], CACHE_TTL.short),
+    ),
+  updateSubscription: (data) =>
+    request(
+      "/api/subscription",
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig(["auth-me", "subscription", "subscription-payment-setup"]),
+    ),
 
   listStaff: () =>
     request("/api/staff", {}, listCache(["staff"], CACHE_TTL.short)),

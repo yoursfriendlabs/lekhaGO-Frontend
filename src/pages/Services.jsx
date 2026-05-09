@@ -1675,7 +1675,9 @@ export default function Services() {
                           <div>{order.Party?.name || order.partyName || <span className="text-slate-400">—</span>}</div>
                           <div className="text-xs text-slate-400">Created by {getCreatorDisplayName(order)}</div>
                         </td>
-                        <td className="py-3 pr-4"><DeliveryBadge date={order.deliveryDate} /></td>
+                        <td className="py-3 pr-4">
+                          { order.status !== 'closed'  ? <DeliveryBadge date={order.deliveryDate} /> : 'Delivered'}
+                        </td>
                         <td className="py-3 pr-4">
                           <button type="button" className="transition hover:opacity-75" onClick={() => openStatusDialog(order)}>
                             <StatusBadge status={order.status} />

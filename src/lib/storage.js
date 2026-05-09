@@ -1,7 +1,10 @@
 const TOKEN_KEY = 'mms_token';
 const USER_KEY = 'mms_user';
 const BUSINESS_KEY = 'mms_business_id';
+const BUSINESS_DATA_KEY = 'mms_business';
+const BUSINESS_PROFILE_KEY = 'mms_business_profile';
 const ROLE_KEY = 'mms_role';
+const SUBSCRIPTION_KEY = 'mms_subscription';
 const SESSION_NOTICE_KEY = 'mms_session_notice';
 const PENDING_EMAIL_VERIFICATION_KEY = 'mms_pending_email_verification';
 const PASSWORD_RESET_FLOW_KEY = 'mms_password_reset_flow';
@@ -24,8 +27,12 @@ export function setToken(token) {
 }
 
 export function getUser() {
-  const raw = localStorage.getItem(USER_KEY);
-  return raw ? JSON.parse(raw) : null;
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function setUser(user) {
@@ -42,6 +49,34 @@ export function setBusinessId(id) {
   else localStorage.removeItem(BUSINESS_KEY);
 }
 
+export function getBusiness() {
+  try {
+    const raw = localStorage.getItem(BUSINESS_DATA_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setBusiness(business) {
+  if (business) localStorage.setItem(BUSINESS_DATA_KEY, JSON.stringify(business));
+  else localStorage.removeItem(BUSINESS_DATA_KEY);
+}
+
+export function getBusinessProfile() {
+  try {
+    const raw = localStorage.getItem(BUSINESS_PROFILE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setBusinessProfile(profile) {
+  if (profile) localStorage.setItem(BUSINESS_PROFILE_KEY, JSON.stringify(profile));
+  else localStorage.removeItem(BUSINESS_PROFILE_KEY);
+}
+
 export function getRole() {
   return localStorage.getItem(ROLE_KEY) || getUser()?.role || '';
 }
@@ -49,6 +84,20 @@ export function getRole() {
 export function setRole(role) {
   if (role) localStorage.setItem(ROLE_KEY, role);
   else localStorage.removeItem(ROLE_KEY);
+}
+
+export function getSubscription() {
+  try {
+    const raw = localStorage.getItem(SUBSCRIPTION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setSubscription(subscription) {
+  if (subscription) localStorage.setItem(SUBSCRIPTION_KEY, JSON.stringify(subscription));
+  else localStorage.removeItem(SUBSCRIPTION_KEY);
 }
 
 export function setSessionNotice(message) {
@@ -126,6 +175,9 @@ export function clearSession() {
   setToken('');
   setUser(null);
   setBusinessId('');
+  setBusiness(null);
+  setBusinessProfile(null);
   setRole('');
+  setSubscription(null);
   clearPendingEmailVerification();
 }

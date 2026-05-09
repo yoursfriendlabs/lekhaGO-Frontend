@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { getNavigationForBusinessType } from '../lib/businessTypeConfig.js';
 import BrandLogo from './BrandLogo.jsx';
+import UpgradeSubscriptionCta from './subscription/UpgradeSubscriptionCta.jsx';
 
 const NAV_ROLE_MAP = {
   dashboard: ['owner', 'staff'],
@@ -21,7 +22,7 @@ const NAV_ROLE_MAP = {
 
 export default function Sidebar() {
   const { t } = useI18n();
-  const { role } = useAuth();
+  const { role, hasFeatureAccess } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const navigation = getNavigationForBusinessType(
     Array.isArray(businessProfile?.navigation) && businessProfile.navigation.length
@@ -41,7 +42,8 @@ export default function Sidebar() {
 
   const visibleNavItems = navigation
     .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
-    .concat(role === 'owner' ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }] : []);
+    .filter((item) => hasFeatureAccess(item.key))
+    .concat(role === 'owner' && hasFeatureAccess('admin') ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }] : []);
 
   return (
     <aside className="hidden h-full w-64 flex-col gap-6 border-r border-slate-200/70 bg-white/80 p-6 dark:border-slate-800/70 dark:bg-slate-950/70 md:fixed md:inset-y-0 md:left-0 md:flex md:overflow-y-auto">
@@ -66,8 +68,11 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="mt-auto rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-xs text-slate-500 dark:border-slate-800/60 dark:bg-slate-900/60 dark:text-slate-400">
-        {t('notices.businessRequiredDesc')}
+      <div className="mt-auto space-y-3">
+        <UpgradeSubscriptionCta variant="sidebar" />
+        <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-xs text-slate-500 dark:border-slate-800/60 dark:bg-slate-900/60 dark:text-slate-400">
+          {t('notices.businessRequiredDesc')}
+        </div>
       </div>
     </aside>
   );

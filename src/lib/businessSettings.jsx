@@ -51,8 +51,12 @@ function writeProfileCache(businessId, data) {
 
 const BusinessSettingsContext = createContext(null);
 
+function getBusinessDisplayName(business) {
+  return business?.name || business?.businessName || '';
+}
+
 export function BusinessSettingsProvider({ children }) {
-  const { businessId } = useAuth();
+  const { businessId, business, businessProfile: authBusinessProfile } = useAuth();
   // Start from cache so invoices render instantly on first paint
   const [settings, setSettings] = useState(() => readCache(getBusinessId()));
   const [businessProfile, setBusinessProfile] = useState(() => readProfileCache(getBusinessId()));
@@ -60,15 +64,39 @@ export function BusinessSettingsProvider({ children }) {
 
   const applySettings = useCallback((data, businessId) => {
     const cleaned = data || {};
-    writeCache(businessId || getBusinessId(), cleaned);
-    setSettings(cleaned);
-  }, []);
+    const businessName = getBusinessDisplayName(business);
+    const mergedSettings = !cleaned.companyName && businessName
+      ? { ...cleaned, companyName: businessName }
+      : cleaned;
+
+    writeCache(businessId || getBusinessId(), mergedSettings);
+    setSettings(mergedSettings);
+  }, [business]);
+
+  const mergeSettings = useCallback((updater, targetBusinessId) => {
+    const bid = targetBusinessId || businessId || getBusinessId();
+    setSettings((currentSettings) => {
+      const nextSettings = typeof updater === 'function'
+        ? updater(currentSettings || {})
+        : { ...(currentSettings || {}), ...(updater || {}) };
+
+      writeCache(bid, nextSettings);
+      return nextSettings;
+    });
+  }, [businessId]);
 
   const applyBusinessProfile = useCallback((data, businessId) => {
     const normalized = normalizeBusinessProfile(data || null);
     writeProfileCache(businessId || getBusinessId(), normalized);
     setBusinessProfile(normalized);
   }, []);
+
+  const syncBusinessName = useCallback((targetBusinessId, nextBusiness = business) => {
+    const businessName = getBusinessDisplayName(nextBusiness);
+    if (!businessName) return;
+
+    mergeSettings((currentSettings) => ({ ...currentSettings, companyName: businessName }), targetBusinessId);
+  }, [business, mergeSettings]);
 
   // Fetch from API and refresh cache
   const fetchSettings = useCallback(async (businessId) => {
@@ -94,10 +122,21 @@ export function BusinessSettingsProvider({ children }) {
 
   useEffect(() => {
     const bid = businessId || getBusinessId();
-    setSettings(readCache(bid));
-    setBusinessProfile(readProfileCache(bid));
+    applySettings(readCache(bid), bid);
+    setBusinessProfile(readProfileCache(bid) || authBusinessProfile || null);
     fetchSettings(bid);
-  }, [businessId, fetchSettings]);
+  }, [applySettings, authBusinessProfile, businessId, fetchSettings]);
+
+  useEffect(() => {
+    if (!authBusinessProfile) return;
+    const bid = businessId || getBusinessId();
+    applyBusinessProfile(authBusinessProfile, bid);
+  }, [applyBusinessProfile, authBusinessProfile, businessId]);
+
+  useEffect(() => {
+    if (!business) return;
+    syncBusinessName(businessId || getBusinessId(), business);
+  }, [business, businessId, syncBusinessName]);
 
   // Save to API, then update cache + state
   const saveSettings = useCallback(async (data, businessId) => {
@@ -111,13 +150,13 @@ export function BusinessSettingsProvider({ children }) {
   // Call this when businessId changes (user switches business in Topbar)
   const reloadSettings = useCallback((nextBusinessId) => {
     const bid = nextBusinessId || businessId || getBusinessId();
-    setSettings(readCache(bid));
-    setBusinessProfile(readProfileCache(bid));
+    applySettings(readCache(bid), bid);
+    setBusinessProfile(readProfileCache(bid) || authBusinessProfile || null);
     fetchSettings(bid);
-  }, [businessId, fetchSettings]);
+  }, [applySettings, authBusinessProfile, businessId, fetchSettings]);
 
   return (
-    <BusinessSettingsContext.Provider value={{ settings, businessProfile, loading, saveSettings, reloadSettings }}>
+    <BusinessSettingsContext.Provider value={{ settings, businessProfile, loading, saveSettings, reloadSettings, mergeSettings, syncBusinessName }}>
       {children}
     </BusinessSettingsContext.Provider>
   );

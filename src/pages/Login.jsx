@@ -65,7 +65,15 @@ export default function Login() {
       const data = await api.login({ email: form.email, password: form.password });
       const resolvedBusinessId = form.businessId || data.business?.id || '';
       const resolvedRole = data.role || data.user?.role || '';
-      setSession(data.token, data.user, resolvedBusinessId, resolvedRole);
+      setSession(
+        data.token,
+        data.user,
+        resolvedBusinessId,
+        resolvedRole,
+        data.subscription || null,
+        data.business || null,
+        data.businessProfile || null
+      );
       if (hasUnverifiedEmail(data.user)) {
         setPendingEmailVerification({
           email: data.user?.email || form.email,
