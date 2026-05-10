@@ -213,40 +213,52 @@ export default function Settings() {
     <div className="min-w-0 max-w-6xl space-y-6 overflow-x-hidden">
       <PageHeader title={t('settingsPage.title')} subtitle={activeTabMeta?.description || t('settingsPage.subtitle')} />
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 grid-cols-5">
         <button
           type="button"
           onClick={handleCompanySettingClick}
           aria-pressed={!isProfileSection}
-          className={`rounded-[22px] border p-5 text-left shadow-sm transition ${
+          className={`group flex w-full flex-col items-start gap-1.5 px-1 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
             !isProfileSection
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-900 shadow-emerald-100/60 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-100'
-              : 'border-amber-200 bg-white text-slate-900 hover:border-amber-300 hover:bg-amber-50 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100'
+              ? 'text-primary-700 dark:text-primary-300'
+              : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
           }`}
         >
-          <div>
-            <p className="text-xl font-bold">Company Setting</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Company details and business configuration.
-            </p>
-          </div>
+          <span
+            className={`inline-block border-b-2 pb-1 text-xl font-bold leading-tight transition-colors ${
+              !isProfileSection
+                ? 'border-primary text-primary-700 dark:border-primary-400 dark:text-primary-300'
+                : 'border-transparent text-slate-700 group-hover:border-slate-300 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:border-slate-600 dark:group-hover:text-white'
+            }`}
+          >
+            Company Setting
+          </span>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Company details and business configuration.
+          </p>
         </button>
         <button
           type="button"
           onClick={handleProfileSettingClick}
           aria-pressed={isProfileSection}
-          className={`rounded-[22px] border p-5 text-left shadow-sm transition ${
+          className={`group flex w-full flex-col items-start gap-1.5 px-1 py-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
             isProfileSection
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-900 shadow-emerald-100/60 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-100'
-              : 'border-amber-200 bg-white text-slate-900 hover:border-amber-300 hover:bg-amber-50 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100'
+              ? 'text-primary-700 dark:text-primary-300'
+              : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
           }`}
         >
-          <div>
-            <p className="text-xl font-bold">Profile Setting</p>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Security, profile details, and subscription access.
-            </p>
-          </div>
+          <span
+            className={`inline-block border-b-2 pb-1 text-xl font-bold leading-tight transition-colors ${
+              isProfileSection
+                ? 'border-primary text-primary-700 dark:border-primary-400 dark:text-primary-300'
+                : 'border-transparent text-slate-700 group-hover:border-slate-300 group-hover:text-slate-900 dark:text-slate-300 dark:group-hover:border-slate-600 dark:group-hover:text-white'
+            }`}
+          >
+            Profile Setting
+          </span>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Security, profile details, and subscription access.
+          </p>
         </button>
       </div>
 
