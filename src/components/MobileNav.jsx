@@ -31,7 +31,7 @@ const ICON_MAP = {
 
 export default function MobileNav() {
   const { t } = useI18n();
-  const { role } = useAuth();
+  const { role, hasFeatureAccess } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const navigation = getNavigationForBusinessType(
     Array.isArray(businessProfile?.navigation) && businessProfile.navigation.length
@@ -48,7 +48,8 @@ export default function MobileNav() {
   );
   const visibleNavItems = navigation
     .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
-    .concat(role === 'owner' ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }] : []);
+    .filter((item) => hasFeatureAccess(item.key))
+    .concat(role === 'owner' && hasFeatureAccess('admin') ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }] : []);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200/70 bg-white/95 px-2 py-2 shadow-lg backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/90 md:hidden">

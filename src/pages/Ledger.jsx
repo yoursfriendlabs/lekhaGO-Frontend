@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download, Printer } from 'lucide-react';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  CalendarRange,
+  Download,
+  FilterX,
+  Printer,
+  ScrollText,
+  Users,
+  WalletCards,
+} from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
@@ -40,6 +50,7 @@ function getLedgerTypeMeta(type, t) {
   const map = {
     sale: { label: t('ledger.sale'), className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
     purchase: { label: t('ledger.purchase'), className: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
+    expense: { label: t('purchases.expense'), className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300' },
     service: { label: t('ledger.service'), className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
     payment_in: { label: t('parties.paymentIn'), className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300' },
     payment_out: { label: t('parties.paymentOut'), className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
@@ -69,6 +80,7 @@ function buildLedgerLabel(row, t) {
 
   if (row.type === 'sale') return `${t('ledger.salesInvoice')}${reference}`;
   if (row.type === 'purchase') return `${t('ledger.purchaseInvoice')}${reference}`;
+  if (row.type === 'expense') return `${t('purchases.expense')}${reference}`;
   if (row.type === 'service') return `${t('parties.serviceOrder')}${reference}`;
   if (row.type === 'payment_in') return `${t('parties.paymentIn')}${reference}`;
   if (row.type === 'payment_out') return `${t('parties.paymentOut')}${reference}`;
@@ -86,6 +98,12 @@ function normalizeLedgerRow(row, t) {
     runningBalance: Number(row.runningBalance || 0),
     label: buildLedgerLabel(row, t),
   };
+}
+
+function toResolvedPartyOption(raw) {
+  const party = normalizeLookupParty(raw);
+  if (!party.id) return null;
+  return toPartyLookupOption(party);
 }
 
 export default function Ledger() {
@@ -108,14 +126,49 @@ export default function Ledger() {
 
   useEffect(() => {
     setSelectedPartyId(initialPartyId);
-    if (!initialPartyId) {
-      setSelectedPartyOption(null);
-    }
+    setSelectedPartyOption((current) => (
+      initialPartyId && String(current?.value || '') === String(initialPartyId)
+        ? current
+        : null
+    ));
   }, [initialPartyId]);
 
   useEffect(() => {
     setPage(1);
   }, [period, selectedPartyId]);
+
+  useEffect(() => {
+    if (!selectedPartyId) {
+      setSelectedPartyOption(null);
+      return undefined;
+    }
+
+    if (String(selectedPartyOption?.value || '') === String(selectedPartyId)) {
+      return undefined;
+    }
+
+    const matchedParty = ledger.items.find((row) => String(row.partyId || '') === String(selectedPartyId));
+    const matchedOption = matchedParty ? toResolvedPartyOption({ ...matchedParty, id: selectedPartyId }) : null;
+
+    if (matchedOption) {
+      setSelectedPartyOption(matchedOption);
+      return undefined;
+    }
+
+    let isActive = true;
+
+    api.getParty(selectedPartyId)
+      .then((party) => {
+        if (!isActive) return;
+        const option = toResolvedPartyOption(party);
+        if (option) setSelectedPartyOption(option);
+      })
+      .catch(() => {});
+
+    return () => {
+      isActive = false;
+    };
+  }, [ledger.items, selectedPartyId, selectedPartyOption]);
 
   useEffect(() => {
     const params = {
@@ -139,18 +192,6 @@ export default function Ledger() {
           limit: Number(data?.limit || pageSize),
           offset: Number(data?.offset || 0),
         });
-
-        const matchedPartyRow = (Array.isArray(data?.items) ? data.items : []).find(
-          (row) => String(row.partyId || '') === String(selectedPartyId)
-        ) || data?.items?.[0];
-
-        if (selectedPartyId && !selectedPartyOption && matchedPartyRow?.partyName) {
-          const party = normalizeLookupParty({
-            id: matchedPartyRow.partyId || selectedPartyId,
-            partyName: matchedPartyRow.partyName,
-          });
-          setSelectedPartyOption(toPartyLookupOption(party));
-        }
       })
       .catch((error) => {
         if (!isActive) return;
@@ -164,7 +205,7 @@ export default function Ledger() {
     return () => {
       isActive = false;
     };
-  }, [from, page, pageSize, selectedPartyId, selectedPartyOption, to]);
+  }, [from, page, pageSize, selectedPartyId, to]);
 
   const statementRows = useMemo(
     () => ledger.items.map((row) => normalizeLedgerRow(row, t)),
@@ -198,6 +239,46 @@ export default function Ledger() {
   }, [biz?.logoUrl]);
   const balanceToneClass = getBalanceToneClass(summary.currentBalance);
   const balanceLabel = getBalanceLabel(summary.currentBalance, t);
+  const currentPeriodLabel = period === 'month'
+    ? t('ledger.thisMonth')
+    : period === 'year'
+      ? t('ledger.thisYear')
+      : t('ledger.allTime');
+  const hasActivePartyFilter = Boolean(selectedPartyId);
+  const summaryCards = [
+    {
+      key: 'balance',
+      label: balanceLabel,
+      value: t('currency.formatted', { symbol: t('currency.symbol'), amount: Math.abs(summary.currentBalance).toFixed(2) }),
+      icon: WalletCards,
+      valueClassName: balanceToneClass,
+      accentClassName: 'bg-white/80 text-primary-700 ring-1 ring-primary-100',
+    },
+    {
+      key: 'debit',
+      label: t('ledger.totalDebit'),
+      value: t('currency.formatted', { symbol: t('currency.symbol'), amount: summary.totalDebit.toFixed(2) }),
+      icon: ArrowDownLeft,
+      valueClassName: 'text-rose-700 dark:text-rose-300',
+      accentClassName: 'bg-rose-50 text-rose-700 ring-1 ring-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/40',
+    },
+    {
+      key: 'credit',
+      label: t('ledger.totalCredit'),
+      value: t('currency.formatted', { symbol: t('currency.symbol'), amount: summary.totalCredit.toFixed(2) }),
+      icon: ArrowUpRight,
+      valueClassName: 'text-emerald-700 dark:text-emerald-300',
+      accentClassName: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/40',
+    },
+    {
+      key: 'entries',
+      label: t('ledger.totalEntries'),
+      value: String(summary.entries),
+      icon: ScrollText,
+      valueClassName: 'text-slate-900 dark:text-slate-100',
+      accentClassName: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700',
+    },
+  ];
 
   const handlePartyFilterChange = (option) => {
     const partyId = option?.value || '';
@@ -418,65 +499,131 @@ export default function Ledger() {
         </div>
 
         <div className="space-y-6 print:hidden">
-          <div className="card space-y-5">
-            <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_180px]">
-              <div>
-                <label className="label">{t('ledger.party')}</label>
-                <PartyFilterSelect
-                  className="mt-1"
-                  value={selectedPartyId}
-                  selectedOption={selectedPartyOption}
-                  onChange={handlePartyFilterChange}
-                  placeholder={t('ledger.allParties')}
-                  searchPlaceholder={t('ledger.searchPlaceholder')}
-                />
-                {selectedPartyId ? (
-                  <button type="button" className="mt-2 text-xs font-medium text-primary-700 hover:text-primary-600" onClick={() => handlePartyFilterChange(null)}>
-                    {t('common.clear')}
-                  </button>
-                ) : null}
+          <div className="overflow-hidden rounded-[28px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,_rgba(155,104,53,0.18),_transparent_38%),linear-gradient(135deg,_rgba(255,255,255,0.98),_rgba(248,244,237,0.98))] shadow-sm dark:border-primary-900/40 dark:bg-[radial-gradient(circle_at_top_left,_rgba(155,104,53,0.16),_transparent_34%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(30,41,59,0.96))]">
+            <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)] lg:p-6">
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-primary-700 shadow-sm ring-1 ring-primary-100 dark:bg-slate-900/85 dark:text-primary-300 dark:ring-primary-900/40">
+                  <ScrollText size={14} />
+                  {t('ledger.statementTitle')}
+                </div>
+
+                <div className="space-y-2">
+                  <h2 className="font-serif text-2xl font-semibold text-slate-900 dark:text-slate-50 sm:text-[2rem]">
+                    {selectedPartyLabel}
+                  </h2>
+                  <p className="max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    {timeSpanLabel}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900/70 dark:text-slate-200 dark:ring-slate-700/80">
+                    <Users size={13} className="text-primary-600 dark:text-primary-400" />
+                    {hasActivePartyFilter ? `${t('ledger.party')}: ${selectedPartyLabel}` : t('ledger.allParties')}
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900/70 dark:text-slate-200 dark:ring-slate-700/80">
+                    <CalendarRange size={13} className="text-primary-600 dark:text-primary-400" />
+                    {currentPeriodLabel}
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900/70 dark:text-slate-200 dark:ring-slate-700/80">
+                    <ScrollText size={13} className="text-primary-600 dark:text-primary-400" />
+                    {t('ledger.totalEntries')}: {summary.entries}
+                  </span>
+                </div>
               </div>
 
-              <div>
-                <label className="label">{t('analytics.period')}</label>
-                <select className="input mt-1" value={period} onChange={(event) => setPeriod(event.target.value)}>
-                  <option value="month">{t('ledger.thisMonth')}</option>
-                  <option value="year">{t('ledger.thisYear')}</option>
-                  <option value="all">{t('ledger.allTime')}</option>
-                </select>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/45">
+                  <label className="label">{t('ledger.party')}</label>
+                  <PartyFilterSelect
+                    className="mt-1"
+                    value={selectedPartyId}
+                    selectedOption={selectedPartyOption}
+                    onChange={handlePartyFilterChange}
+                    placeholder={t('ledger.allParties')}
+                    searchPlaceholder={t('ledger.searchPlaceholder')}
+                  />
+                  {hasActivePartyFilter ? (
+                    <button
+                      type="button"
+                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-700 transition hover:text-primary-600 dark:text-primary-300 dark:hover:text-primary-200"
+                      onClick={() => handlePartyFilterChange(null)}
+                    >
+                      <FilterX size={13} />
+                      {t('common.clear')}
+                    </button>
+                  ) : (
+                    <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                      {t('ledger.allParties')}
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/45">
+                  <label className="label">{t('analytics.period')}</label>
+                  <select className="input mt-1" value={period} onChange={(event) => setPeriod(event.target.value)}>
+                    <option value="month">{t('ledger.thisMonth')}</option>
+                    <option value="year">{t('ledger.thisYear')}</option>
+                    <option value="all">{t('ledger.allTime')}</option>
+                  </select>
+                  <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                    {timeSpanLabel}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/50">
-                <p className="text-xs uppercase text-slate-400">{balanceLabel}</p>
-                <p className={`mt-2 text-lg font-semibold ${balanceToneClass}`}>
-                  {t('currency.formatted', { symbol: t('currency.symbol'), amount: Math.abs(summary.currentBalance).toFixed(2) })}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/50">
-                <p className="text-xs uppercase text-slate-400">{t('ledger.totalDebit')}</p>
-                <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  {t('currency.formatted', { symbol: t('currency.symbol'), amount: summary.totalDebit.toFixed(2) })}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/50">
-                <p className="text-xs uppercase text-slate-400">{t('ledger.totalCredit')}</p>
-                <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">
-                  {t('currency.formatted', { symbol: t('currency.symbol'), amount: summary.totalCredit.toFixed(2) })}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/50">
-                <p className="text-xs uppercase text-slate-400">{t('ledger.totalEntries')}</p>
-                <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">{summary.entries}</p>
-              </div>
+            <div className="grid gap-4 px-5 pb-5 md:grid-cols-2 xl:grid-cols-4 lg:px-6 lg:pb-6">
+              {summaryCards.map((card) => {
+                const Icon = card.icon;
+
+                return (
+                  <div
+                    key={card.key}
+                    className="rounded-2xl border border-white/75 bg-white/85 p-4 shadow-sm backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/50"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                          {card.label}
+                        </p>
+                        <p className={`mt-3 text-lg font-semibold ${card.valueClassName}`}>
+                          {card.value}
+                        </p>
+                      </div>
+                      <span className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${card.accentClassName}`}>
+                        <Icon size={18} />
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           <div className="card space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 pb-4 dark:border-slate-800/70">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                  {t('ledger.transaction')}
+                </p>
+                <h3 className="mt-1 truncate text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  {selectedPartyLabel}
+                </h3>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <span className="rounded-full bg-secondary-100 px-3 py-1 dark:bg-slate-800">
+                  {timeSpanLabel}
+                </span>
+                <span className="rounded-full bg-secondary-100 px-3 py-1 dark:bg-slate-800">
+                  {t('ledger.totalEntries')}: {summary.entries}
+                </span>
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 md:hidden">
-              <span className="rounded-full bg-secondary-100 px-3 py-1">{selectedPartyLabel}</span>
-              <span className="rounded-full bg-secondary-100 px-3 py-1">{timeSpanLabel}</span>
+              <span className="rounded-full bg-secondary-100 px-3 py-1 dark:bg-slate-800">{selectedPartyLabel}</span>
+              <span className="rounded-full bg-secondary-100 px-3 py-1 dark:bg-slate-800">{timeSpanLabel}</span>
             </div>
 
             <div className="space-y-3 md:hidden">

@@ -3,6 +3,7 @@ import { Pencil, Plus, Trash2 } from 'lucide-react';
 import Notice from '../Notice';
 import Pagination from '../Pagination';
 import { Dialog } from '../ui/Dialog.tsx';
+import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
@@ -41,6 +42,8 @@ export default function UnitsSettingsPanel() {
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [deleteUnit, setDeleteUnit] = useState(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   const params = useMemo(
     () => ({
@@ -152,17 +155,24 @@ export default function UnitsSettingsPanel() {
     }
   };
 
-  const handleDelete = async (unit) => {
-    if (!window.confirm(t('unitsManagement.deleteConfirm', { name: unit.name }))) {
-      return;
-    }
+  const closeDeleteDialog = () => {
+    if (deleteSubmitting) return;
+    setDeleteUnit(null);
+  };
 
+  const handleDelete = async () => {
+    if (!deleteUnit) return;
+
+    setDeleteSubmitting(true);
     try {
-      await api.deleteUnit(unit.id);
+      await api.deleteUnit(deleteUnit.id);
       await loadUnits();
       setStatus({ type: 'success', message: t('unitsManagement.messages.deleted') });
     } catch (error) {
       setStatus({ type: 'error', message: resolveUnitErrorMessage(error, t, 'delete') });
+    } finally {
+      setDeleteSubmitting(false);
+      setDeleteUnit(null);
     }
   };
 
@@ -213,7 +223,7 @@ export default function UnitsSettingsPanel() {
                     <Pencil size={14} className="mr-1 inline" />
                     {t('common.edit')}
                   </button>
-                  <button className="btn-ghost" type="button" onClick={() => handleDelete(unit)}>
+                  <button className="btn-ghost" type="button" onClick={() => setDeleteUnit(unit)}>
                     <Trash2 size={14} className="mr-1 inline" />
                     {t('common.delete')}
                   </button>
@@ -251,7 +261,7 @@ export default function UnitsSettingsPanel() {
                         <button className="btn-ghost" type="button" onClick={() => openEdit(unit)}>
                           <Pencil size={14} />
                         </button>
-                        <button className="btn-ghost" type="button" onClick={() => handleDelete(unit)}>
+                        <button className="btn-ghost" type="button" onClick={() => setDeleteUnit(unit)}>
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -321,6 +331,14 @@ export default function UnitsSettingsPanel() {
           </div>
         </form>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteUnit)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDelete}
+        description={deleteUnit ? t('unitsManagement.deleteConfirm', { name: deleteUnit.name }) : t('common.confirmDelete')}
+        confirming={deleteSubmitting}
+      />
     </section>
   );
 }

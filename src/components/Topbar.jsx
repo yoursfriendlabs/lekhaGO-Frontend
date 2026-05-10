@@ -2,12 +2,23 @@ import { RefreshCw } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
+import UpgradeSubscriptionCta from './subscription/UpgradeSubscriptionCta.jsx';
 
 export default function Topbar() {
-  const { user, logout } = useAuth();
+  const { user, logout, subscription } = useAuth();
   const { businessProfile } = useBusinessSettings();
 
   const { locale, setLocale, t } = useI18n();
+  const subscriptionAccess = subscription?.access || null;
+  const planStatus = String(subscriptionAccess?.subscriptionStatus || subscription?.currentPlan?.subscriptionStatus || '').toLowerCase();
+  const planLabel = subscription?.currentPlan?.label || (subscriptionAccess?.planKey ? `${humanizePlanKey(subscriptionAccess.planKey)}` : '');
+  const planBadgeClass = planStatus === 'expired'
+    ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200'
+    : planStatus === 'expiring-soon'
+      ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'
+      : subscriptionAccess?.requiresPaymentSetup || subscriptionAccess?.requiresManualReview
+        ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'
+      : 'border-primary/20 bg-primary/10 text-primary-700 dark:border-primary/30 dark:bg-primary/15 dark:text-primary-200';
   const refreshWorkspace = () => {
     if (typeof window === 'undefined') return;
     window.location.reload();
@@ -19,9 +30,17 @@ export default function Topbar() {
         <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-[0.2em] text-secondary-500">{t('topbar.workspace')}</p>
           <h2 className="truncate font-serif text-lg text-ink sm:text-xl">{user?.name || t('topbar.welcome')}</h2>
-          {businessProfile?.label ? (
-            <p className="mt-1 truncate text-xs font-medium text-secondary-500">{businessProfile.label}</p>
-          ) : null}
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            {businessProfile?.label ? (
+              <p className="truncate text-xs font-medium text-secondary-500">{businessProfile.label}</p>
+            ) : null}
+            {planLabel ? (
+              <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${planBadgeClass}`}>
+                {planLabel}
+                {subscriptionAccess?.hasPendingChange ? ` · ${t('topbar.pendingPlan')}` : ''}
+              </span>
+            ) : null}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 md:hidden">
           <button
@@ -53,6 +72,7 @@ export default function Topbar() {
         </div>
       </div>
       <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
+        <UpgradeSubscriptionCta className="btn-primary w-full justify-center md:w-auto" />
         <div className="hidden gap-2 md:flex md:items-center">
           <button className="btn-ghost gap-2" onClick={refreshWorkspace} type="button" title={t('topbar.refresh')}>
             <RefreshCw size={16} />
@@ -70,4 +90,11 @@ export default function Topbar() {
       </div>
     </header>
   );
+}
+
+function humanizePlanKey(value = '') {
+  return String(value)
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase())
+    .trim();
 }

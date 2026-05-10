@@ -459,7 +459,7 @@ export default function Sales() {
         id: sale.partyId || sale.customerId || sale.Customer?.id || sale.Party?.id,
         partyName: sale.partyName || sale.customerName || sale.Customer?.name || sale.Party?.name,
         phone: sale.partyPhone || sale.Customer?.phone || sale.Party?.phone,
-        currentAmount: sale.Party?.currentAmount || sale.Customer?.currentAmount,
+        currentAmount: sale.Party?.currentAmount ?? sale.Customer?.currentAmount ?? null,
         type: 'customer',
       });
       const hydratedProducts = saleItems

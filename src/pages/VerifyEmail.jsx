@@ -65,6 +65,7 @@ function normalizeContext(value) {
     user: value.user || null,
     businessId: value.businessId || '',
     role: value.role || '',
+    subscription: value.subscription || null,
     source: value.source || 'login',
     requestOtpOnOpen: Boolean(value.requestOtpOnOpen ?? value.autoSend),
     resendAvailableAt: Number(value.resendAvailableAt || 0),
@@ -294,11 +295,20 @@ export default function VerifyEmail() {
       const user = response?.user || (context?.user ? { ...context.user, emailVerified: true } : null);
       const businessId = response?.business?.id || context?.businessId || '';
       const role = response?.role || context?.role || '';
+      const subscription = response?.subscription || context?.subscription || null;
 
       clearPendingEmailVerification();
 
       if (token) {
-        setSession(token, user, businessId, role);
+        setSession(
+          token,
+          user,
+          businessId,
+          role,
+          subscription,
+          response?.business || context?.business || null,
+          response?.businessProfile || context?.businessProfile || null
+        );
         navigate('/app');
         return;
       }

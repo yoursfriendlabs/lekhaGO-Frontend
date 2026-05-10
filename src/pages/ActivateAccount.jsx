@@ -121,11 +121,20 @@ export default function ActivateAccount() {
       const nextToken = response?.token || token;
       const nextBusinessId = response?.business?.id || businessId;
       const nextRole = response?.role || role;
+      const nextSubscription = response?.subscription || null;
 
       clearPendingEmailVerification();
 
       if (response?.token || response?.user || response?.business?.id || response?.role) {
-        setSession(nextToken, nextUser, nextBusinessId, nextRole);
+        setSession(
+          nextToken,
+          nextUser,
+          nextBusinessId,
+          nextRole,
+          nextSubscription,
+          response?.business || null,
+          response?.businessProfile || null
+        );
       } else {
         updateUser({ emailVerified: true });
       }

@@ -5,6 +5,7 @@ import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
+import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 import dayjs, { todayISODate } from '../lib/datetime';
@@ -55,6 +56,7 @@ function getStatementBadgeClass(type) {
     sale: 'bg-emerald-100 text-emerald-700',
     service: 'bg-sky-100 text-sky-700',
     purchase: 'bg-amber-100 text-amber-700',
+    expense: 'bg-rose-100 text-rose-700',
     payment_in: 'bg-teal-100 text-teal-700',
     payment_out: 'bg-indigo-100 text-indigo-700',
   };
@@ -72,6 +74,8 @@ function getStatementRowTitle(row, t) {
       return `${t('parties.serviceOrder')} ${reference}`;
     case 'purchase':
       return `${t('parties.purchaseBill')} ${reference}`;
+    case 'expense':
+      return `${t('purchases.expense')} ${reference}`;
     case 'payment_in':
       return `${t('parties.paymentIn')} ${reference}`;
     case 'payment_out':
@@ -135,6 +139,8 @@ export default function Parties() {
   const [pendingServices, setPendingServices] = useState([]);
   const [pendingServicesLoading, setPendingServicesLoading] = useState(false);
   const [txPage, setTxPage] = useState(1);
+  const [deleteParty, setDeleteParty] = useState(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const submitPartyRequestRef = useRef(false);
 
   useEffect(() => {
@@ -269,6 +275,32 @@ export default function Parties() {
   );
   const selectedPartyWhatsAppLink = getWhatsAppLink(selectedPartyView?.phone, selectedPartyWhatsAppMessage);
   const totalTxPages = Math.max(1, Math.ceil(statementData.summary.totalRows / TX_PAGE_SIZE));
+  const partySummaryCards = [
+    {
+      key: 'sales',
+      label: t('ledger.sale'),
+      total: statementData.summary.totalSales,
+      due: statementData.summary.salesDue,
+    },
+    {
+      key: 'services',
+      label: t('ledger.service'),
+      total: statementData.summary.totalServices,
+      due: statementData.summary.servicesDue,
+    },
+    {
+      key: 'purchases',
+      label: t('ledger.purchase'),
+      total: statementData.summary.totalPurchases,
+      due: statementData.summary.purchasesDue,
+    },
+    {
+      key: 'expenses',
+      label: t('purchases.expense'),
+      total: statementData.summary.totalExpenses,
+      due: statementData.summary.expensesDue,
+    },
+  ];
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -344,17 +376,29 @@ export default function Parties() {
     setTxForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(t('parties.confirmDelete'))) return;
+  const closeDeleteDialog = () => {
+    if (deleteSubmitting) return;
+    setDeleteParty(null);
+  };
 
+  const handleDelete = async () => {
+    if (!deleteParty) return;
+
+    setDeleteSubmitting(true);
     try {
-      await api.deleteParty(id);
-      removeParty(id);
+      await api.deleteParty(deleteParty.id);
+      removeParty(deleteParty.id);
       invalidateParties();
       setStatus({ type: 'success', message: t('parties.messages.deleted') });
+      if (selectedId === deleteParty.id) {
+        setSelectedId(null);
+      }
       setPartyReloadKey((prev) => prev + 1);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
+    } finally {
+      setDeleteSubmitting(false);
+      setDeleteParty(null);
     }
   };
 
@@ -436,16 +480,16 @@ export default function Parties() {
 
       await api.createPartyTransaction(payload);
 
-      if (txForm.serviceId) {
-        const selectedService = pendingServices.find((service) => service.id === txForm.serviceId);
-        if (selectedService) {
-          const nextPaidAmount = Math.min(
-            toAmount(selectedService.totalAmount),
-            toAmount(selectedService.paidAmount) + amount
-          );
-          await api.updateService(txForm.serviceId, { receivedTotal: nextPaidAmount });
-        }
-      }
+      // if (txForm.serviceId) {
+      //   const selectedService = pendingServices.find((service) => service.id === txForm.serviceId);
+      //   if (selectedService) {
+      //     const nextPaidAmount = Math.min(
+      //       toAmount(selectedService.totalAmount),
+      //       toAmount(selectedService.paidAmount) + amount
+      //     );
+      //     await api.updateService(txForm.serviceId, { receivedTotal: nextPaidAmount });
+      //   }
+      // }
 
       invalidateParties();
       setPartyReloadKey((prev) => prev + 1);
@@ -663,10 +707,35 @@ export default function Parties() {
                 </div>
                 <div className="flex gap-2">
 
-                  <button className="btn-ghost text-rose-600" type="button" onClick={() => handleDelete(selectedPartyView.id)}>
+                  <button className="btn-ghost text-rose-600" type="button" onClick={() => setDeleteParty(selectedPartyView)}>
                     {t('common.delete')}
                   </button>
                 </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {partySummaryCards.map((card) => (
+                  <div
+                    key={card.key}
+                    className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3 dark:border-slate-800/60 dark:bg-slate-900/30"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      {card.label}
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
+                      {t('common.total')}: {t('currency.formatted', {
+                        symbol: t('currency.symbol'),
+                        amount: card.total.toFixed(2),
+                      })}
+                    </p>
+                    <p className="mt-1 text-xs text-rose-500 dark:text-rose-300">
+                      {t('common.due')}: {t('currency.formatted', {
+                        symbol: t('currency.symbol'),
+                        amount: card.due.toFixed(2),
+                      })}
+                    </p>
+                  </div>
+                ))}
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
@@ -897,21 +966,21 @@ export default function Parties() {
             <label className="label">{t('parties.transactionDate')}</label>
             <input className="input mt-1" name="txDate" type="date" value={txForm.txDate} onChange={handleTxChange} />
           </div>
-          {pendingServicesLoading ? (
-            <p className="text-xs text-slate-500">{t('common.loading')}</p>
-          ) : pendingServices.length > 0 ? (
-            <div>
-              <label className="label">Apply to service order <span className="text-slate-400">(optional)</span></label>
-              <select className="input mt-1" name="serviceId" value={txForm.serviceId} onChange={handleTxChange}>
-                <option value="">— none —</option>
-                {pendingServices.map((service) => (
-                  <option key={service.id} value={service.id}>
-                    {(service.referenceNo || service.id.slice(0, 8))} — {t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(service.dueAmount).toFixed(2) })} due
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
+          {/*{pendingServicesLoading ? (*/}
+          {/*  <p className="text-xs text-slate-500">{t('common.loading')}</p>*/}
+          {/*) : pendingServices.length > 0 ? (*/}
+          {/*  <div>*/}
+          {/*    <label className="label">Apply to service order <span className="text-slate-400">(optional)</span></label>*/}
+          {/*    <select className="input mt-1" name="serviceId" value={txForm.serviceId} onChange={handleTxChange}>*/}
+          {/*      <option value="">— none —</option>*/}
+          {/*      {pendingServices.map((service) => (*/}
+          {/*        <option key={service.id} value={service.id}>*/}
+          {/*          {(service.referenceNo || service.id.slice(0, 8))} — {t('currency.formatted', { symbol: t('currency.symbol'), amount: toAmount(service.dueAmount).toFixed(2) })} due*/}
+          {/*        </option>*/}
+          {/*      ))}*/}
+          {/*    </select>*/}
+          {/*  </div>*/}
+          {/*) : null}*/}
           <PaymentMethodFields
             value={{
               paymentMethod: txForm.paymentMethod,
@@ -935,6 +1004,14 @@ export default function Parties() {
           </div>
         </form>
       </Dialog>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteParty)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDelete}
+        description={t('parties.confirmDelete')}
+        confirming={deleteSubmitting}
+      />
     </div>
   );
 }

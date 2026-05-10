@@ -4,10 +4,11 @@ import {
   ArrowRight,
   Building2,
   CheckCircle2,
-  Coffee,
-  Gem,
+  Eye,
+  EyeOff,
   Lock,
   Mail,
+  Phone,
   Store,
   UserRound,
 } from 'lucide-react';
@@ -27,30 +28,37 @@ const btnPrimary =
   'font-semibold text-white shadow-lg transition-all duration-300 hover:scale-[1.01] hover:from-[#8a5d2f] hover:to-[#9e7751] ' +
   'hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none';
 
+const REGISTRATION_HIDDEN_TYPES = new Set(['jewellery', 'cafe']);
+
 const typeIconMap = {
   retail: Store,
-  jewellery: Gem,
-  cafe: Coffee,
 };
 
 function getTypeIcon(type) {
   return typeIconMap[type] || Building2;
 }
 
-function buildStatusCopy(status) {
+function getRegistrationBusinessTypes(items) {
+  return (Array.isArray(items) ? items : []).filter((item) => {
+    const value = String(item?.value || '').toLowerCase();
+    return value && !REGISTRATION_HIDDEN_TYPES.has(value);
+  });
+}
+
+function buildStatusCopy(status, t) {
   if (!status?.message) return null;
 
   if (/email already in use/i.test(status.message)) {
     return {
-      title: 'This email is already registered.',
-      description: 'Sign in with the existing account or complete email verification instead of creating a second one.',
+      title: t('auth.registerEmailExistsTitle'),
+      description: t('auth.registerEmailExistsDescription'),
     };
   }
 
   if (/register failed/i.test(status.message)) {
     return {
-      title: 'We could not finish creating the account.',
-      description: 'Please try again once. If it happens again, contact support so we can finish the setup safely.',
+      title: t('auth.registerFailedTitle'),
+      description: t('auth.registerFailedDescription'),
     };
   }
 
@@ -67,6 +75,7 @@ export default function Register() {
   const [form, setForm] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
     businessName: '',
     businessType: '',
@@ -74,7 +83,7 @@ export default function Register() {
   const [status, setStatus] = useState({ type: 'info', message: '' });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [businessTypes, setBusinessTypes] = useState(() => getFallbackBusinessTypes());
+  const [businessTypes, setBusinessTypes] = useState(() => getRegistrationBusinessTypes(getFallbackBusinessTypes()));
 
   useEffect(() => {
     let active = true;
@@ -82,12 +91,13 @@ export default function Register() {
     api.getBusinessTypes()
       .then((data) => {
         if (!active) return;
-        const items = Array.isArray(data?.items) && data.items.length ? data.items : getFallbackBusinessTypes();
+        const remoteItems = getRegistrationBusinessTypes(data?.items);
+        const items = remoteItems.length ? remoteItems : getRegistrationBusinessTypes(getFallbackBusinessTypes());
         setBusinessTypes(items);
       })
       .catch(() => {
         if (!active) return;
-        setBusinessTypes(getFallbackBusinessTypes());
+        setBusinessTypes(getRegistrationBusinessTypes(getFallbackBusinessTypes()));
       });
 
     return () => {
@@ -96,7 +106,8 @@ export default function Register() {
   }, []);
 
   useEffect(() => {
-    if (form.businessType || !businessTypes.length) return;
+    if (!businessTypes.length) return;
+    if (businessTypes.some((entry) => entry.value === form.businessType)) return;
     setForm((prev) => ({
       ...prev,
       businessType: businessTypes[0].value,
@@ -132,18 +143,42 @@ export default function Register() {
     return [...new Set(highlights)].slice(0, 4);
   }, [selectedBusinessType]);
 
-  const statusCopy = useMemo(() => buildStatusCopy(status), [status]);
+  const statusCopy = useMemo(() => buildStatusCopy(status, t), [status, t]);
+  const phoneDigits = useMemo(() => String(form.phone || '').replace(/\D/g, ''), [form.phone]);
+  const showBusinessTypePicker = businessTypeOptions.length > 1;
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (phoneDigits.length < 10) {
+      setStatus({ type: 'error', message: t('errors.phoneMinDigits') });
+      return;
+    }
+
     setLoading(true);
     setStatus({ type: 'info', message: '' });
 
     try {
-      const data = await api.register(form);
+      const payload = {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        password: form.password,
+        businessName: form.businessName.trim(),
+        businessType: form.businessType,
+      };
+      const data = await api.register(payload);
       const businessId = data.business?.id || '';
       if (data.user?.emailVerified && data.token) {
-        setSession(data.token, data.user, businessId, data.role || 'owner');
+        setSession(
+          data.token,
+          data.user,
+          businessId,
+          data.role || 'owner',
+          data.subscription || null,
+          data.business || null,
+          data.businessProfile || null
+        );
         navigate('/app');
         return;
       }
@@ -155,6 +190,7 @@ export default function Register() {
         user: data.user || null,
         businessId,
         role: data.role || 'owner',
+        subscription: data.subscription || null,
         source: 'register',
         requestOtpOnOpen: !data.otpSent,
         resendAvailableAt: data.otpSent ? Date.now() + 30_000 : 0,
@@ -168,7 +204,7 @@ export default function Register() {
         },
       });
     } catch (err) {
-      setStatus({ type: 'error', message: err.message || 'Register failed' });
+      setStatus({ type: 'error', message: err.message || t('auth.registerFailedTitle') });
     } finally {
       setLoading(false);
     }
@@ -179,7 +215,7 @@ export default function Register() {
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-white">
       <div className="flex w-full items-center justify-center p-6 lg:w-1/2 lg:p-12">
-        <div className="w-full max-w-xl space-y-8">
+        <div className="w-full max-w-2xl space-y-6">
           <div className="text-center lg:text-left">
             <span className="inline-flex items-center rounded-full border border-[#9b6835]/20 bg-[#9b6835]/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#9b6835]">
               {t('auth.register')}
@@ -188,7 +224,10 @@ export default function Register() {
             <p className="mt-3 text-lg text-gray-600">{t('auth.registerSubtitle')}</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-6 rounded-[2rem] border border-[#9b6835]/10 bg-white/95 p-6 shadow-[0_24px_80px_-40px_rgba(155,104,53,0.45)] backdrop-blur sm:p-8"
+          >
             {statusCopy ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
                 <p className="font-semibold">{statusCopy.title}</p>
@@ -199,7 +238,7 @@ export default function Register() {
             ) : null}
 
             <div className="grid gap-5 md:grid-cols-2">
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-2">
                 <label htmlFor="owner-name" className="flex items-center gap-2 text-sm font-medium text-gray-700">
                   <UserRound className="h-4 w-4" aria-hidden />
                   {t('auth.ownerName')}
@@ -212,8 +251,30 @@ export default function Register() {
                   onChange={handleChange}
                   required
                   autoComplete="name"
-                  placeholder="Your full name"
+                  placeholder={t('auth.registerNamePlaceholder')}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="register-phone" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <Phone className="h-4 w-4" aria-hidden />
+                  {t('auth.phone')}
+                </label>
+                <input
+                  id="register-phone"
+                  className={inputCls}
+                  name="phone"
+                  type="tel"
+                  inputMode="tel"
+                  value={form.phone}
+                  onChange={handleChange}
+                  required
+                  autoComplete="tel"
+                  placeholder={t('auth.phonePlaceholder')}
+                />
+                {form.phone && phoneDigits.length < 10 ? (
+                  <p className="text-xs font-medium text-rose-600">{t('errors.phoneMinDigits')}</p>
+                ) : null}
               </div>
 
               <div className="space-y-2">
@@ -230,7 +291,7 @@ export default function Register() {
                   onChange={handleChange}
                   required
                   autoComplete="email"
-                  placeholder="you@example.com"
+                  placeholder={t('auth.emailPlaceholder')}
                 />
               </div>
 
@@ -249,19 +310,20 @@ export default function Register() {
                     onChange={handleChange}
                     required
                     autoComplete="new-password"
-                    placeholder="Choose a password"
+                    placeholder={t('auth.registerPasswordPlaceholder')}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-[#9b6835] transition-colors hover:text-[#8a5d2f]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-[#8a5d2f]"
+                    aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                   >
-                    {showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 md:col-span-2">
                 <label htmlFor="business-name" className="flex items-center gap-2 text-sm font-medium text-gray-700">
                   <Building2 className="h-4 w-4" aria-hidden />
                   {t('auth.businessName')}
@@ -274,38 +336,49 @@ export default function Register() {
                   onChange={handleChange}
                   required
                   autoComplete="organization"
-                  placeholder="Your business name"
+                  placeholder={t('auth.registerBusinessNamePlaceholder')}
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 md:col-span-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
                   <SelectedTypeIcon className="h-4 w-4" aria-hidden />
                   {t('auth.businessType')}
                 </label>
-                <SearchableSelect
-                  options={businessTypeOptions}
-                  value={form.businessType}
-                  onChange={(value) => setForm((prev) => ({ ...prev, businessType: value }))}
-                  placeholder="Choose a business type"
-                />
+                {showBusinessTypePicker ? (
+                  <SearchableSelect
+                    options={businessTypeOptions}
+                    value={form.businessType}
+                    onChange={(value) => setForm((prev) => ({ ...prev, businessType: value }))}
+                    placeholder={t('auth.registerBusinessTypePlaceholder')}
+                  />
+                ) : selectedBusinessType ? (
+                  <div className="rounded-2xl border border-[#9b6835]/15 bg-[#9b6835]/6 px-4 py-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#9b6835]/10 text-[#9b6835]">
+                        <SelectedTypeIcon className="h-5 w-5" aria-hidden />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">{selectedBusinessType.label}</p>
+                        <p className="mt-1 text-sm leading-6 text-gray-600">{selectedBusinessType.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
 
             {selectedBusinessType ? (
-              <div className="rounded-2xl border border-[#9b6835]/15 bg-white p-5 shadow-sm">
+              <div className="rounded-2xl border border-[#9b6835]/15 bg-[#fcfaf7] p-5">
                 <div className="flex items-start gap-4">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#9b6835]/10 text-[#9b6835]">
                     <SelectedTypeIcon className="h-6 w-6" aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="text-lg font-semibold text-gray-900">{selectedBusinessType.label}</h2>
-                      <span className="rounded-full bg-[#9b6835]/10 px-2.5 py-1 text-xs font-medium text-[#9b6835]">
-                        {selectedBusinessType.salesFlow?.createLabel || selectedBusinessType.label}
-                      </span>
+                      <h2 className="text-lg font-semibold text-gray-900">{t('auth.registerSetupTitle')}</h2>
                     </div>
-                    <p className="mt-2 text-sm leading-6 text-gray-600">{selectedBusinessType.description}</p>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">{t('auth.registerWorkflowDescription')}</p>
                     <div className="mt-4 flex flex-wrap gap-2">
                       {selectedHighlights.map((item) => (
                         <span
@@ -354,46 +427,44 @@ export default function Register() {
 
         <div className="relative z-10 max-w-lg space-y-8 text-white">
           <div>
-            <h2 className="text-5xl font-bold leading-tight">Set up the right workflow from day one.</h2>
+            <h2 className="text-5xl font-bold leading-tight">{t('auth.registerWorkflowTitle')}</h2>
             <p className="mt-4 text-lg leading-8 text-white/90">
-              Pick the business type that matches how the client sells, then the app adjusts navigation, inventory language, and day-to-day flow automatically.
+              {t('auth.registerWorkflowDescription')}
             </p>
           </div>
 
-          <div className="space-y-4">
-            {businessTypes.map((type) => {
-              const Icon = getTypeIcon(type.value);
-              const isSelected = selectedBusinessType?.value === type.value;
-
-              return (
-                <div
-                  key={type.value}
-                  className={`rounded-3xl border p-5 backdrop-blur-sm transition-all ${
-                    isSelected
-                      ? 'border-white/60 bg-white/18 shadow-2xl'
-                      : 'border-white/20 bg-white/10'
-                  }`}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15">
-                      <Icon className="h-6 w-6" aria-hidden />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-semibold">{type.label}</h3>
-                        {isSelected ? (
-                          <span className="rounded-full bg-white/20 px-2.5 py-1 text-xs font-medium">
-                            Selected
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-2 text-sm leading-6 text-white/85">{type.description}</p>
-                    </div>
-                  </div>
+          {selectedBusinessType ? (
+            <div className="rounded-3xl border border-white/30 bg-white/12 p-6 backdrop-blur-sm">
+              <div className="flex items-start gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+                  <SelectedTypeIcon className="h-7 w-7" aria-hidden />
                 </div>
-              );
-            })}
-          </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/75">
+                    {t('auth.registerSetupTitle')}
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold">{selectedBusinessType.label}</h3>
+                  <p className="mt-2 text-sm leading-6 text-white/85">{selectedBusinessType.description}</p>
+                </div>
+              </div>
+
+              {selectedHighlights.length ? (
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  {selectedHighlights.map((item) => (
+                    <div
+                      key={item}
+                      className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-medium text-white/95"
+                    >
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-white" aria-hidden />
+                        <span>{item}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

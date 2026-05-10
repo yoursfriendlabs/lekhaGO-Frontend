@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import Notice from '../Notice';
+import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n.jsx';
 
@@ -33,6 +34,8 @@ export default function OrderAttributesSettingsPanel() {
   const [loadingList, setLoadingList] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [deleteAttribute, setDeleteAttribute] = useState(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
 
   const derivedKey = useMemo(() => sanitizeAttributeKey(form.name), [form.name]);
 
@@ -89,19 +92,28 @@ export default function OrderAttributesSettingsPanel() {
     setStatus({ type: 'info', message: '' });
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm(t('common.confirmDelete') || 'Are you sure?')) return;
+  const closeDeleteDialog = () => {
+    if (deleteSubmitting) return;
+    setDeleteAttribute(null);
+  };
 
+  const handleDelete = async () => {
+    if (!deleteAttribute) return;
+
+    setDeleteSubmitting(true);
     try {
-      await api.deleteOrderAttribute(id);
+      await api.deleteOrderAttribute(deleteAttribute.id);
       await loadAttributes();
       setStatus({ type: 'success', message: t('orderAttributes.messages.deleted') });
-      if (editingId === id) {
+      if (editingId === deleteAttribute.id) {
         setEditingId(null);
         setForm(emptyForm);
       }
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
+    } finally {
+      setDeleteSubmitting(false);
+      setDeleteAttribute(null);
     }
   };
 
@@ -255,7 +267,7 @@ export default function OrderAttributesSettingsPanel() {
                     <button onClick={() => handleEdit(attribute)} className="btn-ghost" type="button">
                       {t('common.edit')}
                     </button>
-                    <button onClick={() => handleDelete(attribute.id)} className="btn-ghost" type="button">
+                    <button onClick={() => setDeleteAttribute(attribute)} className="btn-ghost" type="button">
                       {t('common.remove')}
                     </button>
                   </div>
@@ -308,7 +320,7 @@ export default function OrderAttributesSettingsPanel() {
                           <button onClick={() => handleEdit(attribute)} className="btn-ghost" type="button">
                             {t('common.edit')}
                           </button>
-                          <button onClick={() => handleDelete(attribute.id)} className="btn-ghost" type="button">
+                          <button onClick={() => setDeleteAttribute(attribute)} className="btn-ghost" type="button">
                             {t('common.remove')}
                           </button>
                         </div>
@@ -321,6 +333,14 @@ export default function OrderAttributesSettingsPanel() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteAttribute)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDelete}
+        description={t('common.confirmDelete')}
+        confirming={deleteSubmitting}
+      />
     </section>
   );
 }

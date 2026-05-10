@@ -479,6 +479,25 @@ export const api = {
       mutationConfig(["auth-me", "subscription", "subscription-payment-setup"]),
     ),
 
+  getSubscription: () =>
+    request(
+      "/api/subscription",
+      {},
+      listCache(["subscription"], CACHE_TTL.short),
+    ),
+  getSubscriptionPaymentSetup: () =>
+    request(
+      "/api/subscription/payment-setup",
+      {},
+      listCache(["subscription", "subscription-payment-setup"], CACHE_TTL.short),
+    ),
+  updateSubscription: (data) =>
+    request(
+      "/api/subscription",
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig(["auth-me", "subscription", "subscription-payment-setup"]),
+    ),
+
   listStaff: () =>
     request("/api/staff", {}, listCache(["staff"], CACHE_TTL.short)),
   createStaff: (data) =>
@@ -708,6 +727,21 @@ export const api = {
         "banks",
       ]),
     ),
+  deleteSale: (id) =>
+    request(
+      `/api/sales/${id}`,
+      { method: "DELETE" },
+      mutationConfig([
+        detailTags("sale", id),
+        "sales",
+        "products",
+        "reports",
+        "dashboard",
+        "parties",
+        "party-statements",
+        "banks",
+      ]),
+    ),
 
   createService: (data) =>
     request(
@@ -733,6 +767,21 @@ export const api = {
     request(
       `/api/services/${id}`,
       { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("service", id),
+        "services",
+        "products",
+        "reports",
+        "dashboard",
+        "parties",
+        "party-statements",
+        "banks",
+      ]),
+    ),
+  deleteService: (id) =>
+    request(
+      `/api/services/${id}`,
+      { method: "DELETE" },
       mutationConfig([
         detailTags("service", id),
         "services",
@@ -867,8 +916,11 @@ export const api = {
         "party-transactions",
         "parties",
         "party-statements",
+        "purchases",
+        "sales",
         "services",
         "reports",
+        "analytics",
         "banks",
       ]),
     ),
@@ -981,6 +1033,12 @@ export const api = {
   getAnalyticsSummary: (params = {}) =>
     listRequest(
       "/api/analytics/summary",
+      params,
+      listCache(["analytics"], CACHE_TTL.short),
+    ),
+  getAnalyticsExpenses: (params = {}) =>
+    listRequest(
+      "/api/analytics/expenses",
       params,
       listCache(["analytics"], CACHE_TTL.short),
     ),

@@ -82,7 +82,7 @@ export function normalizeLookupParty(raw = {}) {
     phone: String(pickFirstDefined(raw.phone, raw.partyPhone, party.phone)).trim(),
     type: String(pickFirstDefined(raw.type, party.type, 'both')).trim(),
     currentAmount: toLookupAmount(
-      pickFirstDefined(raw.currentAmount, raw.balance, party.currentAmount, party.balance)
+      pickFirstDefined(raw.currentAmount, party.currentAmount, raw.balance, party.balance)
     ),
   };
 }

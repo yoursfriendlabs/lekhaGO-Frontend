@@ -165,7 +165,7 @@ export default function Purchases() {
   const expenseTotals = useMemo(() => {
     return items.reduce(
       (acc, item) => {
-        const amount = Number(item.lineTotal || 0);
+        const amount = Number(item.lineTotal || 0) + getVatAmount(item.lineTotal, item.taxRate);
         if (item.itemType === 'labor') acc.labor += amount;
         else if (item.itemType === 'part') acc.part += amount;
         else acc.expense += amount;
@@ -215,12 +215,12 @@ export default function Purchases() {
     const value = typeof eventOrValue === 'string' ? eventOrValue : eventOrValue.target.value;
     setStatus({ type: 'info', message: '' });
     setItemStatus({ type: 'info', message: '' });
-    if (value === 'expense') setSelectedSupplier(null);
     setHeader((prev) => ({
       ...prev,
       entryType: value,
-      partyId: value === 'expense' ? '' : prev.partyId,
-      partyName: value === 'expense' ? prev.partyName : '',
+      partyName: value === 'expense'
+        ? prev.partyName || selectedSupplier?.name || ''
+        : prev.partyName,
     }));
     setItems([]);
     setDeletedItemIds([]);
@@ -250,7 +250,7 @@ export default function Purchases() {
     setHeader((previous) => ({
       ...previous,
       partyId: party?.id || '',
-      partyName: party?.id ? '' : previous.partyName,
+      partyName: party?.name || previous.partyName,
     }));
   };
 
@@ -492,7 +492,7 @@ export default function Purchases() {
         id: purchase.partyId || purchase.supplierId || purchase.Party?.id || purchase.Supplier?.id,
         partyName: purchase.partyName || purchase.supplierName || purchase.Party?.name || purchase.Supplier?.name,
         phone: purchase.partyPhone || purchase.Party?.phone || purchase.Supplier?.phone,
-        currentAmount: purchase.Party?.currentAmount || purchase.Supplier?.currentAmount,
+        currentAmount: purchase.Party?.currentAmount ?? purchase.Supplier?.currentAmount ?? null,
         type: 'supplier',
       });
       const hydratedProducts = purchaseItems
@@ -973,7 +973,8 @@ export default function Purchases() {
                                     {t('purchases.taxTotal')}: {money(itemVatAmount)}
                                   </span>
                                   <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white dark:bg-primary-900/70">
-                                    {t('common.total')}: {money(item.lineTotal)}
+                                    {t('common.total')}: {money(Number(item.lineTotal || 0) + itemVatAmount)}
+
                                   </span>
                                 </div>
                               </div>
@@ -1109,7 +1110,7 @@ export default function Purchases() {
                       className="input mt-1"
                       value={itemDraft.unitType}
                       onChange={(e) => handleDraftChange('unitType', e.target.value)}
-                      disabled={isExpense && itemDraft.itemType !== 'part'}
+                      disabled={false}
                     >
                       <option value="primary">{t('products.primaryUnit')}</option>
                       <option value="secondary">{t('products.secondaryUnit')}</option>
@@ -1174,7 +1175,8 @@ export default function Purchases() {
                     </div>
                     <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-sm dark:border-slate-700">
                       <span className="font-medium text-slate-600 dark:text-slate-300">{t('common.total')}</span>
-                      <span className="text-lg font-bold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</span>
+                      <span className="text-lg font-bold text-slate-900 dark:text-white">{money(Number(itemDraft.lineTotal || 0) + itemDraftVatAmount)}
+</span>
                     </div>
                   </div>
                 </div>

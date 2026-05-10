@@ -11,6 +11,7 @@ import MobileFormStepper from '../components/MobileFormStepper.jsx';
 import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
 import CreatorFilterSelect from '../components/CreatorFilterSelect.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
+import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
@@ -44,6 +45,7 @@ import {
   Wallet,
   Wrench,
   MessageCircle,
+  Trash2,
 } from 'lucide-react';
 import { usePartyStore } from '../stores/parties';
 import { useServiceStore } from '../stores/services';
@@ -456,13 +458,20 @@ export default function Services() {
     : t('services.newOrder');
 
   const { upsert: upsertParty } = usePartyStore();
-  const { services: serviceList, loading: listLoading, fetch: fetchServices, invalidate: invalidateServices } = useServiceStore();
+  const {
+    services: serviceList,
+    loading: listLoading,
+    fetch: fetchServices,
+    invalidate: invalidateServices,
+    patch: patchService,
+  } = useServiceStore();
   const [suggestedOrderNo, setSuggestedOrderNo] = useState('');
   const [productDirectory, setProductDirectory] = useState({});
 
   // ── List state ──
   const [statusFilter, setStatusFilter] = useState('all');
   const [listError, setListError] = useState('');
+  const [listNotice, setListNotice] = useState({ type: '', message: '' });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
@@ -491,6 +500,8 @@ export default function Services() {
   // ── Edit state ──
   const [editingId, setEditingId] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
+  const [deletingServiceId, setDeletingServiceId] = useState('');
+  const [deleteService, setDeleteService] = useState(null);
 
   // ── Lightbox ──
   const [lightboxUrl, setLightboxUrl] = useState(null);
@@ -570,12 +581,14 @@ export default function Services() {
 
   // ── Load services list ──
   const loadServices = () => {
+    setListError('');
     invalidateServices(listParams);
-    fetchServices(listParams, true).catch((err) => setListError(err.message));
+    return fetchServices(listParams, true).catch((err) => setListError(err.message));
   };
 
   useEffect(() => {
     if (!businessId) return;
+    setListError('');
     fetchServices(listParams).catch((err) => setListError(err.message));
   }, [businessId, fetchServices, listParams]);
 
@@ -1215,6 +1228,13 @@ export default function Services() {
   // ── Paged service list ──
   const filteredServiceList = safeServiceList;
 
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(filteredServiceList.length / pageSize));
+    if (page > maxPage) {
+      setPage(maxPage);
+    }
+  }, [filteredServiceList.length, page, pageSize]);
+
   const pagedServices = useMemo(() => {
     const start = (page - 1) * pageSize;
     return filteredServiceList.slice(start, start + pageSize);
@@ -1314,10 +1334,56 @@ export default function Services() {
           ),
         });
       }
+      const refreshedOrder = normalizeServiceOrder(await api.getService(payDialog.id));
+      patchService(payDialog.id, refreshedOrder);
+      if (invoiceOrder?.id === refreshedOrder.id) {
+        setInvoiceOrder(refreshedOrder);
+      }
+      const refreshedParty = normalizeLookupParty({
+        partyId: refreshedOrder.partyId || refreshedOrder.Party?.id || refreshedOrder.Customer?.id || '',
+        partyName: refreshedOrder.partyName || refreshedOrder.Party?.name || refreshedOrder.Customer?.name || '',
+        partyPhone: refreshedOrder.partyPhone || refreshedOrder.Party?.phone || refreshedOrder.Customer?.phone || '',
+        currentAmount: refreshedOrder.Party?.currentAmount ?? refreshedOrder.Customer?.currentAmount ?? null,
+        type: 'customer',
+      });
+      if (refreshedParty.id) {
+        upsertParty(refreshedParty);
+        if (selectedParty?.id === refreshedParty.id) {
+          setSelectedParty(refreshedParty);
+        }
+      }
       setPayDialog(null);
-      loadServices();
+      await loadServices();
     } catch (err) {
       setPayError(err.message);
+    }
+  };
+
+  const closeDeleteDialog = () => {
+    if (deleteService && deletingServiceId === deleteService.id) return;
+    setDeleteService(null);
+  };
+
+  const handleDeleteService = async () => {
+    if (!deleteService) return;
+
+    setDeletingServiceId(deleteService.id);
+    setListNotice({ type: '', message: '' });
+
+    try {
+      await api.deleteService(deleteService.id);
+      useProductStore.getState().invalidate();
+      setListError('');
+      setListNotice({ type: 'success', message: t('services.messages.deleted') });
+      if (pagedServices.length === 1 && page > 1) {
+        setPage((current) => Math.max(1, current - 1));
+      }
+      await loadServices();
+    } catch (err) {
+      setListNotice({ type: 'error', message: err.message || t('services.messages.deleteFailed') });
+    } finally {
+      setDeletingServiceId('');
+      setDeleteService(null);
     }
   };
 
@@ -1374,7 +1440,7 @@ export default function Services() {
         <div className="p-5 md:p-8">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl">
-              <h1 className="mt-4 font-serif text-3xl text-slate-900 dark:text-white md:text-4xl">{servicesTitle}</h1>
+              <h1 className="mt-0 font-serif text-3xl text-slate-900 dark:text-white md:text-3xl">{servicesTitle}</h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 md:text-base">
                 {servicesSubtitle}
               </p>
@@ -1395,6 +1461,7 @@ export default function Services() {
         </div>
       </section>
 
+      {listNotice.message ? <Notice title={listNotice.message} tone={listNotice.type} /> : null}
       {listError ? <Notice title={listError} tone="error" /> : null}
 
       {/* ── Orders Table ── */}
@@ -1511,7 +1578,7 @@ export default function Services() {
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-3 gap-2 border-t border-slate-200/70 pt-3 dark:border-slate-800/70">
+                    <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-200/70 pt-3 dark:border-slate-800/70">
                       <button
                         type="button"
                         className="inline-flex items-center justify-center gap-1 rounded-2xl border border-slate-200/70 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60"
@@ -1535,6 +1602,15 @@ export default function Services() {
                       >
                         <Pencil size={12} />
                         {t('common.edit')}
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center gap-1 rounded-2xl border border-rose-200/80 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-300 dark:hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-60"
+                        onClick={() => setDeleteService(order)}
+                        disabled={deletingServiceId === order.id}
+                      >
+                        <Trash2 size={12} />
+                        {t('common.delete')}
                       </button>
                     </div>
 
@@ -1599,7 +1675,9 @@ export default function Services() {
                           <div>{order.Party?.name || order.partyName || <span className="text-slate-400">—</span>}</div>
                           <div className="text-xs text-slate-400">Created by {getCreatorDisplayName(order)}</div>
                         </td>
-                        <td className="py-3 pr-4"><DeliveryBadge date={order.deliveryDate} /></td>
+                        <td className="py-3 pr-4">
+                          { order.status !== 'closed'  ? <DeliveryBadge date={order.deliveryDate} /> : 'Delivered'}
+                        </td>
                         <td className="py-3 pr-4">
                           <button type="button" className="transition hover:opacity-75" onClick={() => openStatusDialog(order)}>
                             <StatusBadge status={order.status} />
@@ -1637,6 +1715,15 @@ export default function Services() {
                             </button>
                             <button type="button" title={t('common.view')} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800" onClick={() => openInvoiceModal(order)}>
                               <FileText size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              title={t('common.delete')}
+                              className="rounded-xl p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 disabled:cursor-not-allowed disabled:opacity-60"
+                              onClick={() => setDeleteService(order)}
+                              disabled={deletingServiceId === order.id}
+                            >
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </td>
@@ -2935,6 +3022,14 @@ export default function Services() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteService)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteService}
+        description={deleteService ? t('services.deleteConfirm', { name: deleteService.orderNo || deleteService.id.slice(0, 8) }) : t('common.confirmDelete')}
+        confirming={Boolean(deleteService) && deletingServiceId === deleteService.id}
+      />
     </div>
   );
 }
