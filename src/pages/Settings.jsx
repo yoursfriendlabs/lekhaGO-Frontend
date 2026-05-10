@@ -8,6 +8,8 @@ import StaffManagement from '../components/StaffManagement';
 import BanksSettingsPanel from '../components/settings/BanksSettingsPanel.jsx';
 import CategoriesSettingsPanel from '../components/settings/CategoriesSettingsPanel.jsx';
 import OrderAttributesSettingsPanel from '../components/settings/OrderAttributesSettingsPanel.jsx';
+import ProfileSettingsPanel from '../components/settings/ProfileSettingsPanel.jsx';
+import SubscriptionSettingsPanel from '../components/settings/SubscriptionSettingsPanel.jsx';
 import UnitsSettingsPanel from '../components/settings/UnitsSettingsPanel.jsx';
 import { api, API_BASE } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -19,7 +21,9 @@ import {
   CATEGORIES_SETTINGS_TAB,
   GENERAL_SETTINGS_TAB,
   ORDER_ATTRIBUTES_SETTINGS_TAB,
+  PROFILE_SETTINGS_TAB,
   STAFF_SETTINGS_TAB,
+  SUBSCRIPTION_SETTINGS_TAB,
   UNITS_SETTINGS_TAB,
 } from '../lib/settingsTabs';
 
@@ -32,10 +36,12 @@ const EMPTY = {
   logoUrl: '',
 };
 
+const PROFILE_TAB_KEYS = [PROFILE_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB, ACCOUNT_SETTINGS_TAB];
+
 export default function Settings() {
   const { t } = useI18n();
   const { businessId, role } = useAuth();
-  const { settings, businessProfile, loading: settingsLoading, saveSettings, reloadSettings } = useBusinessSettings();
+  const { settings, loading: settingsLoading, saveSettings, reloadSettings } = useBusinessSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [form, setForm] = useState({ ...EMPTY, ...settings });
   const [saving, setSaving] = useState(false);
@@ -56,11 +62,23 @@ export default function Settings() {
       });
     }
 
-    nextTabs.push({
-      key: ACCOUNT_SETTINGS_TAB,
-      label: t('settingsPage.tabs.account'),
-      description: t('settingsPage.descriptions.account'),
-    });
+    nextTabs.push(
+      {
+        key: PROFILE_SETTINGS_TAB,
+        label: t('settingsPage.tabs.profile'),
+        description: t('settingsPage.descriptions.profile'),
+      },
+      {
+        key: SUBSCRIPTION_SETTINGS_TAB,
+        label: t('settingsPage.tabs.subscription'),
+        description: t('settingsPage.descriptions.subscription'),
+      },
+      {
+        key: ACCOUNT_SETTINGS_TAB,
+        label: t('settingsPage.tabs.account'),
+        description: t('settingsPage.descriptions.account'),
+      }
+    );
 
     if (isOwner) {
       nextTabs.push({
@@ -96,10 +114,22 @@ export default function Settings() {
     return nextTabs;
   }, [isOwner, t]);
 
+  const companyTabs = useMemo(
+    () => tabs.filter((tab) => !PROFILE_TAB_KEYS.includes(tab.key)),
+    [tabs]
+  );
+  const profileTabs = useMemo(
+    () => tabs.filter((tab) => PROFILE_TAB_KEYS.includes(tab.key)),
+    [tabs]
+  );
+  const defaultCompanyTab = companyTabs[0]?.key || GENERAL_SETTINGS_TAB;
+  const defaultProfileTab = PROFILE_SETTINGS_TAB;
+
   const requestedTab = searchParams.get('tab');
-  const defaultTab = tabs[0]?.key || ACCOUNT_SETTINGS_TAB;
+  const defaultTab = tabs[0]?.key || defaultProfileTab;
   const activeTab = tabs.some((tab) => tab.key === requestedTab) ? requestedTab : defaultTab;
   const activeTabMeta = tabs.find((tab) => tab.key === activeTab) || tabs[0];
+  const isProfileSection = PROFILE_TAB_KEYS.includes(activeTab);
 
   useEffect(() => {
     reloadSettings(businessId);
@@ -165,6 +195,14 @@ export default function Settings() {
     setSearchParams(nextParams);
   };
 
+  const handleCompanySettingClick = () => {
+    handleTabChange(defaultCompanyTab);
+  };
+
+  const handleProfileSettingClick = () => {
+    handleTabChange(defaultProfileTab);
+  };
+
   const logoSrc = form.logoUrl
     ? form.logoUrl.startsWith('http')
       ? form.logoUrl
@@ -174,37 +212,55 @@ export default function Settings() {
   return (
     <div className="min-w-0 max-w-6xl space-y-6 overflow-x-hidden">
       <PageHeader title={t('settingsPage.title')} subtitle={activeTabMeta?.description || t('settingsPage.subtitle')} />
-      <div>
-        <div className="grid gap-3 grid-cols-5 ">
-          <button className="rounded-[22px] border border-amber-200 bg-white p-5 text-left ">
-            <div>
-              <p className="text-xl font-bold ">Company Setting</p>
-            </div>
-          </button>
-          <button className="rounded-[22px] border border-amber-200 bg-white p-5 text-left ">
-            <div>
-              <p className="text-xl font-bold ">Profile Setting</p>
-            </div>
-          </button>
-          <button className="rounded-[22px] border border-amber-200 bg-white p-5 text-left ">
-            <div>
-              <p className="text-xl font-bold ">Plans</p>
-            </div>
-          </button>
-        </div>
-        
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={handleCompanySettingClick}
+          aria-pressed={!isProfileSection}
+          className={`rounded-[22px] border p-5 text-left shadow-sm transition ${
+            !isProfileSection
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-900 shadow-emerald-100/60 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-100'
+              : 'border-amber-200 bg-white text-slate-900 hover:border-amber-300 hover:bg-amber-50 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100'
+          }`}
+        >
+          <div>
+            <p className="text-xl font-bold">Company Setting</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Company details and business configuration.
+            </p>
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={handleProfileSettingClick}
+          aria-pressed={isProfileSection}
+          className={`rounded-[22px] border p-5 text-left shadow-sm transition ${
+            isProfileSection
+              ? 'border-emerald-300 bg-emerald-50 text-emerald-900 shadow-emerald-100/60 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-100'
+              : 'border-amber-200 bg-white text-slate-900 hover:border-amber-300 hover:bg-amber-50 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-100'
+          }`}
+        >
+          <div>
+            <p className="text-xl font-bold">Profile Setting</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              Security, profile details, and subscription access.
+            </p>
+          </div>
+        </button>
       </div>
+
       <div className="card space-y-4">
         <div className="space-y-1">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
             {t('settingsPage.title')}
           </p>
-          <h2 className="break-words font-serif text-xl text-slate-900 dark:text-white">{activeTabMeta.label}</h2>
+          <h2 className="break-words font-serif text-xl text-slate-900 dark:text-white">{activeTabMeta?.label}</h2>
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap">
           <div className="contents lg:flex lg:flex-wrap lg:gap-2">
-            {tabs.map((tab) => {
+            {(isProfileSection ? profileTabs : companyTabs).map((tab) => {
               const isActive = activeTab === tab.key;
 
               return (
@@ -212,10 +268,11 @@ export default function Settings() {
                   key={tab.key}
                   type="button"
                   onClick={() => handleTabChange(tab.key)}
-                  className={`min-w-0 rounded-2xl px-3 py-3 text-center text-sm font-semibold leading-tight transition lg:w-auto lg:px-4 lg:py-2.5 lg:text-left ${isActive
+                  className={`min-w-0 rounded-2xl px-3 py-3 text-center text-sm font-semibold leading-tight transition lg:w-auto lg:px-4 lg:py-2.5 lg:text-left ${
+                    isActive
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
-                    }`}
+                  }`}
                 >
                   {tab.label}
                 </button>
@@ -227,8 +284,6 @@ export default function Settings() {
 
       {activeTab === GENERAL_SETTINGS_TAB ? (
         <>
-
-
           {error ? <Notice title={error} tone="error" /> : null}
 
           {settingsLoading && !form.companyName ? (
@@ -376,6 +431,8 @@ export default function Settings() {
         </>
       ) : null}
 
+      {activeTab === PROFILE_SETTINGS_TAB ? <ProfileSettingsPanel isOwner={isOwner} /> : null}
+      {activeTab === SUBSCRIPTION_SETTINGS_TAB ? <SubscriptionSettingsPanel isOwner={isOwner} /> : null}
       {activeTab === ACCOUNT_SETTINGS_TAB ? <AccountSecurityPanel /> : null}
       {activeTab === STAFF_SETTINGS_TAB ? <StaffManagement businessId={businessId} /> : null}
       {activeTab === CATEGORIES_SETTINGS_TAB ? <CategoriesSettingsPanel /> : null}
