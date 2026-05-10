@@ -37,6 +37,8 @@ const EMPTY = {
   logoUrl: '',
 };
 
+const PROFILE_TAB_KEYS = [PROFILE_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB, ACCOUNT_SETTINGS_TAB];
+
 function scrollToGrowthPlan() {
   if (typeof document === 'undefined') return;
   window.setTimeout(() => {
@@ -137,10 +139,22 @@ export default function Settings() {
   }, [generalLocked, hasFeatureAccess, isOwner, t]);
 
   const requestedTab = searchParams.get('tab');
-  const defaultTab = tabs[0]?.key || PROFILE_SETTINGS_TAB;
+  const companyTabs = useMemo(
+    () => tabs.filter((tab) => !PROFILE_TAB_KEYS.includes(tab.key)),
+    [tabs]
+  );
+  const profileTabs = useMemo(
+    () => tabs.filter((tab) => PROFILE_TAB_KEYS.includes(tab.key)),
+    [tabs]
+  );
+  const defaultCompanyTab = companyTabs[0]?.key || '';
+  const defaultProfileTab = PROFILE_SETTINGS_TAB;
+  const defaultTab = defaultCompanyTab || defaultProfileTab;
   const activeTab = tabs.some((tab) => tab.key === requestedTab) ? requestedTab : defaultTab;
   const activeTabMeta = tabs.find((tab) => tab.key === activeTab) || tabs[0];
   const routeNotice = location.state?.notice;
+  const isProfileSection = PROFILE_TAB_KEYS.includes(activeTab);
+  const visibleTabs = isProfileSection ? profileTabs : companyTabs;
 
   useEffect(() => {
     reloadSettings(businessId);
@@ -226,6 +240,14 @@ export default function Settings() {
     setSearchParams(nextParams);
   };
 
+  const handleCompanySettingClick = () => {
+    handleTabChange(defaultCompanyTab);
+  };
+
+  const handleProfileSettingClick = () => {
+    handleTabChange(defaultProfileTab);
+  };
+
   const logoSrc = form.logoUrl
     ? form.logoUrl.startsWith('http')
       ? form.logoUrl
@@ -235,6 +257,33 @@ export default function Settings() {
   return (
     <div className="min-w-0 max-w-6xl space-y-6 overflow-x-hidden">
       <PageHeader title={t('settingsPage.title')} subtitle={activeTabMeta?.description || t('settingsPage.subtitle')} />
+
+      <div className="flex flex-wrap items-end gap-8 border-b border-slate-200/80 pb-1 dark:border-slate-800">
+        <button
+          type="button"
+          onClick={handleCompanySettingClick}
+          aria-pressed={!isProfileSection}
+          className={`relative pb-3 text-lg font-semibold transition-colors after:absolute after:left-0 after:-bottom-[1px] after:h-0.5 after:w-full after:origin-left after:rounded-full after:transition-transform after:duration-200 after:content-[''] ${
+            !isProfileSection
+              ? 'text-primary-600 after:scale-x-100 after:bg-primary-600 dark:text-primary-300 dark:after:bg-primary-300'
+              : 'text-slate-500 after:scale-x-0 after:bg-transparent hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          Company Setting
+        </button>
+        <button
+          type="button"
+          onClick={handleProfileSettingClick}
+          aria-pressed={isProfileSection}
+          className={`relative pb-3 text-lg font-semibold transition-colors after:absolute after:left-0 after:-bottom-[1px] after:h-0.5 after:w-full after:origin-left after:rounded-full after:transition-transform after:duration-200 after:content-[''] ${
+            isProfileSection
+              ? 'text-primary-600 after:scale-x-100 after:bg-primary-600 dark:text-primary-300 dark:after:bg-primary-300'
+              : 'text-slate-500 after:scale-x-0 after:bg-transparent hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+          }`}
+        >
+          Profile Setting
+        </button>
+      </div>
 
       <div className="card space-y-4">
         <div className="space-y-1">
@@ -246,7 +295,7 @@ export default function Settings() {
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap">
           <div className="contents lg:flex lg:flex-wrap lg:gap-2">
-            {tabs.map((tab) => {
+            {visibleTabs.map((tab) => {
               const isActive = activeTab === tab.key;
 
               return (
