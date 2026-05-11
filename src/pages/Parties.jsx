@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
@@ -44,6 +44,7 @@ const makeEmptyTx = () => ({
 });
 
 const TX_PAGE_SIZE = 10;
+const PARTY_PAGE_SIZE = 20;
 
 function formatDate(value) {
   if (!value) return '-';
@@ -107,6 +108,19 @@ function getStatementAmountFields(row, t) {
   };
 }
 
+function mergeUniqueParties(existing = [], incoming = []) {
+  const seen = new Set();
+  const merged = [];
+
+  [...existing, ...incoming].forEach((party) => {
+    if (!party?.id || seen.has(party.id)) return;
+    seen.add(party.id);
+    merged.push(party);
+  });
+
+  return merged;
+}
+
 export default function Parties() {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -141,39 +155,127 @@ export default function Parties() {
   const [txPage, setTxPage] = useState(1);
   const [deleteParty, setDeleteParty] = useState(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [partyTotal, setPartyTotal] = useState(0);
+  const [loadingMoreParties, setLoadingMoreParties] = useState(false);
+  const [partyHasMore, setPartyHasMore] = useState(false);
+  const partyListScrollRef = useRef(null);
+  const partyListSentinelRef = useRef(null);
+  const partyListSessionRef = useRef(0);
   const submitPartyRequestRef = useRef(false);
+  const supportsIntersectionObserver = typeof IntersectionObserver !== 'undefined';
 
-  useEffect(() => {
-    let isActive = true;
+  const loadPartyPage = useCallback(
+    async ({ offset = 0, append = false, session = partyListSessionRef.current } = {}) => {
+      const search = debouncedQuery.trim();
+      const requestParams = {
+        limit: PARTY_PAGE_SIZE,
+        offset,
+        ...(search ? { search } : {}),
+        ...(filterType !== 'all' ? { type: filterType } : {}),
+      };
 
-    async function loadParties() {
-      setLoadingParties(true);
-      setListError('');
+      if (append) {
+        setLoadingMoreParties(true);
+      } else {
+        setLoadingParties(true);
+        setListError('');
+      }
 
       try {
-        const data = await api.listParties({
-          ...(debouncedQuery.trim() ? { search: debouncedQuery.trim() } : {}),
-          ...(filterType !== 'all' ? { type: filterType } : {}),
-        });
+        const data = await api.listParties(requestParams);
 
-        if (!isActive) return;
-        setParties(data?.items || []);
+        if (session !== partyListSessionRef.current) return;
+
+        const nextItems = data?.items || [];
+        const total = Number(data?.total ?? nextItems.length);
+        const pageFilled = nextItems.length === PARTY_PAGE_SIZE;
+
+        setListError('');
+        setParties((previous) => (append ? mergeUniqueParties(previous, nextItems) : nextItems));
+        setPartyTotal(total);
+        setPartyHasMore(nextItems.length > 0 && (offset + nextItems.length < total || pageFilled));
+
+        if (!append && nextItems[0]?.id) {
+          setSelectedId((currentSelectedId) => currentSelectedId || nextItems[0].id);
+        }
       } catch (err) {
-        if (!isActive) return;
-        setListError(err.message);
-        setParties([]);
-      } finally {
-        if (isActive) setLoadingParties(false);
-      }
-    }
+        if (session !== partyListSessionRef.current) return;
 
-    loadParties();
-    return () => {
-      isActive = false;
-    };
-  }, [debouncedQuery, filterType, partyReloadKey]);
+        setListError(err.message);
+        setPartyHasMore(false);
+
+        if (!append) {
+          setParties([]);
+          setPartyTotal(0);
+        }
+      } finally {
+        if (session !== partyListSessionRef.current) return;
+
+        if (append) {
+          setLoadingMoreParties(false);
+        } else {
+          setLoadingParties(false);
+        }
+      }
+    },
+    [debouncedQuery, filterType]
+  );
 
   useEffect(() => {
+    const session = partyListSessionRef.current + 1;
+    partyListSessionRef.current = session;
+    if (partyListScrollRef.current) {
+      partyListScrollRef.current.scrollTop = 0;
+    }
+    setParties([]);
+    setPartyTotal(0);
+    setPartyHasMore(false);
+    setLoadingMoreParties(false);
+    loadPartyPage({ offset: 0, append: false, session });
+  }, [debouncedQuery, filterType, partyReloadKey, loadPartyPage]);
+
+  useEffect(() => {
+    const root = partyListScrollRef.current;
+    const sentinel = partyListSentinelRef.current;
+
+    if (
+      !supportsIntersectionObserver ||
+      !root ||
+      !sentinel ||
+      !partyHasMore ||
+      loadingParties ||
+      loadingMoreParties
+    ) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (!entry?.isIntersecting) return;
+
+        loadPartyPage({
+          offset: parties.length,
+          append: true,
+          session: partyListSessionRef.current,
+        });
+      },
+      {
+        root,
+        rootMargin: '160px 0px',
+        threshold: 0.1,
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadPartyPage, loadingMoreParties, loadingParties, partyHasMore, parties.length, supportsIntersectionObserver]);
+
+  useEffect(() => {
+    if (loadingParties && parties.length === 0) {
+      return;
+    }
+
     if (!parties.length) {
       setSelectedId(null);
       return;
@@ -187,7 +289,7 @@ export default function Parties() {
       // If selected party is not in list, keep the selectedId but don't auto-change
       // This allows the statement to load for that party even if not in filtered list
     }
-  }, [parties]);
+  }, [loadingParties, parties, selectedId]);
 
   useEffect(() => {
     setTxPage(1);
@@ -549,10 +651,10 @@ export default function Parties() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="card space-y-4">
+        <div className="card flex flex-col gap-4 lg:sticky lg:top-6 lg:self-start">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
-              {t('parties.listTitle', { count: parties.length })}
+              {t('parties.listTitle', { count: partyTotal || parties.length })}
             </h3>
             <button className="btn-ghost" type="button" onClick={openCreate}>
               <ChevronDown size={16} /> {t('parties.addParty')}
@@ -591,11 +693,31 @@ export default function Parties() {
             ))}
           </div>
 
-          <div className="space-y-2">
+          <div
+            ref={partyListScrollRef}
+            className="max-h-[60vh] space-y-2 overflow-y-auto pr-1 no-scrollbar lg:max-h-[calc(100vh-22rem)]"
+          >
             {loadingParties && parties.length === 0 ? (
               <p className="text-sm text-slate-500">{t('common.loading')}</p>
             ) : parties.length === 0 ? (
-              <p className="text-sm text-slate-500">{t('parties.noParties')}</p>
+              <div className="space-y-2">
+                <p className="text-sm text-slate-500">{t('parties.noParties')}</p>
+                {listError ? (
+                  <button
+                    type="button"
+                    className="text-sm font-semibold text-rose-600 transition hover:text-rose-700"
+                    onClick={() =>
+                      loadPartyPage({
+                        offset: 0,
+                        append: false,
+                        session: partyListSessionRef.current,
+                      })
+                    }
+                  >
+                    Retry
+                  </button>
+                ) : null}
+              </div>
             ) : (
               parties.map((party) => {
                 const balanceMeta = getPartyBalanceMeta(party.currentAmount, t);
@@ -643,6 +765,54 @@ export default function Parties() {
                 );
               })
             )}
+
+            {parties.length > 0 ? (
+              <div className="flex items-center justify-between gap-2 border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-slate-700/60">
+                <span>{t('pagination.showing', { start: 1, end: parties.length, total: partyTotal || parties.length })}</span>
+                {loadingMoreParties ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-500" />
+                    {t('common.loading')}
+                  </span>
+                ) : listError ? (
+                  <button
+                    type="button"
+                    className="font-semibold text-rose-600 transition hover:text-rose-700"
+                    onClick={() =>
+                      loadPartyPage({
+                        offset: parties.length,
+                        append: true,
+                        session: partyListSessionRef.current,
+                      })
+                    }
+                  >
+                    Retry load more
+                  </button>
+                ) : partyHasMore ? (
+                  supportsIntersectionObserver ? (
+                    <span>Scroll to load more</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="font-semibold text-emerald-600 transition hover:text-emerald-700"
+                      onClick={() =>
+                        loadPartyPage({
+                          offset: parties.length,
+                          append: true,
+                          session: partyListSessionRef.current,
+                        })
+                      }
+                    >
+                      Load more
+                    </button>
+                  )
+                ) : (
+                  <span>All parties loaded</span>
+                )}
+              </div>
+            ) : null}
+
+            <div ref={partyListSentinelRef} className="h-4" aria-hidden="true" />
           </div>
         </div>
 
