@@ -2922,7 +2922,7 @@ export default function Services() {
                     invoiceType="Service Bill"
                     invoiceNo={invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)}
                     date={invoiceOrder.deliveryDate ? formatMaybeDate(invoiceOrder.deliveryDate, 'MMMM D, YYYY') : null}
-                    status={invoiceOrder.status}
+                    // status={invoiceOrder.status}
                     statusColor="border border-black text-black"
                   />
                 </div>
