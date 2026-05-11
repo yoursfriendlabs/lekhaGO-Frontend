@@ -1425,7 +1425,7 @@ export default function Purchases() {
       <Dialog
         isOpen={Boolean(payDialog)}
         onClose={closePayDialog}
-        title={t('common.recordPayment')}
+        title={t('RecordPayment')}
         size="sm"
       >
         {payDialog ? (
@@ -1449,7 +1449,7 @@ export default function Purchases() {
             </div>
 
             <div>
-              <label className="label">{t('common.amount')}</label>
+              <label className="label">{t('Amount')}</label>
               <input
                 className="input mt-1"
                 type="number"
@@ -1481,7 +1481,7 @@ export default function Purchases() {
                 {t('common.cancel')}
               </button>
               <button type="submit" className="btn-primary flex-1">
-                {t('common.recordPayment')}
+                {t('Record Payment')}
               </button>
             </div>
           </form>
@@ -1669,7 +1669,7 @@ export default function Purchases() {
                             type="button"
                             className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60"
                             onClick={() => openPayDialog(purchase)}
-                            aria-label={t('common.recordPayment')}
+                            aria-label={t('RecordPayment')}
                           >
                             {money(due)} {t('common.due')}
                           </button>
