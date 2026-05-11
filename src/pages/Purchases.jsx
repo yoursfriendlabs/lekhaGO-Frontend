@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Pencil, FileText, Package, Plus, Wallet, Wrench, X, Trash2 } from 'lucide-react';
+import { Pencil, FileText, Package, Plus, Wallet, Wrench, X, Trash2, Printer } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
@@ -13,6 +12,7 @@ import { useAuth } from '../lib/auth';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import Pagination from '../components/Pagination';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
+import ActionMenu from '../components/ActionMenu.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
@@ -1413,31 +1413,21 @@ export default function Purchases() {
                     </div>
                   </div>
 
-                  <div className="mt-3 flex items-center justify-end gap-1 border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
-                    <button
-                      type="button"
-                      title={t('common.edit')}
-                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-                      onClick={() => openEdit(purchase.id)}
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <Link
-                      title={t('common.view')}
-                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800"
-                      to={`/app/invoice/purchases/${purchase.id}`}
-                    >
-                      <FileText size={14} />
-                    </Link>
-                    <button
-                      type="button"
-                      title={t('common.delete')}
-                      className="rounded-lg p-1.5 text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 disabled:cursor-not-allowed disabled:opacity-60"
-                      onClick={() => setDeletePurchase(purchase)}
-                      disabled={deletingPurchaseId === purchase.id}
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                  <div className="mt-3 flex items-center justify-end border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
+                    <ActionMenu
+                      actions={[
+                        { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(purchase.id) },
+                        { label: t('common.view'), icon: FileText, to: `/app/invoice/purchases/${purchase.id}` },
+                        { label: 'Print Preview', icon: Printer, to: `/app/invoice/purchases/${purchase.id}?print=1` },
+                        {
+                          label: t('common.delete'),
+                          icon: Trash2,
+                          tone: 'danger',
+                          disabled: deletingPurchaseId === purchase.id,
+                          onClick: () => setDeletePurchase(purchase),
+                        },
+                      ]}
+                    />
                   </div>
                 </div>
               );
@@ -1517,32 +1507,20 @@ export default function Purchases() {
                         )}
                       </td>
                       <td className="py-2.5 text-right">
-                        <div className="inline-flex items-center gap-1">
-                          <button
-                            type="button"
-                            title={t('common.edit')}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-                            onClick={() => openEdit(purchase.id)}
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <Link
-                            title={t('common.view')}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800"
-                            to={`/app/invoice/purchases/${purchase.id}`}
-                          >
-                            <FileText size={14} />
-                          </Link>
-                          <button
-                            type="button"
-                            title={t('common.delete')}
-                            className="rounded-lg p-1.5 text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 disabled:cursor-not-allowed disabled:opacity-60"
-                            onClick={() => setDeletePurchase(purchase)}
-                            disabled={deletingPurchaseId === purchase.id}
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+                        <ActionMenu
+                          actions={[
+                            { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(purchase.id) },
+                            { label: t('common.view'), icon: FileText, to: `/app/invoice/purchases/${purchase.id}` },
+                            { label: 'Print Preview', icon: Printer, to: `/app/invoice/purchases/${purchase.id}?print=1` },
+                            {
+                              label: t('common.delete'),
+                              icon: Trash2,
+                              tone: 'danger',
+                              disabled: deletingPurchaseId === purchase.id,
+                              onClick: () => setDeletePurchase(purchase),
+                            },
+                          ]}
+                        />
                       </td>
                     </tr>
                   );
