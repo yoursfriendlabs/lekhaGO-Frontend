@@ -6,9 +6,9 @@ import {
 } from "./storage";
 import { toQueryKey, toQueryString } from "./queryKey";
 
-export const API_BASE =
-  import.meta.env.VITE_API_BASE_URL || "https://api.yoursfriend.com";
-// export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+// export const API_BASE =
+//   import.meta.env.VITE_API_BASE_URL || "https://api.yoursfriend.com";
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
 const INACTIVE_USER_REGEX = /user is inactive/i;
 const SESSION_EXPIRED_MESSAGE = "Your session expired. Please log in again.";
@@ -473,11 +473,28 @@ export const api = {
       {},
       listCache(["subscription", "subscription-payment-setup"], CACHE_TTL.short),
     ),
+  getPaymentsSetup: () =>
+    request(
+      "/api/payments/setup",
+      {},
+      listCache(["subscription", "payments-setup"], CACHE_TTL.short),
+    ),
   updateSubscription: (data) =>
     request(
       "/api/subscription",
       { method: "PATCH", body: JSON.stringify(data) },
-      mutationConfig(["auth-me", "subscription", "subscription-payment-setup"]),
+      mutationConfig(["auth-me", "subscription", "subscription-payment-setup", "payments-setup"]),
+    ),
+  initiatePayment: (data) =>
+    request("/api/payments/initiate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  verifyPayment: (data) =>
+    request(
+      "/api/payments/verify",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["auth-me", "subscription", "subscription-payment-setup", "payments-setup"]),
     ),
 
   listStaff: () =>

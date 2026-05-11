@@ -6,12 +6,20 @@ import { useAuth } from '../../lib/auth';
 import { todayISODate } from '../../lib/datetime';
 import { useI18n } from '../../lib/i18n.jsx';
 import {
+  getPaymentProviderSetup,
   getPreferredBillingCycle,
   getSubscriptionGuard,
   humanizeKey,
+  isPaymentProviderConfigured,
+  normalizePaymentsSetupPayload,
   normalizeSubscriptionPayload,
   sortAvailablePlans,
 } from '../../lib/subscription';
+import {
+  getPaymentProviderLabel,
+  PAYMENT_PROVIDER_OPTIONS,
+  submitProviderCheckout,
+} from '../../lib/subscriptionPayments';
 
 function resolveTranslatedValue(t, key, fallback) {
   const translated = t(key);
@@ -103,18 +111,84 @@ function MetricCard({ label, value, description, icon: Icon, tone = 'slate' }) {
   );
 }
 
+function getSelectedBillingOption(plan, selectedCycle) {
+  if (!Array.isArray(plan?.billingOptions)) return null;
+
+  return plan.billingOptions.find((option) => option.cycle === selectedCycle)
+    || plan.billingOptions[0]
+    || null;
+}
+
+function isSubscriptionPayload(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+
+  return Boolean(
+    payload.businessId
+      || payload.currentPlan
+      || payload.pendingChange
+      || payload.access
+      || payload.paymentIntegration
+      || Array.isArray(payload.availablePlans)
+  );
+}
+
+function getProviderHelperText(providerSetup, t) {
+  if (providerSetup?.message) return providerSetup.message;
+  if (providerSetup?.nextSteps?.length) return providerSetup.nextSteps.join(' ');
+  if (providerSetup?.missingEnvKeys?.length) {
+    return t('settingsPage.subscription.providerMissingKeys', {
+      keys: providerSetup.missingEnvKeys.join(', '),
+    });
+  }
+  if (providerSetup?.configured === true) {
+    return t('settingsPage.subscription.providerReadyDescription', {
+      provider: providerSetup.label,
+    });
+  }
+  if (providerSetup?.configured === false) {
+    return t('settingsPage.subscription.providerNeedsSetupDescription', {
+      provider: providerSetup.label,
+    });
+  }
+
+  return t('settingsPage.subscription.providerStatusUnknown');
+}
+
+function getPreferredProvider(plan, subscriptionData, fallbackProvider) {
+  const pendingProvider = subscriptionData?.pendingChange?.key === plan?.key
+    ? subscriptionData?.pendingChange?.paymentProvider
+    : '';
+  const currentProvider = subscriptionData?.currentPlan?.key === plan?.key
+    ? subscriptionData?.currentPlan?.paymentProvider
+    : '';
+
+  return [pendingProvider, currentProvider, fallbackProvider].find((value) =>
+    PAYMENT_PROVIDER_OPTIONS.some((option) => option.value === value)
+  ) || fallbackProvider;
+}
+
 export default function SubscriptionSettingsPanel({ isOwner = false }) {
   const { t } = useI18n();
   const { businessId, subscription, updateSubscription } = useAuth();
   const [subscriptionData, setSubscriptionData] = useState(() => normalizeSubscriptionPayload(subscription));
+  const [paymentsSetup, setPaymentsSetup] = useState(() => normalizePaymentsSetupPayload(null));
+  const [paymentsSetupLoaded, setPaymentsSetupLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [paymentsSetupError, setPaymentsSetupError] = useState('');
   const [notice, setNotice] = useState({ type: 'info', message: '' });
   const [planSelections, setPlanSelections] = useState({});
+  const [providerSelections, setProviderSelections] = useState({});
   const [activePlanKey, setActivePlanKey] = useState('');
 
   const syncSubscription = useCallback((payload) => {
-    const normalized = normalizeSubscriptionPayload(payload);
+    const candidate = payload?.subscription && typeof payload.subscription === 'object'
+      ? payload.subscription
+      : payload;
+
+    if (!isSubscriptionPayload(candidate)) return null;
+
+    const normalized = normalizeSubscriptionPayload(candidate);
     setSubscriptionData(normalized);
     updateSubscription(normalized);
     return normalized;
@@ -123,18 +197,44 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
   const loadSubscriptionSettings = useCallback(async ({ showSpinner = true } = {}) => {
     if (!businessId) {
       setSubscriptionData(null);
+      setPaymentsSetup(normalizePaymentsSetupPayload(null));
+      setPaymentsSetupLoaded(false);
       setError('');
+      setPaymentsSetupError('');
       return;
     }
 
     if (showSpinner) setLoading(true);
     setError('');
+    setPaymentsSetupError('');
 
     try {
       const subscriptionResponse = await api.getSubscription();
       syncSubscription(subscriptionResponse);
     } catch (loadError) {
       setError(loadError.message || t('auth.errors.generic'));
+      if (showSpinner) setLoading(false);
+      return;
+    }
+
+    try {
+      const setupResponse = await api.getPaymentsSetup();
+      setPaymentsSetup(normalizePaymentsSetupPayload(setupResponse));
+      setPaymentsSetupLoaded(true);
+    } catch (setupError) {
+      try {
+        const legacySetup = await api.getSubscriptionPaymentSetup();
+        setPaymentsSetup(normalizePaymentsSetupPayload({
+          providers: {
+            esewa: legacySetup,
+          },
+        }));
+        setPaymentsSetupLoaded(true);
+      } catch {
+        setPaymentsSetup(normalizePaymentsSetupPayload(null));
+        setPaymentsSetupLoaded(false);
+        setPaymentsSetupError(setupError.message || t('auth.errors.generic'));
+      }
     } finally {
       if (showSpinner) setLoading(false);
     }
@@ -178,6 +278,33 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
     });
   }, [subscriptionData]);
 
+  useEffect(() => {
+    const plans = subscriptionData?.availablePlans || [];
+    if (!plans.length) return;
+
+    const configuredProviders = PAYMENT_PROVIDER_OPTIONS.filter((option) =>
+      isPaymentProviderConfigured(getPaymentProviderSetup(paymentsSetup, option.value))
+    ).map((option) => option.value);
+    const fallbackProvider = configuredProviders[0] || PAYMENT_PROVIDER_OPTIONS[0].value;
+
+    setProviderSelections((currentSelections) => {
+      const nextSelections = { ...currentSelections };
+      let changed = false;
+
+      sortAvailablePlans(plans).forEach((plan) => {
+        if (!plan?.isPaid) return;
+
+        const preferredProvider = getPreferredProvider(plan, subscriptionData, fallbackProvider);
+        if (!nextSelections[plan.key]) {
+          nextSelections[plan.key] = preferredProvider;
+          changed = true;
+        }
+      });
+
+      return changed ? nextSelections : currentSelections;
+    });
+  }, [paymentsSetup, subscriptionData]);
+
   const access = subscriptionData?.access || null;
   const currentPlan = subscriptionData?.currentPlan || null;
   const pendingChange = subscriptionData?.pendingChange || null;
@@ -186,7 +313,10 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
     [subscriptionData?.availablePlans]
   );
   const guard = useMemo(() => getSubscriptionGuard(subscriptionData || access), [access, subscriptionData]);
-  const checkoutUrl = guard.checkoutUrl || '';
+  const providerCards = useMemo(
+    () => PAYMENT_PROVIDER_OPTIONS.map((option) => getPaymentProviderSetup(paymentsSetup, option.value)),
+    [paymentsSetup]
+  );
 
   const handleRefresh = async () => {
     setNotice({ type: 'info', message: '' });
@@ -197,17 +327,16 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
     if (!businessId || !isOwner) return;
 
     const selectedCycle = planSelections[plan.key] || getPreferredBillingCycle(plan, currentPlan, pendingChange);
-    const selectedOption = Array.isArray(plan.billingOptions)
-      ? plan.billingOptions.find((option) => option.cycle === selectedCycle) || null
-      : null;
+    const billingOption = getSelectedBillingOption(plan, selectedCycle);
+    const selectedProvider = plan.isPaid
+      ? providerSelections[plan.key] || PAYMENT_PROVIDER_OPTIONS[0].value
+      : '';
     const payload = plan.key === 'freemium'
       ? { plan: 'freemium', subscriptionStartDate: todayISODate() }
       : {
         plan: plan.key,
         billingCycle: selectedCycle || (plan.key === 'custom' ? 'custom' : 'monthly'),
-        ...(selectedOption?.amountConfigured && selectedOption?.amount !== null
-          ? { billingAmount: selectedOption.amount }
-          : {}),
+        paymentProvider: selectedProvider,
       };
 
     setActivePlanKey(plan.key);
@@ -215,12 +344,56 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
 
     try {
       const response = await api.updateSubscription(payload);
-      syncSubscription(response);
-      setNotice({
-        type: 'success',
-        message: response?.message || t('settingsPage.subscription.planSaved'),
+      const syncedSubscription = syncSubscription(response);
+
+      if (!syncedSubscription) {
+        await loadSubscriptionSettings({ showSpinner: false });
+      }
+
+      if (!plan.isPaid) {
+        setNotice({
+          type: 'success',
+          message: response?.message || t('settingsPage.subscription.planSaved'),
+        });
+        await loadSubscriptionSettings({ showSpinner: false });
+        return;
+      }
+
+      const providerSetup = getPaymentProviderSetup(paymentsSetup, selectedProvider);
+      if (paymentsSetupLoaded && providerSetup?.configured === false) {
+        setNotice({
+          type: 'warn',
+          message: providerSetup.message || t('settingsPage.subscription.providerSetupRequired', {
+            provider: getPaymentProviderLabel(selectedProvider),
+          }),
+        });
+        return;
+      }
+
+      const numericAmount = Number(billingOption?.amount);
+      const canStartCheckout = billingOption?.amountConfigured
+        && Number.isFinite(numericAmount)
+        && numericAmount > 0;
+
+      if (!canStartCheckout) {
+        setNotice({
+          type: 'success',
+          message: response?.message || t('settingsPage.subscription.planSaved'),
+        });
+        await loadSubscriptionSettings({ showSpinner: false });
+        return;
+      }
+
+      const initiateResponse = await api.initiatePayment({
+        provider: selectedProvider,
+        amount: numericAmount,
+        purchaseOrderName: t('settingsPage.subscription.purchaseOrderName', {
+          plan: plan.label || humanizeKey(plan.key),
+        }),
       });
-      await loadSubscriptionSettings({ showSpinner: false });
+      console.log(initiateResponse);
+
+      submitProviderCheckout(selectedProvider, initiateResponse);
     } catch (saveError) {
       setNotice({
         type: 'error',
@@ -261,10 +434,25 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
         {notice.message ? (
           <Notice
             title={notice.message}
-            tone={notice.type === 'error' ? 'error' : notice.type === 'success' ? 'success' : 'info'}
+            tone={
+              notice.type === 'error'
+                ? 'error'
+                : notice.type === 'success'
+                  ? 'success'
+                  : notice.type === 'warn'
+                    ? 'warn'
+                    : 'info'
+            }
           />
         ) : null}
         {error ? <Notice title={error} tone="error" /> : null}
+        {paymentsSetupError ? (
+          <Notice
+            title={t('settingsPage.subscription.providerLoadErrorTitle')}
+            description={paymentsSetupError}
+            tone="warn"
+          />
+        ) : null}
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <MetricCard
@@ -298,6 +486,50 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
           tone={access?.canUseApplication ? 'info' : 'warn'}
         />
       ) : null}
+
+      <div className="card space-y-5">
+        <div>
+          <h3 className="font-serif text-lg text-slate-900 dark:text-white">
+            {t('settingsPage.subscription.paymentSetupTitle')}
+          </h3>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            {t('settingsPage.subscription.paymentSetupSubtitle')}
+          </p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {providerCards.map((providerSetup) => (
+            <div
+              key={providerSetup.key}
+              className="rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 dark:border-slate-800/70 dark:bg-slate-900/60"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    {t('settingsPage.subscription.providerCardEyebrow')}
+                  </p>
+                  <h4 className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
+                    {providerSetup.label}
+                  </h4>
+                </div>
+                <StatusPill
+                  label={
+                    providerSetup.configured === true
+                      ? t('settingsPage.subscription.providerReady')
+                      : providerSetup.configured === false
+                        ? t('settingsPage.subscription.providerNeedsSetup')
+                        : t('settingsPage.subscription.providerUnknown')
+                  }
+                  tone={providerSetup.configured === true ? 'emerald' : providerSetup.configured === false ? 'amber' : 'slate'}
+                />
+              </div>
+              <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">
+                {getProviderHelperText(providerSetup, t)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
 
       <div className="card space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -338,19 +570,6 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
             </p>
           </div>
         </div>
-
-        {checkoutUrl ? (
-          <div className="flex justify-start">
-            <a
-              className="btn-primary inline-flex justify-center"
-              href={checkoutUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {t('settingsPage.subscription.checkoutCta')}
-            </a>
-          </div>
-        ) : null}
       </div>
 
       <div className="card space-y-5">
@@ -369,13 +588,25 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
           <div className="grid gap-4 xl:grid-cols-3">
             {orderedPlans.map((plan) => {
               const selectedCycle = planSelections[plan.key] || getPreferredBillingCycle(plan, currentPlan, pendingChange);
-              const billingOption = Array.isArray(plan.billingOptions)
-                ? plan.billingOptions.find((option) => option.cycle === selectedCycle) || plan.billingOptions[0] || null
-                : null;
+              const billingOption = getSelectedBillingOption(plan, selectedCycle);
+              const selectedProvider = providerSelections[plan.key] || PAYMENT_PROVIDER_OPTIONS[0].value;
+              const providerSetup = getPaymentProviderSetup(paymentsSetup, selectedProvider);
               const isCurrentPlan = currentPlan?.key === plan.key;
               const isPendingPlan = pendingChange?.key === plan.key;
               const isSubmitting = activePlanKey === plan.key;
-              const planCheckoutUrl = plan.checkoutUrl || billingOption?.checkoutUrl || checkoutUrl || '';
+              const canStartCheckout = plan.isPaid
+                && billingOption?.amountConfigured
+                && billingOption?.amount !== null
+                && billingOption?.amount !== undefined;
+              const actionLabel = isSubmitting
+                ? t('settingsPage.subscription.processingCta')
+                : isCurrentPlan
+                  ? t('adminPage.plan.currentPlanCta')
+                  : canStartCheckout
+                    ? t('settingsPage.subscription.checkoutWithProviderCta', {
+                      provider: getPaymentProviderLabel(selectedProvider),
+                    })
+                    : t('settingsPage.subscription.requestPlanCta');
 
               return (
                 <div
@@ -446,6 +677,43 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
                     </div>
                   ) : null}
 
+                  {plan.isPaid ? (
+                    <div className="mt-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        {t('settingsPage.subscription.chooseProviderLabel')}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {PAYMENT_PROVIDER_OPTIONS.map((option) => {
+                          const optionSetup = getPaymentProviderSetup(paymentsSetup, option.value);
+                          const isSelected = selectedProvider === option.value;
+
+                          return (
+                            <button
+                              key={`${plan.key}-${option.value}`}
+                              type="button"
+                              onClick={() => setProviderSelections((currentSelections) => ({
+                                ...currentSelections,
+                                [plan.key]: option.value,
+                              }))}
+                              disabled={!isOwner || Boolean(activePlanKey)}
+                              className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                                isSelected
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                              } ${!isOwner || activePlanKey ? 'cursor-not-allowed opacity-60' : ''}`}
+                            >
+                              {option.label}
+                              {optionSetup?.configured === false ? ` · ${t('settingsPage.subscription.providerNeedsSetupShort')}` : ''}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                        {getProviderHelperText(providerSetup, t)}
+                      </p>
+                    </div>
+                  ) : null}
+
                   <div className="mt-6 grid gap-3">
                     <button
                       type="button"
@@ -457,19 +725,8 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
                       disabled={isSubmitting || isCurrentPlan || !isOwner}
                       onClick={() => handlePlanChange(plan)}
                     >
-                      {isSubmitting ? t('adminPage.plan.savingCta') : isCurrentPlan ? t('adminPage.plan.currentPlanCta') : t('settingsPage.subscription.requestPlanCta')}
+                      {actionLabel}
                     </button>
-
-                    {planCheckoutUrl ? (
-                      <a
-                        className="btn-secondary justify-center"
-                        href={planCheckoutUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {t('settingsPage.subscription.checkoutCta')}
-                      </a>
-                    ) : null}
                   </div>
                 </div>
               );

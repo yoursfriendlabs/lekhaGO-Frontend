@@ -3,6 +3,7 @@
  */
 
 const PLAN_DISPLAY_ORDER = ['freemium', 'growth', 'custom'];
+const PAYMENT_PROVIDER_KEYS = ['esewa', 'khalti'];
 const RECOVERY_FEATURES = new Set(['settings', 'subscription', 'profile', 'account']);
 const ALL_FEATURES = [
   'dashboard',
@@ -224,18 +225,128 @@ export function normalizeSubscriptionPayload(payload, context = {}) {
 
 export function normalizePaymentSetupPayload(payload) {
   const source = asObject(payload);
+  const configured = pickBoolean(
+    source.configured,
+    source.isConfigured,
+    source.enabled,
+    source.ready,
+    source?.configuration?.configured
+  );
 
   return {
     ...source,
     configuration: {
       ...asObject(source.configuration),
-      configured: Boolean(source?.configuration?.configured),
+      configured: Boolean(configured),
     },
     missingEnvKeys: flattenStringList(source.missingEnvKeys),
     currentStatus: pickString(source.currentStatus, source.status),
     nextSteps: flattenStringList(source.nextSteps),
     checkoutUrl: pickString(source.checkoutUrl, source?.configuration?.checkoutUrl),
   };
+}
+
+function resolveProviderConfigured(provider) {
+  const configured = pickBoolean(
+    provider.configured,
+    provider.isConfigured,
+    provider.enabled,
+    provider.isEnabled,
+    provider.available,
+    provider.ready,
+    provider?.configuration?.configured,
+    provider?.configuration?.isConfigured
+  );
+
+  if (typeof configured === 'boolean') return configured;
+
+  const currentStatus = pickString(
+    provider.currentStatus,
+    provider.status,
+    provider.providerStatus,
+    provider.setupStatus,
+    provider?.configuration?.status
+  ).toLowerCase();
+
+  if (['configured', 'active', 'enabled', 'ready', 'available', 'connected'].includes(currentStatus)) {
+    return true;
+  }
+
+  if (currentStatus) {
+    return false;
+  }
+
+  return undefined;
+}
+
+function normalizePaymentProviderSetup(providerKey, payload) {
+  const source = normalizePaymentSetupPayload(payload);
+  const normalizedProviderKey = normalizeFeatureKey(providerKey);
+
+  return {
+    ...source,
+    key: normalizedProviderKey,
+    label: normalizedProviderKey === 'khalti' ? 'Khalti' : 'eSewa',
+    configured: resolveProviderConfigured(source),
+    message: pickString(source.message, source.description, source.reason, source.note),
+  };
+}
+
+function getPaymentsProviderSource(source, providerKey) {
+  const normalizedKey = normalizeFeatureKey(providerKey);
+  const candidateCollections = [
+    asObject(source.providers),
+    asObject(source.paymentProviders),
+    asObject(source.gateways),
+    asObject(source.gatewaySettings),
+    asObject(source.configuration?.providers),
+  ];
+
+  for (const collection of candidateCollections) {
+    const providerPayload = collection?.[normalizedKey]
+      || collection?.[providerKey]
+      || collection?.[providerKey === 'esewa' ? 'eSewa' : 'Khalti']
+      || collection?.[providerKey.toUpperCase()];
+
+    if (providerPayload && typeof providerPayload === 'object') {
+      return providerPayload;
+    }
+  }
+
+  return source?.[normalizedKey]
+    || source?.[providerKey]
+    || source?.[providerKey === 'esewa' ? 'eSewa' : 'Khalti']
+    || source?.[providerKey.toUpperCase()]
+    || null;
+}
+
+export function normalizePaymentsSetupPayload(payload) {
+  const source = asObject(payload);
+
+  return {
+    ...source,
+    providers: Object.fromEntries(
+      PAYMENT_PROVIDER_KEYS.map((providerKey) => [
+        providerKey,
+        normalizePaymentProviderSetup(
+          providerKey,
+          getPaymentsProviderSource(source, providerKey)
+        ),
+      ])
+    ),
+  };
+}
+
+export function getPaymentProviderSetup(paymentsSetup, providerKey) {
+  const normalizedSetup = normalizePaymentsSetupPayload(paymentsSetup);
+  const normalizedKey = normalizeFeatureKey(providerKey);
+
+  return normalizedSetup.providers?.[normalizedKey]
+    || normalizePaymentProviderSetup(normalizedKey, null);
+}
+
+export function isPaymentProviderConfigured(providerSetup) {
+  return providerSetup?.configured === true;
 }
 
 export function sortAvailablePlans(plans = []) {

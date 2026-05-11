@@ -36,6 +36,7 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const ActivateAccount = lazy(() => import('./pages/ActivateAccount'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Invoice = lazy(() => import('./pages/Invoice'));
+const PaymentCallback = lazy(() => import('./pages/PaymentCallback'));
 
 const OWNER_AND_STAFF_ROLES = ['owner', 'staff'];
 const OWNER_ONLY_ROLES = ['owner'];
@@ -351,6 +352,9 @@ export default function App() {
                       </PublicOnlyRoute>
                     )}
                   />
+                  <Route path="/payment/esewa/success" element={<PaymentCallback provider="esewa" outcome="success" />} />
+                  <Route path="/payment/esewa/failure" element={<PaymentCallback provider="esewa" outcome="failure" />} />
+                  <Route path="/payment/khalti/return" element={<PaymentCallback provider="khalti" outcome="return" />} />
                   <Route
                     path="/app/*"
                     element={(
