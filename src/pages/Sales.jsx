@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Pencil, FileText, Package, Plus } from 'lucide-react';
+import { Pencil, FileText, Package, Plus, Printer } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
@@ -1084,6 +1084,13 @@ export default function Sales() {
                     >
                       <FileText size={14} />
                     </Link>
+                    <Link
+                      title="Print"
+                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800"
+                      to={`/app/invoice/sales/${sale.id}?print=1`}
+                    >
+                      <Printer size={14} />
+                    </Link>
                   </div>
                 </div>
               );
@@ -1182,6 +1189,13 @@ export default function Sales() {
                             to={`/app/invoice/sales/${sale.id}`}
                           >
                             <FileText size={14} />
+                          </Link>
+                          <Link
+                            title="Print"
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800"
+                            to={`/app/invoice/sales/${sale.id}?print=1`}
+                          >
+                            <Printer size={14} />
                           </Link>
                         </div>
                       </td>

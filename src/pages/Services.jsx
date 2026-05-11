@@ -34,6 +34,7 @@ import {
   Search,
   Pencil,
   FileText,
+  Printer,
   ChevronDown,
   Phone,
   ArrowRight,
@@ -509,6 +510,7 @@ export default function Services() {
   // ── Invoice modal ──
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [invoiceBillMode, setInvoiceBillMode] = useState('view');
 
   // ── Attribute definitions for invoice display ──
   const [attributeDefs, setAttributeDefs] = useState([]);
@@ -1271,8 +1273,9 @@ export default function Services() {
   };
   const closeStatusDialog = () => setStatusDialog(null);
 
-  const openInvoiceModal = async (order) => {
+  const openInvoiceModal = async (order, { print = false } = {}) => {
     setInvoiceOrder(normalizeServiceOrder(order));
+    setInvoiceBillMode(print ? 'print' : 'view');
     setInvoiceLoading(true);
     try {
       const full = normalizeServiceOrder(await api.getService(order.id));
@@ -1598,6 +1601,14 @@ export default function Services() {
                       <button
                         type="button"
                         className="inline-flex items-center justify-center gap-1 rounded-2xl border border-slate-200/70 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60"
+                        onClick={() => openInvoiceModal(order, { print: true })}
+                      >
+                        <Printer size={12} />
+                        Print
+                      </button>
+                      <button
+                        type="button"
+                        className="inline-flex items-center justify-center gap-1 rounded-2xl border border-slate-200/70 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60"
                         onClick={() => openEditDialog(order)}
                       >
                         <Pencil size={12} />
@@ -1715,6 +1726,9 @@ export default function Services() {
                             </button>
                             <button type="button" title={t('common.view')} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800" onClick={() => openInvoiceModal(order)}>
                               <FileText size={14} />
+                            </button>
+                            <button type="button" title="Print" className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800" onClick={() => openInvoiceModal(order, { print: true })}>
+                              <Printer size={14} />
                             </button>
                             <button
                               type="button"
@@ -2706,14 +2720,24 @@ export default function Services() {
           <div className="relative mt-4 w-full max-w-3xl md:mt-8">
             <div className="mb-4 flex items-center justify-between print:hidden">
               <button type="button" className="btn-ghost" onClick={() => setInvoiceOrder(null)}>← Close</button>
-              <button type="button" className="btn-primary" onClick={handlePrint}>Download PDF</button>
+              <div className="flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setInvoiceBillMode((mode) => (mode === 'print' ? 'view' : 'print'))}
+                >
+                  {invoiceBillMode === 'print' ? 'View Bill' : 'Print Preview'}
+                </button>
+                <button type="button" className="btn-primary" onClick={handlePrint}>Print Bill</button>
+              </div>
             </div>
             {invoiceLoading ? (
               <div className="card flex items-center justify-center py-16">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
               </div>
             ) : (
-              <div ref={invoicePrintRef} className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950">
+              <>
+              <div className={`${invoiceBillMode === 'print' ? 'hidden' : ''} overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950`}>
                 {/* ── Header ── */}
                 <div className="px-8 pt-0">
                     <InvoiceHeader
@@ -2918,6 +2942,119 @@ export default function Services() {
                   </p>
                 </div>
               </div>
+
+              <div
+                ref={invoicePrintRef}
+                className={`${invoiceBillMode === 'print' ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm sm:p-8' : 'print-template bg-white p-6 text-black sm:p-8'}`}
+              >
+                <div className="border-b-2 border-black pb-4">
+                  <InvoiceHeader
+                    biz={bizSettings}
+                    invoiceType="Service Bill"
+                    invoiceNo={invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)}
+                    date={invoiceOrder.deliveryDate ? formatMaybeDate(invoiceOrder.deliveryDate, 'MMMM D, YYYY') : null}
+                    status={invoiceOrder.status}
+                    statusColor="border border-black text-black"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-6 border-b border-slate-300 py-4 text-sm">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Bill To</p>
+                    <p className="mt-1 font-semibold">{invoiceOrder.Party?.name || invoiceOrder.partyName || '—'}</p>
+                    {invoiceOrder.Party?.phone ? <p className="mt-0.5">{invoiceOrder.Party.phone}</p> : null}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Details</p>
+                    <p className="mt-1">Created By: {getCreatorDisplayName(invoiceOrder)}</p>
+                    {invoiceOrder.notes ? <p className="mt-1 whitespace-pre-wrap">Notes: {invoiceOrder.notes}</p> : null}
+                  </div>
+                </div>
+
+                {showGoldJewelleryDetails && (invoiceJewellery.metalType || invoiceJewellery.metalPurity || invoiceJewellery.actualWeight || invoiceJewellery.wastagePercent || invoiceJewellery.totalWeight || invoiceJewellery.diamondType || invoiceJewellery.diamondWeight || invoiceJewellery.diamondCarat || invoiceJewellery.diamondCharge) ? (
+                  <div className="border-b border-slate-300 py-3 text-sm">
+                    {invoiceJewellery.metalType ? <span className="mr-4">Metal: <strong>{invoiceJewellery.metalType}</strong></span> : null}
+                    {invoiceJewellery.metalPurity ? <span className="mr-4">Purity: <strong>{invoiceJewellery.metalPurity}</strong></span> : null}
+                    {invoiceJewellery.actualWeight ? <span className="mr-4">Actual weight: <strong>{invoiceJewellery.actualWeight}</strong></span> : null}
+                    {invoiceJewellery.wastagePercent ? <span className="mr-4">Wastage: <strong>{invoiceJewellery.wastagePercent}% ({invoiceJewellery.wastageWeight || '0'})</strong></span> : null}
+                    {invoiceJewellery.totalWeight ? <span className="mr-4">Total weight: <strong>{invoiceJewellery.totalWeight}</strong></span> : null}
+                    {invoiceJewellery.diamondType ? (
+                      <span className="mr-4">
+                        Diamond: <strong>{[invoiceJewellery.diamondType, invoiceJewellery.diamondWeight && `${invoiceJewellery.diamondWeight} wt`, invoiceJewellery.diamondCarat && `${invoiceJewellery.diamondCarat} ct`, invoiceJewellery.diamondPurity].filter(Boolean).join(' · ')}</strong>
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {invoiceExtraAttributes.length > 0 ? (
+                  <div className="border-b border-slate-300 py-3 text-sm">
+                    {invoiceExtraAttributes.map(([key, val]) => {
+                      const def = safeAttributeDefs.find((d) => d.key === key);
+                      const attrLabel = def?.name || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                      return (
+                        <span key={key} className="mr-4">
+                          {attrLabel}: <strong>{String(val || '—')}</strong>
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                <table className="mt-5 w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-black">
+                      <th className="py-2 text-left text-[10px] font-bold uppercase">Type</th>
+                      <th className="py-2 text-left text-[10px] font-bold uppercase">Description</th>
+                      <th className="py-2 text-left text-[10px] font-bold uppercase">Product</th>
+                      <th className="py-2 text-right text-[10px] font-bold uppercase">Qty</th>
+                      <th className="py-2 text-right text-[10px] font-bold uppercase">Unit Price</th>
+                      <th className="py-2 text-right text-[10px] font-bold uppercase">Tax</th>
+                      <th className="py-2 text-right text-[10px] font-bold uppercase">Tax Total</th>
+                      <th className="py-2 text-right text-[10px] font-bold uppercase">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoiceItems.map((item, idx) => (
+                      <tr key={`${item.productId || item.description || 'service'}-print-${idx}`} className="border-b border-slate-200">
+                        <td className="py-2 pr-3">{item.itemType === 'labor' ? 'Service' : 'Product'}</td>
+                        <td className="py-2 pr-3 font-medium">{item.description || item.productName || '—'}</td>
+                        <td className="py-2 pr-3">{item.productName || '—'}</td>
+                        <td className="py-2 text-right">{Number(item.quantity || 0).toFixed(item.quantity % 1 ? 3 : 0)}</td>
+                        <td className="py-2 text-right">{money(item.unitPrice)}</td>
+                        <td className="py-2 text-right">{Number(item.taxRate || 0).toFixed(2)}%</td>
+                        <td className="py-2 text-right">{money(getVatAmount(item.lineTotal, item.taxRate))}</td>
+                        <td className="py-2 text-right font-semibold">{money(item.lineTotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="mt-6 ml-auto max-w-xs space-y-2 text-sm">
+                  <div className="flex justify-between"><span>{t('services.subTotal')}</span><span>{money(invoiceTotals.subTotal)}</span></div>
+                  <div className="flex justify-between"><span>Service Total</span><span>{money(invoiceTotals.laborTotal)}</span></div>
+                  <div className="flex justify-between"><span>Product Total</span><span>{money(invoiceTotals.partsTotal)}</span></div>
+                  {showGoldJewelleryDetails && invoiceJewellery.diamondChargeNumber > 0 ? <div className="flex justify-between"><span>Diamond Charge</span><span>{money(invoiceJewellery.diamondChargeNumber)}</span></div> : null}
+                  <div className="flex justify-between"><span>{t('services.taxTotal')}</span><span>{money(invoiceTotals.taxTotal)}</span></div>
+                  {showGoldJewelleryDetails && invoiceJewellery.additionalTaxNumber > 0 ? <div className="flex justify-between"><span>Additional Tax</span><span>{money(invoiceJewellery.additionalTaxNumber)}</span></div> : null}
+                  {Number(invoiceTotals.discountTotal || 0) > 0 ? <div className="flex justify-between"><span>{t('services.discount')}</span><span>-{money(invoiceTotals.discountTotal)}</span></div> : null}
+                  <div className="flex justify-between border-t border-black pt-2 text-base font-bold">
+                    <span>{t('services.grandTotal')}</span><span>{money(invoiceTotals.grandTotal)}</span>
+                  </div>
+                  <div className="flex justify-between"><span>{t('services.amountReceived')}</span><span>{money(invoiceOrder.receivedTotal)}</span></div>
+                  {Math.max(Number(invoiceTotals.grandTotal || 0) - Number(invoiceOrder.receivedTotal || 0), 0) > 0 ? (
+                    <div className="flex justify-between font-bold">
+                      <span>{t('services.dueAmount')}</span>
+                      <span>{money(Math.max(Number(invoiceTotals.grandTotal || 0) - Number(invoiceOrder.receivedTotal || 0), 0))}</span>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-8 flex items-center justify-between border-t border-slate-300 pt-3 text-xs">
+                  <span>Thank you for your business!</span>
+                  <span>Printed {dayjs().format('D MMM YYYY')}</span>
+                </div>
+              </div>
+              </>
             )}
           </div>
         </div>
