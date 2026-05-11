@@ -64,6 +64,13 @@ function getPurchaseEntryType(purchase) {
     : 'purchase';
 }
 
+function getPurchaseDueAmount(purchase) {
+  return Math.max(
+    Number(purchase?.grandTotal || 0) - Number(purchase?.amountReceived || 0),
+    0
+  );
+}
+
 const emptyPurchaseItem = {
   productId: '',
   quantity: '1',
@@ -127,6 +134,12 @@ export default function Purchases() {
   const [status, setStatus] = useState({ type: 'info', message: '' });
   const [itemStatus, setItemStatus] = useState({ type: 'info', message: '' });
   const [isOpen, setIsOpen] = useState(false);
+  const [payDialog, setPayDialog] = useState(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payPaymentMethod, setPayPaymentMethod] = useState('cash');
+  const [payBankId, setPayBankId] = useState('');
+  const [payNotes, setPayNotes] = useState('');
+  const [payError, setPayError] = useState('');
   const [formMode, setFormMode] = useState('create');
   const [editingId, setEditingId] = useState(null);
   const [deletedItemIds, setDeletedItemIds] = useState([]);
@@ -473,6 +486,7 @@ export default function Purchases() {
   const openCreate = async () => {
     resetForm();
     setStatus({ type: 'info', message: '' });
+    setPayDialog(null);
     setIsOpen(true);
 
     if (businessId) {
@@ -488,6 +502,7 @@ export default function Purchases() {
   const openEdit = async (purchaseId) => {
     try {
       setStatus({ type: 'info', message: '' });
+      setPayDialog(null);
       const purchase = await api.getPurchase(purchaseId);
       const purchaseItems = purchase?.PurchaseItems || [];
       const entryType = purchase.entryType || purchase.type || 'purchase';
@@ -530,7 +545,7 @@ export default function Purchases() {
       setEditingId(purchaseId);
       setFormMode('edit');
       setSuggestedInvoiceNo(purchase.invoiceNo || '');
-      const computedDue = Number(purchase.dueAmount ?? Math.max(Number(purchase.grandTotal || 0) - Number(purchase.amountReceived || 0), 0));
+      const computedDue = getPurchaseDueAmount(purchase);
       setIsPaid(computedDue <= 0 && String(purchase.status || '').toLowerCase() !== 'ordered');
       setMobileStep('details');
       setShowItemDialog(false);
@@ -669,6 +684,86 @@ export default function Purchases() {
     } finally {
       setDeletingPurchaseId('');
       setDeletePurchase(null);
+    }
+  };
+
+  const openPayDialog = (purchase) => {
+    setPayDialog(purchase);
+    setPayAmount('');
+    setPayPaymentMethod('cash');
+    setPayBankId('');
+    setPayNotes('');
+    setPayError('');
+  };
+
+  const closePayDialog = () => {
+    setPayDialog(null);
+    setPayError('');
+  };
+
+  const handleRecordPayment = async (event) => {
+    event.preventDefault();
+    if (!payDialog) return;
+
+    const amount = Number(payAmount || 0);
+    if (!amount || amount <= 0) {
+      setPayError('Enter a valid amount.');
+      return;
+    }
+
+    if (requiresBankSelection({ paymentMethod: payPaymentMethod, bankId: payBankId }, amount)) {
+      setPayError(t('payments.bankRequired'));
+      return;
+    }
+
+    const currentDue = getPurchaseDueAmount(payDialog);
+    if (amount > currentDue) {
+      setPayError(`Amount cannot exceed due of ${money(currentDue)}.`);
+      return;
+    }
+
+    try {
+      const currentReceived = Number(payDialog.amountReceived || 0);
+      const nextReceived = currentReceived + amount;
+      const nextDue = Math.max(currentDue - amount, 0);
+      const currentStatus = String(payDialog.status || '').toLowerCase();
+      const nextStatus = currentStatus === 'ordered'
+        ? 'ordered'
+        : nextDue > 0
+          ? 'due'
+          : 'received';
+
+      await api.updatePurchase(payDialog.id, {
+        amountReceived: nextReceived,
+        status: nextStatus,
+      });
+
+      const partyId = payDialog.partyId || payDialog.supplierId || payDialog.Party?.id || payDialog.Supplier?.id || '';
+      if (partyId) {
+        const entryLabel = getPurchaseEntryType(payDialog) === 'expense'
+          ? t('purchases.expense')
+          : t('purchases.purchase');
+
+        await api.createPartyTransaction({
+          partyId,
+          direction: 'give',
+          amount,
+          txDate: todayISODate(),
+          ...buildPaymentPayload(
+            {
+              paymentMethod: payPaymentMethod,
+              bankId: payBankId,
+              paymentNote: `${entryLabel} ${t('common.payment')} - ${payDialog.invoiceNo || payDialog.id.slice(0, 8)}${payNotes ? ` · ${payNotes}` : ''}`,
+            },
+            { noteKey: 'note' }
+          ),
+        });
+      }
+
+      closePayDialog();
+      await fetchPurchases(listParams, true);
+    } catch (err) {
+      setPayError(err.message);
     }
   };
 
@@ -1327,6 +1422,72 @@ export default function Purchases() {
         </form>
       </Dialog>
 
+      <Dialog
+        isOpen={Boolean(payDialog)}
+        onClose={closePayDialog}
+        title={t('RecordPayment')}
+        size="sm"
+      >
+        {payDialog ? (
+          <form className="space-y-4" onSubmit={handleRecordPayment}>
+            {payError ? <Notice title={payError} tone="error" /> : null}
+            <div className="rounded-[22px] bg-slate-50 p-4 text-sm dark:bg-slate-900/60">
+              <p className="font-semibold text-slate-800 dark:text-slate-200">
+                {payDialog.invoiceNo || payDialog.id.slice(0, 8)}
+              </p>
+              {getSupplierName(payDialog) ? (
+                <p className="text-slate-500 dark:text-slate-400">{getSupplierName(payDialog)}</p>
+              ) : null}
+              <div className="mt-3 flex items-center justify-between gap-3 text-xs">
+                <span className="text-slate-500 dark:text-slate-400">
+                  {t('common.total')}: {money(payDialog.grandTotal)}
+                </span>
+                <span className="font-semibold text-rose-600 dark:text-rose-400">
+                  {t('purchases.dueLabel')}: {money(getPurchaseDueAmount(payDialog))}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">{t('Amount')}</label>
+              <input
+                className="input mt-1"
+                type="number"
+                step="0.01"
+                min="0"
+                value={payAmount}
+                onChange={(e) => setPayAmount(e.target.value)}
+                placeholder="0.00"
+                autoFocus
+              />
+            </div>
+
+            <PaymentMethodFields
+              value={{
+                paymentMethod: payPaymentMethod,
+                bankId: payBankId,
+                paymentNote: payNotes,
+              }}
+              onChange={(patch) => {
+                setPayPaymentMethod(patch.paymentMethod);
+                setPayBankId(patch.bankId);
+                setPayNotes(patch.paymentNote);
+              }}
+              noteLabel={t('payments.paymentNote')}
+            />
+
+            <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row">
+              <button type="button" className="btn-ghost flex-1" onClick={closePayDialog}>
+                {t('common.cancel')}
+              </button>
+              <button type="submit" className="btn-primary flex-1">
+                {t('Record Payment')}
+              </button>
+            </div>
+          </form>
+        ) : null}
+      </Dialog>
+
       <div className="card">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
 
@@ -1372,7 +1533,7 @@ export default function Purchases() {
           ) : (
             pagedPurchases.map((purchase) => {
               const supplierName = getSupplierName(purchase);
-              const due = Number(purchase.dueAmount || 0);
+              const due = getPurchaseDueAmount(purchase);
               const purchaseEntryType = getPurchaseEntryType(purchase);
               const purchaseMeta = getTransactionMeta(purchaseEntryType);
               const PurchaseTypeIcon = purchaseMeta.icon;
@@ -1404,9 +1565,14 @@ export default function Purchases() {
                     <div className="shrink-0 text-right">
                       <p className="font-semibold text-slate-800 dark:text-slate-200">{money(purchase.grandTotal)}</p>
                       {due > 0 ? (
-                        <span className="mt-1 inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                        <button
+                          type="button"
+                          className="mt-1 inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60"
+                          onClick={() => openPayDialog(purchase)}
+                          aria-label={t('common.recordPayment')}
+                        >
                           {money(due)} {t('common.due')}
-                        </span>
+                        </button>
                       ) : (
                         <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">{t('common.paid')}</p>
                       )}
@@ -1463,7 +1629,7 @@ export default function Purchases() {
               ) : (
                 pagedPurchases.map((purchase) => {
                   const supplierName = getSupplierName(purchase);
-                  const due = Number(purchase.dueAmount || 0);
+                  const due = getPurchaseDueAmount(purchase);
                   const purchaseEntryType = getPurchaseEntryType(purchase);
                   const purchaseMeta = getTransactionMeta(purchaseEntryType);
                   const PurchaseTypeIcon = purchaseMeta.icon;
@@ -1499,9 +1665,14 @@ export default function Purchases() {
                       </td>
                       <td className="py-2.5 pr-4 text-right">
                         {due > 0 ? (
-                          <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                          <button
+                            type="button"
+                            className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60"
+                            onClick={() => openPayDialog(purchase)}
+                            aria-label={t('RecordPayment')}
+                          >
                             {money(due)} {t('common.due')}
-                          </span>
+                          </button>
                         ) : (
                           <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">{t('common.paid')}</span>
                         )}
