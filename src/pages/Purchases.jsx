@@ -736,29 +736,12 @@ export default function Purchases() {
       await api.updatePurchase(payDialog.id, {
         amountReceived: nextReceived,
         status: nextStatus,
+        ...buildPaymentPayload({
+          paymentMethod: payPaymentMethod,
+          bankId: payBankId,
+          paymentNote: payNotes,
+        }),
       });
-
-      const partyId = payDialog.partyId || payDialog.supplierId || payDialog.Party?.id || payDialog.Supplier?.id || '';
-      if (partyId) {
-        const entryLabel = getPurchaseEntryType(payDialog) === 'expense'
-          ? t('purchases.expense')
-          : t('purchases.purchase');
-
-        await api.createPartyTransaction({
-          partyId,
-          direction: 'give',
-          amount,
-          txDate: todayISODate(),
-          ...buildPaymentPayload(
-            {
-              paymentMethod: payPaymentMethod,
-              bankId: payBankId,
-              paymentNote: `${entryLabel} ${t('common.payment')} - ${payDialog.invoiceNo || payDialog.id.slice(0, 8)}${payNotes ? ` · ${payNotes}` : ''}`,
-            },
-            { noteKey: 'note' }
-          ),
-        });
-      }
 
       closePayDialog();
       await fetchPurchases(listParams, true);
