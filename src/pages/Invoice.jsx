@@ -239,7 +239,7 @@ export default function Invoice() {
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Details</p>
               <p className="mt-1">Created By: {creatorName}</p>
-              {record.notes ? <p className="mt-1 whitespace-pre-wrap">Notes: {record.notes}</p> : null}
+              {/* {record.notes ? <p className="mt-1 whitespace-pre-wrap">Notes: {record.notes}</p> : null} */}
             </div>
           </div>
 
