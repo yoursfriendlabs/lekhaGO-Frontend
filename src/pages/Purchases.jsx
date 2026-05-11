@@ -1329,14 +1329,10 @@ export default function Purchases() {
 
       <div className="card">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('purchases.recentPurchases')}</h3>
-            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('purchases.subtitle')}</p>
-          </div>
 
 
         </div>
-        <div className="my-7 grid gap-3 sm:grid-cols-2 xl:max-w-xl">
+        <div className=" grid gap-3 sm:grid-cols-2 xl:max-w-xl">
           <div>
             <label className="label">{t('inventory.itemType')}</label>
             <select
