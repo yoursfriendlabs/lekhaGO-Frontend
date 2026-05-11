@@ -217,7 +217,7 @@ export default function Invoice() {
           ref={printRef}
           className={`${isPrintBillView ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm sm:p-8' : 'print-template bg-white p-6 text-black sm:p-8'}`}
         >
-          {/* <div className="border-b-2 border-black pb-4">
+          <div className="border-b-2 border-black pb-4">
             <InvoiceHeader
               biz={biz}
               invoiceType={isSale ? 'Sales Bill' : 'Purchase Bill'}
@@ -226,7 +226,7 @@ export default function Invoice() {
               // status={record.status}
               // statusColor="border border-black text-black"
             />
-          </div> */}
+          </div>
 
           <div className="grid grid-cols-2 gap-6 border-b border-slate-300 py-4 text-sm">
             <div>

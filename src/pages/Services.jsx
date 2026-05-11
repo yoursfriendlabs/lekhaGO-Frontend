@@ -12,6 +12,7 @@ import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
 import CreatorFilterSelect from '../components/CreatorFilterSelect.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
+import ActionMenu from '../components/ActionMenu.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
@@ -1581,48 +1582,22 @@ export default function Services() {
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-200/70 pt-3 dark:border-slate-800/70">
-                      <button
-                        type="button"
-                        className="inline-flex items-center justify-center gap-1 rounded-2xl border border-slate-200/70 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60"
-                        onClick={() => openStatusDialog(order)}
-                      >
-                        <ChevronDown size={12} />
-                        {t('services.status')}
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center justify-center gap-1 rounded-2xl border border-slate-200/70 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60"
-                        onClick={() => openInvoiceModal(order)}
-                      >
-                        <FileText size={12} />
-                        {t('common.view')}
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center justify-center gap-1 rounded-2xl border border-slate-200/70 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60"
-                        onClick={() => openInvoiceModal(order, { print: true })}
-                      >
-                        <Printer size={12} />
-                        Print
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center justify-center gap-1 rounded-2xl border border-slate-200/70 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/60"
-                        onClick={() => openEditDialog(order)}
-                      >
-                        <Pencil size={12} />
-                        {t('common.edit')}
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex items-center justify-center gap-1 rounded-2xl border border-rose-200/80 px-3 py-2 text-xs font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 dark:border-rose-900/60 dark:text-rose-300 dark:hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-60"
-                        onClick={() => setDeleteService(order)}
-                        disabled={deletingServiceId === order.id}
-                      >
-                        <Trash2 size={12} />
-                        {t('common.delete')}
-                      </button>
+                    <div className="mt-4 flex justify-end border-t border-slate-200/70 pt-3 dark:border-slate-800/70">
+                      <ActionMenu
+                        actions={[
+                          { label: t('services.status'), icon: ChevronDown, onClick: () => openStatusDialog(order) },
+                          { label: t('common.view'), icon: FileText, onClick: () => openInvoiceModal(order) },
+                          { label: 'Print Preview', icon: Printer, onClick: () => openInvoiceModal(order, { print: true }) },
+                          { label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) },
+                          {
+                            label: t('common.delete'),
+                            icon: Trash2,
+                            tone: 'danger',
+                            disabled: deletingServiceId === order.id,
+                            onClick: () => setDeleteService(order),
+                          },
+                        ]}
+                      />
                     </div>
 
                     {attachmentUrls.length > 0 ? (
@@ -1720,26 +1695,20 @@ export default function Services() {
                           )}
                         </td>
                         <td className="py-3 text-right">
-                          <div className="inline-flex items-center gap-1">
-                            <button type="button" title={t('common.edit')} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800" onClick={() => openEditDialog(order)}>
-                              <Pencil size={14} />
-                            </button>
-                            <button type="button" title={t('common.view')} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800" onClick={() => openInvoiceModal(order)}>
-                              <FileText size={14} />
-                            </button>
-                            <button type="button" title="Print" className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800" onClick={() => openInvoiceModal(order, { print: true })}>
-                              <Printer size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              title={t('common.delete')}
-                              className="rounded-xl p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 disabled:cursor-not-allowed disabled:opacity-60"
-                              onClick={() => setDeleteService(order)}
-                              disabled={deletingServiceId === order.id}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
+                          <ActionMenu
+                            actions={[
+                              { label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) },
+                              { label: t('common.view'), icon: FileText, onClick: () => openInvoiceModal(order) },
+                              { label: 'Print Preview', icon: Printer, onClick: () => openInvoiceModal(order, { print: true }) },
+                              {
+                                label: t('common.delete'),
+                                icon: Trash2,
+                                tone: 'danger',
+                                disabled: deletingServiceId === order.id,
+                                onClick: () => setDeleteService(order),
+                              },
+                            ]}
+                          />
                         </td>
                       </tr>
                     );
