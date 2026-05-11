@@ -736,29 +736,12 @@ export default function Purchases() {
       await api.updatePurchase(payDialog.id, {
         amountReceived: nextReceived,
         status: nextStatus,
+        ...buildPaymentPayload({
+          paymentMethod: payPaymentMethod,
+          bankId: payBankId,
+          paymentNote: payNotes,
+        }),
       });
-
-      const partyId = payDialog.partyId || payDialog.supplierId || payDialog.Party?.id || payDialog.Supplier?.id || '';
-      if (partyId) {
-        const entryLabel = getPurchaseEntryType(payDialog) === 'expense'
-          ? t('purchases.expense')
-          : t('purchases.purchase');
-
-        await api.createPartyTransaction({
-          partyId,
-          direction: 'give',
-          amount,
-          txDate: todayISODate(),
-          ...buildPaymentPayload(
-            {
-              paymentMethod: payPaymentMethod,
-              bankId: payBankId,
-              paymentNote: `${entryLabel} ${t('common.payment')} - ${payDialog.invoiceNo || payDialog.id.slice(0, 8)}${payNotes ? ` · ${payNotes}` : ''}`,
-            },
-            { noteKey: 'note' }
-          ),
-        });
-      }
 
       closePayDialog();
       await fetchPurchases(listParams, true);
@@ -1583,8 +1566,8 @@ export default function Purchases() {
                     <ActionMenu
                       actions={[
                         { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(purchase.id) },
-                        { label: t('common.view'), icon: FileText, to: `/app/invoice/purchases/${purchase.id}` },
-                        { label: 'Print Preview', icon: Printer, to: `/app/invoice/purchases/${purchase.id}?print=1` },
+                        { label: 'View Bill', icon: FileText, to: `/app/invoice/purchases/${purchase.id}` },
+                        { label: 'Print Bill', icon: Printer, to: `/app/invoice/purchases/${purchase.id}?print=1` },
                         {
                           label: t('common.delete'),
                           icon: Trash2,
@@ -1681,8 +1664,8 @@ export default function Purchases() {
                         <ActionMenu
                           actions={[
                             { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(purchase.id) },
-                            { label: t('common.view'), icon: FileText, to: `/app/invoice/purchases/${purchase.id}` },
-                            { label: 'Print Preview', icon: Printer, to: `/app/invoice/purchases/${purchase.id}?print=1` },
+                            { label: 'View Bill', icon: FileText, to: `/app/invoice/purchases/${purchase.id}` },
+                            { label: 'Print Bill', icon: Printer, to: `/app/invoice/purchases/${purchase.id}?print=1` },
                             {
                               label: t('common.delete'),
                               icon: Trash2,
