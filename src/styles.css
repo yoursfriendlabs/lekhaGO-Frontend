@@ -151,6 +151,10 @@ body {
   animation: login-fade-up 0.6s 0.5s ease both;
 }
 
+.print-template {
+  display: none;
+}
+
 @media print {
   /* Hide all top-level body children */
   body > * {
@@ -161,9 +165,10 @@ body {
   body > .print-clone {
     display: block !important;
     position: static !important;
+    box-sizing: border-box !important;
     width: 100% !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 0.8cm !important;
   }
 
   .print-clone .card,
