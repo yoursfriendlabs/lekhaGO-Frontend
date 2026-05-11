@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, FileText, Package, Plus, Printer } from 'lucide-react';
+import { Pencil, FileText, Package, Plus, Printer, Trash2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
@@ -14,6 +14,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
+import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import Pagination from '../components/Pagination';
 import { useI18n } from '../lib/i18n.jsx';
 import FileUpload from '../components/FileUpload';
@@ -124,6 +125,8 @@ export default function Sales() {
   const [formMode, setFormMode] = useState('create');
   const [editingId, setEditingId] = useState(null);
   const [deletedItemIds, setDeletedItemIds] = useState([]);
+  const [deleteSale, setDeleteSale] = useState(null);
+  const [deletingSaleId, setDeletingSaleId] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [mobileStep, setMobileStep] = useState('details');
@@ -568,6 +571,34 @@ export default function Sales() {
     }
   };
 
+  const closeDeleteDialog = () => {
+    if (deleteSale && deletingSaleId === deleteSale.id) return;
+    setDeleteSale(null);
+  };
+
+  const handleDeleteSale = async () => {
+    if (!deleteSale) return;
+
+    setDeletingSaleId(deleteSale.id);
+    setStatus({ type: 'info', message: '' });
+
+    try {
+      await api.deleteSale(deleteSale.id);
+      setStatus({ type: 'success', message: t('sales.messages.deleted') });
+      if (pagedSales.length === 1 && page > 1) {
+        setPage((current) => Math.max(1, current - 1));
+      }
+      useProductStore.getState().invalidate();
+      invalidateSales(listParams);
+      await fetchSales(listParams, true);
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || t('sales.messages.deleteFailed') });
+    } finally {
+      setDeletingSaleId('');
+      setDeleteSale(null);
+    }
+  };
+
   const currentStepIndex = saleSteps.findIndex((step) => step.id === mobileStep);
   const showDetailsStep = !isMobile || mobileStep === 'details';
   const showItemsStep = !isMobile || mobileStep === 'items';
@@ -614,7 +645,7 @@ export default function Sales() {
       {/* ── Form Dialog ── */}
       <Dialog isOpen={isOpen} onClose={closeDialog} title={formMode === 'edit' ? t('sales.editSale') : createSaleLabel} size="full">
         <form className="space-y-5" onSubmit={handleSubmit}>
-          {status.message ? <Notice title={status.message} tone={status.type} /> : null}
+          {/* {status.message ? <Notice title={status.message} tone={status.type} /> : null} */}
           {isMobile ? (
             <MobileFormStepper
               steps={saleSteps}
@@ -1072,8 +1103,15 @@ export default function Sales() {
                     <ActionMenu
                       actions={[
                         { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) },
-                        { label: t('common.view'), icon: FileText, to: `/app/invoice/sales/${sale.id}` },
-                        { label: 'Print Preview', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
+                        { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
+                        { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
+                        {
+                          label: t('common.delete'),
+                          icon: Trash2,
+                          tone: 'danger',
+                          disabled: deletingSaleId === sale.id,
+                          onClick: () => setDeleteSale(sale),
+                        },
                       ]}
                     />
                   </div>
@@ -1162,8 +1200,15 @@ export default function Sales() {
                         <ActionMenu
                           actions={[
                             { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) },
-                            { label: t('common.view'), icon: FileText, to: `/app/invoice/sales/${sale.id}` },
-                            { label: 'Print Preview', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
+                            { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
+                            { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
+                            {
+                              label: t('common.delete'),
+                              icon: Trash2,
+                              tone: 'danger',
+                              disabled: deletingSaleId === sale.id,
+                              onClick: () => setDeleteSale(sale),
+                            },
                           ]}
                         />
                       </td>
@@ -1183,6 +1228,14 @@ export default function Sales() {
           onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
         />
       </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteSale)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteSale}
+        description={deleteSale ? t('sales.deleteConfirm', { name: deleteSale.invoiceNo || deleteSale.id.slice(0, 8) }) : t('common.confirmDelete')}
+        confirming={Boolean(deleteSale) && deletingSaleId === deleteSale.id}
+      />
     </div>
   );
 }

@@ -35,18 +35,17 @@ import {
   Search,
   Pencil,
   FileText,
-  Printer,
   ChevronDown,
   Phone,
   ArrowRight,
   CalendarDays,
   LayoutList,
   Package,
-  Sparkles,
   UserRound,
   Wallet,
   Wrench,
   MessageCircle,
+  Printer,
   Trash2,
 } from 'lucide-react';
 import { usePartyStore } from '../stores/parties';
@@ -164,6 +163,7 @@ function AttachmentStrip({ urls = [], onOpen, maxVisible = 3, size = 'sm' }) {
   if (!urls.length) return null;
 
   const visibleUrls = urls.slice(0, maxVisible);
+  const hiddenUrls = urls.slice(maxVisible);
   const hiddenCount = urls.length - visibleUrls.length;
 
   return (
@@ -172,9 +172,14 @@ function AttachmentStrip({ urls = [], onOpen, maxVisible = 3, size = 'sm' }) {
         <AttachmentPreview key={url} url={url} onOpen={onOpen} size={size} />
       ))}
       {hiddenCount > 0 ? (
-        <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-2xl bg-slate-100 px-2 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+        <button
+          type="button"
+          className="inline-flex h-9 min-w-9 items-center justify-center rounded-2xl bg-slate-100 px-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+          onClick={() => onOpen(hiddenUrls[0])}
+          title="Open more attachments"
+        >
           +{hiddenCount}
-        </span>
+        </button>
       ) : null}
     </div>
   );
@@ -373,22 +378,6 @@ function FilterChip({ label, active, onClick }) {
   );
 }
 
-function SummaryPill({ icon: Icon, label, value, valueClassName = '' }) {
-  return (
-    <div className="rounded-2xl border border-white/60 bg-white/70 p-3 shadow-sm shadow-primary-950/5 backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/50">
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 rounded-xl bg-primary-50 p-2 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200">
-          <Icon size={14} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{label}</p>
-          <p className={`mt-1 truncate text-sm font-semibold text-slate-900 dark:text-white ${valueClassName}`}>{value}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function isPlaceholderItem(item) {
   if (!item) return true;
   return !String(item.description || '').trim()
@@ -511,7 +500,6 @@ export default function Services() {
   // ── Invoice modal ──
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
-  const [invoiceBillMode, setInvoiceBillMode] = useState('view');
 
   // ── Attribute definitions for invoice display ──
   const [attributeDefs, setAttributeDefs] = useState([]);
@@ -542,7 +530,6 @@ export default function Services() {
   const [itemDraft, setItemDraft] = useState({ ...emptyItem });
   const [editingItemIdx, setEditingItemIdx] = useState(null);
   const [mobileStep, setMobileStep] = useState('details');
-  const [mobileSummaryExpanded, setMobileSummaryExpanded] = useState(false);
   const jewelleryAttributes = useMemo(() => normalizeJewelleryAttributes(header.attributes), [header.attributes]);
   const jewelleryDetails = useMemo(() => getJewelleryBreakdown(jewelleryAttributes), [jewelleryAttributes]);
   const activeJewelleryDetails = useMemo(
@@ -711,15 +698,14 @@ export default function Services() {
   }, [isPaid, totals.grandTotal]);
 
   useEffect(() => {
-    if (!dialogOpen || !isMobile) return undefined;
-    setMobileSummaryExpanded(false);
+    if (!dialogOpen) return undefined;
     const node = formScrollRef.current;
     if (!node) return undefined;
     const frame = window.requestAnimationFrame(() => {
       node.scrollTo({ top: 0, behavior: 'smooth' });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [dialogOpen, isMobile, mobileStep]);
+  }, [dialogOpen, mobileStep]);
 
   // ── Product helpers ──
   const getProductById = (id) => {
@@ -1055,7 +1041,6 @@ export default function Services() {
     setSuggestedOrderNo('');
     setProductDirectory({});
     setMobileStep('details');
-    setMobileSummaryExpanded(false);
   };
 
   const openDialog = async () => {
@@ -1274,9 +1259,8 @@ export default function Services() {
   };
   const closeStatusDialog = () => setStatusDialog(null);
 
-  const openInvoiceModal = async (order, { print = false } = {}) => {
+  const openInvoiceModal = async (order) => {
     setInvoiceOrder(normalizeServiceOrder(order));
-    setInvoiceBillMode(print ? 'print' : 'view');
     setInvoiceLoading(true);
     try {
       const full = normalizeServiceOrder(await api.getService(order.id));
@@ -1321,23 +1305,14 @@ export default function Services() {
     if (amount > currentDue) { setPayError(`Amount cannot exceed due of ${currentDue.toFixed(2)}.`); return; }
     try {
       const newReceived = Number(payDialog.receivedTotal || 0) + amount;
-      await api.updateService(payDialog.id, { receivedTotal: newReceived });
-      if (payDialog.partyId) {
-        await api.createPartyTransaction({
-          partyId: payDialog.partyId,
-          direction: 'receive',
-          amount,
-          txDate: todayISODate(),
-          ...buildPaymentPayload(
-            {
-              paymentMethod: payPaymentMethod,
-              bankId: payBankId,
-              paymentNote: `${t('services.servicePaymentNote')} - ${payDialog.orderNo || payDialog.id.slice(0, 8)}${payNotes ? ` · ${payNotes}` : ''}`,
-            },
-            { noteKey: 'note' }
-          ),
-        });
-      }
+      await api.updateService(payDialog.id, {
+        receivedTotal: newReceived,
+        ...buildPaymentPayload({
+          paymentMethod: payPaymentMethod,
+          bankId: payBankId,
+          paymentNote: payNotes,
+        }),
+      });
       const refreshedOrder = normalizeServiceOrder(await api.getService(payDialog.id));
       patchService(payDialog.id, refreshedOrder);
       if (invoiceOrder?.id === refreshedOrder.id) {
@@ -1413,9 +1388,9 @@ export default function Services() {
     window.print();
   };
 
-  const showDetailsStep = !isMobile || mobileStep === 'details';
-  const showItemsStep = !isMobile || mobileStep === 'items';
-  const showPaymentStep = !isMobile || mobileStep === 'payment';
+  const showDetailsStep = mobileStep === 'details';
+  const showItemsStep = mobileStep === 'items';
+  const showPaymentStep = mobileStep === 'payment';
   const itemDraftProduct = getProductById(itemDraft.productId);
   const itemDraftVatAmount = getVatAmount(itemDraft.lineTotal, itemDraft.taxRate);
   const canSaveDraftItem = itemDraft.itemType === 'part'
@@ -1423,7 +1398,6 @@ export default function Services() {
     : Number(itemDraft.lineTotal || 0) > 0 || Boolean(String(itemDraft.description || '').trim());
   const dialogTitle = editingId ? t('services.editOrder') : newOrderLabel;
   const summaryOrderNo = header.orderNo || suggestedOrderNo || '—';
-  const summaryDeliveryDate = header.deliveryDate ? formatMaybeDate(header.deliveryDate, 'D MMM YYYY') : '—';
   const invoiceAttachmentUrls = invoiceOrder ? getServiceAttachmentUrls(invoiceOrder) : [];
   const invoiceItems = invoiceOrder ? getServiceItems(invoiceOrder) : [];
   const invoiceJewellery = invoiceOrder ? getJewelleryBreakdown(invoiceOrder.attributes || {}) : getJewelleryBreakdown({});
@@ -1585,10 +1559,9 @@ export default function Services() {
                     <div className="mt-4 flex justify-end border-t border-slate-200/70 pt-3 dark:border-slate-800/70">
                       <ActionMenu
                         actions={[
-                          { label: t('services.status'), icon: ChevronDown, onClick: () => openStatusDialog(order) },
-                          { label: t('common.view'), icon: FileText, onClick: () => openInvoiceModal(order) },
-                          { label: 'Print Preview', icon: Printer, onClick: () => openInvoiceModal(order, { print: true }) },
                           { label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) },
+                          { label: 'View Bill', icon: FileText, onClick: () => openInvoiceModal(order) },
+                          { label: 'Print Bill', icon: Printer, onClick: () => openInvoiceModal(order, { print: true }) },
                           {
                             label: t('common.delete'),
                             icon: Trash2,
@@ -1698,8 +1671,8 @@ export default function Services() {
                           <ActionMenu
                             actions={[
                               { label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) },
-                              { label: t('common.view'), icon: FileText, onClick: () => openInvoiceModal(order) },
-                              { label: 'Print Preview', icon: Printer, onClick: () => openInvoiceModal(order, { print: true }) },
+                              { label: 'View Bill', icon: FileText, onClick: () => openInvoiceModal(order) },
+                              { label: 'Print Bill', icon: Printer, onClick: () => openInvoiceModal(order, { print: true }) },
                               {
                                 label: t('common.delete'),
                                 icon: Trash2,
@@ -1762,110 +1735,17 @@ export default function Services() {
                       </div>
                     ) : null}
 
-                    {isMobile ? (
-                      <div className="rounded-[28px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.16),transparent_48%),linear-gradient(140deg,rgba(255,255,255,0.98),rgba(249,245,239,0.95))] p-4 shadow-sm shadow-primary-950/10 dark:border-primary-900/40 dark:bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.14),transparent_48%),linear-gradient(140deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))]">
-                        <button
-                          type="button"
-                          onClick={() => setMobileSummaryExpanded((prev) => !prev)}
-                          aria-expanded={mobileSummaryExpanded}
-                          className="w-full text-left"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/75 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:border-slate-800/60 dark:bg-slate-950/50 dark:text-primary-200">
-                                  <Sparkles size={12} />
-                                  {t('services.summaryCard')}
-                                </div>
-                                <StatusBadge status={header.status} />
-                              </div>
-                              <p className="mt-3 truncate text-base font-semibold text-slate-900 dark:text-white">
-                                {selectedParty?.name || summaryOrderNo}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                {summaryOrderNo} · {summaryDeliveryDate}
-                              </p>
-                            </div>
-
-                            <div className="shrink-0 text-right">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                                {t('services.summaryDue')}
-                              </p>
-                              <p className={`mt-1 text-base font-semibold ${totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
-                                {money(totals.due)}
-                              </p>
-                              <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 dark:text-primary-200">
-                                {visibleItems.length} {t('services.summaryItems')}
-                                <ChevronDown
-                                  size={14}
-                                  className={`transition ${mobileSummaryExpanded ? 'rotate-180' : ''}`}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-
-                        {mobileSummaryExpanded ? (
-                          <div className="mt-4 grid grid-cols-2 gap-3">
-                            <SummaryPill icon={UserRound} label={t('services.summaryCustomer')} value={selectedParty?.name || '—'} />
-                            <SummaryPill icon={CalendarDays} label={t('services.summaryDelivery')} value={summaryDeliveryDate} />
-                            <SummaryPill icon={Package} label={t('services.summaryItems')} value={visibleItems.length || 0} />
-                            <SummaryPill
-                              icon={Wallet}
-                              label={t('services.summaryDue')}
-                              value={money(totals.due)}
-                              valueClassName={totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}
-                            />
-                          </div>
-                        ) : (
-                          <div className="mt-3 flex items-center gap-2 rounded-2xl bg-white/55 px-3 py-2 text-xs text-slate-600 dark:bg-slate-950/35 dark:text-slate-300">
-                            <CalendarDays size={13} className="text-primary-700 dark:text-primary-200" />
-                            <span>{t('services.summaryDelivery')}: {summaryDeliveryDate}</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="rounded-[30px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.18),transparent_45%),linear-gradient(140deg,rgba(255,255,255,0.98),rgba(249,245,239,0.95))] p-4 shadow-sm shadow-primary-950/10 dark:border-primary-900/40 dark:bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.16),transparent_45%),linear-gradient(140deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] md:p-5">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                          <div className="min-w-0">
-                            <div className="inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/75 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-primary-700 dark:border-slate-800/60 dark:bg-slate-950/50 dark:text-primary-200">
-                              <Sparkles size={12} />
-                              {dialogTitle}
-                            </div>
-                            <p className="mt-3 text-sm text-slate-600 dark:text-slate-300">
-                              {summaryOrderNo} · {summaryDeliveryDate}
-                            </p>
-                          </div>
-                          <StatusBadge status={header.status} />
-                        </div>
-
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                          <SummaryPill icon={UserRound} label={t('services.summaryCustomer')} value={selectedParty?.name || '—'} />
-                          <SummaryPill icon={CalendarDays} label={t('services.summaryDelivery')} value={summaryDeliveryDate} />
-                          <SummaryPill icon={Package} label={t('services.summaryItems')} value={visibleItems.length || 0} />
-                          <SummaryPill
-                            icon={Wallet}
-                            label={t('services.summaryDue')}
-                            value={money(totals.due)}
-                            valueClassName={totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {isMobile ? (
-                      <MobileFormStepper
-                        steps={formSteps}
-                        currentStep={mobileStep}
-                        onStepChange={setMobileStep}
-                        onNext={goToNextMobileStep}
-                        onBack={goToPreviousMobileStep}
-                        canProceed={!editLoading}
-                        backLabel={t('common.back')}
-                        nextLabel={mobileStep === 'items' ? t('services.paymentStep') : t('common.continue')}
-                        showNavigation={false}
-                      />
-                    ) : null}
+                    <MobileFormStepper
+                      steps={formSteps}
+                      currentStep={mobileStep}
+                      onStepChange={setMobileStep}
+                      onNext={goToNextMobileStep}
+                      onBack={goToPreviousMobileStep}
+                      canProceed={!editLoading}
+                      backLabel={t('common.back')}
+                      nextLabel={mobileStep === 'items' ? t('services.paymentStep') : t('common.continue')}
+                      showNavigation={false}
+                    />
 
                     {showDetailsStep ? (
                       <>
@@ -2598,67 +2478,54 @@ export default function Services() {
 
                 <div className="border-t border-slate-200/70 bg-white/90 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-8">
                   <div className="mx-auto w-full max-w-[1320px]">
-                  {isMobile ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-100/90 px-4 py-3 text-sm dark:bg-slate-900/70">
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                            {formSteps[mobileStepIndex]?.label || t('services.detailStep')}
-                          </p>
-                          <p className="mt-1 truncate font-semibold text-slate-700 dark:text-slate-200">
-                            {summaryOrderNo}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                            {t('services.summaryDue')}
-                          </p>
-                          <p className={`mt-1 font-semibold ${totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
-                            {money(totals.due)}
-                          </p>
-                        </div>
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="grid gap-3 rounded-2xl bg-slate-100/90 px-4 py-3 text-sm dark:bg-slate-900/70 sm:grid-cols-3 lg:min-w-[520px]">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Current</p>
+                        <p className="mt-1 truncate font-semibold text-slate-700 dark:text-slate-200">
+                          {formSteps[mobileStepIndex]?.label || t('services.detailStep')}
+                        </p>
                       </div>
-
-                      <div className={`grid gap-3 ${canGoBackStep ? 'grid-cols-[minmax(0,0.72fr)_minmax(0,1fr)]' : 'grid-cols-1'}`}>
-                        {canGoBackStep ? (
-                          <button type="button" className="btn-ghost w-full" onClick={goToPreviousMobileStep} disabled={editLoading}>
-                            {t('common.back')}
-                          </button>
-                        ) : null}
-
-                        {canGoForwardStep ? (
-                          <button type="button" className="btn-primary w-full" onClick={goToNextMobileStep} disabled={editLoading}>
-                            {mobilePrimaryActionLabel}
-                            <ArrowRight size={14} className="ml-1.5 inline" />
-                          </button>
-                        ) : (
-                          <button type="submit" className="btn-primary w-full" disabled={editLoading}>
-                            {mobilePrimaryActionLabel}
-                            <Check size={14} className="ml-1.5 inline" />
-                          </button>
-                        )}
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Order</p>
+                        <p className="mt-1 truncate font-semibold text-slate-700 dark:text-slate-200">
+                          {summaryOrderNo}
+                        </p>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div className="rounded-2xl bg-slate-100/90 px-4 py-3 text-sm dark:bg-slate-900/70">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('services.summaryDue')}</p>
+                      <div className="min-w-0 sm:text-right">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          {t('services.summaryDue')}
+                        </p>
                         <p className={`mt-1 font-semibold ${totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
                           {money(totals.due)}
                         </p>
                       </div>
+                    </div>
 
-                      <div className="flex flex-col-reverse gap-3 sm:flex-row">
-                        <button type="button" className="btn-ghost w-full sm:w-auto" onClick={closeDialog}>
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                      {canGoBackStep ? (
+                        <button type="button" className="btn-ghost w-full sm:w-auto" onClick={goToPreviousMobileStep} disabled={editLoading}>
+                          {t('common.back')}
+                        </button>
+                      ) : (
+                        <button type="button" className="btn-ghost w-full sm:w-auto" onClick={closeDialog} disabled={editLoading}>
                           {t('common.cancel')}
                         </button>
-                        <button type="submit" className="btn-primary w-full sm:w-auto" disabled={editLoading}>
-                          {editingId ? t('common.update') : t('services.saveOrder')}
+                      )}
+
+                      {canGoForwardStep ? (
+                        <button type="button" className="btn-primary w-full sm:w-auto" onClick={goToNextMobileStep} disabled={editLoading}>
+                          {mobilePrimaryActionLabel}
                           <ArrowRight size={14} className="ml-1.5 inline" />
                         </button>
-                      </div>
+                      ) : (
+                        <button type="submit" className="btn-primary w-full sm:w-auto" disabled={editLoading}>
+                          {mobilePrimaryActionLabel}
+                          <Check size={14} className="ml-1.5 inline" />
+                        </button>
+                      )}
                     </div>
-                  )}
+                  </div>
                   </div>
                 </div>
               </form>
@@ -2689,24 +2556,14 @@ export default function Services() {
           <div className="relative mt-4 w-full max-w-3xl md:mt-8">
             <div className="mb-4 flex items-center justify-between print:hidden">
               <button type="button" className="btn-ghost" onClick={() => setInvoiceOrder(null)}>← Close</button>
-              <div className="flex flex-wrap justify-end gap-2">
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setInvoiceBillMode((mode) => (mode === 'print' ? 'view' : 'print'))}
-                >
-                  {invoiceBillMode === 'print' ? 'View Bill' : 'Print Preview'}
-                </button>
-                <button type="button" className="btn-primary" onClick={handlePrint}>Print Bill</button>
-              </div>
+              <button type="button" className="btn-primary" onClick={handlePrint}>Download PDF</button>
             </div>
             {invoiceLoading ? (
               <div className="card flex items-center justify-center py-16">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
               </div>
             ) : (
-              <>
-              <div className={`${invoiceBillMode === 'print' ? 'hidden' : ''} overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950`}>
+              <div ref={invoicePrintRef} className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950">
                 {/* ── Header ── */}
                 <div className="px-8 pt-0">
                     <InvoiceHeader
@@ -2714,7 +2571,7 @@ export default function Services() {
                       invoiceType="Service Invoice"
                       invoiceNo={invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)}
                       date={invoiceOrder.deliveryDate ? formatMaybeDate(invoiceOrder.deliveryDate, 'MMMM D, YYYY') : null}
-                      status={invoiceOrder.status}
+                      // status={invoiceOrder.status}
                       statusColor={
                         invoiceOrder.status === 'closed'
                         ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
@@ -2911,119 +2768,6 @@ export default function Services() {
                   </p>
                 </div>
               </div>
-
-              <div
-                ref={invoicePrintRef}
-                className={`${invoiceBillMode === 'print' ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm sm:p-8' : 'print-template bg-white p-6 text-black sm:p-8'}`}
-              >
-                <div className="border-b-2 border-black pb-4">
-                  <InvoiceHeader
-                    biz={bizSettings}
-                    invoiceType="Service Bill"
-                    invoiceNo={invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)}
-                    date={invoiceOrder.deliveryDate ? formatMaybeDate(invoiceOrder.deliveryDate, 'MMMM D, YYYY') : null}
-                    // status={invoiceOrder.status}
-                    statusColor="border border-black text-black"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-6 border-b border-slate-300 py-4 text-sm">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Bill To</p>
-                    <p className="mt-1 font-semibold">{invoiceOrder.Party?.name || invoiceOrder.partyName || '—'}</p>
-                    {invoiceOrder.Party?.phone ? <p className="mt-0.5">{invoiceOrder.Party.phone}</p> : null}
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Details</p>
-                    <p className="mt-1">Created By: {getCreatorDisplayName(invoiceOrder)}</p>
-                    {invoiceOrder.notes ? <p className="mt-1 whitespace-pre-wrap">Notes: {invoiceOrder.notes}</p> : null}
-                  </div>
-                </div>
-
-                {showGoldJewelleryDetails && (invoiceJewellery.metalType || invoiceJewellery.metalPurity || invoiceJewellery.actualWeight || invoiceJewellery.wastagePercent || invoiceJewellery.totalWeight || invoiceJewellery.diamondType || invoiceJewellery.diamondWeight || invoiceJewellery.diamondCarat || invoiceJewellery.diamondCharge) ? (
-                  <div className="border-b border-slate-300 py-3 text-sm">
-                    {invoiceJewellery.metalType ? <span className="mr-4">Metal: <strong>{invoiceJewellery.metalType}</strong></span> : null}
-                    {invoiceJewellery.metalPurity ? <span className="mr-4">Purity: <strong>{invoiceJewellery.metalPurity}</strong></span> : null}
-                    {invoiceJewellery.actualWeight ? <span className="mr-4">Actual weight: <strong>{invoiceJewellery.actualWeight}</strong></span> : null}
-                    {invoiceJewellery.wastagePercent ? <span className="mr-4">Wastage: <strong>{invoiceJewellery.wastagePercent}% ({invoiceJewellery.wastageWeight || '0'})</strong></span> : null}
-                    {invoiceJewellery.totalWeight ? <span className="mr-4">Total weight: <strong>{invoiceJewellery.totalWeight}</strong></span> : null}
-                    {invoiceJewellery.diamondType ? (
-                      <span className="mr-4">
-                        Diamond: <strong>{[invoiceJewellery.diamondType, invoiceJewellery.diamondWeight && `${invoiceJewellery.diamondWeight} wt`, invoiceJewellery.diamondCarat && `${invoiceJewellery.diamondCarat} ct`, invoiceJewellery.diamondPurity].filter(Boolean).join(' · ')}</strong>
-                      </span>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {invoiceExtraAttributes.length > 0 ? (
-                  <div className="border-b border-slate-300 py-3 text-sm">
-                    {invoiceExtraAttributes.map(([key, val]) => {
-                      const def = safeAttributeDefs.find((d) => d.key === key);
-                      const attrLabel = def?.name || key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-                      return (
-                        <span key={key} className="mr-4">
-                          {attrLabel}: <strong>{String(val || '—')}</strong>
-                        </span>
-                      );
-                    })}
-                  </div>
-                ) : null}
-
-                <table className="mt-5 w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-black">
-                      <th className="py-2 text-left text-[10px] font-bold uppercase">Type</th>
-                      <th className="py-2 text-left text-[10px] font-bold uppercase">Description</th>
-                      <th className="py-2 text-left text-[10px] font-bold uppercase">Product</th>
-                      <th className="py-2 text-right text-[10px] font-bold uppercase">Qty</th>
-                      <th className="py-2 text-right text-[10px] font-bold uppercase">Unit Price</th>
-                      <th className="py-2 text-right text-[10px] font-bold uppercase">Tax</th>
-                      <th className="py-2 text-right text-[10px] font-bold uppercase">Tax Total</th>
-                      <th className="py-2 text-right text-[10px] font-bold uppercase">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoiceItems.map((item, idx) => (
-                      <tr key={`${item.productId || item.description || 'service'}-print-${idx}`} className="border-b border-slate-200">
-                        <td className="py-2 pr-3">{item.itemType === 'labor' ? 'Service' : 'Product'}</td>
-                        <td className="py-2 pr-3 font-medium">{item.description || item.productName || '—'}</td>
-                        <td className="py-2 pr-3">{item.productName || '—'}</td>
-                        <td className="py-2 text-right">{Number(item.quantity || 0).toFixed(item.quantity % 1 ? 3 : 0)}</td>
-                        <td className="py-2 text-right">{money(item.unitPrice)}</td>
-                        <td className="py-2 text-right">{Number(item.taxRate || 0).toFixed(2)}%</td>
-                        <td className="py-2 text-right">{money(getVatAmount(item.lineTotal, item.taxRate))}</td>
-                        <td className="py-2 text-right font-semibold">{money(item.lineTotal)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-
-                <div className="mt-6 ml-auto max-w-xs space-y-2 text-sm">
-                  <div className="flex justify-between"><span>{t('services.subTotal')}</span><span>{money(invoiceTotals.subTotal)}</span></div>
-                  <div className="flex justify-between"><span>Service Total</span><span>{money(invoiceTotals.laborTotal)}</span></div>
-                  <div className="flex justify-between"><span>Product Total</span><span>{money(invoiceTotals.partsTotal)}</span></div>
-                  {showGoldJewelleryDetails && invoiceJewellery.diamondChargeNumber > 0 ? <div className="flex justify-between"><span>Diamond Charge</span><span>{money(invoiceJewellery.diamondChargeNumber)}</span></div> : null}
-                  <div className="flex justify-between"><span>{t('services.taxTotal')}</span><span>{money(invoiceTotals.taxTotal)}</span></div>
-                  {showGoldJewelleryDetails && invoiceJewellery.additionalTaxNumber > 0 ? <div className="flex justify-between"><span>Additional Tax</span><span>{money(invoiceJewellery.additionalTaxNumber)}</span></div> : null}
-                  {Number(invoiceTotals.discountTotal || 0) > 0 ? <div className="flex justify-between"><span>{t('services.discount')}</span><span>-{money(invoiceTotals.discountTotal)}</span></div> : null}
-                  <div className="flex justify-between border-t border-black pt-2 text-base font-bold">
-                    <span>{t('services.grandTotal')}</span><span>{money(invoiceTotals.grandTotal)}</span>
-                  </div>
-                  <div className="flex justify-between"><span>{t('services.amountReceived')}</span><span>{money(invoiceOrder.receivedTotal)}</span></div>
-                  {Math.max(Number(invoiceTotals.grandTotal || 0) - Number(invoiceOrder.receivedTotal || 0), 0) > 0 ? (
-                    <div className="flex justify-between font-bold">
-                      <span>{t('services.dueAmount')}</span>
-                      <span>{money(Math.max(Number(invoiceTotals.grandTotal || 0) - Number(invoiceOrder.receivedTotal || 0), 0))}</span>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="mt-8 flex items-center justify-between border-t border-slate-300 pt-3 text-xs">
-                  <span>Thank you for your business!</span>
-                  <span>Printed {dayjs().format('D MMM YYYY')}</span>
-                </div>
-              </div>
-              </>
             )}
           </div>
         </div>

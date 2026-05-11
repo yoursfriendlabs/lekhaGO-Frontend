@@ -1417,8 +1417,8 @@ export default function Purchases() {
                     <ActionMenu
                       actions={[
                         { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(purchase.id) },
-                        { label: t('common.view'), icon: FileText, to: `/app/invoice/purchases/${purchase.id}` },
-                        { label: 'Print Preview', icon: Printer, to: `/app/invoice/purchases/${purchase.id}?print=1` },
+                        { label: 'View Bill', icon: FileText, to: `/app/invoice/purchases/${purchase.id}` },
+                        { label: 'Print Bill', icon: Printer, to: `/app/invoice/purchases/${purchase.id}?print=1` },
                         {
                           label: t('common.delete'),
                           icon: Trash2,
@@ -1510,8 +1510,8 @@ export default function Purchases() {
                         <ActionMenu
                           actions={[
                             { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(purchase.id) },
-                            { label: t('common.view'), icon: FileText, to: `/app/invoice/purchases/${purchase.id}` },
-                            { label: 'Print Preview', icon: Printer, to: `/app/invoice/purchases/${purchase.id}?print=1` },
+                            { label: 'View Bill', icon: FileText, to: `/app/invoice/purchases/${purchase.id}` },
+                            { label: 'Print Bill', icon: Printer, to: `/app/invoice/purchases/${purchase.id}?print=1` },
                             {
                               label: t('common.delete'),
                               icon: Trash2,
