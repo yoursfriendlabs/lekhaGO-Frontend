@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Pencil, FileText, Package, Plus, Wallet, Wrench, X } from 'lucide-react';
+import { Pencil, FileText, Package, Plus, Wallet, Wrench, X, Trash2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
@@ -12,6 +12,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import Pagination from '../components/Pagination';
+import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
@@ -129,6 +130,8 @@ export default function Purchases() {
   const [formMode, setFormMode] = useState('create');
   const [editingId, setEditingId] = useState(null);
   const [deletedItemIds, setDeletedItemIds] = useState([]);
+  const [deletePurchase, setDeletePurchase] = useState(null);
+  const [deletingPurchaseId, setDeletingPurchaseId] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [mobileStep, setMobileStep] = useState('details');
@@ -638,6 +641,34 @@ export default function Purchases() {
       fetchPurchases(listParams, true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
+    }
+  };
+
+  const closeDeleteDialog = () => {
+    if (deletePurchase && deletingPurchaseId === deletePurchase.id) return;
+    setDeletePurchase(null);
+  };
+
+  const handleDeletePurchase = async () => {
+    if (!deletePurchase) return;
+
+    setDeletingPurchaseId(deletePurchase.id);
+    setStatus({ type: 'info', message: '' });
+
+    try {
+      await api.deletePurchase(deletePurchase.id);
+      useProductStore.getState().invalidate();
+      invalidatePurchases();
+      setStatus({ type: 'success', message: t('purchases.messages.deleted') });
+      if (pagedPurchases.length === 1 && page > 1) {
+        setPage((current) => Math.max(1, current - 1));
+      }
+      await fetchPurchases(listParams, true);
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || t('purchases.messages.deleteFailed') });
+    } finally {
+      setDeletingPurchaseId('');
+      setDeletePurchase(null);
     }
   };
 
@@ -1402,6 +1433,15 @@ export default function Purchases() {
                     >
                       <FileText size={14} />
                     </Link>
+                    <button
+                      type="button"
+                      title={t('common.delete')}
+                      className="rounded-lg p-1.5 text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => setDeletePurchase(purchase)}
+                      disabled={deletingPurchaseId === purchase.id}
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
               );
@@ -1497,6 +1537,15 @@ export default function Purchases() {
                           >
                             <FileText size={14} />
                           </Link>
+                          <button
+                            type="button"
+                            title={t('common.delete')}
+                            className="rounded-lg p-1.5 text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/40 disabled:cursor-not-allowed disabled:opacity-60"
+                            onClick={() => setDeletePurchase(purchase)}
+                            disabled={deletingPurchaseId === purchase.id}
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1515,6 +1564,14 @@ export default function Purchases() {
           onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
         />
       </div>
+
+      <ConfirmDialog
+        isOpen={Boolean(deletePurchase)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeletePurchase}
+        description={deletePurchase ? t('purchases.deleteConfirm', { name: deletePurchase.invoiceNo || deletePurchase.id.slice(0, 8) }) : t('common.confirmDelete')}
+        confirming={Boolean(deletePurchase) && deletingPurchaseId === deletePurchase.id}
+      />
     </div>
   );
 }

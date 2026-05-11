@@ -716,6 +716,7 @@ const dictionaries = {
       subtitle: 'Log stock coming into the business or record expenses.',
       newPurchase: 'New purchase',
       editPurchase: 'Edit purchase',
+      deleteConfirm: 'Delete purchase "{{name}}"?',
       entryType: 'Entry type',
       purchase: 'Purchase',
       expense: 'Expense',
@@ -771,6 +772,8 @@ const dictionaries = {
       messages: {
         created: 'Purchase created',
         updated: 'Purchase updated',
+        deleted: 'Purchase deleted',
+        deleteFailed: 'Unable to delete purchase.',
       },
     },
     sales: {
@@ -2030,6 +2033,7 @@ const dictionaries = {
       subtitle: 'स्टक आएको वा खर्च रेकर्ड गर्नुहोस्।',
       newPurchase: 'नयाँ खरिद',
       editPurchase: 'खरिद सम्पादन',
+      deleteConfirm: '"{{name}}" खरिद हटाउने?',
       entryType: 'प्रविष्टि प्रकार',
       purchase: 'खरिद',
       expense: 'खर्च',
@@ -2085,6 +2089,8 @@ const dictionaries = {
       messages: {
         created: 'खरिद सिर्जना भयो',
         updated: 'खरिद अपडेट भयो',
+        deleted: 'खरिद हटाइयो',
+        deleteFailed: 'खरिद हटाउन सकिएन।',
       },
     },
     sales: {
