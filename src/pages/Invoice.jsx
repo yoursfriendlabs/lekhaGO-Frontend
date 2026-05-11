@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useBusinessSettings } from '../lib/businessSettings';
 import InvoiceHeader from '../components/InvoiceHeader';
@@ -18,6 +18,7 @@ function money(val) {
 
 export default function Invoice() {
   const { type, id } = useParams();
+  const [searchParams] = useSearchParams();
   const [record, setRecord] = useState(null);
   const [status, setStatus] = useState('');
   const { settings: biz } = useBusinessSettings();
@@ -33,6 +34,7 @@ export default function Invoice() {
     if (!source) { window.print(); return; }
     const clone = source.cloneNode(true);
     clone.classList.add('print-clone');
+    clone.style.cssText = '';
     document.body.appendChild(clone);
     const cleanup = () => {
       if (document.body.contains(clone)) document.body.removeChild(clone);
@@ -43,6 +45,7 @@ export default function Invoice() {
   };
 
   const isSale = type === 'sales';
+  const isPrintBillView = searchParams.get('print') === '1';
   const dateValue = isSale ? record?.saleDate : record?.purchaseDate;
   const items = record?.PurchaseItems || record?.SaleItems || [];
 
@@ -73,15 +76,24 @@ export default function Invoice() {
         <Link className="btn-ghost" to={isSale ? '/app/sales' : '/app/purchases'}>
           ← Back
         </Link>
-        <button className="btn-primary" type="button" onClick={handlePrint}>
-          Download PDF
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            className="btn-secondary"
+            to={`/app/invoice/${type}/${id}${isPrintBillView ? '' : '?print=1'}`}
+          >
+            {isPrintBillView ? 'View Bill' : 'Print Preview'}
+          </Link>
+          <button className="btn-primary" type="button" onClick={handlePrint}>
+            Print Bill
+          </button>
+        </div>
       </div>
 
       {status ? <Notice title={status} tone="error" /> : null}
 
       {record ? (
-        <div ref={printRef} className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950">
+        <>
+        <div className={`${isPrintBillView ? 'hidden' : ''} overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950`}>
           {/* ── Header ── */}
           <div className="px-8 pt-0">
             <InvoiceHeader
@@ -200,6 +212,96 @@ export default function Invoice() {
             </p>
           </div>
         </div>
+
+        <div
+          ref={printRef}
+          className={`${isPrintBillView ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm sm:p-8' : 'print-template bg-white p-6 text-black sm:p-8'}`}
+        >
+          <div className="border-b-2 border-black pb-4">
+            <InvoiceHeader
+              biz={biz}
+              invoiceType={isSale ? 'Sales Bill' : 'Purchase Bill'}
+              invoiceNo={record.invoiceNo || record.id.slice(0, 8)}
+              date={fmt(dateValue)}
+              // status={record.status}
+              // statusColor="border border-black text-black"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-6 border-b border-slate-300 py-4 text-sm">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                {isSale ? 'Bill To' : 'Supplier'}
+              </p>
+              <p className="mt-1 font-semibold">{partyName}</p>
+              {record.partyPhone ? <p className="mt-0.5">{record.partyPhone}</p> : null}
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Details</p>
+              <p className="mt-1">Created By: {creatorName}</p>
+              {/* {record.notes ? <p className="mt-1 whitespace-pre-wrap">Notes: {record.notes}</p> : null} */}
+            </div>
+          </div>
+
+          <table className="mt-5 w-full text-sm">
+            <thead>
+              <tr className="border-b border-black">
+                <th className="py-2 text-left text-[10px] font-bold uppercase">Product</th>
+                <th className="py-2 text-right text-[10px] font-bold uppercase">Qty</th>
+                <th className="py-2 text-right text-[10px] font-bold uppercase">Unit Price</th>
+                <th className="py-2 text-right text-[10px] font-bold uppercase">Tax</th>
+                <th className="py-2 text-right text-[10px] font-bold uppercase">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-4 text-slate-500">No line items.</td>
+                </tr>
+              ) : (
+                items.map((item, idx) => (
+                  <tr key={item.id || idx} className="border-b border-slate-200">
+                    <td className="py-2 pr-4 font-medium">
+                      {item.Product?.name || item.description || '—'}
+                      {item.Product?.companyName ? <span className="ml-2 text-xs">({item.Product.companyName})</span> : null}
+                    </td>
+                    <td className="py-2 text-right">{Number(item.quantity || 0).toFixed(2)}</td>
+                    <td className="py-2 text-right">{money(item.unitPrice)}</td>
+                    <td className="py-2 text-right">{Number(item.taxRate || 0) > 0 ? `${Number(item.taxRate).toFixed(1)}%` : '—'}</td>
+                    <td className="py-2 text-right font-semibold">{money(item.lineTotal)}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+
+          <div className="mt-6 ml-auto max-w-xs space-y-2 text-sm">
+            {Number(record.subTotal || 0) > 0 ? (
+              <div className="flex justify-between"><span>Subtotal</span><span>{money(record.subTotal)}</span></div>
+            ) : null}
+            {Number(record.taxTotal || 0) > 0 ? (
+              <div className="flex justify-between"><span>Tax</span><span>{money(record.taxTotal)}</span></div>
+            ) : null}
+            <div className="flex justify-between border-t border-black pt-2 text-base font-bold">
+              <span>Grand Total</span><span>{money(record.grandTotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>{isSale ? 'Amount Received' : 'Amount Paid'}</span>
+              <span>{money(isSale ? totalReceived : totalPaid)}</span>
+            </div>
+            {dueAmount > 0 ? (
+              <div className="flex justify-between font-bold">
+                <span>Due Amount</span><span>{money(dueAmount)}</span>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-8 flex items-center justify-between border-t border-slate-300 pt-3 text-xs">
+            <span>Thank you for your business!</span>
+            <span>Printed {dayjs().format('D MMM YYYY')}</span>
+          </div>
+        </div>
+        </>
       ) : null}
     </div>
   );

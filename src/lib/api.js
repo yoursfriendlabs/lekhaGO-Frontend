@@ -667,6 +667,21 @@ export const api = {
         "banks",
       ]),
     ),
+  deletePurchase: (id) =>
+    request(
+      `/api/purchases/${id}`,
+      { method: "DELETE" },
+      mutationConfig([
+        detailTags("purchase", id),
+        "purchases",
+        "products",
+        "reports",
+        "dashboard",
+        "parties",
+        "party-statements",
+        "banks",
+      ]),
+    ),
 
   createSale: (data) =>
     request(

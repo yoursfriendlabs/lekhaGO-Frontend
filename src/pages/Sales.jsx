@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Pencil, FileText, Package, Plus } from 'lucide-react';
+import { Pencil, FileText, Package, Plus, Printer } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
@@ -10,6 +9,7 @@ import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import PartySearchCreateField from '../components/PartySearchCreateField.jsx';
 import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
 import CreatorFilterSelect from '../components/CreatorFilterSelect.jsx';
+import ActionMenu from '../components/ActionMenu.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
@@ -1068,22 +1068,14 @@ export default function Sales() {
                       )}
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-end gap-1 border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
-                    <button
-                      type="button"
-                      title={t('common.edit')}
-                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-                      onClick={() => openEdit(sale.id)}
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <Link
-                      title={t('common.view')}
-                      className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800"
-                      to={`/app/invoice/sales/${sale.id}`}
-                    >
-                      <FileText size={14} />
-                    </Link>
+                  <div className="mt-3 flex items-center justify-end border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
+                    <ActionMenu
+                      actions={[
+                        { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) },
+                        { label: t('common.view'), icon: FileText, to: `/app/invoice/sales/${sale.id}` },
+                        { label: 'Print Preview', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
+                      ]}
+                    />
                   </div>
                 </div>
               );
@@ -1167,23 +1159,13 @@ export default function Sales() {
 
                       {/* Actions — icon buttons matching Services exactly */}
                       <td className="py-2.5 text-right">
-                        <div className="inline-flex items-center gap-1">
-                          <button
-                            type="button"
-                            title={t('common.edit')}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
-                            onClick={() => openEdit(sale.id)}
-                          >
-                            <Pencil size={14} />
-                          </button>
-                          <Link
-                            title={t('common.view')}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary-700 dark:hover:bg-slate-800"
-                            to={`/app/invoice/sales/${sale.id}`}
-                          >
-                            <FileText size={14} />
-                          </Link>
-                        </div>
+                        <ActionMenu
+                          actions={[
+                            { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) },
+                            { label: t('common.view'), icon: FileText, to: `/app/invoice/sales/${sale.id}` },
+                            { label: 'Print Preview', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
+                          ]}
+                        />
                       </td>
                     </tr>
                   );
