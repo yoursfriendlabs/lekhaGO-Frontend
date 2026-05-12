@@ -94,6 +94,8 @@ const emptyExpenseItem = {
   description: '',
 };
 
+const TABLE_ROW_OPTIONS = [10, 20, 30, 40, 50];
+
 const getEmptyItem = (entryType) => (entryType === 'expense' ? { ...emptyExpenseItem } : { ...emptyPurchaseItem });
 
 function getVatAmount(lineTotal, taxRate) {
@@ -155,7 +157,7 @@ export default function Purchases() {
   const [deletingPurchaseId, setDeletingPurchaseId] = useState('');
   const [page, setPage] = useState(1);
   const [refreshingPurchases, setRefreshingPurchases] = useState(false);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
   const [mobileStep, setMobileStep] = useState('details');
 
   const isExpense = header.entryType === 'expense';
@@ -167,7 +169,7 @@ export default function Purchases() {
     offset: (page - 1) * pageSize,
     ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
     ...(entryTypeFilter !== 'all' ? { entryType: entryTypeFilter } : {}),
-  }), [entryTypeFilter, page, statusFilter]);
+  }), [entryTypeFilter, page, pageSize, statusFilter]);
 
   // ── Load purchases list (page-specific) ──
   useEffect(() => {
@@ -1711,7 +1713,8 @@ export default function Purchases() {
           total={purchaseTotalKnown ? totalPurchases : null}
           hasNext={pagedPurchases.length >= pageSize}
           onPageChange={setPage}
-          showPageSize={false}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+          pageSizeOptions={TABLE_ROW_OPTIONS}
         />
       </div>
 

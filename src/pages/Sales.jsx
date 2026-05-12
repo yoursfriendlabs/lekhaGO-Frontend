@@ -42,6 +42,8 @@ const emptyItem = {
   lineTotal: '0'
 };
 
+const TABLE_ROW_OPTIONS = [10, 20, 30, 40, 50];
+
 function getVatAmount(lineTotal, taxRate) {
   return (Number(lineTotal || 0) * Number(taxRate || 0)) / 100;
 }
@@ -643,21 +645,27 @@ export default function Sales() {
       />
 
       {/* ── Form Dialog ── */}
-      <Dialog isOpen={isOpen} onClose={closeDialog} title={formMode === 'edit' ? t('sales.editSale') : createSaleLabel} size="full">
+      <Dialog
+        isOpen={isOpen}
+        onClose={closeDialog}
+        title={formMode === 'edit' ? t('sales.editSale') : createSaleLabel}
+        size="full"
+        headerContent={isMobile ? (
+          <MobileFormStepper
+            steps={saleSteps}
+            currentStep={mobileStep}
+            onStepChange={setMobileStep}
+            onNext={goToNextMobileStep}
+            onBack={goToPrevMobileStep}
+            canProceed={mobileStep === 'items' ? hasValidItems : canProceedToItems}
+            nextLabel={mobileStep === 'items' ? t('common.continueToPayment') || 'Continue to Payment' : t('common.continue') || 'Continue'}
+            backLabel={t('common.back') || 'Back'}
+            showNavigation={false}
+          />
+        ) : null}
+      >
         <form className="space-y-5" onSubmit={handleSubmit}>
           {/* {status.message ? <Notice title={status.message} tone={status.type} /> : null} */}
-          {isMobile ? (
-            <MobileFormStepper
-              steps={saleSteps}
-              currentStep={mobileStep}
-              onStepChange={setMobileStep}
-              onNext={goToNextMobileStep}
-              onBack={goToPrevMobileStep}
-              canProceed={mobileStep === 'items' ? hasValidItems : canProceedToItems}
-              nextLabel={mobileStep === 'items' ? t('common.continueToPayment') || 'Continue to Payment' : t('common.continue') || 'Continue'}
-              backLabel={t('common.back') || 'Back'}
-            />
-          ) : null}
 
           {showDetailsStep ? (
             <>
@@ -1226,6 +1234,7 @@ export default function Sales() {
           total={totalSales}
           onPageChange={setPage}
           onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+          pageSizeOptions={TABLE_ROW_OPTIONS}
         />
       </div>
 

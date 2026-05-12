@@ -10,6 +10,7 @@ interface DialogProps {
     size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
     showCloseButton?: boolean;
     closeOnOverlayClick?: boolean;
+    headerContent?: React.ReactNode;
     footer?: React.ReactNode;
 }
 
@@ -21,6 +22,7 @@ export const Dialog = ({
                            size = 'md',
                            showCloseButton = true,
                            closeOnOverlayClick = true,
+                           headerContent,
                            footer,
 }: DialogProps) => {
     const dialogRef = useRef<HTMLDivElement>(null);
@@ -87,9 +89,10 @@ export const Dialog = ({
                 onClick={(e) => e.stopPropagation()}
                 className={`relative flex max-h-[100dvh] w-full flex-col bg-white shadow-2xl md:max-h-[90vh] ${sizeClasses[size]} rounded-t-3xl md:rounded-3xl`}
             >
-                {(title || showCloseButton) && (
-                    <div className="flex items-center justify-between border-b border-slate-200/70 px-4 py-4 md:px-5">
-                        {title && <h2 className="font-serif text-xl text-slate-900">{title}</h2>}
+                {(title || headerContent || showCloseButton) && (
+                    <div className="flex items-center gap-3 border-b border-slate-200/70 px-4 py-3 md:px-5">
+                        {title && <h2 className="min-w-0 flex-1 truncate font-serif text-xl text-slate-900">{title}</h2>}
+                        {headerContent ? <div className="min-w-0 flex-1">{headerContent}</div> : null}
                         {showCloseButton && (
                             <button
                                 type="button"
