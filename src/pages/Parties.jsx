@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import RefreshButton from '../components/RefreshButton.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
@@ -116,6 +117,7 @@ export default function Parties() {
   const [loadingParties, setLoadingParties] = useState(false);
   const [listError, setListError] = useState('');
   const [partyReloadKey, setPartyReloadKey] = useState(0);
+  const [refreshingParties, setRefreshingParties] = useState(false);
 
   const [statementData, setStatementData] = useState(() => normalizePartyStatementResponse());
   const [statementLoading, setStatementLoading] = useState(false);
@@ -142,36 +144,46 @@ export default function Parties() {
   const [deleteParty, setDeleteParty] = useState(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const submitPartyRequestRef = useRef(false);
+  const partyListRequestRef = useRef(0);
 
-  useEffect(() => {
-    let isActive = true;
+  const partyListParams = useMemo(() => ({
+    ...(debouncedQuery.trim() ? { search: debouncedQuery.trim() } : {}),
+    ...(filterType !== 'all' ? { type: filterType } : {}),
+  }), [debouncedQuery, filterType]);
 
-    async function loadParties() {
-      setLoadingParties(true);
-      setListError('');
+  const loadParties = useCallback(async ({ force = false } = {}) => {
+    const requestId = partyListRequestRef.current + 1;
+    partyListRequestRef.current = requestId;
+    setLoadingParties(true);
+    setListError('');
 
-      try {
-        const data = await api.listParties({
-          ...(debouncedQuery.trim() ? { search: debouncedQuery.trim() } : {}),
-          ...(filterType !== 'all' ? { type: filterType } : {}),
-        });
-
-        if (!isActive) return;
-        setParties(data?.items || []);
-      } catch (err) {
-        if (!isActive) return;
-        setListError(err.message);
-        setParties([]);
-      } finally {
-        if (isActive) setLoadingParties(false);
+    try {
+      const data = await api.listParties(partyListParams, { force });
+      if (partyListRequestRef.current !== requestId) return;
+      setParties(data?.items || []);
+    } catch (err) {
+      if (partyListRequestRef.current !== requestId) return;
+      setListError(err.message);
+      setParties([]);
+    } finally {
+      if (partyListRequestRef.current === requestId) {
+        setLoadingParties(false);
       }
     }
+  }, [partyListParams]);
 
+  const refreshParties = async () => {
+    setRefreshingParties(true);
+    try {
+      await loadParties({ force: true });
+    } finally {
+      setRefreshingParties(false);
+    }
+  };
+
+  useEffect(() => {
     loadParties();
-    return () => {
-      isActive = false;
-    };
-  }, [debouncedQuery, filterType, partyReloadKey]);
+  }, [loadParties, partyReloadKey]);
 
   useEffect(() => {
     if (!parties.length) {
@@ -554,9 +566,12 @@ export default function Parties() {
             <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
               {t('parties.listTitle', { count: parties.length })}
             </h3>
-            <button className="btn-ghost" type="button" onClick={openCreate}>
-              <ChevronDown size={16} /> {t('parties.addParty')}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <RefreshButton refreshing={refreshingParties} onClick={refreshParties} />
+              <button className="btn-ghost" type="button" onClick={openCreate}>
+                <ChevronDown size={16} /> {t('parties.addParty')}
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -644,6 +659,7 @@ export default function Parties() {
               })
             )}
           </div>
+
         </div>
 
         <div className="card space-y-4">

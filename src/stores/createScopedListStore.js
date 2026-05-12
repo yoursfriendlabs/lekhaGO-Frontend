@@ -38,6 +38,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
     loaded: false,
     error: null,
     total: 0,
+    totalKnown: false,
     currentKey: '',
     currentScope: getScopeKey(),
     lists: {},
@@ -59,6 +60,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
           loading: false,
           error: null,
           total: 0,
+          totalKnown: false,
         });
       }
 
@@ -70,6 +72,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
             currentKey: key,
             [resourceKey]: cachedItems,
             total: cachedEntry.total ?? cachedItems.length,
+            totalKnown: Boolean(cachedEntry.totalKnown),
             loaded: true,
             loading: false,
             error: null,
@@ -87,6 +90,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
             currentKey: key,
             [resourceKey]: cachedItems,
             total: cachedEntry.total ?? cachedItems.length,
+            totalKnown: Boolean(cachedEntry.totalKnown),
             loaded: Boolean(cachedEntry.loaded),
             loading: true,
             error: null,
@@ -102,6 +106,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
           const total = Number(data?.total ?? items.length);
           const limit = Number(data?.limit ?? items.length);
           const offset = Number(data?.offset ?? 0);
+          const totalKnown = Boolean(data?.totalKnown);
 
           set((currentState) => ({
             lists: {
@@ -109,6 +114,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
               [key]: {
                 items,
                 total,
+                totalKnown,
                 limit,
                 offset,
                 params,
@@ -123,6 +129,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
             currentKey: key,
             [resourceKey]: items,
             total,
+            totalKnown,
             loaded: true,
             loading: false,
             error: null,
@@ -138,6 +145,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
               [key]: {
                 items: cachedItems,
                 total: cachedEntry?.total ?? 0,
+                totalKnown: Boolean(cachedEntry?.totalKnown),
                 limit: cachedEntry?.limit ?? 0,
                 offset: cachedEntry?.offset ?? 0,
                 params,
@@ -152,6 +160,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
             currentKey: key,
             [resourceKey]: cachedItems,
             total: cachedEntry?.total ?? 0,
+            totalKnown: Boolean(cachedEntry?.totalKnown),
             loaded: Boolean(cachedEntry?.loaded),
             loading: false,
             error: error.message,
@@ -169,6 +178,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
             [key]: {
               items: cachedItems,
               total: cachedEntry?.total ?? 0,
+              totalKnown: Boolean(cachedEntry?.totalKnown),
               limit: cachedEntry?.limit ?? 0,
               offset: cachedEntry?.offset ?? 0,
               params,
@@ -183,6 +193,7 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
           currentKey: key,
           [resourceKey]: cachedItems,
           total: cachedEntry?.total ?? 0,
+          totalKnown: Boolean(cachedEntry?.totalKnown),
           loaded: Boolean(cachedEntry?.loaded),
           loading: true,
           error: null,
@@ -208,12 +219,14 @@ export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, all
               ...(currentEntry || {}),
               items: nextItems,
               total: currentEntry?.total ?? nextItems.length,
+              totalKnown: Boolean(currentEntry?.totalKnown),
               loaded: true,
               error: null,
             },
           },
           [resourceKey]: nextItems,
           total: currentEntry?.total ?? nextItems.length,
+          totalKnown: Boolean(currentEntry?.totalKnown),
           loaded: true,
           error: null,
         };

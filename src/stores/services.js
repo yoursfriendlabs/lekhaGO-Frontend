@@ -5,7 +5,7 @@ import { createScopedListStoreSlice } from './createScopedListStore';
 export const useServiceStore = create((set, get) => ({
   ...createScopedListStoreSlice(set, get, {
     resourceKey: 'services',
-    fetcher: (params) => api.listServices(params),
+    fetcher: (params, options) => api.listServices(params, options),
   }),
 
   prepend: (service) =>
