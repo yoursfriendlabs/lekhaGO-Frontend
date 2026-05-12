@@ -707,7 +707,7 @@ export default function Services() {
 
   const mobileStepIndex = formSteps.findIndex((step) => step.id === mobileStep);
   const canGoBackStep = mobileStepIndex > 0;
-  const canGoForwardStep = mobileStepIndex >= 0 && mobileStepIndex < formSteps.length - 1;
+  const canGoForwardStep = mobileStepIndex >= 0 && mobileStepIndex <= formSteps.length;
 
   useEffect(() => {
     if (isPaid) setAmountReceived(totals.grandTotal.toFixed(2));
@@ -1137,12 +1137,12 @@ export default function Services() {
 
   const goToNextMobileStep = () => {
     if (!canGoForwardStep) return;
-    setMobileStep(formSteps[mobileStepIndex + 1].id);
+    setMobileStep(formSteps[mobileStepIndex + 1]?.id);
   };
 
   const goToPreviousMobileStep = () => {
     if (!canGoBackStep) return;
-    setMobileStep(formSteps[mobileStepIndex - 1].id);
+    setMobileStep(formSteps[mobileStepIndex - 1]?.id);
   };
 
   const handlePartyFilterChange = (option) => {
@@ -2524,6 +2524,7 @@ export default function Services() {
                           {t('common.cancel')}
                         </button>
                       )}
+
 
                       {canGoForwardStep ? (
                         <button type="button" className="btn-primary w-full sm:w-auto" onClick={goToNextMobileStep} disabled={editLoading}>
