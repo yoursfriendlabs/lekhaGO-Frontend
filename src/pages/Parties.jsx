@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import RefreshButton from '../components/RefreshButton.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
@@ -130,6 +131,7 @@ export default function Parties() {
   const [loadingParties, setLoadingParties] = useState(false);
   const [listError, setListError] = useState('');
   const [partyReloadKey, setPartyReloadKey] = useState(0);
+  const [refreshingParties, setRefreshingParties] = useState(false);
 
   const [statementData, setStatementData] = useState(() => normalizePartyStatementResponse());
   const [statementLoading, setStatementLoading] = useState(false);
@@ -165,7 +167,7 @@ export default function Parties() {
   const supportsIntersectionObserver = typeof IntersectionObserver !== 'undefined';
 
   const loadPartyPage = useCallback(
-    async ({ offset = 0, append = false, session = partyListSessionRef.current } = {}) => {
+    async ({ offset = 0, append = false, session = partyListSessionRef.current, force = false } = {}) => {
       const search = debouncedQuery.trim();
       const requestParams = {
         limit: PARTY_PAGE_SIZE,
@@ -182,7 +184,7 @@ export default function Parties() {
       }
 
       try {
-        const data = await api.listParties(requestParams);
+        const data = await api.listParties(requestParams, { force });
 
         if (session !== partyListSessionRef.current) return;
 
@@ -220,6 +222,29 @@ export default function Parties() {
     },
     [debouncedQuery, filterType]
   );
+
+  const refreshParties = async () => {
+    const session = partyListSessionRef.current + 1;
+    partyListSessionRef.current = session;
+
+    setRefreshingParties(true);
+    if (partyListScrollRef.current) {
+      partyListScrollRef.current.scrollTop = 0;
+    }
+
+    setParties([]);
+    setPartyTotal(0);
+    setPartyHasMore(false);
+    setLoadingMoreParties(false);
+
+    try {
+      await loadPartyPage({ offset: 0, append: false, session, force: true });
+    } finally {
+      if (session === partyListSessionRef.current) {
+        setRefreshingParties(false);
+      }
+    }
+  };
 
   useEffect(() => {
     const session = partyListSessionRef.current + 1;
@@ -656,9 +681,12 @@ export default function Parties() {
             <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
               {t('parties.listTitle', { count: partyTotal || parties.length })}
             </h3>
-            <button className="btn-ghost" type="button" onClick={openCreate}>
-              <ChevronDown size={16} /> {t('parties.addParty')}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <RefreshButton refreshing={refreshingParties} onClick={refreshParties} />
+              <button className="btn-ghost" type="button" onClick={openCreate}>
+                <ChevronDown size={16} /> {t('parties.addParty')}
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -814,6 +842,7 @@ export default function Parties() {
 
             <div ref={partyListSentinelRef} className="h-4" aria-hidden="true" />
           </div>
+
         </div>
 
         <div className="card space-y-4">
