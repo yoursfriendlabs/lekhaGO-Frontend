@@ -79,6 +79,8 @@ const emptyItem = {
   lineTotal: '0',
 };
 
+const TABLE_ROW_OPTIONS = [10, 20, 30, 40, 50];
+
 const makeEmptyHeader = () => ({
   partyId: '',
   orderNo: '',
@@ -468,7 +470,7 @@ export default function Services() {
   const [listNotice, setListNotice] = useState({ type: '', message: '' });
   const [page, setPage] = useState(1);
   const [refreshingServices, setRefreshingServices] = useState(false);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   // ── New order dialog ──
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -550,7 +552,7 @@ export default function Services() {
     ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
     ...(partyFilterId ? { partyId: partyFilterId } : {}),
     ...(createdByFilterId ? { createdBy: createdByFilterId } : {}),
-  }), [createdByFilterId, page, partyFilterId, statusFilter]);
+  }), [createdByFilterId, page, pageSize, partyFilterId, statusFilter]);
 
   const updatePartyDropdownPosition = useCallback(() => {
     const trigger = partyPickerRef.current;
@@ -1706,7 +1708,8 @@ export default function Services() {
               total={serviceTotalKnown ? serviceTotal : null}
               hasNext={pagedServices.length >= pageSize}
               onPageChange={setPage}
-              showPageSize={false}
+              onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+              pageSizeOptions={TABLE_ROW_OPTIONS}
             />
           </div>
         </div>
@@ -1720,10 +1723,23 @@ export default function Services() {
         >
           <div className="flex h-full items-end justify-center md:items-center md:p-5 xl:p-6">
             <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#fcfaf6] shadow-2xl dark:bg-slate-950 md:h-[calc(100dvh-2.5rem)] md:max-h-[calc(100dvh-2.5rem)] md:max-w-[1440px] md:rounded-[32px] md:border md:border-slate-200/70 md:dark:border-slate-800/70">
-              <div className="flex items-center justify-between border-b border-slate-200/70 bg-white/85 px-4 py-4 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-8">
-                <div className="min-w-0">
+              <div className="flex items-center gap-3 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-8">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary-700 dark:text-primary-200">{t('services.workspaceLabel')}</p>
                   <h2 className="mt-1 truncate font-serif text-2xl text-slate-900 dark:text-white">{dialogTitle}</h2>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <MobileFormStepper
+                    steps={formSteps}
+                    currentStep={mobileStep}
+                    onStepChange={setMobileStep}
+                    onNext={goToNextMobileStep}
+                    onBack={goToPreviousMobileStep}
+                    canProceed={!editLoading}
+                    backLabel={t('common.back')}
+                    nextLabel={mobileStep === 'items' ? t('services.paymentStep') : t('common.continue')}
+                    showNavigation={false}
+                  />
                 </div>
                 <button type="button" onClick={closeDialog} className="rounded-2xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
                   <X size={20} />
@@ -1742,18 +1758,6 @@ export default function Services() {
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
                       </div>
                     ) : null}
-
-                    <MobileFormStepper
-                      steps={formSteps}
-                      currentStep={mobileStep}
-                      onStepChange={setMobileStep}
-                      onNext={goToNextMobileStep}
-                      onBack={goToPreviousMobileStep}
-                      canProceed={!editLoading}
-                      backLabel={t('common.back')}
-                      nextLabel={mobileStep === 'items' ? t('services.paymentStep') : t('common.continue')}
-                      showNavigation={false}
-                    />
 
                     {showDetailsStep ? (
                       <>
