@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
+import RefreshButton from '../components/RefreshButton.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
@@ -77,6 +78,8 @@ const emptyItem = {
   taxRate: '0',
   lineTotal: '0',
 };
+
+const TABLE_ROW_OPTIONS = [10, 20, 30, 40, 50];
 
 const makeEmptyHeader = () => ({
   partyId: '',
@@ -452,6 +455,8 @@ export default function Services() {
   const {
     services: serviceList,
     loading: listLoading,
+    total: serviceTotal,
+    totalKnown: serviceTotalKnown,
     fetch: fetchServices,
     invalidate: invalidateServices,
     patch: patchService,
@@ -464,7 +469,8 @@ export default function Services() {
   const [listError, setListError] = useState('');
   const [listNotice, setListNotice] = useState({ type: '', message: '' });
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [refreshingServices, setRefreshingServices] = useState(false);
+  const [pageSize, setPageSize] = useState(10);
 
   // ── New order dialog ──
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -541,11 +547,12 @@ export default function Services() {
     [jewelleryAttributes.metalType]
   );
   const listParams = useMemo(() => ({
-    limit: 50,
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
     ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
     ...(partyFilterId ? { partyId: partyFilterId } : {}),
     ...(createdByFilterId ? { createdBy: createdByFilterId } : {}),
-  }), [createdByFilterId, partyFilterId, statusFilter]);
+  }), [createdByFilterId, page, pageSize, partyFilterId, statusFilter]);
 
   const updatePartyDropdownPosition = useCallback(() => {
     const trigger = partyPickerRef.current;
@@ -574,6 +581,15 @@ export default function Services() {
     setListError('');
     invalidateServices(listParams);
     return fetchServices(listParams, true).catch((err) => setListError(err.message));
+  };
+
+  const refreshServices = async () => {
+    setRefreshingServices(true);
+    try {
+      await loadServices();
+    } finally {
+      setRefreshingServices(false);
+    }
   };
 
   useEffect(() => {
@@ -1215,18 +1231,7 @@ export default function Services() {
 
   // ── Paged service list ──
   const filteredServiceList = safeServiceList;
-
-  useEffect(() => {
-    const maxPage = Math.max(1, Math.ceil(filteredServiceList.length / pageSize));
-    if (page > maxPage) {
-      setPage(maxPage);
-    }
-  }, [filteredServiceList.length, page, pageSize]);
-
-  const pagedServices = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredServiceList.slice(start, start + pageSize);
-  }, [filteredServiceList, page, pageSize]);
+  const pagedServices = filteredServiceList;
 
   const serviceOverview = useMemo(() => {
     const openCount = safeServiceList.filter((order) => order.status === 'open').length;
@@ -1451,7 +1456,7 @@ export default function Services() {
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('services.browseOrdersHint')}</p>
             </div>
 
-            <div className="grid w-full gap-3 xl:max-w-2xl xl:grid-cols-2">
+            <div className="grid w-full gap-3 xl:max-w-3xl xl:grid-cols-[1fr_1fr_auto] xl:items-end">
               <div>
                 <label className="label">{t('services.filterByParty')}</label>
                 <PartyFilterSelect
@@ -1472,6 +1477,11 @@ export default function Services() {
                   onChange={setCreatedByFilterId}
                 />
               </div>
+              <RefreshButton
+                className="min-h-[44px] xl:self-end"
+                refreshing={refreshingServices}
+                onClick={refreshServices}
+              />
             </div>
           </div>
 
@@ -1695,10 +1705,11 @@ export default function Services() {
             <Pagination
               page={page}
               pageSize={pageSize}
-              total={filteredServiceList.length}
+              total={serviceTotalKnown ? serviceTotal : null}
+              hasNext={pagedServices.length >= pageSize}
               onPageChange={setPage}
               onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
-              pageSizeOptions={[10, 20, 50]}
+              pageSizeOptions={TABLE_ROW_OPTIONS}
             />
           </div>
         </div>
@@ -1712,10 +1723,23 @@ export default function Services() {
         >
           <div className="flex h-full items-end justify-center md:items-center md:p-5 xl:p-6">
             <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#fcfaf6] shadow-2xl dark:bg-slate-950 md:h-[calc(100dvh-2.5rem)] md:max-h-[calc(100dvh-2.5rem)] md:max-w-[1440px] md:rounded-[32px] md:border md:border-slate-200/70 md:dark:border-slate-800/70">
-              <div className="flex items-center justify-between border-b border-slate-200/70 bg-white/85 px-4 py-4 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-8">
-                <div className="min-w-0">
+              <div className="flex items-center gap-3 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-8">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary-700 dark:text-primary-200">{t('services.workspaceLabel')}</p>
                   <h2 className="mt-1 truncate font-serif text-2xl text-slate-900 dark:text-white">{dialogTitle}</h2>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <MobileFormStepper
+                    steps={formSteps}
+                    currentStep={mobileStep}
+                    onStepChange={setMobileStep}
+                    onNext={goToNextMobileStep}
+                    onBack={goToPreviousMobileStep}
+                    canProceed={!editLoading}
+                    backLabel={t('common.back')}
+                    nextLabel={mobileStep === 'items' ? t('services.paymentStep') : t('common.continue')}
+                    showNavigation={false}
+                  />
                 </div>
                 <button type="button" onClick={closeDialog} className="rounded-2xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
                   <X size={20} />
@@ -1734,18 +1758,6 @@ export default function Services() {
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
                       </div>
                     ) : null}
-
-                    <MobileFormStepper
-                      steps={formSteps}
-                      currentStep={mobileStep}
-                      onStepChange={setMobileStep}
-                      onNext={goToNextMobileStep}
-                      onBack={goToPreviousMobileStep}
-                      canProceed={!editLoading}
-                      backLabel={t('common.back')}
-                      nextLabel={mobileStep === 'items' ? t('services.paymentStep') : t('common.continue')}
-                      showNavigation={false}
-                    />
 
                     {showDetailsStep ? (
                       <>
