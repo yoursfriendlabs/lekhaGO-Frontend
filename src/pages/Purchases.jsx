@@ -45,7 +45,7 @@ function StatusBadge({ status }) {
 
 // ── Format date like Sales: "22 Mar" ──
 function formatDate(dateStr) {
-  return formatMaybeDate(dateStr, 'D MMM');
+  return formatMaybeDate(dateStr, 'ddd DD, MMM');
 }
 
 // ── Resolve supplier name from purchase object ──
@@ -125,7 +125,7 @@ export default function Purchases() {
   const [entryTypeFilter, setEntryTypeFilter] = useState('all');
   const [isPaid, setIsPaid] = useState(false);
   const [header, setHeader] = useState({
-    entryType: 'purchase',
+    entryType: 'expense',
     partyId: '',
     partyName: '',
     invoiceNo: '',
@@ -472,7 +472,7 @@ export default function Purchases() {
 
   const resetForm = () => {
     setHeader({
-      entryType: 'purchase',
+      entryType: 'expense',
       partyId: '',
       partyName: '',
       invoiceNo: '',
@@ -881,7 +881,6 @@ export default function Purchases() {
         size="full"
       >
         <form className="space-y-5" onSubmit={handleSubmit}>
-          {status.message ? <Notice title={status.message} tone={status.type} /> : null}
           {isMobile ? (
             <MobileFormStepper
               steps={purchaseSteps}
@@ -891,37 +890,23 @@ export default function Purchases() {
           ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-            <div className={`rounded-[28px] border p-5 shadow-sm ${transactionMeta.panelClassName}`}>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-300">
-                    {t('purchases.entryType')}
-                  </p>
-                  <h3 className="mt-2 font-serif text-2xl text-slate-900 dark:text-white">{transactionMeta.label}</h3>
-                  <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">{t('purchases.subtitle')}</p>
-                </div>
-                <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${transactionMeta.iconWrapClassName}`}>
-                  <TransactionIcon size={22} />
-                </div>
-              </div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {['purchase', 'expense'].map((entryType) => {
+                const optionMeta = getTransactionMeta(entryType);
+                const OptionIcon = optionMeta.icon;
+                const isActive = header.entryType === entryType;
 
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                {['purchase', 'expense'].map((entryType) => {
-                  const optionMeta = getTransactionMeta(entryType);
-                  const OptionIcon = optionMeta.icon;
-                  const isActive = header.entryType === entryType;
-
-                  return (
+                return (
                     <button
-                      key={entryType}
-                      type="button"
-                      aria-pressed={isActive}
-                      className={`rounded-[22px] border px-4 py-4 text-left transition ${
-                        isActive
-                          ? optionMeta.panelClassName
-                          : 'border-slate-200/80 bg-white/90 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700/80 dark:bg-slate-950/40 dark:hover:border-slate-600 dark:hover:bg-slate-900/40'
-                      }`}
-                      onClick={() => handleEntryTypeChange(entryType)}
+                        key={entryType}
+                        type="button"
+                        aria-pressed={isActive}
+                        className={`rounded-[22px] border px-4 py-4 text-left transition ${
+                            isActive
+                                ? optionMeta.panelClassName
+                                : 'border-slate-200/80 bg-white/90 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700/80 dark:bg-slate-950/40 dark:hover:border-slate-600 dark:hover:bg-slate-900/40'
+                        }`}
+                        onClick={() => handleEntryTypeChange(entryType)}
                     >
                       <div className="flex items-center gap-3">
                         <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${optionMeta.iconWrapClassName}`}>
@@ -933,28 +918,8 @@ export default function Purchases() {
                         </div>
                       </div>
                     </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 dark:shadow-none">
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('purchases.items')}</p>
-                  <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{items.length}</p>
-                </div>
-                <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('purchases.grandTotal')}</p>
-                  <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{money(totals.grandTotal)}</p>
-                </div>
-                <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{t('purchases.dueLabel')}</p>
-                  <p className={`mt-2 text-lg font-semibold ${dueAmount > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
-                    {money(dueAmount)}
-                  </p>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
 
@@ -1219,33 +1184,39 @@ export default function Purchases() {
                     </div>
                   ) : null}
 
-                  <div>
-                    <label className="label">{t('purchases.qty')}</label>
-                    <input
-                      className="input mt-1"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={itemDraft.quantity}
-                      onChange={(e) => handleDraftChange('quantity', e.target.value)}
-                    />
-                    {itemDraftProduct ? (
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{getUnitLabel(itemDraftProduct, itemDraft.unitType)}</p>
-                    ) : null}
-                  </div>
+                  { itemDraft.itemType === 'part' && (
+                      <div>
+                        <label className="label">{t('purchases.qty')}</label>
+                        <input
+                            className="input mt-1"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={itemDraft.quantity}
+                            onChange={(e) => handleDraftChange('quantity', e.target.value)}
+                        />
+                        {itemDraftProduct ? (
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{getUnitLabel(itemDraftProduct, itemDraft.unitType)}</p>
+                        ) : null}
+                      </div>
+                  )}
 
-                  <div>
-                    <label className="label">{t('products.unitType')}</label>
-                    <select
-                      className="input mt-1"
-                      value={itemDraft.unitType}
-                      onChange={(e) => handleDraftChange('unitType', e.target.value)}
-                      disabled={false}
-                    >
-                      <option value="primary">{t('products.primaryUnit')}</option>
-                      <option value="secondary">{t('products.secondaryUnit')}</option>
-                    </select>
-                  </div>
+                  {
+                    itemDraft.itemType === 'part' && (
+                        <div>
+                          <label className="label">{t('products.unitType')}</label>
+                          <select
+                              className="input mt-1"
+                              value={itemDraft.unitType}
+                              onChange={(e) => handleDraftChange('unitType', e.target.value)}
+                              disabled={false}
+                          >
+                            <option value="primary">{t('products.primaryUnit')}</option>
+                            <option value="secondary">{t('products.secondaryUnit')}</option>
+                          </select>
+                        </div>
+                    )
+                  }
 
                   <div>
                     <label className="label">{t('purchases.unitPrice')}</label>
@@ -1401,7 +1372,7 @@ export default function Purchases() {
               </div>
             </FormSectionCard>
           ) : null}
-
+          {status.message ? <Notice title={status.message} tone={status.type} /> : null}
           <div className={`${isMobile ? 'mobile-sticky-actions' : ''} flex flex-col-reverse gap-2 sm:flex-row sm:justify-end`}>
             {isMobile && mobileStep !== 'details' ? (
               <button className="btn-secondary w-full sm:w-auto" type="button" onClick={goToPrevMobileStep}>
