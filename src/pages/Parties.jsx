@@ -44,7 +44,7 @@ const makeEmptyTx = () => ({
 });
 
 const TX_PAGE_SIZE = 10;
-const PARTY_PAGE_SIZE = 20;
+const PARTY_PAGE_SIZE = 10;
 
 function formatDate(value) {
   if (!value) return '-';
@@ -158,6 +158,7 @@ export default function Parties() {
   const [partyTotal, setPartyTotal] = useState(0);
   const [loadingMoreParties, setLoadingMoreParties] = useState(false);
   const [partyHasMore, setPartyHasMore] = useState(false);
+  const [partyOffset, setPartyOffset] = useState(0);
   const partyListScrollRef = useRef(null);
   const partyListSentinelRef = useRef(null);
   const partyListSessionRef = useRef(0);
@@ -189,10 +190,12 @@ export default function Parties() {
         const nextItems = data?.items || [];
         const total = Number(data?.total ?? nextItems.length);
         const pageFilled = nextItems.length === PARTY_PAGE_SIZE;
+        const nextOffset = offset + nextItems.length;
 
         setListError('');
         setParties((previous) => (append ? mergeUniqueParties(previous, nextItems) : nextItems));
         setPartyTotal(total);
+        setPartyOffset(nextOffset);
         setPartyHasMore(nextItems.length > 0 && (offset + nextItems.length < total || pageFilled));
 
         if (!append && nextItems[0]?.id) {
@@ -207,6 +210,7 @@ export default function Parties() {
         if (!append) {
           setParties([]);
           setPartyTotal(0);
+          setPartyOffset(0);
         }
       } finally {
         if (session !== partyListSessionRef.current) return;
@@ -231,6 +235,7 @@ export default function Parties() {
     setPartyTotal(0);
     setPartyHasMore(false);
     setLoadingMoreParties(false);
+    setPartyOffset(0);
     loadPartyPage({ offset: 0, append: false, session });
   }, [debouncedQuery, filterType, partyReloadKey, loadPartyPage]);
 
@@ -255,7 +260,7 @@ export default function Parties() {
         if (!entry?.isIntersecting) return;
 
         loadPartyPage({
-          offset: parties.length,
+          offset: partyOffset,
           append: true,
           session: partyListSessionRef.current,
         });
@@ -269,7 +274,7 @@ export default function Parties() {
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [loadPartyPage, loadingMoreParties, loadingParties, partyHasMore, parties.length, supportsIntersectionObserver]);
+  }, [loadPartyPage, loadingMoreParties, loadingParties, partyHasMore, partyOffset, supportsIntersectionObserver]);
 
   useEffect(() => {
     if (loadingParties && parties.length === 0) {
@@ -695,7 +700,7 @@ export default function Parties() {
 
           <div
             ref={partyListScrollRef}
-            className="max-h-[60vh] space-y-2 overflow-y-auto pr-1 no-scrollbar lg:max-h-[calc(100vh-22rem)]"
+            className="min-h-[75rem] max-h-[60vh] space-y-2 overflow-y-auto pr-1 no-scrollbar lg:max-h-[calc(100vh-22rem)]"
           >
             {loadingParties && parties.length === 0 ? (
               <p className="text-sm text-slate-500">{t('common.loading')}</p>
@@ -780,7 +785,7 @@ export default function Parties() {
                     className="font-semibold text-rose-600 transition hover:text-rose-700"
                     onClick={() =>
                       loadPartyPage({
-                        offset: parties.length,
+                        offset: partyOffset,
                         append: true,
                         session: partyListSessionRef.current,
                       })
@@ -797,7 +802,7 @@ export default function Parties() {
                       className="font-semibold text-emerald-600 transition hover:text-emerald-700"
                       onClick={() =>
                         loadPartyPage({
-                          offset: parties.length,
+                          offset: partyOffset,
                           append: true,
                           session: partyListSessionRef.current,
                         })
