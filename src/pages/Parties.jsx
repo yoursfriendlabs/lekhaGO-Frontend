@@ -404,16 +404,10 @@ export default function Parties() {
   const totalTxPages = Math.max(1, Math.ceil(statementData.summary.totalRows / TX_PAGE_SIZE));
   const partySummaryCards = [
     {
-      key: 'sales',
-      label: t('ledger.sale'),
-      total: statementData.summary.totalSales,
-      due: statementData.summary.salesDue,
-    },
-    {
-      key: 'services',
-      label: t('ledger.service'),
-      total: statementData.summary.totalServices,
-      due: statementData.summary.servicesDue,
+      key: 'sales-and-services',
+      label: t('dashboard.salesAndServices'),
+      total: statementData.summary.totalSales + statementData.summary.totalServices,
+      due: statementData.summary.salesDue + statementData.summary.servicesDue,
     },
     {
       key: 'purchases',
@@ -910,7 +904,7 @@ export default function Parties() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {partySummaryCards.map((card) => (
                   <div
                     key={card.key}

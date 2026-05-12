@@ -10,18 +10,35 @@ import dayjs, { formatMaybeDate } from '../lib/datetime';
 
 const EMPTY_SUMMARY = Object.freeze({
   cashReceived: 0,
+  cashPaid: 0,
   pendingAmount: 0,
   pendingReceivable: 0,
   pendingPayable: 0,
   salesTotal: 0,
+  directSalesTotal: 0,
   purchaseTotal: 0,
   serviceTotal: 0,
+  expenseTotal: 0,
+  profitOrLoss: 0,
+  profitOrLossStatus: 'break_even',
   productCount: 0,
   lowStockCount: 0,
   lowStockItems: [],
   recentSales: [],
   recentPurchases: [],
   upcomingServiceDeliveries: [],
+  breakdown: {
+    revenue: {
+      sales: 0,
+      directSales: 0,
+      services: 0,
+    },
+    cashPaid: {
+      purchases: 0,
+      expenses: 0,
+      total: 0,
+    },
+  },
 });
 
 function asArray(value) {
@@ -33,24 +50,67 @@ function asNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function firstNumber(source, keys = []) {
+  for (const key of keys) {
+    const parsed = Number(source?.[key]);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+
+  return null;
+}
+
 function normalizeDashboardSummary(payload = {}) {
   const summary = payload && typeof payload === 'object' ? payload : {};
   const lowStockItems = asArray(summary.lowStockItems);
+  const directSalesTotal = firstNumber(summary, ['directSalesTotal']) ?? firstNumber(summary?.breakdown?.revenue, ['directSales']);
+  const serviceTotal = firstNumber(summary, ['serviceTotal']) ?? firstNumber(summary?.breakdown?.revenue, ['services']) ?? 0;
+  const salesTotal = firstNumber(summary?.breakdown?.revenue, ['sales'])
+    ?? (
+      directSalesTotal !== null
+        ? (firstNumber(summary, ['salesTotal']) ?? (directSalesTotal + serviceTotal))
+        : (asNumber(summary.salesTotal) + serviceTotal)
+    );
+  const purchaseTotal = firstNumber(summary, ['purchaseTotal']) ?? 0;
+  const expenseTotal = firstNumber(summary, ['expenseTotal']) ?? 0;
+  const cashPaid = firstNumber(summary, ['cashPaid'])
+    ?? firstNumber(summary?.breakdown?.cashPaid, ['total'])
+    ?? (
+      (firstNumber(summary?.breakdown?.cashPaid, ['purchases']) ?? 0)
+      + (firstNumber(summary?.breakdown?.cashPaid, ['expenses']) ?? 0)
+    );
+  const profitOrLoss = firstNumber(summary, ['profitOrLoss']) ?? (salesTotal - purchaseTotal - expenseTotal);
 
   return {
     cashReceived: asNumber(summary.cashReceived),
+    cashPaid,
     pendingAmount: asNumber(summary.pendingAmount),
     pendingReceivable: asNumber(summary.pendingReceivable),
     pendingPayable: asNumber(summary.pendingPayable),
-    salesTotal: asNumber(summary.salesTotal),
-    purchaseTotal: asNumber(summary.purchaseTotal),
-    serviceTotal: asNumber(summary.serviceTotal),
+    salesTotal,
+    directSalesTotal: directSalesTotal ?? asNumber(summary.salesTotal),
+    purchaseTotal,
+    serviceTotal,
+    expenseTotal,
+    profitOrLoss,
+    profitOrLossStatus: summary.profitOrLossStatus || (profitOrLoss > 0 ? 'profit' : profitOrLoss < 0 ? 'loss' : 'break_even'),
     productCount: asNumber(summary.productCount),
     lowStockCount: asNumber(summary.lowStockCount ?? lowStockItems.length),
     lowStockItems,
     recentSales: asArray(summary.recentSales),
     recentPurchases: asArray(summary.recentPurchases),
     upcomingServiceDeliveries: asArray(summary.upcomingServiceDeliveries),
+    breakdown: {
+      revenue: {
+        sales: firstNumber(summary?.breakdown?.revenue, ['sales']) ?? salesTotal,
+        directSales: firstNumber(summary?.breakdown?.revenue, ['directSales']) ?? (directSalesTotal ?? asNumber(summary.salesTotal)),
+        services: firstNumber(summary?.breakdown?.revenue, ['services']) ?? serviceTotal,
+      },
+      cashPaid: {
+        purchases: firstNumber(summary?.breakdown?.cashPaid, ['purchases']) ?? 0,
+        expenses: firstNumber(summary?.breakdown?.cashPaid, ['expenses']) ?? 0,
+        total: firstNumber(summary?.breakdown?.cashPaid, ['total']) ?? cashPaid,
+      },
+    },
   };
 }
 
@@ -175,10 +235,12 @@ export default function Dashboard() {
   const recentPurchases = summary.recentPurchases.slice(0, 5);
   const upcomingDeliveries = summary.upcomingServiceDeliveries.slice(0, 6);
   const lowStockItems = summary.lowStockItems.slice(0, 5);
-  const dashboardProfile = businessProfile?.dashboard || {};
   const servicesEnabled = businessProfile?.modules?.services === true;
-  const salesLabel = dashboardProfile.salesLabel || t('dashboard.salesTotal');
-  const servicesLabel = dashboardProfile.servicesLabel || t('dashboard.serviceRevenue');
+  const profitLossToneClass = summary.profitOrLoss < 0
+    ? 'text-rose-600 dark:text-rose-300'
+    : summary.profitOrLoss > 0
+      ? 'text-emerald-700 dark:text-emerald-300'
+      : 'text-slate-900 dark:text-white';
 
   return (
     <div className="space-y-6 pb-28 md:pb-0">
@@ -225,25 +287,40 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="rounded-2xl border border-amber-200/70 bg-white/80 p-4 dark:border-amber-700/40 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-amber-500/80">{t('dashboard.amountPending')}</p>
               <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.pendingAmount)}</p>
             </div>
             <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
-              <p className="text-xs uppercase text-slate-500">{salesLabel}</p>
+              <p className="text-xs uppercase text-slate-500">{t('dashboard.salesAndServices')}</p>
               <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.salesTotal)}</p>
+              <div className="mt-2 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                <p className="flex items-center justify-between gap-2">
+                  <span>{t('analytics.directSales')}</span>
+                  <span>{formatMoney(summary.directSalesTotal)}</span>
+                </p>
+                <p className="flex items-center justify-between gap-2">
+                  <span>{t('nav.services')}</span>
+                  <span>{formatMoney(summary.serviceTotal)}</span>
+                </p>
+              </div>
             </div>
             <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-slate-500">{t('dashboard.purchaseSpend')}</p>
               <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.purchaseTotal)}</p>
             </div>
-            {servicesEnabled ? (
-              <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
-                <p className="text-xs uppercase text-slate-500">{servicesLabel}</p>
-                <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.serviceTotal)}</p>
-              </div>
-            ) : null}
+            <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
+              <p className="text-xs uppercase text-slate-500">{t('dashboard.expenses')}</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.expenseTotal)}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
+              <p className="text-xs uppercase text-slate-500">{t('dashboard.profitLoss')}</p>
+              <p className={`mt-1 text-xl font-semibold ${profitLossToneClass}`}>{formatMoney(summary.profitOrLoss)}</p>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                {t('analytics.totalOutgoing')}: {formatMoney(summary.purchaseTotal + summary.expenseTotal)}
+              </p>
+            </div>
           </div>
 
           <p className="mt-4 text-xs text-slate-500">
@@ -406,7 +483,7 @@ export default function Dashboard() {
                     <p className="text-sm font-semibold text-slate-900 dark:text-white">{item.name || '-'}</p>
                     <p className="text-xs text-slate-500">{item.sku || 'n/a'}</p>
                   </div>
-                  <p className="text-sm font-semibold text-rose-600 dark:text-rose-300">{asNumber(item.quantityOnHand).toFixed(2)}</p>
+                  <p className="text-sm font-semibold text-rose-600 dark:text-rose-300">{asNumber(item.quantityOnHand ?? item.stockOnHand).toFixed(2)}</p>
                 </div>
               ))
             )}

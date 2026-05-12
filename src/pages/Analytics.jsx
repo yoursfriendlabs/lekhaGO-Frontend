@@ -10,11 +10,22 @@ import { formatCurrency } from '../lib/currency';
 import { useI18n } from '../lib/i18n.jsx';
 import dayjs, { todayISODate } from '../lib/datetime';
 
+const EMPTY_METRIC_TOTALS = Object.freeze({
+  count: 0,
+  total: 0,
+  cashReceived: 0,
+  cashPaid: 0,
+  pending: 0,
+});
+
 const EMPTY_SUMMARY = Object.freeze({
   totals: {
-    sales: { count: 0, total: 0, cashReceived: 0, pending: 0 },
-    purchases: { count: 0, total: 0, cashPaid: 0, pending: 0 },
-    services: { count: 0, total: 0, cashReceived: 0, pending: 0 },
+    sales: { ...EMPTY_METRIC_TOTALS, cashReceived: 0 },
+    directSales: { ...EMPTY_METRIC_TOTALS, cashReceived: 0 },
+    services: { ...EMPTY_METRIC_TOTALS, cashReceived: 0 },
+    purchases: { ...EMPTY_METRIC_TOTALS, cashPaid: 0 },
+    expenses: { ...EMPTY_METRIC_TOTALS, cashPaid: 0 },
+    purchasesAndExpenses: { ...EMPTY_METRIC_TOTALS, cashPaid: 0 },
     combined: {
       revenue: 0,
       expenses: 0,
@@ -23,13 +34,46 @@ const EMPTY_SUMMARY = Object.freeze({
       netCash: 0,
       pendingReceivable: 0,
       pendingPayable: 0,
+      profitOrLoss: 0,
+      profitOrLossStatus: 'break_even',
     },
   },
   series: {
     sales: [],
-    purchases: [],
+    directSales: [],
     services: [],
+    purchases: [],
+    expenses: [],
+    purchasesAndExpenses: [],
+    profitLoss: [],
     timeline: [],
+  },
+});
+
+const EMPTY_PROFIT_LOSS = Object.freeze({
+  summary: {
+    profitLoss: {
+      revenue: 0,
+      purchases: 0,
+      expenses: 0,
+      totalExpenses: 0,
+      amount: 0,
+      status: 'break_even',
+    },
+    current: {
+      label: '',
+      revenue: 0,
+      directSales: 0,
+      services: 0,
+      purchases: 0,
+      expenses: 0,
+      totalExpenses: 0,
+      amount: 0,
+      status: 'break_even',
+    },
+  },
+  series: {
+    profitLoss: [],
   },
 });
 
@@ -45,6 +89,12 @@ function firstNumber(source, keys = []) {
   }
 
   return null;
+}
+
+function getProfitLossStatus(amount) {
+  if (amount > 0) return 'profit';
+  if (amount < 0) return 'loss';
+  return 'break_even';
 }
 
 function formatSeriesLabel(rawLabel, fallbackLabel) {
@@ -63,24 +113,34 @@ function formatSeriesLabel(rawLabel, fallbackLabel) {
   return label;
 }
 
-function normalizeMetricTotals(source, receivedKey) {
+function normalizeMetricTotals(source, cashKey) {
   const base = source && typeof source === 'object' && !Array.isArray(source) ? source : {};
   const totalFallback = asNumber(source);
 
   return {
     count: asNumber(base.count),
     total: firstNumber(base, ['total', 'amount']) ?? totalFallback,
-    [receivedKey]: firstNumber(base, [receivedKey]) ?? 0,
-    pending: asNumber(base.pending),
+    [cashKey]: firstNumber(base, [cashKey]) ?? 0,
+    pending: firstNumber(base, ['pending']) ?? 0,
   };
 }
 
-function normalizeCombinedTotals(source) {
+function combineMetricTotals(primary, secondary, cashKey) {
+  return {
+    count: asNumber(primary?.count) + asNumber(secondary?.count),
+    total: asNumber(primary?.total) + asNumber(secondary?.total),
+    [cashKey]: asNumber(primary?.[cashKey]) + asNumber(secondary?.[cashKey]),
+    pending: asNumber(primary?.pending) + asNumber(secondary?.pending),
+  };
+}
+
+function normalizeCombinedTotals(source, revenueTotals, expenseTotals) {
   const base = source && typeof source === 'object' && !Array.isArray(source) ? source : {};
-  const revenue = firstNumber(base, ['revenue', 'revenueTotal', 'total']) ?? asNumber(source);
-  const expenses = firstNumber(base, ['expenses', 'expenseTotal']) ?? 0;
-  const cashIn = firstNumber(base, ['cashIn', 'cashInTotal']) ?? 0;
-  const cashOut = firstNumber(base, ['cashOut', 'cashOutTotal']) ?? 0;
+  const revenue = firstNumber(base, ['revenue', 'revenueTotal']) ?? asNumber(revenueTotals?.total);
+  const expenses = firstNumber(base, ['expenses', 'expenseTotal', 'totalExpenses']) ?? asNumber(expenseTotals?.total);
+  const cashIn = firstNumber(base, ['cashIn', 'cashInTotal']) ?? asNumber(revenueTotals?.cashReceived);
+  const cashOut = firstNumber(base, ['cashOut', 'cashOutTotal']) ?? asNumber(expenseTotals?.cashPaid);
+  const profitOrLoss = firstNumber(base, ['profitOrLoss']) ?? (revenue - expenses);
 
   return {
     revenue,
@@ -88,12 +148,19 @@ function normalizeCombinedTotals(source) {
     cashIn,
     cashOut,
     netCash: firstNumber(base, ['netCash']) ?? (cashIn - cashOut),
-    pendingReceivable: firstNumber(base, ['pendingReceivable']) ?? 0,
-    pendingPayable: firstNumber(base, ['pendingPayable']) ?? 0,
+    pendingReceivable: firstNumber(base, ['pendingReceivable']) ?? asNumber(revenueTotals?.pending),
+    pendingPayable: firstNumber(base, ['pendingPayable']) ?? asNumber(expenseTotals?.pending),
+    profitOrLoss,
+    profitOrLossStatus: base.profitOrLossStatus || getProfitLossStatus(profitOrLoss),
   };
 }
 
-function normalizeBreakdownSeries(items, { totalKeys, receivedKeys, pendingKeys, receivedField = 'received' }) {
+function normalizeBreakdownSeries(items, {
+  totalKeys,
+  cashKeys,
+  pendingKeys,
+  cashField = 'received',
+}) {
   if (!Array.isArray(items)) return [];
 
   return items.map((item, index) => {
@@ -103,8 +170,32 @@ function normalizeBreakdownSeries(items, { totalKeys, receivedKeys, pendingKeys,
       key: String(item?.key || item?.period || item?.date || item?.bucketStart || index),
       label: formatSeriesLabel(rawLabel, `#${index + 1}`),
       total: firstNumber(item, totalKeys) ?? 0,
-      [receivedField]: firstNumber(item, receivedKeys) ?? 0,
+      [cashField]: firstNumber(item, cashKeys) ?? 0,
       pending: firstNumber(item, pendingKeys) ?? 0,
+    };
+  });
+}
+
+function normalizeProfitLossSeries(items) {
+  if (!Array.isArray(items)) return [];
+
+  return items.map((item, index) => {
+    const rawLabel = item?.label || item?.periodLabel || item?.period || item?.date || item?.bucketStart || item?.key;
+    const revenue = firstNumber(item, ['revenue', 'salesAndServicesTotal']) ?? 0;
+    const totalExpenses = firstNumber(item, ['totalExpenses', 'purchaseAndExpenseTotal']) ?? 0;
+    const profitOrLoss = firstNumber(item, ['profitOrLoss', 'amount']) ?? (revenue - totalExpenses);
+
+    return {
+      key: String(item?.key || item?.period || item?.date || item?.bucketStart || index),
+      label: formatSeriesLabel(rawLabel, `#${index + 1}`),
+      revenue,
+      directSales: firstNumber(item, ['directSales', 'salesTotal']) ?? 0,
+      services: firstNumber(item, ['services', 'serviceTotal']) ?? 0,
+      purchases: firstNumber(item, ['purchases', 'purchaseTotal']) ?? 0,
+      expenses: firstNumber(item, ['expenses', 'directExpenseTotal', 'expenseTotal']) ?? 0,
+      totalExpenses,
+      profitOrLoss,
+      status: item?.status || item?.profitOrLossStatus || getProfitLossStatus(profitOrLoss),
     };
   });
 }
@@ -114,24 +205,55 @@ function normalizeTimelineSeries(items) {
 
   return items.map((item, index) => {
     const rawLabel = item?.label || item?.periodLabel || item?.period || item?.date || item?.bucketStart || item?.key;
+    const directSalesTotal = firstNumber(item, ['directSalesTotal', 'salesTotal', 'directSales', 'salesAmount']) ?? 0;
+    const directSalesCashReceived = firstNumber(item, ['directSalesCashReceived', 'salesCashReceived']) ?? 0;
+    const directSalesPending = firstNumber(item, ['directSalesPending', 'salesPending']) ?? 0;
+    const serviceTotal = firstNumber(item, ['serviceTotal', 'services', 'serviceAmount']) ?? 0;
+    const serviceCashReceived = firstNumber(item, ['serviceCashReceived']) ?? 0;
+    const servicePending = firstNumber(item, ['servicePending']) ?? 0;
+    const salesTotal = firstNumber(item, ['salesAndServicesTotal', 'revenueTotal'])
+      ?? (directSalesTotal + serviceTotal);
+    const salesCashReceived = firstNumber(item, ['salesAndServicesCashReceived', 'cashInTotal'])
+      ?? (directSalesCashReceived + serviceCashReceived);
+    const salesPending = firstNumber(item, ['salesAndServicesPending'])
+      ?? (directSalesPending + servicePending);
+    const purchaseTotal = firstNumber(item, ['purchaseTotal', 'purchases', 'purchaseAmount']) ?? 0;
+    const purchaseCashPaid = firstNumber(item, ['purchaseCashPaid']) ?? 0;
+    const purchasePending = firstNumber(item, ['purchasePending']) ?? 0;
+    const expenseTotal = firstNumber(item, ['directExpenseTotal', 'expenseTotal', 'expenses']) ?? 0;
+    const expenseCashPaid = firstNumber(item, ['directExpenseCashPaid', 'expenseCashPaid']) ?? 0;
+    const expensePending = firstNumber(item, ['directExpensePending', 'expensePending']) ?? 0;
+    const purchasesAndExpensesTotal = firstNumber(item, ['purchaseAndExpenseTotal', 'purchasesAndExpensesTotal', 'totalExpenses'])
+      ?? (purchaseTotal + expenseTotal);
+    const purchasesAndExpensesCashPaid = firstNumber(item, ['purchaseAndExpenseCashPaid', 'cashOutTotal'])
+      ?? (purchaseCashPaid + expenseCashPaid);
+    const purchasesAndExpensesPending = firstNumber(item, ['purchaseAndExpensePending'])
+      ?? (purchasePending + expensePending);
+    const profitOrLoss = firstNumber(item, ['profitOrLoss', 'amount']) ?? (salesTotal - purchasesAndExpensesTotal);
 
     return {
       key: String(item?.key || item?.period || item?.date || item?.bucketStart || index),
       label: formatSeriesLabel(rawLabel, `#${index + 1}`),
-      salesTotal: firstNumber(item, ['salesTotal', 'sales', 'salesAmount']) ?? 0,
-      salesCashReceived: firstNumber(item, ['salesCashReceived']) ?? 0,
-      salesPending: firstNumber(item, ['salesPending']) ?? 0,
-      purchaseTotal: firstNumber(item, ['purchaseTotal', 'purchases', 'purchaseAmount']) ?? 0,
-      purchaseCashPaid: firstNumber(item, ['purchaseCashPaid']) ?? 0,
-      purchasePending: firstNumber(item, ['purchasePending']) ?? 0,
-      serviceTotal: firstNumber(item, ['serviceTotal', 'services', 'serviceAmount']) ?? 0,
-      serviceCashReceived: firstNumber(item, ['serviceCashReceived']) ?? 0,
-      servicePending: firstNumber(item, ['servicePending']) ?? 0,
-      revenueTotal: firstNumber(item, ['revenueTotal', 'combined', 'combinedTotal', 'total']) ?? 0,
-      expenseTotal: firstNumber(item, ['expenseTotal']) ?? 0,
-      cashInTotal: firstNumber(item, ['cashInTotal']) ?? 0,
-      cashOutTotal: firstNumber(item, ['cashOutTotal']) ?? 0,
-      netCash: firstNumber(item, ['netCash']) ?? 0,
+      salesTotal,
+      salesCashReceived,
+      salesPending,
+      directSalesTotal,
+      directSalesCashReceived,
+      directSalesPending,
+      purchaseTotal,
+      purchaseCashPaid,
+      purchasePending,
+      serviceTotal,
+      serviceCashReceived,
+      servicePending,
+      expenseTotal,
+      expenseCashPaid,
+      expensePending,
+      purchasesAndExpensesTotal,
+      purchasesAndExpensesCashPaid,
+      purchasesAndExpensesPending,
+      profitOrLoss,
+      profitOrLossStatus: item?.profitOrLossStatus || item?.status || getProfitLossStatus(profitOrLoss),
     };
   });
 }
@@ -141,24 +263,64 @@ function normalizeAnalyticsSummary(payload = {}) {
   const totals = summary?.totals || {};
   const series = summary?.series || {};
   const timeline = normalizeTimelineSeries(series.timeline);
-  const salesSeries = normalizeBreakdownSeries(series.sales, {
-    totalKeys: ['total', 'salesTotal', 'amount', 'value'],
-    receivedKeys: ['cashReceived', 'salesCashReceived'],
-    pendingKeys: ['pending', 'salesPending'],
-    receivedField: 'received',
-  });
-  const purchaseSeries = normalizeBreakdownSeries(series.purchases, {
-    totalKeys: ['total', 'purchaseTotal', 'amount', 'value'],
-    receivedKeys: ['cashPaid', 'purchaseCashPaid'],
-    pendingKeys: ['pending', 'purchasePending'],
-    receivedField: 'paid',
-  });
-  const serviceSeries = normalizeBreakdownSeries(series.services, {
+  const hasMergedRevenueContract = Boolean(totals?.directSales) || Array.isArray(series?.directSales);
+
+  const directSalesTotals = normalizeMetricTotals(
+    hasMergedRevenueContract ? totals.directSales : totals.sales,
+    'cashReceived'
+  );
+  const servicesTotals = normalizeMetricTotals(totals.services, 'cashReceived');
+  const salesTotals = hasMergedRevenueContract
+    ? normalizeMetricTotals(totals.sales, 'cashReceived')
+    : combineMetricTotals(normalizeMetricTotals(totals.sales, 'cashReceived'), servicesTotals, 'cashReceived');
+  const purchasesTotals = normalizeMetricTotals(totals.purchases, 'cashPaid');
+  const expensesTotals = normalizeMetricTotals(totals.expenses, 'cashPaid');
+  const purchasesAndExpensesTotals = totals.purchasesAndExpenses
+    ? normalizeMetricTotals(totals.purchasesAndExpenses, 'cashPaid')
+    : combineMetricTotals(purchasesTotals, expensesTotals, 'cashPaid');
+
+  const rawSalesSeries = hasMergedRevenueContract
+    ? normalizeBreakdownSeries(series.sales, {
+      totalKeys: ['total', 'salesAndServicesTotal', 'salesTotal', 'amount', 'value'],
+      cashKeys: ['cashReceived', 'salesAndServicesCashReceived', 'salesCashReceived'],
+      pendingKeys: ['pending', 'salesAndServicesPending', 'salesPending'],
+      cashField: 'received',
+    })
+    : [];
+  const rawDirectSalesSeries = normalizeBreakdownSeries(
+    hasMergedRevenueContract ? series.directSales : series.sales,
+    {
+      totalKeys: ['total', 'directSalesTotal', 'salesTotal', 'amount', 'value'],
+      cashKeys: ['cashReceived', 'directSalesCashReceived', 'salesCashReceived'],
+      pendingKeys: ['pending', 'directSalesPending', 'salesPending'],
+      cashField: 'received',
+    }
+  );
+  const rawServicesSeries = normalizeBreakdownSeries(series.services, {
     totalKeys: ['total', 'serviceTotal', 'amount', 'value'],
-    receivedKeys: ['cashReceived', 'serviceCashReceived'],
+    cashKeys: ['cashReceived', 'serviceCashReceived'],
     pendingKeys: ['pending', 'servicePending'],
-    receivedField: 'received',
+    cashField: 'received',
   });
+  const rawPurchasesSeries = normalizeBreakdownSeries(series.purchases, {
+    totalKeys: ['total', 'purchaseTotal', 'amount', 'value'],
+    cashKeys: ['cashPaid', 'purchaseCashPaid'],
+    pendingKeys: ['pending', 'purchasePending'],
+    cashField: 'paid',
+  });
+  const rawExpensesSeries = normalizeBreakdownSeries(series.expenses, {
+    totalKeys: ['total', 'expenseTotal', 'directExpenseTotal', 'amount', 'value'],
+    cashKeys: ['cashPaid', 'expenseCashPaid', 'directExpenseCashPaid'],
+    pendingKeys: ['pending', 'expensePending', 'directExpensePending'],
+    cashField: 'paid',
+  });
+  const rawOutgoingSeries = normalizeBreakdownSeries(series.purchasesAndExpenses, {
+    totalKeys: ['total', 'purchaseAndExpenseTotal', 'purchasesAndExpensesTotal', 'totalExpenses', 'amount', 'value'],
+    cashKeys: ['cashPaid', 'purchaseAndExpenseCashPaid', 'cashOutTotal'],
+    pendingKeys: ['pending', 'purchaseAndExpensePending'],
+    cashField: 'paid',
+  });
+  const rawProfitLossSeries = normalizeProfitLossSeries(series.profitLoss);
 
   const fallbackSales = timeline.map((point) => ({
     key: point.key,
@@ -167,12 +329,12 @@ function normalizeAnalyticsSummary(payload = {}) {
     received: point.salesCashReceived,
     pending: point.salesPending,
   }));
-  const fallbackPurchases = timeline.map((point) => ({
+  const fallbackDirectSales = timeline.map((point) => ({
     key: point.key,
     label: point.label,
-    total: point.purchaseTotal,
-    paid: point.purchaseCashPaid,
-    pending: point.purchasePending,
+    total: point.directSalesTotal,
+    received: point.directSalesCashReceived,
+    pending: point.directSalesPending,
   }));
   const fallbackServices = timeline.map((point) => ({
     key: point.key,
@@ -181,19 +343,130 @@ function normalizeAnalyticsSummary(payload = {}) {
     received: point.serviceCashReceived,
     pending: point.servicePending,
   }));
+  const fallbackPurchases = timeline.map((point) => ({
+    key: point.key,
+    label: point.label,
+    total: point.purchaseTotal,
+    paid: point.purchaseCashPaid,
+    pending: point.purchasePending,
+  }));
+  const fallbackExpenses = timeline.map((point) => ({
+    key: point.key,
+    label: point.label,
+    total: point.expenseTotal,
+    paid: point.expenseCashPaid,
+    pending: point.expensePending,
+  }));
+  const fallbackOutgoing = timeline.map((point) => ({
+    key: point.key,
+    label: point.label,
+    total: point.purchasesAndExpensesTotal,
+    paid: point.purchasesAndExpensesCashPaid,
+    pending: point.purchasesAndExpensesPending,
+  }));
+  const fallbackProfitLoss = timeline.map((point) => ({
+    key: point.key,
+    label: point.label,
+    revenue: point.salesTotal,
+    directSales: point.directSalesTotal,
+    services: point.serviceTotal,
+    purchases: point.purchaseTotal,
+    expenses: point.expenseTotal,
+    totalExpenses: point.purchasesAndExpensesTotal,
+    profitOrLoss: point.profitOrLoss,
+    status: point.profitOrLossStatus,
+  }));
 
   return {
     totals: {
-      sales: normalizeMetricTotals(totals.sales, 'cashReceived'),
-      purchases: normalizeMetricTotals(totals.purchases, 'cashPaid'),
-      services: normalizeMetricTotals(totals.services, 'cashReceived'),
-      combined: normalizeCombinedTotals(totals.combined),
+      sales: salesTotals,
+      directSales: directSalesTotals,
+      services: servicesTotals,
+      purchases: purchasesTotals,
+      expenses: expensesTotals,
+      purchasesAndExpenses: purchasesAndExpensesTotals,
+      combined: normalizeCombinedTotals(totals.combined, salesTotals, purchasesAndExpensesTotals),
     },
     series: {
-      sales: salesSeries.length > 0 ? salesSeries : fallbackSales,
-      purchases: purchaseSeries.length > 0 ? purchaseSeries : fallbackPurchases,
-      services: serviceSeries.length > 0 ? serviceSeries : fallbackServices,
+      sales: rawSalesSeries.length > 0 ? rawSalesSeries : fallbackSales,
+      directSales: rawDirectSalesSeries.length > 0 ? rawDirectSalesSeries : fallbackDirectSales,
+      services: rawServicesSeries.length > 0 ? rawServicesSeries : fallbackServices,
+      purchases: rawPurchasesSeries.length > 0 ? rawPurchasesSeries : fallbackPurchases,
+      expenses: rawExpensesSeries.length > 0 ? rawExpensesSeries : fallbackExpenses,
+      purchasesAndExpenses: rawOutgoingSeries.length > 0 ? rawOutgoingSeries : fallbackOutgoing,
+      profitLoss: rawProfitLossSeries.length > 0 ? rawProfitLossSeries : fallbackProfitLoss,
       timeline,
+    },
+  };
+}
+
+function normalizeProfitLossResponse(payload = {}) {
+  const summary = payload && typeof payload === 'object' ? payload : {};
+  const summarySource = summary?.summary || {};
+  const profitLossSource = summarySource?.profitLoss || {};
+  const currentSource = summarySource?.current || {};
+  const series = normalizeProfitLossSeries(summary?.series?.profitLoss || summary?.series?.timeline || []);
+  const totalExpenses = firstNumber(profitLossSource, ['totalExpenses']) ?? 0;
+  const totalAmount = firstNumber(profitLossSource, ['amount', 'profitOrLoss']) ?? 0;
+  const currentAmount = firstNumber(currentSource, ['amount', 'profitOrLoss']) ?? 0;
+
+  return {
+    summary: {
+      profitLoss: {
+        revenue: firstNumber(profitLossSource, ['revenue']) ?? 0,
+        purchases: firstNumber(profitLossSource, ['purchases']) ?? 0,
+        expenses: firstNumber(profitLossSource, ['expenses']) ?? 0,
+        totalExpenses,
+        amount: totalAmount,
+        status: profitLossSource?.status || getProfitLossStatus(totalAmount),
+      },
+      current: {
+        label: currentSource?.label || '',
+        revenue: firstNumber(currentSource, ['revenue']) ?? 0,
+        directSales: firstNumber(currentSource, ['directSales']) ?? 0,
+        services: firstNumber(currentSource, ['services']) ?? 0,
+        purchases: firstNumber(currentSource, ['purchases']) ?? 0,
+        expenses: firstNumber(currentSource, ['expenses']) ?? 0,
+        totalExpenses: firstNumber(currentSource, ['totalExpenses']) ?? 0,
+        amount: currentAmount,
+        status: currentSource?.status || getProfitLossStatus(currentAmount),
+      },
+    },
+    series: {
+      profitLoss: series,
+    },
+  };
+}
+
+function buildProfitLossFallback(summary) {
+  const latestPoint = summary.series.profitLoss[summary.series.profitLoss.length - 1] || null;
+
+  return {
+    summary: {
+      profitLoss: {
+        revenue: summary.totals.sales.total,
+        purchases: summary.totals.purchases.total,
+        expenses: summary.totals.expenses.total,
+        totalExpenses: summary.totals.purchasesAndExpenses.total,
+        amount: summary.totals.combined.profitOrLoss,
+        status: summary.totals.combined.profitOrLossStatus,
+      },
+      current: latestPoint
+        ? {
+          label: latestPoint.label,
+          revenue: latestPoint.revenue,
+          directSales: latestPoint.directSales,
+          services: latestPoint.services,
+          purchases: latestPoint.purchases,
+          expenses: latestPoint.expenses,
+          totalExpenses: latestPoint.totalExpenses,
+          amount: latestPoint.profitOrLoss,
+          status: latestPoint.status,
+        }
+        : { ...EMPTY_PROFIT_LOSS.summary.current },
+    },
+    series: {
+      profitLoss: summary.series.profitLoss,
     },
   };
 }
@@ -201,6 +474,8 @@ function normalizeAnalyticsSummary(payload = {}) {
 function metricToneClasses(tone, value) {
   if (tone === 'success') return 'text-emerald-600 dark:text-emerald-400';
   if (tone === 'danger') return 'text-rose-600 dark:text-rose-400';
+  if (tone === 'info') return 'text-sky-600 dark:text-sky-400';
+  if (tone === 'warning') return 'text-amber-600 dark:text-amber-400';
   if (tone === 'net') {
     return asNumber(value) < 0
       ? 'text-rose-600 dark:text-rose-400'
@@ -213,6 +488,7 @@ function metricToneClasses(tone, value) {
 export default function Analytics() {
   const { t } = useI18n();
   const [summary, setSummary] = useState(() => EMPTY_SUMMARY);
+  const [profitLoss, setProfitLoss] = useState(() => EMPTY_PROFIT_LOSS);
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -230,21 +506,43 @@ export default function Analytics() {
     setLoading(true);
     setStatus('');
 
-    api.getAnalyticsSummary({
+    const params = {
       from: filters.fromDate || undefined,
       to: filters.toDate || undefined,
       groupBy: filters.groupBy || 'auto',
       partyId: filters.partyId || undefined,
       createdBy: filters.createdBy || undefined,
-    })
-      .then((data) => {
+    };
+
+    Promise.allSettled([
+      api.getAnalyticsSummary(params),
+      api.getAnalyticsProfitLoss(params),
+    ])
+      .then(([summaryResult, profitLossResult]) => {
         if (!isActive) return;
-        setSummary(normalizeAnalyticsSummary(data));
+
+        if (summaryResult.status !== 'fulfilled') {
+          setSummary(EMPTY_SUMMARY);
+          setProfitLoss(EMPTY_PROFIT_LOSS);
+          setStatus(summaryResult.reason?.message || t('auth.errors.generic'));
+          return;
+        }
+
+        const nextSummary = normalizeAnalyticsSummary(summaryResult.value);
+        setSummary(nextSummary);
+
+        if (profitLossResult.status === 'fulfilled') {
+          setProfitLoss(normalizeProfitLossResponse(profitLossResult.value));
+          return;
+        }
+
+        setProfitLoss(buildProfitLossFallback(nextSummary));
       })
-      .catch((err) => {
+      .catch((error) => {
         if (!isActive) return;
         setSummary(EMPTY_SUMMARY);
-        setStatus(err.message);
+        setProfitLoss(EMPTY_PROFIT_LOSS);
+        setStatus(error.message || t('auth.errors.generic'));
       })
       .finally(() => {
         if (!isActive) return;
@@ -254,7 +552,7 @@ export default function Analytics() {
     return () => {
       isActive = false;
     };
-  }, [filters.createdBy, filters.fromDate, filters.groupBy, filters.partyId, filters.toDate]);
+  }, [filters.createdBy, filters.fromDate, filters.groupBy, filters.partyId, filters.toDate, t]);
 
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
@@ -296,8 +594,8 @@ export default function Analytics() {
 
   const renderTimelineCell = (primary, items, emphasize = false) => (
     <td className="py-2 text-right">
-      <div className="flex min-w-[9rem] flex-col items-end gap-1">
-        <span className={emphasize ? 'font-semibold text-slate-900 dark:text-white' : 'font-medium text-slate-900 dark:text-white'}>
+      <div className="flex min-w-[10rem] flex-col items-end gap-1">
+        <span className={emphasize ? `font-semibold ${metricToneClasses('net', primary)}` : 'font-medium text-slate-900 dark:text-white'}>
           {formatMoney(primary)}
         </span>
         {items.map((item) => (
@@ -310,10 +608,10 @@ export default function Analytics() {
   );
 
   const pieData = useMemo(() => ([
-    { name: t('nav.sales'), value: summary.totals.sales.total },
-    { name: t('nav.services'), value: summary.totals.services.total },
+    { name: t('analytics.salesAndServices'), value: summary.totals.sales.total },
     { name: t('nav.purchases'), value: summary.totals.purchases.total },
-  ]), [summary.totals.purchases.total, summary.totals.sales.total, summary.totals.services.total, t]);
+    { name: t('analytics.expenses'), value: summary.totals.expenses.total },
+  ]), [summary.totals.expenses.total, summary.totals.purchases.total, summary.totals.sales.total, t]);
 
   const seriesCaption = useMemo(() => {
     const labelMap = {
@@ -325,6 +623,8 @@ export default function Analytics() {
 
     return `${labelMap[filters.groupBy] || labelMap.auto} | ${filters.fromDate || '-'} to ${filters.toDate || '-'}`;
   }, [filters.fromDate, filters.groupBy, filters.toDate, t]);
+
+  const profitLossValueClass = metricToneClasses('net', profitLoss.summary.profitLoss.amount);
 
   return (
     <div className="space-y-8">
@@ -390,21 +690,13 @@ export default function Analytics() {
         <p className="text-xs text-slate-500">{loading ? t('common.loading') : seriesCaption}</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="card">
-          <p className="text-xs uppercase text-slate-400">{t('analytics.salesRevenue')}</p>
+          <p className="text-xs uppercase text-slate-400">{t('analytics.salesAndServices')}</p>
           <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.sales.total)}</p>
           {renderSummaryLines([
-            { label: t('analytics.received'), value: summary.totals.sales.cashReceived, tone: 'success' },
-            { label: t('analytics.pending'), value: summary.totals.sales.pending, tone: 'danger' },
-          ])}
-        </div>
-        <div className="card">
-          <p className="text-xs uppercase text-slate-400">{t('analytics.servicesRevenue')}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.services.total)}</p>
-          {renderSummaryLines([
-            { label: t('analytics.received'), value: summary.totals.services.cashReceived, tone: 'success' },
-            { label: t('analytics.pending'), value: summary.totals.services.pending, tone: 'danger' },
+            { label: t('analytics.directSales'), value: summary.totals.directSales.total, tone: 'info' },
+            { label: t('nav.services'), value: summary.totals.services.total, tone: 'info' },
           ])}
         </div>
         <div className="card">
@@ -416,11 +708,19 @@ export default function Analytics() {
           ])}
         </div>
         <div className="card">
-          <p className="text-xs uppercase text-slate-400">{t('analytics.combinedRevenue')}</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.combined.revenue)}</p>
+          <p className="text-xs uppercase text-slate-400">{t('analytics.expenses')}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.totals.expenses.total)}</p>
           {renderSummaryLines([
-            { label: t('analytics.cashIn'), value: summary.totals.combined.cashIn, tone: 'success' },
-            { label: t('analytics.pendingReceivable'), value: summary.totals.combined.pendingReceivable, tone: 'danger' },
+            { label: t('analytics.paid'), value: summary.totals.expenses.cashPaid, tone: 'warning' },
+            { label: t('analytics.pending'), value: summary.totals.expenses.pending, tone: 'danger' },
+          ])}
+        </div>
+        <div className="card">
+          <p className="text-xs uppercase text-slate-400">{t('analytics.profitLoss')}</p>
+          <p className={`mt-2 text-2xl font-semibold ${profitLossValueClass}`}>{formatMoney(profitLoss.summary.profitLoss.amount)}</p>
+          {renderSummaryLines([
+            { label: t('analytics.salesAndServices'), value: profitLoss.summary.profitLoss.revenue, tone: 'success' },
+            { label: t('analytics.totalOutgoing'), value: profitLoss.summary.profitLoss.totalExpenses, tone: 'warning' },
           ])}
         </div>
       </div>
@@ -439,13 +739,13 @@ export default function Analytics() {
           axisFormatter={formatCompactMoney}
         />
         <BarGraph
-          title={t('analytics.servicesTrend')}
+          title={t('analytics.outgoingTrend')}
           caption={seriesCaption}
-          data={summary.series.services}
+          data={summary.series.purchasesAndExpenses}
           nameKey="label"
           bars={[
-            { dataKey: 'received', label: t('analytics.received'), color: '#3b82f6' },
-            { dataKey: 'pending', label: t('analytics.pending'), color: '#facc15' },
+            { dataKey: 'paid', label: t('analytics.paid'), color: '#d97706' },
+            { dataKey: 'pending', label: t('analytics.pending'), color: '#f97316' },
           ]}
           valueFormatter={formatMoney}
           axisFormatter={formatCompactMoney}
@@ -454,13 +754,14 @@ export default function Analytics() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <BarGraph
-          title={t('analytics.purchaseTrend')}
+          title={t('analytics.profitLossTrend')}
           caption={seriesCaption}
-          data={summary.series.purchases}
+          data={profitLoss.series.profitLoss}
           nameKey="label"
           bars={[
-            { dataKey: 'paid', label: t('analytics.paid'), color: '#d97706' },
-            { dataKey: 'pending', label: t('analytics.pending'), color: '#facc15' },
+            { dataKey: 'revenue', label: t('analytics.salesAndServices'), color: '#10b981' },
+            { dataKey: 'totalExpenses', label: t('analytics.totalOutgoing'), color: '#f59e0b' },
+            { dataKey: 'profitOrLoss', label: t('analytics.profitLoss'), color: '#0f172a' },
           ]}
           valueFormatter={formatMoney}
           axisFormatter={formatCompactMoney}
@@ -487,10 +788,10 @@ export default function Analytics() {
               <thead className="text-xs uppercase text-slate-400">
                 <tr>
                   <th className="py-2 text-left">{t('analytics.period')}</th>
-                  <th className="py-2 text-right">{t('nav.sales')}</th>
+                  <th className="py-2 text-right">{t('analytics.salesAndServices')}</th>
                   <th className="py-2 text-right">{t('nav.purchases')}</th>
-                  <th className="py-2 text-right">{t('nav.services')}</th>
-                  <th className="py-2 text-right">{t('analytics.combined')}</th>
+                  <th className="py-2 text-right">{t('analytics.expenses')}</th>
+                  <th className="py-2 text-right">{t('analytics.profitLoss')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -498,20 +799,20 @@ export default function Analytics() {
                   <tr key={row.key} className="border-t border-slate-200/70 dark:border-slate-800/70">
                     <td className="py-2">{row.label}</td>
                     {renderTimelineCell(row.salesTotal, [
-                      { label: t('analytics.received'), value: row.salesCashReceived, tone: 'success' },
-                      { label: t('analytics.pending'), value: row.salesPending, tone: 'danger' },
+                      { label: t('analytics.directSales'), value: row.directSalesTotal, tone: 'info' },
+                      { label: t('nav.services'), value: row.serviceTotal, tone: 'info' },
                     ])}
                     {renderTimelineCell(row.purchaseTotal, [
                       { label: t('analytics.paid'), value: row.purchaseCashPaid, tone: 'success' },
                       { label: t('analytics.pending'), value: row.purchasePending, tone: 'danger' },
                     ])}
-                    {renderTimelineCell(row.serviceTotal, [
-                      { label: t('analytics.received'), value: row.serviceCashReceived, tone: 'success' },
-                      { label: t('analytics.pending'), value: row.servicePending, tone: 'danger' },
+                    {renderTimelineCell(row.expenseTotal, [
+                      { label: t('analytics.paid'), value: row.expenseCashPaid, tone: 'warning' },
+                      { label: t('analytics.pending'), value: row.expensePending, tone: 'danger' },
                     ])}
-                    {renderTimelineCell(row.revenueTotal, [
-                      { label: t('analytics.cashIn'), value: row.cashInTotal, tone: 'success' },
-                      { label: t('analytics.netCash'), value: row.netCash, tone: 'net' },
+                    {renderTimelineCell(row.profitOrLoss, [
+                      { label: t('analytics.totalOutgoing'), value: row.purchasesAndExpensesTotal, tone: 'warning' },
+                      { label: t('analytics.salesAndServices'), value: row.salesTotal, tone: 'success' },
                     ], true)}
                   </tr>
                 ))}
