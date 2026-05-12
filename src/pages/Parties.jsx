@@ -723,7 +723,7 @@ export default function Parties() {
 
           <div
             ref={partyListScrollRef}
-            className="min-h-[720px] max-h-[60vh] space-y-2 overflow-y-auto pr-1 no-scrollbar lg:max-h-[calc(100vh-22rem)]"
+            className="min-h-[360px] max-h-[60vh] space-y-2 overflow-y-auto pr-1 no-scrollbar lg:max-h-[calc(100vh-22rem)]"
           >
             {loadingParties && parties.length === 0 ? (
               <p className="text-sm text-slate-500">{t('common.loading')}</p>
@@ -794,53 +794,51 @@ export default function Parties() {
               })
             )}
 
-            {parties.length > 0 ? (
-              <div className="flex items-center justify-between gap-2 border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-slate-700/60">
-                <span>{t('pagination.showing', { start: 1, end: parties.length, total: partyTotal || parties.length })}</span>
-                {loadingMoreParties ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-500" />
-                    {t('common.loading')}
-                  </span>
-                ) : listError ? (
-                  <button
-                    type="button"
-                    className="font-semibold text-rose-600 transition hover:text-rose-700"
-                    onClick={() =>
-                      loadPartyPage({
-                        offset: parties.length,
-                        append: true,
-                        session: partyListSessionRef.current,
-                      })
-                    }
-                  >
-                    Retry load more
-                  </button>
-                ) : partyHasMore ? (
-                  supportsIntersectionObserver ? (
-                    <span>Scroll to load more</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className="font-semibold text-emerald-600 transition hover:text-emerald-700"
-                      onClick={() =>
-                        loadPartyPage({
-                          offset: parties.length,
-                          append: true,
-                          session: partyListSessionRef.current,
-                        })
-                      }
-                    >
-                      Load more
-                    </button>
-                  )
-                ) : (
-                  <span>All parties loaded</span>
-                )}
-              </div>
-            ) : null}
-
             <div ref={partyListSentinelRef} className="h-4" aria-hidden="true" />
+          </div>
+
+          <div className="flex items-center justify-between gap-2 border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-slate-700/60">
+            <span>{t('pagination.showing', { start: parties.length ? 1 : 0, end: parties.length, total: partyTotal || parties.length })}</span>
+            {loadingMoreParties ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-500" />
+                {t('common.loading')}
+              </span>
+            ) : listError ? (
+              <button
+                type="button"
+                className="font-semibold text-rose-600 transition hover:text-rose-700"
+                onClick={() =>
+                  loadPartyPage({
+                    offset: parties.length,
+                    append: true,
+                    session: partyListSessionRef.current,
+                  })
+                }
+              >
+                Retry load more
+              </button>
+            ) : partyHasMore ? (
+              supportsIntersectionObserver ? (
+                <span>Scroll to load more</span>
+              ) : (
+                <button
+                  type="button"
+                  className="font-semibold text-emerald-600 transition hover:text-emerald-700"
+                  onClick={() =>
+                    loadPartyPage({
+                      offset: parties.length,
+                      append: true,
+                      session: partyListSessionRef.current,
+                    })
+                  }
+                >
+                  Load more
+                </button>
+              )
+            ) : (
+              <span>All parties loaded</span>
+            )}
           </div>
 
         </div>
