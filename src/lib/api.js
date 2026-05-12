@@ -322,11 +322,17 @@ export function normalizeCollectionResponse(payload, options = {}) {
       total: payload.length,
       limit: payload.length,
       offset: 0,
+      totalKnown: false,
     };
   }
 
   const objectPayload = payload && typeof payload === "object" ? payload : {};
   const items = pickFirstArray(...itemKeys.map((key) => objectPayload?.[key]));
+  const totalKnown =
+    objectPayload.total != null ||
+    objectPayload.count != null ||
+    objectPayload.totalCount != null ||
+    objectPayload.summary?.totalRows != null;
   const total = Number(
     objectPayload.total ??
       objectPayload.count ??
@@ -348,6 +354,7 @@ export function normalizeCollectionResponse(payload, options = {}) {
     total,
     limit,
     offset,
+    totalKnown,
   };
 }
 
@@ -365,8 +372,19 @@ function detailTags(resource, id) {
   return uniqueTags([resource, `${resource}:${id}`]);
 }
 
-function listCache(tags, ttlMs = CACHE_TTL.list) {
-  return { cache: { ttlMs, tags } };
+function listCache(tags, ttlMs = CACHE_TTL.list, options = {}) {
+  if (typeof ttlMs === "object") {
+    options = ttlMs;
+    ttlMs = CACHE_TTL.list;
+  }
+
+  return {
+    cache: {
+      ttlMs,
+      tags,
+      ...(options.force ? { mode: "force" } : {}),
+    },
+  };
 }
 
 function mutationConfig(...tags) {
@@ -640,11 +658,11 @@ export const api = {
         "banks",
       ]),
     ),
-  listPurchases: (params = {}) =>
+  listPurchases: (params = {}, options = {}) =>
     collectionRequest(
       "/api/purchases",
       params,
-      listCache(["purchases", "reports", "dashboard"]),
+      listCache(["purchases", "reports", "dashboard"], options),
     ),
   getPurchase: (id) =>
     request(
@@ -790,11 +808,11 @@ export const api = {
         "banks",
       ]),
     ),
-  listServices: (params = {}) =>
+  listServices: (params = {}, options = {}) =>
     collectionRequest(
       "/api/services",
       params,
-      listCache(["services", "reports", "dashboard"]),
+      listCache(["services", "reports", "dashboard"], options),
     ),
 
   lowStock: (params = {}) =>
@@ -852,11 +870,11 @@ export const api = {
       listCache(["reports", "purchases"], CACHE_TTL.report),
     ),
 
-  listParties: (params = {}) =>
+  listParties: (params = {}, options = {}) =>
     collectionRequest(
       "/api/parties",
       { limit: 500, ...params },
-      listCache(["parties"], CACHE_TTL.lookup),
+      listCache(["parties"], CACHE_TTL.lookup, options),
     ),
   lookupParties: (params = {}) =>
     collectionRequest(

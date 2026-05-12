@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import RefreshButton from '../components/RefreshButton.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
@@ -130,6 +131,7 @@ export default function Parties() {
   const [loadingParties, setLoadingParties] = useState(false);
   const [listError, setListError] = useState('');
   const [partyReloadKey, setPartyReloadKey] = useState(0);
+  const [refreshingParties, setRefreshingParties] = useState(false);
 
   const [statementData, setStatementData] = useState(() => normalizePartyStatementResponse());
   const [statementLoading, setStatementLoading] = useState(false);
@@ -163,6 +165,18 @@ export default function Parties() {
   const partyListSentinelRef = useRef(null);
   const partyListSessionRef = useRef(0);
   const submitPartyRequestRef = useRef(false);
+  const partyListRequestRef = useRef(0);
+
+  const partyListParams = useMemo(() => ({
+    ...(debouncedQuery.trim() ? { search: debouncedQuery.trim() } : {}),
+    ...(filterType !== 'all' ? { type: filterType } : {}),
+  }), [debouncedQuery, filterType]);
+
+  const loadParties = useCallback(async ({ force = false } = {}) => {
+    const requestId = partyListRequestRef.current + 1;
+    partyListRequestRef.current = requestId;
+    setLoadingParties(true);
+    setListError('');
   const supportsIntersectionObserver = typeof IntersectionObserver !== 'undefined';
 
   const loadPartyPage = useCallback(
@@ -661,9 +675,12 @@ export default function Parties() {
             <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
               {t('parties.listTitle', { count: partyTotal || parties.length })}
             </h3>
-            <button className="btn-ghost" type="button" onClick={openCreate}>
-              <ChevronDown size={16} /> {t('parties.addParty')}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <RefreshButton refreshing={refreshingParties} onClick={refreshParties} />
+              <button className="btn-ghost" type="button" onClick={openCreate}>
+                <ChevronDown size={16} /> {t('parties.addParty')}
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -770,55 +787,8 @@ export default function Parties() {
                 );
               })
             )}
-
-            {parties.length > 0 ? (
-              <div className="flex items-center justify-between gap-2 border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-slate-700/60">
-                <span>{t('pagination.showing', { start: 1, end: parties.length, total: partyTotal || parties.length })}</span>
-                {loadingMoreParties ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-500" />
-                    {t('common.loading')}
-                  </span>
-                ) : listError ? (
-                  <button
-                    type="button"
-                    className="font-semibold text-rose-600 transition hover:text-rose-700"
-                    onClick={() =>
-                      loadPartyPage({
-                        offset: partyOffset,
-                        append: true,
-                        session: partyListSessionRef.current,
-                      })
-                    }
-                  >
-                    Retry load more
-                  </button>
-                ) : partyHasMore ? (
-                  supportsIntersectionObserver ? (
-                    <span>Scroll to load more</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className="font-semibold text-emerald-600 transition hover:text-emerald-700"
-                      onClick={() =>
-                        loadPartyPage({
-                          offset: partyOffset,
-                          append: true,
-                          session: partyListSessionRef.current,
-                        })
-                      }
-                    >
-                      Load more
-                    </button>
-                  )
-                ) : (
-                  <span>All parties loaded</span>
-                )}
-              </div>
-            ) : null}
-
-            <div ref={partyListSentinelRef} className="h-4" aria-hidden="true" />
           </div>
+
         </div>
 
         <div className="card space-y-4">

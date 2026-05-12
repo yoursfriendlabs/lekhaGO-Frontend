@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pencil, FileText, Package, Plus, Wallet, Wrench, X, Trash2, Printer } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import RefreshButton from '../components/RefreshButton.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import MobileFormStepper from '../components/MobileFormStepper.jsx';
@@ -105,7 +106,14 @@ export default function Purchases() {
   const isMobile = useIsMobile();
 
   // ── Stores ──
-  const { purchases: purchaseList, loading: purchasesLoading, fetch: fetchPurchases, invalidate: invalidatePurchases } = usePurchaseStore();
+  const {
+    purchases: purchaseList,
+    loading: purchasesLoading,
+    total: purchaseTotal,
+    totalKnown: purchaseTotalKnown,
+    fetch: fetchPurchases,
+    invalidate: invalidatePurchases,
+  } = usePurchaseStore();
   const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState('');
   const [productDirectory, setProductDirectory] = useState({});
   const [selectedSupplier, setSelectedSupplier] = useState(null);
@@ -146,7 +154,8 @@ export default function Purchases() {
   const [deletePurchase, setDeletePurchase] = useState(null);
   const [deletingPurchaseId, setDeletingPurchaseId] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [refreshingPurchases, setRefreshingPurchases] = useState(false);
+  const pageSize = 10;
   const [mobileStep, setMobileStep] = useState('details');
 
   const isExpense = header.entryType === 'expense';
@@ -154,10 +163,11 @@ export default function Purchases() {
     t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(value || 0).toFixed(2) })
   );
   const listParams = useMemo(() => ({
-    limit: 50,
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
     ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
     ...(entryTypeFilter !== 'all' ? { entryType: entryTypeFilter } : {}),
-  }), [entryTypeFilter, statusFilter]);
+  }), [entryTypeFilter, page, statusFilter]);
 
   // ── Load purchases list (page-specific) ──
   useEffect(() => {
@@ -168,6 +178,18 @@ export default function Purchases() {
   useEffect(() => {
     setPage(1);
   }, [entryTypeFilter, statusFilter]);
+
+  const refreshPurchases = async () => {
+    setRefreshingPurchases(true);
+    try {
+      invalidatePurchases(listParams);
+      await fetchPurchases(listParams, true);
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message });
+    } finally {
+      setRefreshingPurchases(false);
+    }
+  };
 
   const totals = useMemo(() => {
     const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
@@ -443,11 +465,8 @@ export default function Purchases() {
     return true;
   }), [entryTypeFilter, purchaseList, statusFilter]);
 
-  const totalPurchases = filteredPurchases.length;
-  const pagedPurchases = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredPurchases.slice(start, start + pageSize);
-  }, [filteredPurchases, page, pageSize]);
+  const totalPurchases = purchaseTotalKnown ? purchaseTotal : filteredPurchases.length;
+  const pagedPurchases = filteredPurchases;
 
   const resetForm = () => {
     setHeader({
@@ -1472,11 +1491,7 @@ export default function Purchases() {
       </Dialog>
 
       <div className="card">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-
-
-        </div>
-        <div className=" grid gap-3 sm:grid-cols-2 xl:max-w-xl">
+        <div className="grid gap-3 sm:grid-cols-2 xl:max-w-3xl xl:grid-cols-[1fr_1fr_auto] xl:items-end">
           <div>
             <label className="label">{t('inventory.itemType')}</label>
             <select
@@ -1506,6 +1521,12 @@ export default function Purchases() {
               ))}
             </select>
           </div>
+
+          <RefreshButton
+            className="min-h-[44px] xl:self-end"
+            refreshing={refreshingPurchases}
+            onClick={refreshPurchases}
+          />
         </div>
 
         <div className="mt-4 space-y-3 md:hidden">
@@ -1687,9 +1708,10 @@ export default function Purchases() {
         <Pagination
           page={page}
           pageSize={pageSize}
-          total={totalPurchases}
+          total={purchaseTotalKnown ? totalPurchases : null}
+          hasNext={pagedPurchases.length >= pageSize}
           onPageChange={setPage}
-          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+          showPageSize={false}
         />
       </div>
 
