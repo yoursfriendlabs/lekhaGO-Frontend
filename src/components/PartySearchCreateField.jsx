@@ -41,7 +41,24 @@ export default function PartySearchCreateField({
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState('');
   const createRequestRef = useRef(false);
-  const selected = normalizeSelectedParty(selectedParty);
+  const selected = useMemo(
+    () => normalizeSelectedParty(selectedParty),
+    [
+      selectedParty?.id,
+      selectedParty?.partyId,
+      selectedParty?.name,
+      selectedParty?.partyName,
+      selectedParty?.customerName,
+      selectedParty?.supplierName,
+      selectedParty?.phone,
+      selectedParty?.partyPhone,
+      selectedParty?.type,
+      selectedParty?.currentAmount,
+      selectedParty?.balance,
+    ]
+  );
+  const selectedIdentity = selected?.id || selected?.name || '';
+  const hasSelectedParty = Boolean(selectedIdentity);
   const debouncedQuery = useDebouncedValue(query, 250);
   const visibleResults = useMemo(() => results.slice(0, 6), [results]);
   const balanceMeta = getPartyBalanceMeta(selected?.currentAmount, t);
@@ -90,9 +107,9 @@ export default function PartySearchCreateField({
   }, []);
 
   useEffect(() => {
-    if (!selected) return;
+    if (!hasSelectedParty) return;
     resetLocalState();
-  }, [selected?.id]);
+  }, [hasSelectedParty, selectedIdentity]);
 
   useEffect(() => {
     function handleMouseDown(event) {
@@ -110,7 +127,7 @@ export default function PartySearchCreateField({
   }, []);
 
   useEffect(() => {
-    if (!open || !query.trim() || selected) return undefined;
+    if (!open || !query.trim() || hasSelectedParty) return undefined;
 
     updateDropdownPosition();
     window.addEventListener('resize', updateDropdownPosition);
@@ -120,13 +137,13 @@ export default function PartySearchCreateField({
       window.removeEventListener('resize', updateDropdownPosition);
       window.removeEventListener('scroll', updateDropdownPosition, true);
     };
-  }, [open, query, selected, updateDropdownPosition]);
+  }, [hasSelectedParty, open, query, updateDropdownPosition]);
 
   useEffect(() => {
     const search = debouncedQuery.trim();
 
-    if (!search || selected) {
-      setResults([]);
+    if (!search || hasSelectedParty) {
+      setResults((previous) => (previous.length ? [] : previous));
       return;
     }
 
@@ -145,7 +162,7 @@ export default function PartySearchCreateField({
     return () => {
       isActive = false;
     };
-  }, [debouncedQuery, selected, type]);
+  }, [debouncedQuery, hasSelectedParty, type]);
 
   const handleSelect = (party) => {
     onSelect?.(party || null);

@@ -11,9 +11,10 @@ import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import Notice from './components/Notice';
 import RouteFallback from './components/RouteFallback';
 import PwaLifecycle from './components/PwaLifecycle';
+import SubscriptionStatusBanner from './components/subscription/SubscriptionStatusBanner.jsx';
 import { hasUnverifiedEmail, isStaffActivationRequired } from './lib/authFlow';
 import { isRetailBusinessType } from './lib/businessTypeConfig.js';
-import { getSubscriptionGuard, humanizeKey } from './lib/subscription';
+import { getSubscriptionGuard, getSubscriptionStatusState, humanizeKey } from './lib/subscription';
 import { BANKS_SETTINGS_TAB, buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB } from './lib/settingsTabs';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -40,7 +41,7 @@ const Invoice = lazy(() => import('./pages/Invoice'));
 const OWNER_AND_STAFF_ROLES = ['owner', 'staff'];
 const OWNER_ONLY_ROLES = ['owner'];
 
-function ProtectedRoute({ children }) {
+export function ProtectedRoute({ children }) {
   const { token } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
   return children;
@@ -56,26 +57,36 @@ function RoleGuard({ children, allowedRoles = OWNER_AND_STAFF_ROLES, redirectTo 
   return children;
 }
 
-function SubscriptionFeatureRoute({ children, featureKey, redirectTo = buildSettingsTabPath(SUBSCRIPTION_SETTINGS_TAB) }) {
+export function SubscriptionFeatureRoute({ children, featureKey, redirectTo = buildSettingsTabPath(SUBSCRIPTION_SETTINGS_TAB) }) {
   const location = useLocation();
-  const { hasFeatureAccess } = useAuth();
+  const { hasFeatureAccess, subscription } = useAuth();
   const { t } = useI18n();
 
   if (hasFeatureAccess(featureKey)) {
     return children;
   }
 
+  const subscriptionState = getSubscriptionStatusState(subscription);
+  const notice = subscriptionState.isExpired
+    ? {
+      title: t('appAccess.expiredRedirectTitle'),
+      description: t('appAccess.expiredRedirectDescription'),
+      tone: 'warn',
+      from: `${location.pathname}${location.search}`,
+    }
+    : {
+      title: t('settingsPage.subscription.redirectTitle'),
+      description: t('settingsPage.subscription.redirectDescription', { feature: humanizeKey(featureKey) }),
+      tone: 'warn',
+      from: `${location.pathname}${location.search}`,
+    };
+
   return (
     <Navigate
       to={redirectTo}
       replace
       state={{
-        notice: {
-          title: t('settingsPage.subscription.redirectTitle'),
-          description: t('settingsPage.subscription.redirectDescription', { feature: humanizeKey(featureKey) }),
-          tone: 'warn',
-          from: `${location.pathname}${location.search}`,
-        },
+        notice,
       }}
     />
   );
@@ -147,7 +158,10 @@ function AppShell() {
   const retailSalesRedirect = servicesEnabled ? '/app/services' : '/app';
   const salesPageElement = hideSalesPage ? <Navigate to={retailSalesRedirect} replace /> : <Sales />;
   const subscriptionGuard = getSubscriptionGuard(subscription);
-  const subscriptionNotice = subscriptionAccess?.canUseApplication === false
+  const subscriptionStatusState = getSubscriptionStatusState(subscription);
+  const subscriptionNotice = subscriptionStatusState.isExpired
+    ? null
+    : subscriptionAccess?.canUseApplication === false
     ? {
       title: subscriptionGuard.title || t('appAccess.lockedTitle'),
       description: subscriptionGuard.description || t('appAccess.lockedDescription'),
@@ -208,6 +222,9 @@ function AppShell() {
                   </Link>
                 </div>
               </div>
+            ) : null}
+            {subscriptionStatusState.isExpired ? (
+              <SubscriptionStatusBanner subscription={subscription} />
             ) : null}
             {subscriptionNotice ? (
               <div className="mb-6">

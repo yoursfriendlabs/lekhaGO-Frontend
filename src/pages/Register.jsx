@@ -136,7 +136,7 @@ export default function Register() {
       selectedBusinessType.inventory?.title,
       selectedBusinessType.salesFlow?.createLabel,
       selectedBusinessType.servicesFlow?.enabled ? selectedBusinessType.servicesFlow?.navLabel : null,
-      selectedBusinessType.modules?.purchases ? 'Purchases' : null,
+      selectedBusinessType.modules?.purchases ? 'Expenses' : null,
       selectedBusinessType.modules?.analytics ? 'Analytics' : null,
     ].filter(Boolean);
 
