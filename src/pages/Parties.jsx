@@ -723,7 +723,7 @@ export default function Parties() {
 
           <div
             ref={partyListScrollRef}
-            className="max-h-[60vh] space-y-2 overflow-y-auto pr-1 no-scrollbar lg:max-h-[calc(100vh-22rem)]"
+            className="min-h-[720px] max-h-[60vh] space-y-2 overflow-y-auto pr-1 no-scrollbar lg:max-h-[calc(100vh-22rem)]"
           >
             {loadingParties && parties.length === 0 ? (
               <p className="text-sm text-slate-500">{t('common.loading')}</p>
