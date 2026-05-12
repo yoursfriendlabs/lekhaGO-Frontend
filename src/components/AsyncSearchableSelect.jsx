@@ -74,11 +74,13 @@ export default function AsyncSearchableSelect({
 
     return safeOptions.find((option) => String(option.value) === String(value) && option.value !== '') || selectedOption;
   }, [safeOptions, selectedOption, value]);
+  const selectedValue = selected?.value ? String(selected.value) : '';
+  const selectedLabel = selected?.label ? String(selected.label) : '';
 
   useEffect(() => {
-    if (!selected) return;
+    if (!selectedValue) return;
     setOptions((previous) => mergeOptions(selected, previous));
-  }, [selected]);
+  }, [selectedLabel, selectedValue]);
 
   const updateDropdownPosition = useCallback(() => {
     const trigger = containerRef.current;
@@ -176,7 +178,7 @@ export default function AsyncSearchableSelect({
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, minQueryLength, open, selected]);
+  }, [debouncedQuery, minQueryLength, open, selectedLabel, selectedValue]);
 
   const handleSelect = (option) => {
     setOptions((previous) => mergeOptions(option, ensureArray(previous)));

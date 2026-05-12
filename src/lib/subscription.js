@@ -61,6 +61,19 @@ function pickString(...values) {
   return '';
 }
 
+function pickNumber(...values) {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+    if (typeof value === 'string' && value.trim()) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+  }
+
+  return null;
+}
+
 function normalizeFeatureKey(value) {
   return String(value || '')
     .trim()
@@ -153,8 +166,35 @@ function normalizePlan(plan) {
 
   return {
     ...plan,
+    isTrial: Boolean(plan.isTrial),
+    trial: normalizeTrial(plan.trial),
+    subscriptionStatus: pickString(plan.subscriptionStatus, plan.billingStatus),
+    daysUntilSubscriptionEnd: pickNumber(plan.daysUntilSubscriptionEnd),
     billingOptions: Array.isArray(plan.billingOptions) ? plan.billingOptions : [],
   };
+}
+
+function normalizeTrial(trial) {
+  if (!trial || typeof trial !== 'object') return null;
+
+  return {
+    ...trial,
+    durationMonths: pickNumber(trial.durationMonths),
+    startsAt: pickString(trial.startsAt),
+    endsAt: pickString(trial.endsAt),
+    status: pickString(trial.status),
+    daysRemaining: pickNumber(trial.daysRemaining),
+    hasEnded: pickBoolean(trial.hasEnded, pickString(trial.status).toLowerCase() === 'expired') ?? false,
+  };
+}
+
+function hasActiveTrialAccess(currentPlan, access) {
+  return Boolean(
+    currentPlan?.isTrial
+    && currentPlan?.trial
+    && currentPlan.trial.hasEnded === false
+    && access?.canUseApplication !== false
+  );
 }
 
 export function humanizeKey(value = '') {
@@ -170,9 +210,8 @@ export function normalizeSubscriptionAccess(access, subscription = null) {
   const source = asObject(access);
   const currentPlan = subscription?.currentPlan || null;
   const pendingChange = subscription?.pendingChange || null;
-  const guard = typeof source.guard === 'string'
-    ? { message: source.guard }
-    : asObject(source.guard);
+  const guardDetails = asObject(source.guardDetails) || asObject(source.guard);
+  const guard = pickString(source.guard, source.guardKey, guardDetails?.key, guardDetails?.code, guardDetails?.type);
   const planKey = pickString(source.planKey, currentPlan?.key, pendingChange?.key);
   const subscriptionStatus = pickString(
     source.subscriptionStatus,
@@ -191,6 +230,33 @@ export function normalizeSubscriptionAccess(access, subscription = null) {
     planKey,
     subscriptionStatus,
     guard,
+    guardDetails,
+  };
+}
+
+function normalizeSubscriptionInput(subscriptionOrAccess) {
+  const source = asObject(subscriptionOrAccess);
+  if (!source) return null;
+
+  const looksLikeSubscriptionPayload =
+    Object.prototype.hasOwnProperty.call(source, 'access')
+    || Object.prototype.hasOwnProperty.call(source, 'currentPlan')
+    || Object.prototype.hasOwnProperty.call(source, 'availablePlans')
+    || Object.prototype.hasOwnProperty.call(source, 'pendingChange')
+    || Object.prototype.hasOwnProperty.call(source, 'paymentIntegration')
+    || Object.prototype.hasOwnProperty.call(source, 'businessId');
+
+  if (looksLikeSubscriptionPayload) {
+    return normalizeSubscriptionPayload(source);
+  }
+
+  return {
+    access: normalizeSubscriptionAccess(source),
+    currentPlan: null,
+    pendingChange: null,
+    availablePlans: [],
+    paymentIntegration: null,
+    businessId: '',
   };
 }
 
@@ -267,13 +333,13 @@ export function getPreferredBillingCycle(plan, currentPlan, pendingChange) {
 }
 
 export function getSubscriptionGuard(subscriptionOrAccess) {
-  const access = subscriptionOrAccess?.access
-    ? normalizeSubscriptionAccess(subscriptionOrAccess.access, subscriptionOrAccess)
-    : normalizeSubscriptionAccess(subscriptionOrAccess);
-  const guard = asObject(access.guard);
+  const normalized = normalizeSubscriptionInput(subscriptionOrAccess);
+  const access = normalized?.access || normalizeSubscriptionAccess(subscriptionOrAccess);
+  const guard = asObject(access.guardDetails);
 
   return {
     ...guard,
+    key: access.guard,
     title: pickString(guard.title),
     description: pickString(guard.description, guard.message, guard.reason),
     actionLabel: pickString(guard.actionLabel, guard.ctaLabel),
@@ -286,19 +352,52 @@ export function canAccessFeature(subscriptionOrAccess, featureKey) {
   const normalizedFeature = normalizeFeatureKey(featureKey);
   if (!normalizedFeature) return true;
 
-  const access = subscriptionOrAccess?.access
-    ? normalizeSubscriptionAccess(subscriptionOrAccess.access, subscriptionOrAccess)
-    : normalizeSubscriptionAccess(subscriptionOrAccess);
+  const normalized = normalizeSubscriptionInput(subscriptionOrAccess);
+  const access = normalized?.access || normalizeSubscriptionAccess(subscriptionOrAccess);
+  const currentPlan = normalized?.currentPlan || null;
+
+  if (hasActiveTrialAccess(currentPlan, access)) {
+    return true;
+  }
 
   if (access.canUseApplication === false && !RECOVERY_FEATURES.has(normalizedFeature)) {
     return false;
   }
 
-  const guardDecision = resolveGuardFeatureState(access.guard, normalizedFeature);
+  const guardDecision = resolveGuardFeatureState(access.guardDetails, normalizedFeature);
   if (typeof guardDecision === 'boolean') return guardDecision;
 
   const featureSet = DEFAULT_PLAN_FEATURES[normalizeFeatureKey(access.planKey)];
   if (featureSet) return featureSet.has(normalizedFeature);
 
   return true;
+}
+
+export function getSubscriptionStatusState(subscriptionOrAccess) {
+  const normalized = normalizeSubscriptionInput(subscriptionOrAccess);
+  const access = normalized?.access || normalizeSubscriptionAccess(subscriptionOrAccess);
+  const currentPlan = normalized?.currentPlan || null;
+  const trial = currentPlan?.isTrial ? normalizeTrial(currentPlan?.trial) : null;
+  const isTrialActive = hasActiveTrialAccess(
+    currentPlan ? { ...currentPlan, trial } : currentPlan,
+    access
+  );
+  const isTrialExpiringSoon = isTrialActive && typeof trial?.daysRemaining === 'number' && trial.daysRemaining <= 7;
+  const isExpired = access.canUseApplication === false && access.guard === 'subscription_expired';
+
+  return {
+    access,
+    currentPlan,
+    trial,
+    isTrialActive,
+    isTrialExpiringSoon,
+    isExpired,
+    kind: isExpired
+      ? 'expired'
+      : isTrialExpiringSoon
+        ? 'trial-expiring'
+        : isTrialActive
+          ? 'trial'
+          : 'none',
+  };
 }

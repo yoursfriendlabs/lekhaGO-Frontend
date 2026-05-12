@@ -44,6 +44,50 @@ describe('PartySearchCreateField', () => {
     lookupParties.mockImplementation(() => new Promise(() => {}));
   });
 
+  it('does not loop when a selected party prop is rerendered with a new object reference', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const selectedParty = {
+      id: 'party-1',
+      name: 'Aarav Traders',
+      phone: '9800000000',
+      type: 'supplier',
+      currentAmount: 0,
+    };
+
+    try {
+      const { rerender } = render(
+        <PartySearchCreateField
+          type="supplier"
+          selectedParty={selectedParty}
+          entityLabel="Supplier"
+          onSelect={vi.fn()}
+        />
+      );
+
+      rerender(
+        <PartySearchCreateField
+          type="supplier"
+          selectedParty={{ ...selectedParty }}
+          entityLabel="Supplier"
+          onSelect={vi.fn()}
+        />
+      );
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      const hasDepthWarning = errorSpy.mock.calls.some((call) => (
+        call.some((arg) => String(arg).includes('Maximum update depth exceeded'))
+      ));
+
+      expect(hasDepthWarning).toBe(false);
+      expect(screen.getByText('Aarav Traders')).toBeInTheDocument();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   it('prevents duplicate create requests while a customer is being created', async () => {
     let resolveCreate;
     const onSelect = vi.fn();
