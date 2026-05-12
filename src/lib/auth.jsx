@@ -25,14 +25,22 @@ const AuthContext = createContext(null);
 const SHOULD_BOOTSTRAP_AUTH = import.meta.env.MODE !== 'test';
 
 export function AuthProvider({ children }) {
-  const [token, setTokenState] = useState(getToken());
-  const [user, setUserState] = useState(getUser());
-  const [businessId, setBusinessIdState] = useState(getBusinessId());
-  const [business, setBusinessState] = useState(getBusiness());
-  const [businessProfile, setBusinessProfileState] = useState(getBusinessProfile());
-  const [role, setRoleState] = useState(getRole());
+  const [token, setTokenState] = useState(() => getToken());
+  const [user, setUserState] = useState(() => getUser());
+  const [businessId, setBusinessIdState] = useState(() => getBusinessId());
+  const [business, setBusinessState] = useState(() => getBusiness());
+  const [businessProfile, setBusinessProfileState] = useState(() => getBusinessProfile());
+  const [role, setRoleState] = useState(() => getRole());
   const [subscription, setSubscriptionState] = useState(() => normalizeSubscriptionPayload(getSubscription()));
-  const [sessionLoading, setSessionLoading] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(() => {
+    const storedToken = getToken();
+    const storedSubscription = normalizeSubscriptionPayload(getSubscription());
+
+    return SHOULD_BOOTSTRAP_AUTH
+      && Boolean(storedToken)
+      && typeof api.getCurrentUser === 'function'
+      && !storedSubscription;
+  });
 
   const applySessionSnapshot = useCallback((snapshot) => {
     const nextToken = snapshot?.token || '';
