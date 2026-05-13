@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Power, Trash2 } from 'lucide-react';
+import ActionMenu from '../ActionMenu.jsx';
 import Notice from '../Notice';
 import Pagination from '../Pagination';
 import { Dialog } from '../ui/Dialog.tsx';
@@ -359,17 +360,18 @@ export default function BanksSettingsPanel() {
                       </span>
                     </td>
                     <td className="py-2 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button className="btn-ghost" type="button" onClick={() => openEdit(bank)}>
-                          <Pencil size={14} />
-                        </button>
-                        <button className="btn-ghost" type="button" onClick={() => handleToggleActive(bank)}>
-                          <Power size={14} />
-                        </button>
-                        <button className="btn-ghost" type="button" onClick={() => setDeleteBank(bank)}>
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      <ActionMenu
+                        actions={[
+                          { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(bank) },
+                          {
+                            label: bank.isActive ? t('banks.deactivate') : t('banks.activate'),
+                            icon: Power,
+                            onClick: () => handleToggleActive(bank),
+                          },
+                          { label: t('common.delete'), icon: Trash2, tone: 'danger', onClick: () => setDeleteBank(bank) },
+                        ]}
+                        label={t('products.action')}
+                      />
                     </td>
                   </tr>
                 ))
