@@ -527,12 +527,7 @@ export default function Parties() {
     if (submitPartyRequestRef.current) return;
 
     const phoneDigits = String(form.phone || '').replace(/\D/g, '');
-    if (!editingId) {
-      if (phoneDigits.length < 10) {
-        setStatus({ type: 'error', message: t('errors.phoneMinDigits') });
-        return;
-      }
-    } else if (form.phone && phoneDigits.length < 10) {
+    if (form.phone && phoneDigits.length < 10) {
       setStatus({ type: 'error', message: t('errors.phoneMinDigits') });
       return;
     }
@@ -1049,7 +1044,7 @@ export default function Parties() {
             </div>
             <div>
               <label className="label">{t('parties.phone')}</label>
-              <input className="input mt-1" type="tel" inputMode="numeric" name="phone" value={form.phone} onChange={handleChange} placeholder={t('parties.phonePlaceholder')} required={!editingId} />
+              <input className="input mt-1" type="tel" inputMode="numeric" name="phone" value={form.phone} onChange={handleChange} placeholder={t('parties.phonePlaceholder')} />
             </div>
           </div>
           <div>
