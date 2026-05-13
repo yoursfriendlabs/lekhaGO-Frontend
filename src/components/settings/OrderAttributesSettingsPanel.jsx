@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
+import ActionMenu from '../ActionMenu.jsx';
 import Notice from '../Notice';
 import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import { api } from '../../lib/api';
@@ -315,15 +317,14 @@ export default function OrderAttributesSettingsPanel() {
                           {t(`orderAttributes.entities.${attribute.entityType}`)}
                         </span>
                       </td>
-                      <td className="py-3">
-                        <div className="flex justify-end gap-2">
-                          <button onClick={() => handleEdit(attribute)} className="btn-ghost" type="button">
-                            {t('common.edit')}
-                          </button>
-                          <button onClick={() => setDeleteAttribute(attribute)} className="btn-ghost" type="button">
-                            {t('common.remove')}
-                          </button>
-                        </div>
+                      <td className="py-3 text-right">
+                        <ActionMenu
+                          actions={[
+                            { label: t('common.edit'), icon: Pencil, onClick: () => handleEdit(attribute) },
+                            { label: t('common.remove'), icon: Trash2, tone: 'danger', onClick: () => setDeleteAttribute(attribute) },
+                          ]}
+                          label={t('products.action')}
+                        />
                       </td>
                     </tr>
                   ))
