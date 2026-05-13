@@ -199,7 +199,7 @@ export default function Login() {
               </Link>
             </div>
 
-            <button type="submit" disabled={loading} className={btnPrimary}>
+            <button id="submit" type="submit" disabled={loading} className={btnPrimary}>
               {loading ? (
                 <span className="flex items-center gap-2">
                   <SpinIcon />
