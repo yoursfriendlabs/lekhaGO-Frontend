@@ -201,6 +201,9 @@ function DeliveryBadge({ date }) {
   const days = getDeliveryDaysLeft(date);
   const label = formatMaybeDate(date, 'D MMM');
   const base = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold';
+  if (days === null) {
+    return <span className="text-xs text-slate-600 dark:text-slate-400">{label}</span>;
+  }
   if (days < 0) {
     return (
       <span className={`${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`}>
@@ -222,7 +225,11 @@ function DeliveryBadge({ date }) {
       </span>
     );
   }
-  return <span className="text-xs text-slate-600 dark:text-slate-400">{label}</span>;
+  return (
+    <span className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`}>
+      <Clock size={10} /> {label} · {days}d left
+    </span>
+  );
 }
 
 function getVatAmount(lineTotal, taxRate) {
@@ -707,7 +714,7 @@ export default function Services() {
 
   const mobileStepIndex = formSteps.findIndex((step) => step.id === mobileStep);
   const canGoBackStep = mobileStepIndex > 0;
-  const canGoForwardStep = mobileStepIndex >= 0 && mobileStepIndex < formSteps.length - 1;
+  const canGoForwardStep = mobileStepIndex >= 0 && mobileStepIndex <= formSteps.length;
 
   useEffect(() => {
     if (isPaid) setAmountReceived(totals.grandTotal.toFixed(2));
@@ -1137,12 +1144,12 @@ export default function Services() {
 
   const goToNextMobileStep = () => {
     if (!canGoForwardStep) return;
-    setMobileStep(formSteps[mobileStepIndex + 1].id);
+    setMobileStep(formSteps[mobileStepIndex + 1]?.id);
   };
 
   const goToPreviousMobileStep = () => {
     if (!canGoBackStep) return;
-    setMobileStep(formSteps[mobileStepIndex - 1].id);
+    setMobileStep(formSteps[mobileStepIndex - 1]?.id);
   };
 
   const handlePartyFilterChange = (option) => {
@@ -1678,7 +1685,7 @@ export default function Services() {
                           )}
                         </td>
                         <td className="py-3 text-right">
-                          <ActionMenu
+                           <ActionMenu
                             actions={[
                               { label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) },
                               { label: 'View Bill', icon: FileText, onClick: () => openInvoiceModal(order) },
@@ -2524,6 +2531,7 @@ export default function Services() {
                           {t('common.cancel')}
                         </button>
                       )}
+
 
                       {canGoForwardStep ? (
                         <button type="button" className="btn-primary w-full sm:w-auto" onClick={goToNextMobileStep} disabled={editLoading}>

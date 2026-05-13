@@ -31,14 +31,16 @@ export default function Sidebar() {
         { key: 'dashboard', label: t('nav.dashboard'), route: '/app' },
         { key: 'inventory', label: t('nav.items'), route: '/app/inventory' },
         { key: 'sales', label: t('nav.sales'), route: '/app/sales' },
-        { key: 'purchases', label: t('nav.purchases'), route: '/app/purchases' },
+        { key: 'purchases', label: t('nav.expenses'), route: '/app/purchases' },
         { key: 'parties', label: t('nav.parties'), route: '/app/parties' },
         { key: 'ledger', label: t('nav.ledger'), route: '/app/ledger' },
         { key: 'analytics', label: t('nav.analytics'), route: '/app/analytics' },
         { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
       ],
     businessProfile,
-  );
+  ).map((item) => (item?.key === 'purchases'
+    ? { ...item, label: t('nav.expenses') }
+    : item));
 
   const visibleNavItems = navigation
     .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))

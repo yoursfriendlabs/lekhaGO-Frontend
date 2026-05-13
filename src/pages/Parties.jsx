@@ -60,7 +60,7 @@ function getStatementBadgeClass(type) {
     purchase: 'bg-amber-100 text-amber-700',
     expense: 'bg-rose-100 text-rose-700',
     payment_in: 'bg-teal-100 text-teal-700',
-    payment_out: 'bg-indigo-100 text-indigo-700',
+    payment_out: 'bg-red-500 text-white',
   };
 
   return classes[type] || 'bg-slate-100 text-slate-600';
@@ -71,17 +71,17 @@ function getStatementRowTitle(row, t) {
 
   switch (row.type) {
     case 'sale':
-      return `${t('parties.salesInvoice')} ${reference}`;
+      return `${t('parties.salesInvoice')} `;
     case 'service':
-      return `${t('parties.serviceOrder')} ${reference}`;
+      return `${t('parties.serviceOrder')} `;
     case 'purchase':
-      return `${t('parties.purchaseBill')} ${reference}`;
+      return `${t('parties.purchaseBill')} `;
     case 'expense':
-      return `${t('purchases.expense')} ${reference}`;
+      return `${t('purchases.expense')} `;
     case 'payment_in':
-      return `${t('parties.paymentIn')} ${reference}`;
+      return `Received`;
     case 'payment_out':
-      return `${t('parties.paymentOut')} ${reference}`;
+      return `Given `;
     default:
       return reference;
   }
@@ -404,16 +404,10 @@ export default function Parties() {
   const totalTxPages = Math.max(1, Math.ceil(statementData.summary.totalRows / TX_PAGE_SIZE));
   const partySummaryCards = [
     {
-      key: 'sales',
-      label: t('ledger.sale'),
-      total: statementData.summary.totalSales,
-      due: statementData.summary.salesDue,
-    },
-    {
-      key: 'services',
-      label: t('ledger.service'),
-      total: statementData.summary.totalServices,
-      due: statementData.summary.servicesDue,
+      key: 'sales-and-services',
+      label: t('dashboard.salesAndServices'),
+      total: statementData.summary.totalSales + statementData.summary.totalServices,
+      due: statementData.summary.salesDue + statementData.summary.servicesDue,
     },
     {
       key: 'purchases',
@@ -910,7 +904,7 @@ export default function Parties() {
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {partySummaryCards.map((card) => (
                   <div
                     key={card.key}
@@ -967,11 +961,10 @@ export default function Parties() {
                                 {getStatementRowTitle(row, t)}
                               </span>
                             </div>
-                            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-                              <span>{formatDate(row.date || row.createdAt)}</span>
+                            <div className="mt-2 flex flex-wrap text-black font-medium items-center gap-x-3 gap-y-1 text-xs ">
+                              <span>{dayjs(row.date || row.createdAt).format('dddd MMM, YY')}</span>
                               {row.status ? <span>{row.status}</span> : null}
-                              {row.direction ? <span>{row.direction}</span> : null}
-                              {row.note ? <span className="italic">{row.note}</span> : null}
+                              {row.note ? <span className="italic">Note: {row.note}</span> : null}
                             </div>
                             <PaymentTypeSummary
                               source={row}
