@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
+import ActionMenu from '../ActionMenu.jsx';
 import Notice from '../Notice';
 import Pagination from '../Pagination';
 import { Dialog } from '../ui/Dialog.tsx';
@@ -250,14 +251,13 @@ export default function CategoriesSettingsPanel() {
                     <td className="py-3 font-semibold text-slate-900 dark:text-white">{category.name}</td>
                     <td className="py-3 capitalize">{category.type || 'product'}</td>
                     <td className="py-3 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button className="btn-ghost" type="button" onClick={() => openEdit(category)}>
-                          <Pencil size={14} />
-                        </button>
-                        <button className="btn-ghost" type="button" onClick={() => setDeleteCategory(category)}>
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      <ActionMenu
+                        actions={[
+                          { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(category) },
+                          { label: t('common.delete'), icon: Trash2, tone: 'danger', onClick: () => setDeleteCategory(category) },
+                        ]}
+                        label={t('products.action')}
+                      />
                     </td>
                   </tr>
                 ))

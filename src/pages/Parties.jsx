@@ -71,17 +71,17 @@ function getStatementRowTitle(row, t) {
 
   switch (row.type) {
     case 'sale':
-      return `${t('parties.salesInvoice')} Ref no: ${reference}`;
+      return `${t('parties.salesInvoice')} `;
     case 'service':
-      return `${t('parties.serviceOrder')} ${reference}`;
+      return `${t('parties.serviceOrder')} `;
     case 'purchase':
-      return `${t('parties.purchaseBill')} ${reference}`;
+      return `${t('parties.purchaseBill')} `;
     case 'expense':
-      return `${t('purchases.expense')} ${reference}`;
+      return `${t('purchases.expense')} `;
     case 'payment_in':
-      return `Received Ref no: ${reference}`;
+      return `Received`;
     case 'payment_out':
-      return `Given (Ref no: ${reference})`;
+      return `Given `;
     default:
       return reference;
   }
