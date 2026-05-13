@@ -1021,7 +1021,7 @@ export default function Services() {
       return;
     }
     const phoneDigits = newPartyPhone.trim().replace(/\D/g, '');
-    if (phoneDigits.length < 10) {
+    if (phoneDigits && phoneDigits.length < 10) {
       setFormNotice({ type: 'error', message: t('errors.phoneMinDigits') });
       return;
     }
