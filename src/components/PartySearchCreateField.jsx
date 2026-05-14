@@ -180,8 +180,8 @@ export default function PartySearchCreateField({
     const name = query.trim().replace(/\s*\(.*\)\s*$/, '').trim();
     if (!name) return;
 
-    const phoneDigits = newPartyPhone.trim().replace(/\D/g, '');
-    if (phoneDigits.length < 10) {
+    const phoneDigits = String(newPartyPhone || '').replace(/\D/g, '');
+    if (newPartyPhone && phoneDigits.length < 10) {
       setMessage(t('errors.phoneMinDigits'));
       return;
     }

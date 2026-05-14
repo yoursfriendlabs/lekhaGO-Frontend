@@ -155,6 +155,9 @@ export default function Purchases() {
   const [deletedItemIds, setDeletedItemIds] = useState([]);
   const [deletePurchase, setDeletePurchase] = useState(null);
   const [deletingPurchaseId, setDeletingPurchaseId] = useState('');
+  const [savingPurchase, setSavingPurchase] = useState(false);
+  const [recordingPaymentId, setRecordingPaymentId] = useState('');
+  const [openingPurchaseForm, setOpeningPurchaseForm] = useState(false);
   const [page, setPage] = useState(1);
   const [refreshingPurchases, setRefreshingPurchases] = useState(false);
   const [pageSize, setPageSize] = useState(10);
@@ -182,6 +185,8 @@ export default function Purchases() {
   }, [entryTypeFilter, statusFilter]);
 
   const refreshPurchases = async () => {
+    if (refreshingPurchases) return;
+
     setRefreshingPurchases(true);
     try {
       invalidatePurchases(listParams);
@@ -505,18 +510,25 @@ export default function Purchases() {
   };
 
   const openCreate = async () => {
+    if (openingPurchaseForm) return;
+
+    setOpeningPurchaseForm(true);
     resetForm();
     setStatus({ type: 'info', message: '' });
     setPayDialog(null);
     setIsOpen(true);
 
-    if (businessId) {
-      try {
-        const data = await api.getNextSequences();
-        setSuggestedInvoiceNo(data?.nextPurchaseInvoiceNo || '');
-      } catch {
-        setSuggestedInvoiceNo('');
+    try {
+      if (businessId) {
+        try {
+          const data = await api.getNextSequences();
+          setSuggestedInvoiceNo(data?.nextPurchaseInvoiceNo || '');
+        } catch {
+          setSuggestedInvoiceNo('');
+        }
       }
+    } finally {
+      setOpeningPurchaseForm(false);
     }
   };
 
@@ -609,6 +621,7 @@ export default function Purchases() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (savingPurchase) return;
     if (!businessId) { setStatus({ type: 'error', message: t('errors.businessIdRequired') }); return; }
     if (!header.purchaseDate) { setStatus({ type: 'error', message: t('errors.purchaseDateRequired') }); return; }
     if (header.entryType === 'expense') {
@@ -634,6 +647,7 @@ export default function Purchases() {
     }
 
     try {
+      setSavingPurchase(true);
       const manualInvoiceNo = String(header.invoiceNo || '').trim();
       const { paymentMethod, bankId, paymentNote, ...headerFields } = header;
       const payload = {
@@ -677,6 +691,8 @@ export default function Purchases() {
       fetchPurchases(listParams, true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
+    } finally {
+      setSavingPurchase(false);
     }
   };
 
@@ -687,6 +703,7 @@ export default function Purchases() {
 
   const handleDeletePurchase = async () => {
     if (!deletePurchase) return;
+    if (deletingPurchaseId === deletePurchase.id) return;
 
     setDeletingPurchaseId(deletePurchase.id);
     setStatus({ type: 'info', message: '' });
@@ -725,6 +742,7 @@ export default function Purchases() {
   const handleRecordPayment = async (event) => {
     event.preventDefault();
     if (!payDialog) return;
+    if (recordingPaymentId === payDialog.id) return;
 
     const amount = Number(payAmount || 0);
     if (!amount || amount <= 0) {
@@ -744,6 +762,7 @@ export default function Purchases() {
     }
 
     try {
+      setRecordingPaymentId(payDialog.id);
       const currentReceived = Number(payDialog.amountReceived || 0);
       const nextReceived = currentReceived + amount;
       const nextDue = Math.max(currentDue - amount, 0);
@@ -768,6 +787,8 @@ export default function Purchases() {
       await fetchPurchases(listParams, true);
     } catch (err) {
       setPayError(err.message);
+    } finally {
+      setRecordingPaymentId('');
     }
   };
 
@@ -868,8 +889,8 @@ export default function Purchases() {
         title={t('purchases.title')}
         subtitle={t('purchases.subtitle')}
         action={(
-          <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate}>
-            {t('purchases.newPurchase')}
+          <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate} disabled={openingPurchaseForm}>
+            {openingPurchaseForm ? t('common.loading') : t('purchases.newPurchase')}
           </button>
         )}
       />
@@ -1389,8 +1410,10 @@ export default function Purchases() {
                 {t('common.continue')}
               </button>
             ) : (
-              <button className="btn-primary w-full sm:w-auto" type="submit">
-                {formMode === 'edit' ? t('purchases.updatePurchase') : t('purchases.savePurchase')}
+              <button className="btn-primary w-full sm:w-auto" type="submit" disabled={savingPurchase}>
+                {savingPurchase
+                  ? t('common.saving')
+                  : formMode === 'edit' ? t('purchases.updatePurchase') : t('purchases.savePurchase')}
               </button>
             )}
           </div>
@@ -1452,11 +1475,11 @@ export default function Purchases() {
             />
 
             <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row">
-              <button type="button" className="btn-ghost flex-1" onClick={closePayDialog}>
+              <button type="button" className="btn-ghost flex-1" onClick={closePayDialog} disabled={recordingPaymentId === payDialog.id}>
                 {t('common.cancel')}
               </button>
-              <button type="submit" className="btn-primary flex-1">
-                {t('Record Payment')}
+              <button type="submit" className="btn-primary flex-1" disabled={recordingPaymentId === payDialog.id}>
+                {recordingPaymentId === payDialog.id ? t('common.loading') : t('Record Payment')}
               </button>
             </div>
           </form>

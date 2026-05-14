@@ -129,6 +129,8 @@ export default function Sales() {
   const [deletedItemIds, setDeletedItemIds] = useState([]);
   const [deleteSale, setDeleteSale] = useState(null);
   const [deletingSaleId, setDeletingSaleId] = useState('');
+  const [savingSale, setSavingSale] = useState(false);
+  const [openingSaleForm, setOpeningSaleForm] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [mobileStep, setMobileStep] = useState('details');
@@ -442,16 +444,23 @@ export default function Sales() {
   };
 
   const openCreate = async () => {
+    if (openingSaleForm) return;
+
+    setOpeningSaleForm(true);
     resetForm();
     setIsOpen(true);
 
-    if (businessId) {
-      try {
-        const data = await api.getNextSequences();
-        setSuggestedInvoiceNo(data?.nextSaleInvoiceNo || '');
-      } catch {
-        setSuggestedInvoiceNo('');
+    try {
+      if (businessId) {
+        try {
+          const data = await api.getNextSequences();
+          setSuggestedInvoiceNo(data?.nextSaleInvoiceNo || '');
+        } catch {
+          setSuggestedInvoiceNo('');
+        }
       }
+    } finally {
+      setOpeningSaleForm(false);
     }
   };
 
@@ -508,6 +517,7 @@ export default function Sales() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (savingSale) return;
     if (!businessId) { setStatus({ type: 'error', message: t('errors.businessIdRequired') }); return; }
     if (!header.saleDate) { setStatus({ type: 'error', message: t('errors.saleDateRequired') }); return; }
     if (!items.length) { setStatus({ type: 'error', message: t('sales.addFirstItem') }); return; }
@@ -524,6 +534,7 @@ export default function Sales() {
     }
 
     try {
+      setSavingSale(true);
       const derivedStatus = dueAmount > 0 ? 'due' : 'paid';
       const manualInvoiceNo = String(header.invoiceNo || '').trim();
       const { paymentMethod, bankId, paymentNote, ...headerFields } = header;
@@ -570,6 +581,8 @@ export default function Sales() {
       fetchSales(listParams, true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
+    } finally {
+      setSavingSale(false);
     }
   };
 
@@ -580,6 +593,7 @@ export default function Sales() {
 
   const handleDeleteSale = async () => {
     if (!deleteSale) return;
+    if (deletingSaleId === deleteSale.id) return;
 
     setDeletingSaleId(deleteSale.id);
     setStatus({ type: 'info', message: '' });
@@ -637,9 +651,9 @@ export default function Sales() {
         title={salesTitle}
         subtitle={salesSubtitle}
         action={
-          <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate}>
+          <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate} disabled={openingSaleForm}>
             <Plus size={16} className="mr-1.5 inline" />
-            {createSaleLabel}
+            {openingSaleForm ? t('common.loading') : createSaleLabel}
           </button>
         }
       />
@@ -998,7 +1012,11 @@ export default function Sales() {
                 {t('common.continue')}
               </button>
             ) : (
-              <button className="btn-primary w-full sm:w-auto" type="submit">{formMode === 'edit' ? t('sales.updateSale') : t('sales.saveSale')}</button>
+              <button className="btn-primary w-full sm:w-auto" type="submit" disabled={savingSale}>
+                {savingSale
+                  ? t('common.saving')
+                  : formMode === 'edit' ? t('sales.updateSale') : t('sales.saveSale')}
+              </button>
             )}
           </div>
         </form>

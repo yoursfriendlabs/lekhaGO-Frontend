@@ -224,6 +224,8 @@ export default function Parties() {
   );
 
   const refreshParties = async () => {
+    if (refreshingParties) return;
+
     const session = partyListSessionRef.current + 1;
     partyListSessionRef.current = session;
 
@@ -458,6 +460,7 @@ export default function Parties() {
   };
 
   const openTxDialog = async () => {
+    if (pendingServicesLoading) return;
     if (!selectedParty) return;
 
     setTxForm({ ...makeEmptyTx(), partyId: selectedParty.id });
@@ -504,6 +507,7 @@ export default function Parties() {
 
   const handleDelete = async () => {
     if (!deleteParty) return;
+    if (deleteSubmitting) return;
 
     setDeleteSubmitting(true);
     try {
@@ -568,6 +572,7 @@ export default function Parties() {
 
   const submitTransaction = async (event) => {
     event.preventDefault();
+    if (txLoading) return;
     if (!txForm.partyId) return;
 
     setTxLoading(true);
@@ -928,8 +933,8 @@ export default function Parties() {
                 <h4 className="text-lg font-semibold text-slate-900">
                   {t('parties.transactions', { count: statementData.summary.totalRows })}
                 </h4>
-                <button className="btn-primary" type="button" onClick={openTxDialog}>
-                  <Plus size={16} /> {t('parties.addTransaction')}
+                <button className="btn-primary" type="button" onClick={openTxDialog} disabled={pendingServicesLoading}>
+                  <Plus size={16} /> {pendingServicesLoading ? t('common.loading') : t('parties.addTransaction')}
                 </button>
               </div>
 
