@@ -287,12 +287,12 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-2xl border border-amber-200/70 bg-white/80 p-4 dark:border-amber-700/40 dark:bg-slate-900/50">
+          <div className="mt-6 flex gap-3 overflow-x-auto pb-2 scrollbar-hide sm:grid sm:grid-cols-2 lg:grid-cols-3">
+            <div className="min-w-[160px] flex-1 rounded-2xl border border-amber-200/70 bg-white/80 p-4 dark:border-amber-700/40 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-amber-500/80">{t('dashboard.amountPending')}</p>
               <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.pendingAmount)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
+            <div className="min-w-[160px] flex-1 rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-slate-500">{t('dashboard.salesAndServices')}</p>
               <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.salesTotal)}</p>
               <div className="mt-2 space-y-1 text-xs text-slate-500 dark:text-slate-400">
@@ -306,15 +306,15 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
+            <div className="min-w-[160px] flex-1 rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-slate-500">{t('dashboard.purchaseSpend')}</p>
               <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.purchaseTotal)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
+            <div className="min-w-[160px] flex-1 rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-slate-500">{t('dashboard.expenses')}</p>
               <p className="mt-1 text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.expenseTotal)}</p>
             </div>
-            <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
+            <div className="min-w-[160px] flex-1 rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-slate-500">{t('dashboard.profitLoss')}</p>
               <p className={`mt-1 text-xl font-semibold ${profitLossToneClass}`}>{formatMoney(summary.profitOrLoss)}</p>
               <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
@@ -359,10 +359,10 @@ export default function Dashboard() {
               <p className="text-sm font-semibold text-slate-900 dark:text-white">{t('dashboard.quickActions')}</p>
               <Package size={18} className="text-slate-400" />
             </div>
-            <div className="mt-4 grid gap-2">
-              <Link className="btn-primary w-full justify-center" to={businessProfile?.salesFlow?.route || '/app/sales'}>{t('dashboard.newSale')}</Link>
-              <Link className="btn-secondary w-full justify-center" to="/app/purchases">{t('dashboard.newPurchase')}</Link>
-              <Link className="btn-ghost w-full justify-center" to="/app/inventory">{t('dashboard.addProduct')}</Link>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <Link className="btn-primary w-full justify-center" to={businessProfile?.salesFlow?.route || '/app/pos'}>{t('dashboard.quickSale')}</Link>
+              <Link className="btn-ghost w-full justify-center" to="/app/purchases?create=1&entry=expense">{t('dashboard.newPurchase')}</Link>
+              <Link className="btn-ghost w-full justify-center" to="/app/banks">{t('dashboard.manageBanks')}</Link>
             </div>
           </div>
         </div>
@@ -408,7 +408,7 @@ export default function Dashboard() {
                     <div className="ml-3 text-right">
                       <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{formatMoney(order.grandTotal)}</p>
                       <span className={`text-xs font-medium capitalize ${order.status === 'in_progress' ? 'text-amber-600 dark:text-amber-400' : order.status === 'open' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}>
-                        {order.status === 'in_progress' ? 'In progress' : order.status || '-'}
+                        {order.status === 'in_progress' ? t('services.inProgress') : order.status === 'open' ? t('services.open') : order.status === 'closed' ? t('services.closed') : order.status || '-'}
                       </span>
                     </div>
                   </div>

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Pencil, FileText, Package, Plus, Wallet, Wrench, X, Trash2, Printer } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
@@ -7,6 +8,7 @@ import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import MobileFormStepper from '../components/MobileFormStepper.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
+import QuickPaymentButtons from '../components/QuickPaymentButtons.jsx';
 import PartySearchCreateField from '../components/PartySearchCreateField.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -105,7 +107,9 @@ function getVatAmount(lineTotal, taxRate) {
 export default function Purchases() {
   const { t } = useI18n();
   const { businessId } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const createIntentHandledRef = useRef(false);
 
   // ── Stores ──
   const {
@@ -153,6 +157,7 @@ export default function Purchases() {
   const [formMode, setFormMode] = useState('create');
   const [editingId, setEditingId] = useState(null);
   const [deletedItemIds, setDeletedItemIds] = useState([]);
+  const quantityInputRef = useRef(null);
   const [deletePurchase, setDeletePurchase] = useState(null);
   const [deletingPurchaseId, setDeletingPurchaseId] = useState('');
   const [savingPurchase, setSavingPurchase] = useState(false);
@@ -256,6 +261,12 @@ export default function Purchases() {
     setHeader((prev) => ({ ...prev, [name]: value }));
   };
 
+  const applyQuickPaidAmount = (nextAmount, { markPaid = false } = {}) => {
+    const normalizedAmount = Math.min(Math.max(Number(nextAmount || 0), 0), totals.grandTotal);
+    setIsPaid(markPaid && totals.grandTotal > 0);
+    setHeader((prev) => ({ ...prev, amountReceived: normalizedAmount.toFixed(2) }));
+  };
+
   const handleEntryTypeChange = (eventOrValue) => {
     const value = typeof eventOrValue === 'string' ? eventOrValue : eventOrValue.target.value;
     setStatus({ type: 'info', message: '' });
@@ -344,6 +355,11 @@ export default function Purchases() {
 
     if (product) {
       syncDraftDefaults(product);
+      // Auto-focus quantity input after product selection
+      setTimeout(() => {
+        quantityInputRef.current?.focus();
+        quantityInputRef.current?.select();
+      }, 100);
     }
   };
 
@@ -475,9 +491,9 @@ export default function Purchases() {
   const totalPurchases = purchaseTotalKnown ? purchaseTotal : filteredPurchases.length;
   const pagedPurchases = filteredPurchases;
 
-  const resetForm = () => {
+  const resetForm = (entryType = 'expense') => {
     setHeader({
-      entryType: 'expense',
+      entryType,
       partyId: '',
       partyName: '',
       invoiceNo: '',
@@ -500,7 +516,7 @@ export default function Purchases() {
     setSelectedSupplier(null);
     setShowItemDialog(false);
     setEditingItemIdx(null);
-    setItemDraft(getEmptyItem('purchase'));
+    setItemDraft(getEmptyItem(entryType));
     setItemStatus({ type: 'info', message: '' });
   };
 
@@ -509,11 +525,12 @@ export default function Purchases() {
     setMobileStep('details');
   };
 
-  const openCreate = async () => {
+  const openCreate = async ({ entryType = 'expense' } = {}) => {
     if (openingPurchaseForm) return;
 
     setOpeningPurchaseForm(true);
-    resetForm();
+    resetForm(entryType);
+    setMobileStep(isMobile ? 'items' : 'details');
     setStatus({ type: 'info', message: '' });
     setPayDialog(null);
     setIsOpen(true);
@@ -531,6 +548,23 @@ export default function Purchases() {
       setOpeningPurchaseForm(false);
     }
   };
+
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') {
+      createIntentHandledRef.current = false;
+      return;
+    }
+
+    if (createIntentHandledRef.current) return;
+    createIntentHandledRef.current = true;
+    const requestedEntryType = searchParams.get('entry') === 'purchase' ? 'purchase' : 'expense';
+    openCreate({ entryType: requestedEntryType });
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('create');
+    nextParams.delete('entry');
+    setSearchParams(nextParams, { replace: true });
+  }, [openCreate, searchParams, setSearchParams]);
 
   const openEdit = async (purchaseId) => {
     try {
@@ -901,14 +935,18 @@ export default function Purchases() {
         title={formMode === 'edit' ? t('purchases.editPurchase') : t('purchases.newPurchase')}
         size="full"
       >
+        <div className="md:hidden">
+          <MobileFormStepper
+            steps={purchaseSteps}
+            currentStep={mobileStep}
+            onStepChange={setMobileStep}
+            onNext={goToNextMobileStep}
+            onBack={goToPrevMobileStep}
+            showNavigation={false}
+          />
+        </div>
+
         <form className="space-y-5" onSubmit={handleSubmit}>
-          {isMobile ? (
-            <MobileFormStepper
-              steps={purchaseSteps}
-              currentStep={mobileStep}
-              onStepChange={setMobileStep}
-            />
-          ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -953,7 +991,10 @@ export default function Purchases() {
               >
                 <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
                   <div className="xl:col-span-2">
-                    <label className="label">{t('purchases.supplier')}</label>
+                    <div className="flex items-center justify-between">
+                      <label className="label">{t('purchases.supplier')}</label>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('common.optional')}</span>
+                    </div>
                     <div className="mt-1">
                       <PartySearchCreateField
                         type="supplier"
@@ -1209,8 +1250,10 @@ export default function Purchases() {
                       <div>
                         <label className="label">{t('purchases.qty')}</label>
                         <input
+                            ref={quantityInputRef}
                             className="input mt-1"
                             type="number"
+                            inputMode="decimal"
                             min="0"
                             step="0.01"
                             value={itemDraft.quantity}
@@ -1244,6 +1287,7 @@ export default function Purchases() {
                     <input
                       className="input mt-1"
                       type="number"
+                      inputMode="decimal"
                       step="0.01"
                       min="0"
                       value={itemDraft.unitPrice}
@@ -1256,6 +1300,7 @@ export default function Purchases() {
                     <input
                       className="input mt-1"
                       type="number"
+                      inputMode="decimal"
                       step="0.01"
                       min="0"
                       value={itemDraft.taxRate}
@@ -1359,11 +1404,18 @@ export default function Purchases() {
                     <input
                       className="input mt-1"
                       type="number"
+                      inputMode="decimal"
                       step="0.01"
                       min="0"
                       value={isPaid ? totals.grandTotal.toFixed(2) : header.amountReceived}
                       disabled={isPaid}
                       onChange={(e) => setHeader((prev) => ({ ...prev, amountReceived: e.target.value }))}
+                    />
+                    <QuickPaymentButtons
+                      disabled={totals.grandTotal <= 0}
+                      onNoPayment={() => applyQuickPaidAmount(0)}
+                      onHalfPayment={() => applyQuickPaidAmount(totals.grandTotal / 2)}
+                      onFullPayment={() => applyQuickPaidAmount(totals.grandTotal, { markPaid: true })}
                     />
                   </div>
                   <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800/40">

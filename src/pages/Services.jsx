@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
 import RefreshButton from '../components/RefreshButton.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
+import QuickPaymentButtons from '../components/QuickPaymentButtons.jsx';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import InvoiceHeader from '../components/InvoiceHeader';
 import MobileFormStepper from '../components/MobileFormStepper.jsx';
@@ -398,14 +400,16 @@ function isPlaceholderItem(item) {
 }
 
 function StatusBadge({ status }) {
+  const { t } = useI18n();
   const map = {
     open: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
     in_progress: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
     closed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
   };
   const label =
-    status === 'in_progress' ? 'In progress'
-    : status ? status.charAt(0).toUpperCase() + status.slice(1)
+    status === 'in_progress' ? t('services.inProgress')
+    : status === 'open' ? t('services.open')
+    : status === 'closed' ? t('services.closed')
     : '—';
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[status] || 'bg-slate-100 text-slate-600'}`}>
@@ -444,7 +448,9 @@ const STATUS_STEPS = [
 export default function Services() {
   const { t } = useI18n();
   const { businessId, user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const createIntentHandledRef = useRef(false);
   const partyPickerRef = useRef(null);
   const partyDropdownRef = useRef(null);
   const { settings: bizSettings, businessProfile } = useBusinessSettings();
@@ -534,6 +540,8 @@ export default function Services() {
   const [creatingParty, setCreatingParty] = useState(false);
   const [header, setHeader] = useState(() => makeEmptyHeader());
   const [items, setItems] = useState([]);
+  const quantityInputRef = useRef(null);
+  const descriptionInputRef = useRef(null);
   const [discount, setDiscount] = useState('0');
   const [amountReceived, setAmountReceived] = useState('0');
   const [isPaid, setIsPaid] = useState(false);
@@ -720,6 +728,12 @@ export default function Services() {
     if (isPaid) setAmountReceived(totals.grandTotal.toFixed(2));
   }, [isPaid, totals.grandTotal]);
 
+  const applyQuickReceivedAmount = useCallback((nextAmount, { markPaid = false } = {}) => {
+    const normalizedAmount = Math.min(Math.max(Number(nextAmount || 0), 0), totals.grandTotal);
+    setIsPaid(markPaid && totals.grandTotal > 0);
+    setAmountReceived(normalizedAmount.toFixed(2));
+  }, [totals.grandTotal]);
+
   useEffect(() => {
     if (!dialogOpen) return undefined;
     const node = formScrollRef.current;
@@ -865,6 +879,11 @@ export default function Services() {
 
     if (product) {
       syncItemDefaults(null, product, true);
+      // Auto-focus quantity input after product selection
+      setTimeout(() => {
+        quantityInputRef.current?.focus();
+        quantityInputRef.current?.select();
+      }, 100);
     }
   };
 
@@ -901,6 +920,7 @@ export default function Services() {
       if (field === 'itemType' && value === 'labor') {
         next.productId = '';
         next.unitType = 'primary';
+        next.quantity = '1';
       }
       next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
       return next;
@@ -1079,6 +1099,22 @@ export default function Services() {
       }
     }
   };
+
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') {
+      createIntentHandledRef.current = false;
+      return;
+    }
+
+    if (createIntentHandledRef.current) return;
+    createIntentHandledRef.current = true;
+    openDialog();
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('create');
+    setSearchParams(nextParams, { replace: true });
+  }, [openDialog, searchParams, setSearchParams]);
+
   const openEditDialog = async (order) => {
     resetForm();
     setEditingId(order.id);
@@ -1161,7 +1197,7 @@ export default function Services() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!businessId) { setFormNotice({ type: 'error', message: t('errors.businessIdRequired') }); return; }
-    if (!header.partyId) { setFormNotice({ type: 'error', message: t('errors.customerRequired') }); return; }
+    // Customer is optional for services (walk-in support)
     const invalidPart = chargeableItems.find((i) => i.itemType === 'part' && !i.productId);
     if (invalidPart) { setFormNotice({ type: 'error', message: t('errors.selectProductPart') }); return; }
     const invalidConversion = chargeableItems.find((i) => {
@@ -1442,7 +1478,7 @@ export default function Services() {
             </button>
           </div>
 
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-hide sm:grid sm:grid-cols-2 xl:grid-cols-4">
             <OverviewMetric icon={LayoutList} label={t('services.totalOrders')} value={serviceOverview.totalOrders} />
             <OverviewMetric icon={Wrench} label={t('services.open')} value={serviceOverview.openCount} tone="blue" />
             <OverviewMetric icon={CalendarDays} label={t('services.activeJobs')} value={serviceOverview.inProgressCount} tone="amber" />
@@ -1732,10 +1768,15 @@ export default function Services() {
             <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#fcfaf6] shadow-2xl dark:bg-slate-950 md:h-[calc(100dvh-2.5rem)] md:max-h-[calc(100dvh-2.5rem)] md:max-w-[1440px] md:rounded-[32px] md:border md:border-slate-200/70 md:dark:border-slate-800/70">
               <div className="flex items-center gap-3 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-8">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary-700 dark:text-primary-200">{t('services.workspaceLabel')}</p>
-                  <h2 className="mt-1 truncate font-serif text-2xl text-slate-900 dark:text-white">{dialogTitle}</h2>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary-700 dark:text-primary-200">{t('services.workspaceLabel')}</p>
+                  <h2 className="mt-1 truncate font-serif text-xl text-slate-900 dark:text-white md:text-2xl">{dialogTitle}</h2>
                 </div>
-                <div className="min-w-0 flex-1">
+                <button type="button" onClick={closeDialog} className="rounded-2xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
+                  <X size={20} />
+                </button>
+              </div>
+
+                <div className="md:hidden">
                   <MobileFormStepper
                     steps={formSteps}
                     currentStep={mobileStep}
@@ -1748,10 +1789,6 @@ export default function Services() {
                     showNavigation={false}
                   />
                 </div>
-                <button type="button" onClick={closeDialog} className="rounded-2xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
-                  <X size={20} />
-                </button>
-              </div>
 
               <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
                 <div ref={formScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
@@ -1769,13 +1806,12 @@ export default function Services() {
                     {showDetailsStep ? (
                       <>
                         <FormSectionCard
-                          title={t('services.detailsSectionTitle')}
-                          hint={t('services.detailsSectionHint')}
                           className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                         >
-                          <label className="label">
-                            {t('services.customer')} <span className="ml-1 text-rose-500">*</span>
-                          </label>
+                          <div className="flex items-center justify-between">
+                            <label className="label">{t('services.customer')}</label>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('common.optional')}</span>
+                          </div>
                           <div ref={partyPickerRef} className="relative mt-2">
                             {selectedParty ? (
                               <div className="flex items-center gap-3 rounded-[24px] border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-900/10">
@@ -2179,11 +2215,13 @@ export default function Services() {
                                             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.description}</p>
                                           ) : null}
                                           <div className="mt-2 flex flex-wrap gap-2">
+                                            {item.itemType === 'part' && (
+                                              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                                {t('services.qty')}: {item.quantity}{unitLabel ? ` ${unitLabel}` : ''}
+                                              </span>
+                                            )}
                                             <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
-                                              {t('services.qty')}: {item.quantity}{unitLabel ? ` ${unitLabel}` : ''}
-                                            </span>
-                                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
-                                              {t('services.unitPrice')}: {money(item.unitPrice)}
+                                              {item.itemType === 'labor' ? t('common.total') : t('services.unitPrice')}: {money(item.unitPrice)}
                                             </span>
                                             <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
                                               {t('services.tax')}: {Number(item.taxRate || 0).toFixed(2)}%
@@ -2253,21 +2291,39 @@ export default function Services() {
                             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{t('services.itemComposerHint')}</p>
                           </div>
 
-                          <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="flex flex-col gap-4">
                             <div>
                               <label className="label">{t('services.type')}</label>
-                              <select
-                                className="input mt-1"
-                                value={itemDraft.itemType}
-                                onChange={(e) => handleDraftChange('itemType', e.target.value)}
-                              >
-                                <option value="labor">{t('services.serviceLine')}</option>
-                                <option value="part">{t('services.productLine')}</option>
-                              </select>
+                              <div className="mt-1 flex gap-2">
+                                <button
+                                  type="button"
+                                  className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
+                                    itemDraft.itemType === 'labor'
+                                      ? 'bg-primary-600 text-white shadow-md ring-2 ring-primary-600 ring-offset-2 dark:ring-offset-slate-900'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
+                                  }`}
+                                  onClick={() => handleDraftChange('itemType', 'labor')}
+                                >
+                                  {t('services.serviceLine')}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
+                                    itemDraft.itemType === 'part'
+                                      ? 'bg-primary-600 text-white shadow-md ring-2 ring-primary-600 ring-offset-2 dark:ring-offset-slate-900'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
+                                  }`}
+                                  onClick={() => handleDraftChange('itemType', 'part')}
+                                >
+                                  {t('services.productLine')}
+                                </button>
+                              </div>
                             </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                               <label className="label">{t('services.description')}</label>
                               <input
+                                ref={descriptionInputRef}
                                 className="input mt-1"
                                 value={itemDraft.description}
                                 onChange={(e) => handleDraftChange('description', e.target.value)}
@@ -2319,22 +2375,26 @@ export default function Services() {
                               </div>
                             ) : null}
 
+                            {itemDraft.itemType === 'part' ? (
+                              <div>
+                                <label className="label">{t('services.qty')}</label>
+                                <input
+                                  ref={quantityInputRef}
+                                  className="input mt-1"
+                                  type="number"
+                                  inputMode="decimal"
+                                  min="0"
+                                  step="0.1"
+                                  value={itemDraft.quantity}
+                                  onChange={(e) => handleDraftChange('quantity', e.target.value)}
+                                />
+                                {itemDraft.itemType === 'part' ? (
+                                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{getUnitLabel(itemDraftProduct, itemDraft.unitType)}</p>
+                                ) : null}
+                              </div>
+                            ) : null}
                             <div>
-                              <label className="label">{t('services.qty')}</label>
-                              <input
-                                className="input mt-1"
-                                type="number"
-                                min="0"
-                                step="0.1"
-                                value={itemDraft.quantity}
-                                onChange={(e) => handleDraftChange('quantity', e.target.value)}
-                              />
-                              {itemDraft.itemType === 'part' ? (
-                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{getUnitLabel(itemDraftProduct, itemDraft.unitType)}</p>
-                              ) : null}
-                            </div>
-                            <div>
-                              <label className="label">{t('services.unitPrice')}</label>
+                              <label className="label">{itemDraft.itemType === 'labor' ? t('common.total') : t('services.unitPrice')}</label>
                               <input
                                 className="input mt-1"
                                 type="number"
@@ -2354,6 +2414,7 @@ export default function Services() {
                                 value={itemDraft.taxRate}
                                 onChange={(e) => handleDraftChange('taxRate', e.target.value)}
                               />
+                            </div>
                             </div>
                           </div>
                         </div>
@@ -2459,6 +2520,12 @@ export default function Services() {
                                   disabled={isPaid}
                                   onChange={(e) => setAmountReceived(e.target.value)}
                                 />
+                                <QuickPaymentButtons
+                                  disabled={totals.grandTotal <= 0}
+                                  onNoPayment={() => applyQuickReceivedAmount(0)}
+                                  onHalfPayment={() => applyQuickReceivedAmount(totals.grandTotal / 2)}
+                                  onFullPayment={() => applyQuickReceivedAmount(totals.grandTotal, { markPaid: true })}
+                                />
                               </div>
                               <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-slate-300 dark:hover:bg-slate-800/60">
                                 <input
@@ -2495,28 +2562,24 @@ export default function Services() {
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200/70 bg-white/90 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-8">
+                <div className="border-t border-slate-200/70 bg-white/90 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-8">
                   <div className="mx-auto w-full max-w-[1320px]">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="grid gap-3 rounded-2xl bg-slate-100/90 px-4 py-3 text-sm dark:bg-slate-900/70 sm:grid-cols-3 lg:min-w-[520px]">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Current</p>
-                        <p className="mt-1 truncate font-semibold text-slate-700 dark:text-slate-200">
+                    <div className="flex items-center gap-4 rounded-2xl bg-slate-100/90 px-4 py-2.5 text-sm dark:bg-slate-900/70 lg:min-w-[520px]">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-bold text-slate-800 dark:text-slate-200">
                           {formSteps[mobileStepIndex]?.label || t('services.detailStep')}
                         </p>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Order</p>
-                        <p className="mt-1 truncate font-semibold text-slate-700 dark:text-slate-200">
-                          {summaryOrderNo}
+                        <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                          Order: {summaryOrderNo}
                         </p>
                       </div>
-                      <div className="min-w-0 sm:text-right">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                          {t('services.summaryDue')}
-                        </p>
-                        <p className={`mt-1 font-semibold ${totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
+                      <div className="shrink-0 text-right">
+                        <p className={`font-bold ${totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
                           {money(totals.due)}
+                        </p>
+                        <p className="text-[10px] uppercase tracking-wider text-slate-500">
+                          {t('services.summaryDue')}
                         </p>
                       </div>
                     </div>
@@ -2861,6 +2924,7 @@ export default function Services() {
                 <input
                   className="input mt-1"
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min="0"
                   value={payAmount}

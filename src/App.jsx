@@ -13,18 +13,19 @@ import RouteFallback from './components/RouteFallback';
 import PwaLifecycle from './components/PwaLifecycle';
 import SubscriptionStatusBanner from './components/subscription/SubscriptionStatusBanner.jsx';
 import { hasUnverifiedEmail, isStaffActivationRequired } from './lib/authFlow';
-import { isRetailBusinessType } from './lib/businessTypeConfig.js';
 import { getSubscriptionGuard, getSubscriptionStatusState, humanizeKey } from './lib/subscription';
-import { BANKS_SETTINGS_TAB, buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB } from './lib/settingsTabs';
+import { buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB } from './lib/settingsTabs';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Admin = lazy(() => import('./pages/Admin'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Purchases = lazy(() => import('./pages/Purchases'));
 const Sales = lazy(() => import('./pages/Sales'));
+const QuickPos = lazy(() => import('./pages/QuickPos'));
 const CafeOrders = lazy(() => import('./pages/CafeOrders'));
 const Services = lazy(() => import('./pages/Services'));
 const Parties = lazy(() => import('./pages/Parties'));
+const Banks = lazy(() => import('./pages/Banks'));
 const Ledger = lazy(() => import('./pages/Ledger'));
 const Analytics = lazy(() => import('./pages/Analytics'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -154,9 +155,7 @@ function AppShell() {
   const servicesEnabled = businessProfile?.modules?.services !== false;
   const cafeOrdersEnabled = businessProfile?.modules?.orders === true || businessProfile?.type === 'cafe';
   const salesRoute = businessProfile?.salesFlow?.route || '/app/sales';
-  const hideSalesPage = isRetailBusinessType(businessProfile);
-  const retailSalesRedirect = servicesEnabled ? '/app/services' : '/app';
-  const salesPageElement = hideSalesPage ? <Navigate to={retailSalesRedirect} replace /> : <Sales />;
+  const posPageElement = businessProfile?.type === 'cafe' && cafeOrdersEnabled ? <CafeOrders /> : <QuickPos />;
   const subscriptionGuard = getSubscriptionGuard(subscription);
   const subscriptionStatusState = getSubscriptionStatusState(subscription);
   const subscriptionNotice = subscriptionStatusState.isExpired
@@ -188,12 +187,12 @@ function AppShell() {
           : null;
 
   return (
-    <div className="min-h-screen gradient-bg bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 md:h-screen md:overflow-hidden">
-      <div className="flex min-h-screen md:h-screen">
+    <div className="gradient-bg min-h-[100dvh] overflow-x-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 md:h-screen md:overflow-hidden">
+      <div className="flex min-h-[100dvh] max-w-full md:h-screen">
         <Sidebar />
-        <div className="flex min-h-screen flex-1 flex-col md:ml-64 md:min-h-0 md:h-screen md:overflow-hidden">
+        <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col overflow-x-hidden md:ml-64 md:min-h-0 md:h-screen md:overflow-hidden">
           <Topbar />
-          <main className="flex-1 px-4 pt-6 pb-[calc(env(safe-area-inset-bottom)+88px)] md:min-h-0 md:overflow-y-auto md:px-6 md:py-8 md:pb-8">
+          <main className="min-w-0 flex-1 overflow-x-hidden px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+88px)] md:min-h-0 md:overflow-y-auto md:px-6 md:py-8 md:pb-8">
             {!businessId ? (
               <div className="mb-6">
                 <Notice
@@ -266,8 +265,8 @@ function AppShell() {
                       </EmailActivationRequiredRoute>
                     )}
                   />
-                  <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="sales">{salesPageElement}</SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="pos" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="sales">{salesPageElement}</SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="sales"><Sales /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="pos" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="sales">{posPageElement}</SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route
                     path="services"
                     element={(
@@ -281,7 +280,7 @@ function AppShell() {
                     )}
                   />
                   <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><SubscriptionFeatureRoute featureKey="parties"><Parties /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="banks" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="banks"><Navigate to={buildSettingsTabPath(BANKS_SETTINGS_TAB)} replace /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="banks" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="banks"><Banks /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="ledger" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="ledger"><Ledger /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="analytics" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><SubscriptionFeatureRoute featureKey="analytics"><Analytics /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="admin" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><SubscriptionFeatureRoute featureKey="admin"><Admin /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />

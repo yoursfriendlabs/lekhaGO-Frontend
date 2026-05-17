@@ -6,9 +6,26 @@
   color-scheme: light;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+html {
+  background-color: #f8f5f2;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   font-family: "Space Grotesk", system-ui, sans-serif;
   @apply bg-mist text-ink;
+  min-height: 100dvh;
+  overscroll-behavior-x: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .glass {
@@ -195,4 +212,20 @@ body {
     margin: 1.5cm;
     size: A4 portrait;
   }
+}
+
+/* Custom Scrollbar Utilities */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

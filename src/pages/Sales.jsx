@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Pencil, FileText, Package, Plus, Printer, Trash2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
@@ -6,6 +7,7 @@ import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import MobileFormStepper from '../components/MobileFormStepper.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
+import QuickPaymentButtons from '../components/QuickPaymentButtons.jsx';
 import PartySearchCreateField from '../components/PartySearchCreateField.jsx';
 import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
 import CreatorFilterSelect from '../components/CreatorFilterSelect.jsx';
@@ -82,7 +84,9 @@ export default function Sales() {
   const { t } = useI18n();
   const { businessId, user } = useAuth();
   const { businessProfile } = useBusinessSettings();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const createIntentHandledRef = useRef(false);
   const salesFlow = businessProfile?.salesFlow || {};
   const salesTitle = salesFlow.title || t('sales.title');
   const salesSubtitle = salesFlow.attributeSectionHint || t('sales.subtitle');
@@ -119,6 +123,7 @@ export default function Sales() {
     attributes: {},
   });
   const [items, setItems] = useState([]);
+  const quantityInputRef = useRef(null);
   const [showItemDialog, setShowItemDialog] = useState(false);
   const [itemDraft, setItemDraft] = useState({ ...emptyItem });
   const [editingItemIdx, setEditingItemIdx] = useState(null);
@@ -203,6 +208,12 @@ export default function Sales() {
     setHeader((prev) => ({ ...prev, [name]: value }));
   };
 
+  const applyQuickReceivedAmount = (nextAmount, { markPaid = false } = {}) => {
+    const normalizedAmount = Math.min(Math.max(Number(nextAmount || 0), 0), totals.grandTotal);
+    setIsPaid(markPaid && totals.grandTotal > 0);
+    setHeader((prev) => ({ ...prev, amountReceived: normalizedAmount.toFixed(2) }));
+  };
+
   const getProductById = (id) => {
     if (id === null || id === undefined || id === '') return null;
     return productDirectory[String(id)] || null;
@@ -274,6 +285,11 @@ export default function Sales() {
 
     if (product) {
       syncDraftDefaults(product);
+      // Auto-focus quantity input after product selection for faster grocery entry
+      setTimeout(() => {
+        quantityInputRef.current?.focus();
+        quantityInputRef.current?.select();
+      }, 100);
     }
   };
 
@@ -448,6 +464,7 @@ export default function Sales() {
 
     setOpeningSaleForm(true);
     resetForm();
+    setMobileStep(isMobile ? 'items' : 'details');
     setIsOpen(true);
 
     try {
@@ -463,6 +480,21 @@ export default function Sales() {
       setOpeningSaleForm(false);
     }
   };
+
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') {
+      createIntentHandledRef.current = false;
+      return;
+    }
+
+    if (createIntentHandledRef.current) return;
+    createIntentHandledRef.current = true;
+    openCreate();
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('create');
+    setSearchParams(nextParams, { replace: true });
+  }, [openCreate, searchParams, setSearchParams]);
 
   const openEdit = async (saleId) => {
     setStatus({ type: 'info', message: '' });
@@ -664,7 +696,8 @@ export default function Sales() {
         onClose={closeDialog}
         title={formMode === 'edit' ? t('sales.editSale') : createSaleLabel}
         size="full"
-        headerContent={isMobile ? (
+      >
+        <div className="md:hidden">
           <MobileFormStepper
             steps={saleSteps}
             currentStep={mobileStep}
@@ -676,17 +709,20 @@ export default function Sales() {
             backLabel={t('common.back') || 'Back'}
             showNavigation={false}
           />
-        ) : null}
-      >
+        </div>
+
         <form className="space-y-5" onSubmit={handleSubmit}>
           {/* {status.message ? <Notice title={status.message} tone={status.type} /> : null} */}
 
           {showDetailsStep ? (
             <>
-              <FormSectionCard hint={t('sales.customerOptional')}>
+              <FormSectionCard>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="sm:col-span-2 lg:col-span-1">
-                    <label className="label">{t('sales.customer')}</label>
+                    <div className="flex items-center justify-between">
+                      <label className="label">{t('sales.customer')}</label>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('common.optional')}</span>
+                    </div>
                     <div className="mt-1">
                       <PartySearchCreateField
                         type="customer"
@@ -871,8 +907,10 @@ export default function Sales() {
                   <div>
                     <label className="label">{t('sales.qty')}</label>
                     <input
+                      ref={quantityInputRef}
                       className="input mt-1"
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       step="1"
                       value={itemDraft.quantity}
@@ -896,6 +934,7 @@ export default function Sales() {
                     <input
                       className="input mt-1"
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       step="0.01"
                       value={itemDraft.unitPrice}
@@ -907,6 +946,7 @@ export default function Sales() {
                     <input
                       className="input mt-1"
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       step="1"
                       value={itemDraft.taxRate}
@@ -917,20 +957,20 @@ export default function Sales() {
               </div>
 
               <div className="rounded-[28px] border border-primary-200 bg-primary-50/60 p-4 shadow-sm dark:border-primary-900/40 dark:bg-primary-900/15">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-200">{t('common.total')}</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</p>
-                <div className="mt-4 space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-200">{t('common.total')}</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</p>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:flex sm:flex-col">
                   <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('sales.taxTotal')}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{money(itemDraftVatAmount)}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('sales.taxTotal')}</p>
+                    <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-200">{money(itemDraftVatAmount)}</p>
+                  </div>
+                  <div className="col-span-2 rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50 sm:col-auto">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('sales.product')}</p>
+                    <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{itemDraftProduct?.name || '—'}</p>
                   </div>
                   <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('sales.product')}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{itemDraftProduct?.name || '—'}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('products.unitType')}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{getUnitLabel(itemDraftProduct, itemDraft.unitType) || t('products.primaryUnit')}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('products.unitType')}</p>
+                    <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{getUnitLabel(itemDraftProduct, itemDraft.unitType) || t('products.primaryUnit')}</p>
                   </div>
                 </div>
               </div>
@@ -954,11 +994,11 @@ export default function Sales() {
                 </div>
               </div>
 
-              <div className="mt-4 border-t border-slate-200/70 pt-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="flex-1">
-                    <label className="label">{t('services.amountReceived')}</label>
-                    <input
+                <div className="mt-4 border-t border-slate-200/70 pt-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="flex-1">
+                      <label className="label">{t('services.amountReceived')}</label>
+                      <input
                       className="input mt-1"
                       type="number"
                       step="0.01"
@@ -966,10 +1006,16 @@ export default function Sales() {
                       value={isPaid ? totals.grandTotal.toFixed(2) : header.amountReceived}
                       disabled={isPaid}
                       onChange={(e) => setHeader((prev) => ({ ...prev, amountReceived: e.target.value }))}
-                    />
-                  </div>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 sm:mb-0.5">
-                    <input
+                      />
+                      <QuickPaymentButtons
+                        disabled={totals.grandTotal <= 0}
+                        onNoPayment={() => applyQuickReceivedAmount(0)}
+                        onHalfPayment={() => applyQuickReceivedAmount(totals.grandTotal / 2)}
+                        onFullPayment={() => applyQuickReceivedAmount(totals.grandTotal, { markPaid: true })}
+                      />
+                    </div>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 sm:mb-0.5">
+                      <input
                       type="checkbox"
                       className="h-4 w-4 rounded accent-primary-600"
                       checked={isPaid}

@@ -6,7 +6,7 @@ const DEFAULT_BUSINESS_TYPES = [
     navigation: [
       { key: 'dashboard', label: 'Dashboard', route: '/app' },
       { key: 'inventory', label: 'Inventory', route: '/app/inventory' },
-      { key: 'sales', label: 'Sales', route: '/app/sales' },
+      { key: 'sales', label: 'Sales', route: '/app/pos' },
       { key: 'services', label: 'Services', route: '/app/services' },
       { key: 'purchases', label: 'Expenses', route: '/app/purchases' },
       { key: 'parties', label: 'Parties', route: '/app/parties' },
@@ -41,7 +41,7 @@ const DEFAULT_BUSINESS_TYPES = [
       title: 'Sales',
       navLabel: 'Sales',
       createLabel: 'New Sale',
-      route: '/app/sales',
+      route: '/app/pos',
       attributeSectionTitle: 'Order Information',
       attributeSectionHint: 'Optional invoice or customer-specific fields.',
     },
