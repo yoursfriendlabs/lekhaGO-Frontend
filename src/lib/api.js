@@ -6,9 +6,14 @@ import {
 } from "./storage";
 import { toQueryKey, toQueryString } from "./queryKey";
 
-// export const API_BASE =
-  // import.meta.env.VITE_API_BASE_URL || "https://api.yoursfriend.com";
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+const DEFAULT_API_BASE = "http://localhost:4000";
+
+function normalizeApiBase(value) {
+  const apiBase = String(value || "").trim() || DEFAULT_API_BASE;
+  return apiBase.replace(/\/+$/, "");
+}
+
+export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE_URL);
 
 const INACTIVE_USER_REGEX = /user is inactive/i;
 const SESSION_EXPIRED_MESSAGE = "Your session expired. Please log in again.";
