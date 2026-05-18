@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Pencil, FileText, Package, Plus, Printer, Trash2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
@@ -683,10 +683,10 @@ export default function Sales() {
         title={salesTitle}
         subtitle={salesSubtitle}
         action={
-          <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate} disabled={openingSaleForm}>
+          <Link className="btn-primary w-full sm:w-auto" to="/app/pos">
             <Plus size={16} className="mr-1.5 inline" />
-            {openingSaleForm ? t('common.loading') : createSaleLabel}
-          </button>
+            {createSaleLabel}
+          </Link>
         }
       />
 
@@ -959,12 +959,12 @@ export default function Sales() {
               <div className="rounded-[28px] border border-primary-200 bg-primary-50/60 p-4 shadow-sm dark:border-primary-900/40 dark:bg-primary-900/15">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-200">{t('common.total')}</p>
                 <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</p>
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:flex sm:flex-col">
+                <div className="mt-4 flex flex-col gap-3">
                   <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('sales.taxTotal')}</p>
                     <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-200">{money(itemDraftVatAmount)}</p>
                   </div>
-                  <div className="col-span-2 rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50 sm:col-auto">
+                  <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
                     <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('sales.product')}</p>
                     <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{itemDraftProduct?.name || '—'}</p>
                   </div>
@@ -979,16 +979,16 @@ export default function Sales() {
 
           {showPaymentStep ? (
             <FormSectionCard title={t('payments.summaryTitle')}>
-              <div className="grid gap-3 text-sm sm:grid-cols-3">
-                <div className="flex justify-between sm:flex-col sm:gap-0.5">
+              <div className="grid gap-3 text-sm">
+                <div className="flex justify-between gap-3">
                   <span className="text-slate-500">{t('sales.subTotal')}</span>
                   <span className="font-semibold text-slate-800">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</span>
                 </div>
-                <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                <div className="flex justify-between gap-3">
                   <span className="text-slate-500">{t('sales.taxTotal')}</span>
                   <span className="font-semibold text-slate-800">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</span>
                 </div>
-                <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                <div className="flex justify-between gap-3">
                   <span className="text-slate-500">{t('sales.grandTotal')}</span>
                   <span className="text-lg font-bold text-slate-900">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</span>
                 </div>

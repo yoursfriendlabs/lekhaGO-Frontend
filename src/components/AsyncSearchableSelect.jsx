@@ -145,7 +145,7 @@ export default function AsyncSearchableSelect({
     if (!open || typeof loadOptionsRef.current !== 'function') return undefined;
 
     const search = debouncedQuery.trim();
-    
+
     // Load options when opened, even with empty query (for browsing all options)
     if (search.length < minQueryLength && minQueryLength > 0) {
       setOptions((previous) => {

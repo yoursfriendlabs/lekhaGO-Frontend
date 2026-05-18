@@ -6,7 +6,7 @@ const DEFAULT_BUSINESS_TYPES = [
     navigation: [
       { key: 'dashboard', label: 'Dashboard', route: '/app' },
       { key: 'inventory', label: 'Inventory', route: '/app/inventory' },
-      { key: 'sales', label: 'Sales', route: '/app/pos' },
+      { key: 'sales', label: 'Quick POS', route: '/app/pos' },
       { key: 'services', label: 'Services', route: '/app/services' },
       { key: 'purchases', label: 'Expenses', route: '/app/purchases' },
       { key: 'parties', label: 'Parties', route: '/app/parties' },
@@ -38,8 +38,8 @@ const DEFAULT_BUSINESS_TYPES = [
     },
     salesFlow: {
       mode: 'retail',
-      title: 'Sales',
-      navLabel: 'Sales',
+      title: 'Quick POS',
+      navLabel: 'Quick POS',
       createLabel: 'New Sale',
       route: '/app/pos',
       attributeSectionTitle: 'Order Information',

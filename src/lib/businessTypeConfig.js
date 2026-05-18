@@ -1,4 +1,5 @@
 const RETAIL_BUSINESS_TYPE = 'retail';
+const RETAIL_SALES_LABEL = 'Quick POS';
 const RETAIL_SALES_ROUTE = '/app/pos';
 const RETAIL_SERVICES_LABEL = 'Services';
 
@@ -17,7 +18,7 @@ export function getNavigationForBusinessType(navigation = [], businessProfile) {
 
   const normalized = navigation.map((item) => (
     item?.key === 'sales'
-      ? { ...item, route: RETAIL_SALES_ROUTE }
+      ? { ...item, label: RETAIL_SALES_LABEL, route: RETAIL_SALES_ROUTE }
       : item?.key === 'services'
         ? { ...item, label: getServicesDisplayLabel(businessProfile, item.label) }
         : item
@@ -30,7 +31,7 @@ export function getNavigationForBusinessType(navigation = [], businessProfile) {
   const servicesIndex = normalized.findIndex((item) => item?.key === 'services');
   const inventoryIndex = normalized.findIndex((item) => item?.key === 'inventory');
   const insertIndex = servicesIndex >= 0 ? servicesIndex : inventoryIndex >= 0 ? inventoryIndex + 1 : 1;
-  const salesItem = { key: 'sales', label: 'Sales', route: RETAIL_SALES_ROUTE };
+  const salesItem = { key: 'sales', label: RETAIL_SALES_LABEL, route: RETAIL_SALES_ROUTE };
 
   return [
     ...normalized.slice(0, insertIndex),

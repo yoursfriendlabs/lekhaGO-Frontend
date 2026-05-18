@@ -154,7 +154,7 @@ function AppShell() {
   const requiresActivation = isStaffActivationRequired(user, role);
   const servicesEnabled = businessProfile?.modules?.services !== false;
   const cafeOrdersEnabled = businessProfile?.modules?.orders === true || businessProfile?.type === 'cafe';
-  const salesRoute = businessProfile?.salesFlow?.route || '/app/sales';
+  const salesRoute = businessProfile?.salesFlow?.route || '/app/pos';
   const posPageElement = businessProfile?.type === 'cafe' && cafeOrdersEnabled ? <CafeOrders /> : <QuickPos />;
   const subscriptionGuard = getSubscriptionGuard(subscription);
   const subscriptionStatusState = getSubscriptionStatusState(subscription);
