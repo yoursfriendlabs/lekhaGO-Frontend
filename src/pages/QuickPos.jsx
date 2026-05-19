@@ -564,8 +564,10 @@ export default function QuickPos() {
           showNavigation={false}
         />
       </div>
+      <div className="min-w-0 space-y-6 pb-28 md:pb-0">
 
       <PageHeader
+      id="quick-pos-header"
         title={salesTitle}
         subtitle={t('quickPos.subtitle')}
         action={(
@@ -576,6 +578,7 @@ export default function QuickPos() {
           </div>
         )}
       />
+      </div>
 
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
 
