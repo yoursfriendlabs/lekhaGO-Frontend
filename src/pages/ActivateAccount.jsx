@@ -133,7 +133,8 @@ export default function ActivateAccount() {
           nextRole,
           nextSubscription,
           response?.business || null,
-          response?.businessProfile || null
+          response?.businessProfile || null,
+          response?.accessControl || response?.user?.accessControl || null
         );
       } else {
         updateUser({ emailVerified: true });

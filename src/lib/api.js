@@ -4,8 +4,10 @@ import {
   getToken,
   setSessionNotice,
 } from "./storage";
+import { normalizePopularAnalyticsResponse } from "./analyticsPopular";
 import { normalizeLedgerReportResponse } from "./ledger";
 import { toQueryKey, toQueryString } from "./queryKey";
+import { normalizeStaffCollection, normalizeStaffMeta, normalizeStaffMember } from "./staff";
 
 const DEFAULT_API_BASE = "http://localhost:4000";
 
@@ -504,20 +506,34 @@ export const api = {
       mutationConfig(["auth-me", "subscription", "subscription-payment-setup"]),
     ),
 
+  getStaffMeta: () =>
+    request("/api/staff/meta", {}, listCache(["staff"], CACHE_TTL.short)).then(
+      normalizeStaffMeta,
+    ),
   listStaff: () =>
-    request("/api/staff", {}, listCache(["staff"], CACHE_TTL.short)),
+    request("/api/staff", {}, listCache(["staff"], CACHE_TTL.short)).then(
+      normalizeStaffCollection,
+    ),
   createStaff: (data) =>
     request(
       "/api/staff",
       { method: "POST", body: JSON.stringify(data) },
       mutationConfig(["staff"]),
-    ),
+    ).then((payload) => ({
+      ...payload,
+      meta: normalizeStaffMeta(payload?.meta),
+      member: normalizeStaffMember(payload?.member, payload?.meta),
+    })),
   updateStaff: (membershipId, data) =>
     request(
       `/api/staff/${membershipId}`,
       { method: "PATCH", body: JSON.stringify(data) },
       mutationConfig(["staff"]),
-    ),
+    ).then((payload) => ({
+      ...payload,
+      meta: normalizeStaffMeta(payload?.meta),
+      member: normalizeStaffMember(payload?.member, payload?.meta),
+    })),
   deleteStaff: (membershipId) =>
     request(
       `/api/staff/${membershipId}`,
@@ -1069,6 +1085,18 @@ export const api = {
       params,
       listCache(["analytics"], CACHE_TTL.short),
     ),
+  getPopularItemsAnalytics: (params = {}) =>
+    listRequest(
+      "/api/analytics/popular-items",
+      { limit: 10, ...params },
+      listCache(["analytics"], CACHE_TTL.short),
+    ).then(normalizePopularAnalyticsResponse),
+  getPopularCategoriesAnalytics: (params = {}) =>
+    listRequest(
+      "/api/analytics/popular-categories",
+      { limit: 10, ...params },
+      listCache(["analytics"], CACHE_TTL.short),
+    ).then(normalizePopularAnalyticsResponse),
 
   uploadAttachment: (file) => {
     const formData = new FormData();

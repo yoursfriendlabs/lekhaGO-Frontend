@@ -7,16 +7,16 @@ import BrandLogo from './BrandLogo.jsx';
 import UpgradeSubscriptionCta from './subscription/UpgradeSubscriptionCta.jsx';
 
 const NAV_ROLE_MAP = {
-  dashboard: ['owner', 'staff'],
-  orders: ['owner', 'staff'],
-  inventory: ['owner', 'staff'],
-  sales: ['owner', 'staff'],
-  services: ['owner', 'staff'],
-  purchases: ['owner'],
-  parties: ['owner'],
-  ledger: ['owner', 'staff'],
-  analytics: ['owner'],
-  settings: ['owner', 'staff'],
+  dashboard: ['owner', 'staff', 'admin', 'super_admin'],
+  orders: ['owner', 'staff', 'admin', 'super_admin'],
+  inventory: ['owner', 'staff', 'admin', 'super_admin'],
+  sales: ['owner', 'staff', 'admin', 'super_admin'],
+  services: ['owner', 'staff', 'admin', 'super_admin'],
+  purchases: ['owner', 'staff', 'admin', 'super_admin'],
+  parties: ['owner', 'staff', 'admin', 'super_admin'],
+  ledger: ['owner', 'staff', 'admin', 'super_admin'],
+  analytics: ['owner', 'staff', 'admin', 'super_admin'],
+  settings: ['owner', 'staff', 'admin', 'super_admin'],
   admin: ['owner'],
 };
 
@@ -45,7 +45,9 @@ export default function Sidebar() {
   const visibleNavItems = navigation
     .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
     .filter((item) => hasFeatureAccess(item.key))
-    .concat(role === 'owner' && hasFeatureAccess('admin') ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }] : []);
+    .concat((role === 'owner' || role === 'admin' || role === 'super_admin') && hasFeatureAccess('admin')
+      ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }]
+      : []);
 
   return (
     <aside className="hidden h-full w-64 flex-col gap-6 border-r border-slate-200/70 bg-white/80 p-6 dark:border-slate-800/70 dark:bg-slate-950/70 md:fixed md:inset-y-0 md:left-0 md:flex md:overflow-y-auto">

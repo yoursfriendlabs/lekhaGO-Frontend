@@ -13,7 +13,7 @@ export function ThemeProvider({ children }) {
 
   const value = useMemo(() => ({ theme, setTheme: () => {} }), []);
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return <ThemeContext value={value}>{children}</ThemeContext>;
 }
 
 export function useTheme() {

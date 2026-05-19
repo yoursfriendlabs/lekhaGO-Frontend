@@ -72,7 +72,8 @@ export default function Login() {
         resolvedRole,
         data.subscription || null,
         data.business || null,
-        data.businessProfile || null
+        data.businessProfile || null,
+        data.accessControl || data.user?.accessControl || null
       );
       if (hasUnverifiedEmail(data.user)) {
         setPendingEmailVerification({

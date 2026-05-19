@@ -447,7 +447,8 @@ const STATUS_STEPS = [
 
 export default function Services() {
   const { t } = useI18n();
-  const { businessId, user } = useAuth();
+  const { businessId, user, canManageFeature } = useAuth();
+  const canManageServices = canManageFeature('services');
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const createIntentHandledRef = useRef(false);
@@ -1087,6 +1088,7 @@ export default function Services() {
   };
 
   const openDialog = async () => {
+    if (!canManageServices) return;
     resetForm();
     setDialogOpen(true);
 
@@ -1116,6 +1118,7 @@ export default function Services() {
   }, [openDialog, searchParams, setSearchParams]);
 
   const openEditDialog = async (order) => {
+    if (!canManageServices) return;
     resetForm();
     setEditingId(order.id);
     setDialogOpen(true);
@@ -1196,6 +1199,7 @@ export default function Services() {
   // ── Submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!canManageServices) { setFormNotice({ type: 'error', message: t('staffManagement.permissionError') }); return; }
     if (!businessId) { setFormNotice({ type: 'error', message: t('errors.businessIdRequired') }); return; }
     // Customer is optional for services (walk-in support)
     const invalidPart = chargeableItems.find((i) => i.itemType === 'part' && !i.productId);
@@ -1301,6 +1305,7 @@ export default function Services() {
 
   // ── Status dialog ──
   const openStatusDialog = (order) => {
+    if (!canManageServices) return;
     setStatusDialog(order);
     setNewStatus(order.status || 'open');
     setStatusError('');
@@ -1321,6 +1326,7 @@ export default function Services() {
   };
 
   const handleUpdateStatus = async () => {
+    if (!canManageServices) return;
     if (!statusDialog) return;
     try {
       await api.updateService(statusDialog.id, { status: newStatus });
@@ -1333,6 +1339,7 @@ export default function Services() {
 
   // ── Record payment ──
   const openPayDialog = (order) => {
+    if (!canManageServices) return;
     setPayDialog(order);
     setPayAmount('');
     setPayNotes('');
@@ -1343,6 +1350,7 @@ export default function Services() {
 
   const handleRecordPayment = async (e) => {
     e.preventDefault();
+    if (!canManageServices) { setPayError(t('staffManagement.permissionError')); return; }
     const amount = Number(payAmount || 0);
     if (!amount || amount <= 0) { setPayError('Enter a valid amount.'); return; }
     if (requiresBankSelection({ paymentMethod: payPaymentMethod, bankId: payBankId }, amount)) {
@@ -1392,6 +1400,7 @@ export default function Services() {
   };
 
   const handleDeleteService = async () => {
+    if (!canManageServices) return;
     if (!deleteService) return;
 
     setDeletingServiceId(deleteService.id);
@@ -1472,10 +1481,12 @@ export default function Services() {
               </p>
             </div>
 
-            <button className="btn-primary w-full sm:w-auto" type="button" onClick={openDialog}>
-              <Plus size={16} className="mr-1.5 inline" />
-              {newOrderLabel}
-            </button>
+            {canManageServices ? (
+              <button className="btn-primary w-full sm:w-auto" type="button" onClick={openDialog}>
+                <Plus size={16} className="mr-1.5 inline" />
+                {newOrderLabel}
+              </button>
+            ) : null}
           </div>
 
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-hide sm:grid sm:grid-cols-2 xl:grid-cols-4">
@@ -1612,16 +1623,18 @@ export default function Services() {
                     <div className="mt-4 flex justify-end border-t border-slate-200/70 pt-3 dark:border-slate-800/70">
                       <ActionMenu
                         actions={[
-                          { label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) },
+                          ...(canManageServices ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) }] : []),
                           { label: 'View Bill', icon: FileText, onClick: () => openInvoiceModal(order) },
                           { label: 'Print Bill', icon: Printer, onClick: () => openInvoiceModal(order, { print: true }) },
-                          {
-                            label: t('common.delete'),
-                            icon: Trash2,
-                            tone: 'danger',
-                            disabled: deletingServiceId === order.id,
-                            onClick: () => setDeleteService(order),
-                          },
+                          ...(canManageServices
+                            ? [{
+                              label: t('common.delete'),
+                              icon: Trash2,
+                              tone: 'danger',
+                              disabled: deletingServiceId === order.id,
+                              onClick: () => setDeleteService(order),
+                            }]
+                            : []),
                         ]}
                       />
                     </div>
@@ -1723,16 +1736,18 @@ export default function Services() {
                         <td className="py-3 text-right">
                            <ActionMenu
                             actions={[
-                              { label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) },
+                              ...(canManageServices ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) }] : []),
                               { label: 'View Bill', icon: FileText, onClick: () => openInvoiceModal(order) },
                               { label: 'Print Bill', icon: Printer, onClick: () => openInvoiceModal(order, { print: true }) },
-                              {
-                                label: t('common.delete'),
-                                icon: Trash2,
-                                tone: 'danger',
-                                disabled: deletingServiceId === order.id,
-                                onClick: () => setDeleteService(order),
-                              },
+                              ...(canManageServices
+                                ? [{
+                                  label: t('common.delete'),
+                                  icon: Trash2,
+                                  tone: 'danger',
+                                  disabled: deletingServiceId === order.id,
+                                  onClick: () => setDeleteService(order),
+                                }]
+                                : []),
                             ]}
                           />
                         </td>

@@ -7,6 +7,7 @@ import { Dialog } from '../components/ui/Dialog.tsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import { api } from '../lib/api';
+import { useAuth } from '../lib/auth.jsx';
 import { useBankStore } from '../stores/banks';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
@@ -36,6 +37,8 @@ function normalizeBankForm(bank = {}) {
 
 export default function Banks() {
   const { t } = useI18n();
+  const { canManageFeature } = useAuth();
+  const canManageBanks = canManageFeature('banks');
   const {
     banks,
     total,
@@ -116,6 +119,7 @@ export default function Banks() {
   };
 
   const openCreate = () => {
+    if (!canManageBanks) return;
     setEditingId(null);
     setForm(emptyForm);
     setStatus({ type: 'info', message: '' });
@@ -123,6 +127,7 @@ export default function Banks() {
   };
 
   const openEdit = async (bank) => {
+    if (!canManageBanks) return;
     setEditingId(bank.id);
     setDialogOpen(true);
     setLoadingDetail(true);
@@ -147,6 +152,10 @@ export default function Banks() {
 
   const submitForm = async (event) => {
     event.preventDefault();
+    if (!canManageBanks) {
+      setStatus({ type: 'error', message: t('staffManagement.permissionError') });
+      return;
+    }
 
     if (!form.name.trim()) {
       setStatus({ type: 'error', message: t('banks.validation.nameRequired') });
@@ -193,6 +202,7 @@ export default function Banks() {
   };
 
   const handleDelete = async () => {
+    if (!canManageBanks) return;
     if (!deleteBank) return;
 
     setDeleteSubmitting(true);
@@ -209,6 +219,7 @@ export default function Banks() {
   };
 
   const handleToggleActive = async (bank) => {
+    if (!canManageBanks) return;
     try {
       await api.patchBank(bank.id, { isActive: !bank.isActive });
       await reloadBanks();
@@ -237,10 +248,12 @@ export default function Banks() {
         title={t('banks.title')}
         subtitle={t('banks.subtitle')}
         action={(
-          <button className="btn-primary" type="button" onClick={openCreate}>
-            <Plus size={16} className="mr-1.5 inline" />
-            {t('banks.addBank')}
-          </button>
+          canManageBanks ? (
+            <button className="btn-primary" type="button" onClick={openCreate}>
+              <Plus size={16} className="mr-1.5 inline" />
+              {t('banks.addBank')}
+            </button>
+          ) : null
         )}
       />
 
@@ -278,13 +291,15 @@ export default function Banks() {
                   <p className="mt-4 text-sm text-slate-500">{selectedBank?.accountNumber || selectedBank?.accountName || '—'}</p>
                   <p className="mt-2 text-xl font-semibold text-primary-700">{formatMoney(selectedBank?.currentBalance)}</p>
                 </div>
-                <button
-                  className="btn-primary h-14 justify-center rounded-[24px]"
-                  type="button"
-                  onClick={() => (selectedBank ? openEdit(selectedBank) : openCreate())}
-                >
-                  {t('banks.adjustBalance')}
-                </button>
+                {canManageBanks ? (
+                  <button
+                    className="btn-primary h-14 justify-center rounded-[24px]"
+                    type="button"
+                    onClick={() => (selectedBank ? openEdit(selectedBank) : openCreate())}
+                  >
+                    {t('banks.adjustBalance')}
+                  </button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -323,10 +338,12 @@ export default function Banks() {
               <p className="text-lg font-semibold text-slate-900">{t('banks.allAccounts')}</p>
               <p className="mt-1 text-sm text-slate-500">{t('banks.subtitle')}</p>
             </div>
-            <button className="btn-secondary" type="button" onClick={openCreate}>
-              <Plus size={16} className="mr-1.5 inline" />
-              {t('banks.newAccount')}
-            </button>
+            {canManageBanks ? (
+              <button className="btn-secondary" type="button" onClick={openCreate}>
+                <Plus size={16} className="mr-1.5 inline" />
+                {t('banks.newAccount')}
+              </button>
+            ) : null}
           </div>
 
           <div className="space-y-3 md:hidden">
@@ -375,7 +392,7 @@ export default function Banks() {
                       </div>
                     </div>
 
-                    {isSelected ? (
+                    {isSelected && canManageBanks ? (
                       <div className="mt-4 flex flex-wrap gap-2">
                         <button className="btn-ghost" type="button" onClick={(event) => { event.stopPropagation(); openEdit(bank); }}>
                           <Pencil size={14} className="mr-1 inline" />
@@ -436,17 +453,21 @@ export default function Banks() {
                         </span>
                       </td>
                       <td className="py-2 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button className="btn-ghost" type="button" onClick={() => openEdit(bank)}>
-                            <Pencil size={14} />
-                          </button>
-                          <button className="btn-ghost" type="button" onClick={() => handleToggleActive(bank)}>
-                            <Power size={14} />
-                          </button>
-                          <button className="btn-ghost" type="button" onClick={() => setDeleteBank(bank)}>
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
+                        {canManageBanks ? (
+                          <div className="flex justify-end gap-2">
+                            <button className="btn-ghost" type="button" onClick={() => openEdit(bank)}>
+                              <Pencil size={14} />
+                            </button>
+                            <button className="btn-ghost" type="button" onClick={() => handleToggleActive(bank)}>
+                              <Power size={14} />
+                            </button>
+                            <button className="btn-ghost" type="button" onClick={() => setDeleteBank(bank)}>
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-medium text-slate-400">{t('common.view')}</span>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -467,7 +488,7 @@ export default function Banks() {
           />
         </div>
 
-        {selectedBank ? (
+        {selectedBank && canManageBanks ? (
           <div className="mobile-sticky-actions md:hidden">
             <div className="grid grid-cols-2 gap-3">
               <button className="btn-secondary w-full justify-center rounded-[22px]" type="button" onClick={openCreate}>

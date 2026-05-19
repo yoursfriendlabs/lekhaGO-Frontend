@@ -106,7 +106,8 @@ function getVatAmount(lineTotal, taxRate) {
 
 export default function Purchases() {
   const { t } = useI18n();
-  const { businessId } = useAuth();
+  const { businessId, canManageFeature } = useAuth();
+  const canManagePurchases = canManageFeature('purchases');
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const createIntentHandledRef = useRef(false);
@@ -526,6 +527,7 @@ export default function Purchases() {
   };
 
   const openCreate = async ({ entryType = 'expense' } = {}) => {
+    if (!canManagePurchases) return;
     if (openingPurchaseForm) return;
 
     setOpeningPurchaseForm(true);
@@ -567,6 +569,7 @@ export default function Purchases() {
   }, [openCreate, searchParams, setSearchParams]);
 
   const openEdit = async (purchaseId) => {
+    if (!canManagePurchases) return;
     try {
       setStatus({ type: 'info', message: '' });
       setPayDialog(null);
@@ -655,6 +658,7 @@ export default function Purchases() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (!canManagePurchases) { setStatus({ type: 'error', message: t('staffManagement.permissionError') }); return; }
     if (savingPurchase) return;
     if (!businessId) { setStatus({ type: 'error', message: t('errors.businessIdRequired') }); return; }
     if (!header.purchaseDate) { setStatus({ type: 'error', message: t('errors.purchaseDateRequired') }); return; }
@@ -736,6 +740,7 @@ export default function Purchases() {
   };
 
   const handleDeletePurchase = async () => {
+    if (!canManagePurchases) return;
     if (!deletePurchase) return;
     if (deletingPurchaseId === deletePurchase.id) return;
 
@@ -760,6 +765,7 @@ export default function Purchases() {
   };
 
   const openPayDialog = (purchase) => {
+    if (!canManagePurchases) return;
     setPayDialog(purchase);
     setPayAmount('');
     setPayPaymentMethod('cash');
@@ -775,6 +781,10 @@ export default function Purchases() {
 
   const handleRecordPayment = async (event) => {
     event.preventDefault();
+    if (!canManagePurchases) {
+      setPayError(t('staffManagement.permissionError'));
+      return;
+    }
     if (!payDialog) return;
     if (recordingPaymentId === payDialog.id) return;
 
@@ -923,9 +933,11 @@ export default function Purchases() {
         title={t('purchases.title')}
         subtitle={t('purchases.subtitle')}
         action={(
-          <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate} disabled={openingPurchaseForm}>
-            {openingPurchaseForm ? t('common.loading') : t('purchases.newPurchase')}
-          </button>
+          canManagePurchases ? (
+            <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate} disabled={openingPurchaseForm}>
+              {openingPurchaseForm ? t('common.loading') : t('purchases.newPurchase')}
+            </button>
+          ) : null
         )}
       />
 
@@ -1634,16 +1646,18 @@ export default function Purchases() {
                   <div className="mt-3 flex items-center justify-end border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
                     <ActionMenu
                       actions={[
-                        { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(purchase.id) },
+                        ...(canManagePurchases ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEdit(purchase.id) }] : []),
                         { label: 'View Bill', icon: FileText, to: `/app/invoice/purchases/${purchase.id}` },
                         { label: 'Print Bill', icon: Printer, to: `/app/invoice/purchases/${purchase.id}?print=1` },
-                        {
-                          label: t('common.delete'),
-                          icon: Trash2,
-                          tone: 'danger',
-                          disabled: deletingPurchaseId === purchase.id,
-                          onClick: () => setDeletePurchase(purchase),
-                        },
+                        ...(canManagePurchases
+                          ? [{
+                            label: t('common.delete'),
+                            icon: Trash2,
+                            tone: 'danger',
+                            disabled: deletingPurchaseId === purchase.id,
+                            onClick: () => setDeletePurchase(purchase),
+                          }]
+                          : []),
                       ]}
                     />
                   </div>
@@ -1732,16 +1746,18 @@ export default function Purchases() {
                       <td className="py-2.5 text-right">
                         <ActionMenu
                           actions={[
-                            { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(purchase.id) },
+                            ...(canManagePurchases ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEdit(purchase.id) }] : []),
                             { label: 'View Bill', icon: FileText, to: `/app/invoice/purchases/${purchase.id}` },
                             { label: 'Print Bill', icon: Printer, to: `/app/invoice/purchases/${purchase.id}?print=1` },
-                            {
-                              label: t('common.delete'),
-                              icon: Trash2,
-                              tone: 'danger',
-                              disabled: deletingPurchaseId === purchase.id,
-                              onClick: () => setDeletePurchase(purchase),
-                            },
+                            ...(canManagePurchases
+                              ? [{
+                                label: t('common.delete'),
+                                icon: Trash2,
+                                tone: 'danger',
+                                disabled: deletingPurchaseId === purchase.id,
+                                onClick: () => setDeletePurchase(purchase),
+                              }]
+                              : []),
                           ]}
                         />
                       </td>

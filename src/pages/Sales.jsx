@@ -82,7 +82,8 @@ function getCustomerName(sale) {
 
 export default function Sales() {
   const { t } = useI18n();
-  const { businessId, user } = useAuth();
+  const { businessId, user, canManageFeature } = useAuth();
+  const canManageSales = canManageFeature('sales');
   const { businessProfile } = useBusinessSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
@@ -460,6 +461,7 @@ export default function Sales() {
   };
 
   const openCreate = async () => {
+    if (!canManageSales) return;
     if (openingSaleForm) return;
 
     setOpeningSaleForm(true);
@@ -497,6 +499,7 @@ export default function Sales() {
   }, [openCreate, searchParams, setSearchParams]);
 
   const openEdit = async (saleId) => {
+    if (!canManageSales) return;
     setStatus({ type: 'info', message: '' });
     try {
       const sale = await api.getSale(saleId);
@@ -549,6 +552,7 @@ export default function Sales() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (!canManageSales) { setStatus({ type: 'error', message: t('staffManagement.permissionError') }); return; }
     if (savingSale) return;
     if (!businessId) { setStatus({ type: 'error', message: t('errors.businessIdRequired') }); return; }
     if (!header.saleDate) { setStatus({ type: 'error', message: t('errors.saleDateRequired') }); return; }
@@ -683,10 +687,12 @@ export default function Sales() {
         title={salesTitle}
         subtitle={salesSubtitle}
         action={
-          <Link className="btn-primary w-full sm:w-auto" to="/app/pos">
-            <Plus size={16} className="mr-1.5 inline" />
-            {createSaleLabel}
-          </Link>
+          canManageSales ? (
+            <Link className="btn-primary w-full sm:w-auto" to="/app/pos">
+              <Plus size={16} className="mr-1.5 inline" />
+              {createSaleLabel}
+            </Link>
+          ) : null
         }
       />
 
@@ -1174,16 +1180,18 @@ export default function Sales() {
                   <div className="mt-3 flex items-center justify-end border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
                     <ActionMenu
                       actions={[
-                        { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) },
+                        ...(canManageSales ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) }] : []),
                         { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
                         { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
-                        {
-                          label: t('common.delete'),
-                          icon: Trash2,
-                          tone: 'danger',
-                          disabled: deletingSaleId === sale.id,
-                          onClick: () => setDeleteSale(sale),
-                        },
+                        ...(canManageSales
+                          ? [{
+                            label: t('common.delete'),
+                            icon: Trash2,
+                            tone: 'danger',
+                            disabled: deletingSaleId === sale.id,
+                            onClick: () => setDeleteSale(sale),
+                          }]
+                          : []),
                       ]}
                     />
                   </div>
@@ -1271,16 +1279,18 @@ export default function Sales() {
                       <td className="py-2.5 text-right">
                         <ActionMenu
                           actions={[
-                            { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) },
+                            ...(canManageSales ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) }] : []),
                             { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
                             { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
-                            {
-                              label: t('common.delete'),
-                              icon: Trash2,
-                              tone: 'danger',
-                              disabled: deletingSaleId === sale.id,
-                              onClick: () => setDeleteSale(sale),
-                            },
+                            ...(canManageSales
+                              ? [{
+                                label: t('common.delete'),
+                                icon: Trash2,
+                                tone: 'danger',
+                                disabled: deletingSaleId === sale.id,
+                                onClick: () => setDeleteSale(sale),
+                              }]
+                              : []),
                           ]}
                         />
                       </td>
