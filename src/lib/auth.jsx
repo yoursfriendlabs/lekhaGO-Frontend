@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import {
+  getAccessControl,
   clearPendingEmailVerification,
   clearSession,
   getBusiness,
@@ -12,12 +13,17 @@ import {
   setBusiness,
   setBusinessId,
   setBusinessProfile,
+  setAccessControl,
   setRole,
   setSubscription,
   setToken,
   setUser,
 } from './storage';
 import { api, clearApiCache } from './api';
+import {
+  getFeatureAccessLevel as getFeatureAccessLevelFromAccessControl,
+  normalizeAccessControl,
+} from './accessControl';
 import { normalizeSessionPayload } from './session';
 import { canAccessFeature, normalizeSubscriptionPayload } from './subscription';
 
@@ -31,6 +37,7 @@ export function AuthProvider({ children }) {
   const [business, setBusinessState] = useState(() => getBusiness());
   const [businessProfile, setBusinessProfileState] = useState(() => getBusinessProfile());
   const [role, setRoleState] = useState(() => getRole());
+  const [accessControl, setAccessControlState] = useState(() => normalizeAccessControl(getAccessControl()));
   const [subscription, setSubscriptionState] = useState(() => normalizeSubscriptionPayload(getSubscription()));
   const [sessionLoading, setSessionLoading] = useState(() => {
     const storedToken = getToken();
@@ -49,6 +56,10 @@ export function AuthProvider({ children }) {
     const nextBusiness = snapshot?.business || null;
     const nextBusinessProfile = snapshot?.businessProfile || null;
     const nextRole = snapshot?.role || nextUser?.role || '';
+    const nextAccessControl = normalizeAccessControl(snapshot?.accessControl, {
+      role: nextRole,
+      businessId: nextBusinessId,
+    });
     const nextSubscription = normalizeSubscriptionPayload(snapshot?.subscription, {
       businessId: nextBusinessId,
       business: nextBusiness,
@@ -60,6 +71,7 @@ export function AuthProvider({ children }) {
     setBusiness(nextBusiness);
     setBusinessProfile(nextBusinessProfile);
     setRole(nextRole);
+    setAccessControl(nextAccessControl);
     setSubscription(nextSubscription);
 
     setTokenState(nextToken);
@@ -68,6 +80,7 @@ export function AuthProvider({ children }) {
     setBusinessState(nextBusiness);
     setBusinessProfileState(nextBusinessProfile);
     setRoleState(nextRole);
+    setAccessControlState(nextAccessControl);
     setSubscriptionState(nextSubscription);
 
     return {
@@ -77,6 +90,7 @@ export function AuthProvider({ children }) {
       business: nextBusiness,
       businessProfile: nextBusinessProfile,
       role: nextRole,
+      accessControl: nextAccessControl,
       subscription: nextSubscription,
     };
   }, []);
@@ -89,6 +103,7 @@ export function AuthProvider({ children }) {
       businessId: overrides.businessId ?? businessId,
       business: overrides.business ?? business,
       businessProfile: overrides.businessProfile ?? businessProfile,
+      accessControl: overrides.accessControl ?? accessControl,
       subscription: overrides.subscription ?? subscription,
     });
 
@@ -100,9 +115,9 @@ export function AuthProvider({ children }) {
       ...snapshot,
       token: overrides.token ?? token,
     });
-  }, [applySessionSnapshot, token, user, role, businessId, business, businessProfile, subscription]);
+  }, [accessControl, applySessionSnapshot, token, user, role, businessId, business, businessProfile, subscription]);
 
-  const setSession = useCallback((nextToken, nextUser, nextBusinessId, nextRole, nextSubscription = null, nextBusiness = null, nextBusinessProfile = null) => {
+  const setSession = useCallback((nextToken, nextUser, nextBusinessId, nextRole, nextSubscription = null, nextBusiness = null, nextBusinessProfile = null, nextAccessControl = null) => {
     clearApiCache();
     clearPendingEmailVerification();
 
@@ -115,6 +130,7 @@ export function AuthProvider({ children }) {
           businessId: nextBusinessId,
           business: nextBusiness,
           businessProfile: nextBusinessProfile,
+          accessControl: nextAccessControl,
           subscription: nextSubscription,
         },
         {
@@ -181,6 +197,7 @@ export function AuthProvider({ children }) {
     setBusinessState(null);
     setBusinessProfileState(null);
     setRoleState('');
+    setAccessControlState(null);
     setSubscriptionState(null);
     setSessionLoading(false);
   }, []);
@@ -191,10 +208,35 @@ export function AuthProvider({ children }) {
     setSubscription(normalized);
   }, [businessId, business]);
 
-  const hasFeatureAccess = useCallback(
+  const hasSubscriptionFeatureAccess = useCallback(
     (featureKey) => canAccessFeature(subscription, featureKey),
     [subscription]
   );
+
+  const getFeatureAccessLevel = useCallback((featureKey) => {
+    const accessLevel = getFeatureAccessLevelFromAccessControl(accessControl, featureKey, role);
+    if (accessLevel) {
+      if (!hasSubscriptionFeatureAccess(featureKey)) {
+        return 'none';
+      }
+
+      return accessLevel;
+    }
+
+    return hasSubscriptionFeatureAccess(featureKey) ? 'manage' : 'none';
+  }, [accessControl, hasSubscriptionFeatureAccess, role]);
+
+  const canViewFeature = useCallback(
+    (featureKey) => getFeatureAccessLevel(featureKey) !== 'none',
+    [getFeatureAccessLevel]
+  );
+
+  const canManageFeature = useCallback(
+    (featureKey) => getFeatureAccessLevel(featureKey) === 'manage',
+    [getFeatureAccessLevel]
+  );
+
+  const hasFeatureAccess = canViewFeature;
 
   useEffect(() => {
     if (!SHOULD_BOOTSTRAP_AUTH || !token || typeof api.getCurrentUser !== 'function') {
@@ -236,6 +278,7 @@ export function AuthProvider({ children }) {
       business,
       businessProfile,
       role,
+      accessControl,
       subscription,
       subscriptionAccess,
       sessionLoading,
@@ -247,6 +290,10 @@ export function AuthProvider({ children }) {
       updateBusinessProfile,
       updateSubscription,
       updateUser,
+      getFeatureAccessLevel,
+      canViewFeature,
+      canManageFeature,
+      hasSubscriptionFeatureAccess,
       hasFeatureAccess,
       logout,
     }),
@@ -257,6 +304,7 @@ export function AuthProvider({ children }) {
       business,
       businessProfile,
       role,
+      accessControl,
       subscription,
       subscriptionAccess,
       sessionLoading,
@@ -268,12 +316,16 @@ export function AuthProvider({ children }) {
       updateBusinessProfile,
       updateSubscription,
       updateUser,
+      getFeatureAccessLevel,
+      canViewFeature,
+      canManageFeature,
+      hasSubscriptionFeatureAccess,
       hasFeatureAccess,
       logout,
     ]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext value={value}>{children}</AuthContext>;
 }
 
 export function useAuth() {

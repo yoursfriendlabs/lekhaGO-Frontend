@@ -177,7 +177,8 @@ export default function Register() {
           data.role || 'owner',
           data.subscription || null,
           data.business || null,
-          data.businessProfile || null
+          data.businessProfile || null,
+          data.accessControl || data.user?.accessControl || null
         );
         navigate('/app');
         return;

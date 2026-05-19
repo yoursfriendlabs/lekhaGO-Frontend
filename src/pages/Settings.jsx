@@ -52,7 +52,7 @@ function scrollToGrowthPlan() {
 export default function Settings() {
   const { t } = useI18n();
   const location = useLocation();
-  const { businessId, role, subscription, hasFeatureAccess } = useAuth();
+  const { businessId, role, subscription, canManageFeature, canViewFeature } = useAuth();
   const { settings, loading: settingsLoading, saveSettings, reloadSettings } = useBusinessSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [form, setForm] = useState({ ...EMPTY, ...settings });
@@ -64,7 +64,7 @@ export default function Settings() {
   const isOwner = role === 'owner';
   const subscriptionAccess = subscription?.access || null;
   const subscriptionGuard = getSubscriptionGuard(subscription);
-  const generalLocked = isOwner && !hasFeatureAccess('general-settings');
+  const generalLocked = isOwner && !canManageFeature('general-settings');
 
   const tabs = useMemo(() => {
     const nextTabs = [];
@@ -95,7 +95,7 @@ export default function Settings() {
       }
     );
 
-    if (isOwner && hasFeatureAccess('staff')) {
+    if (canViewFeature('staff')) {
       nextTabs.push({
         key: STAFF_SETTINGS_TAB,
         label: t('settingsPage.tabs.staff'),
@@ -103,7 +103,7 @@ export default function Settings() {
       });
     }
 
-    if (hasFeatureAccess('categories')) {
+    if (canManageFeature('categories')) {
       nextTabs.push({
         key: CATEGORIES_SETTINGS_TAB,
         label: t('settingsPage.tabs.categories'),
@@ -111,7 +111,7 @@ export default function Settings() {
       });
     }
 
-    if (hasFeatureAccess('units')) {
+    if (canManageFeature('units')) {
       nextTabs.push({
         key: UNITS_SETTINGS_TAB,
         label: t('settingsPage.tabs.units'),
@@ -119,7 +119,7 @@ export default function Settings() {
       });
     }
 
-    if (hasFeatureAccess('banks')) {
+    if (canManageFeature('banks')) {
       nextTabs.push({
         key: BANKS_SETTINGS_TAB,
         label: t('settingsPage.tabs.banks'),
@@ -127,7 +127,7 @@ export default function Settings() {
       });
     }
 
-    if (hasFeatureAccess('order-attributes')) {
+    if (canManageFeature('order-attributes')) {
       nextTabs.push({
         key: ORDER_ATTRIBUTES_SETTINGS_TAB,
         label: t('settingsPage.tabs.orderAttributes'),
@@ -136,7 +136,7 @@ export default function Settings() {
     }
 
     return nextTabs;
-  }, [generalLocked, hasFeatureAccess, isOwner, t]);
+  }, [canManageFeature, canViewFeature, generalLocked, isOwner, t]);
 
   const requestedTab = searchParams.get('tab');
   const companyTabs = useMemo(
