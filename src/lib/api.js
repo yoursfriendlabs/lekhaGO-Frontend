@@ -4,6 +4,7 @@ import {
   getToken,
   setSessionNotice,
 } from "./storage";
+import { normalizeLedgerReportResponse } from "./ledger";
 import { toQueryKey, toQueryString } from "./queryKey";
 
 const DEFAULT_API_BASE = "http://localhost:4000";
@@ -833,11 +834,11 @@ export const api = {
       listCache(["reports", "dashboard"], CACHE_TTL.report),
     ),
   ledgerReport: (params = {}) =>
-    collectionRequest(
+    listRequest(
       "/api/reports/ledger",
       params,
       listCache(["reports", "party-statements"], CACHE_TTL.short),
-    ),
+    ).then((payload) => normalizeLedgerReportResponse(payload)),
   partyReport: (params = {}) =>
     collectionRequest(
       "/api/reports/party-report",
