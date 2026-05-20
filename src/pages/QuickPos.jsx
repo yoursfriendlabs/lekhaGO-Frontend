@@ -150,6 +150,8 @@ export default function QuickPos() {
   const [successState, setSuccessState] = useState(null);
   const [mobileStep, setMobileStep] = useState('items');
   const [productUnitTypes, setProductUnitTypes] = useState({});
+      const [currentOption, setCurrentOption] = useState('primary');
+
 
   const formSteps = [
     { id: 'items', label: t('quickPos.items') || 'Items' },
@@ -446,9 +448,10 @@ export default function QuickPos() {
 
     const selectedUnitType = item.unitType || 'primary';
     const options = [
-      { value: 'primary', unit: item.primaryUnit || t('products.primaryUnit'), disabled: false },
-      { value: 'secondary', unit: item.secondaryUnit, disabled: Number(item.conversionRate || 0) <= 0 },
+      { unit: 'primary', value: item.primaryUnit || t('products.primaryUnit'), disabled: false },
+      { unit: 'secondary', vlue: item.secondaryUnit, disabled: Number(item.conversionRate || 0) <= 0 },
     ];
+
 
     return (
       <label className="mt-2 inline-flex max-w-full items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
@@ -473,15 +476,51 @@ export default function QuickPos() {
   const renderProductUnitSelect = (product, inCart) => {
     if (!product.secondaryUnit) return null;
 
-    const selectedUnitType = inCart?.unitType || productUnitTypes[product.id] || 'primary';
+    const selectedUnitType = inCart?.unitType || productUnitTypes[product.unit] || 'primary';
     const options = [
       { value: 'primary', unit: product.primaryUnit || t('products.primaryUnit'), disabled: false },
       { value: 'secondary', unit: product.secondaryUnit, disabled: false },
     ];
 
+
+    const handleSecodaryUnit = (options) => () => {
+      console.log('options', options);
+      const nextUnitType = options.value;
+      const selectedOption = options.value;
+      setCurrentOption(options.value);
+       if (inCart) {
+            updateCartUnitType(product.id, nextUnitType);
+            return;
+             }
+          setProductUnitTypes((previous) => ({
+            ...previous,
+            [product.id]: nextUnitType,
+          }));
+    }
+
     return (
-      <select
-        className="h-5 w-[58px] rounded-full border border-slate-200 bg-white px-1 text-[10px] font-semibold text-slate-700 shadow-sm outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-100"
+
+
+      <>
+      <div className='flex  gap-3 font-semibold text-xs rounded-full border border-slate-200 bg-white px-2 py-1 shadow-sm'>
+
+
+
+      {
+
+        options.map(option => (
+          <button className={ option.value === currentOption ? ' text text-green-500': ''} onClick={ handleSecodaryUnit(option)}
+
+           key={option.value} >
+            {option.unit}
+
+            </button>
+        ) )
+      }
+      </div>
+
+      {/* <select
+        className="h-5 w-96 rounded-full border border-slate-200 bg-white px-1 text-[10px] font-semibold text-slate-700 shadow-sm outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-100"
         value={selectedUnitType}
         onClick={(event) => event.stopPropagation()}
         onPointerDown={(event) => event.stopPropagation()}
@@ -503,7 +542,8 @@ export default function QuickPos() {
             {option.unit}
           </option>
         ))}
-      </select>
+      </select> */}
+      </>
     );
   };
 
@@ -1038,7 +1078,7 @@ export default function QuickPos() {
                       </div>
                       <p className="text-sm font-semibold text-primary-700">{money(item.lineTotal)}</p>
                     </div>
-                    {/* <div className="mt-3 flex items-center justify-between rounded-[18px] bg-white px-3 py-1">
+                    <div className="mt-3 flex items-center justify-between rounded-[18px] bg-white px-3 py-1">
                       <button type="button" className="rounded-full bg-slate-100 p-2 text-slate-600" onClick={() => updateCartQuantity(item.productId, Number(item.quantity) - 1)}>
                         <Minus size={14} />
                       </button>
@@ -1055,7 +1095,7 @@ export default function QuickPos() {
                       <button type="button" className="rounded-full bg-primary p-2 text-white" onClick={() => updateCartQuantity(item.productId, Number(item.quantity) + 1)}>
                         <Plus size={14} />
                       </button>
-                    </div> */}
+                    </div>
                   </div>
                 ))
               )}
