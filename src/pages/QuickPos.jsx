@@ -8,7 +8,6 @@ import QuickPaymentButtons from '../components/QuickPaymentButtons.jsx';
 import QuickPartySelector from '../components/QuickPartySelector.jsx';
 import QuickActionSuccessDialog from '../components/QuickActionSuccessDialog.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
-import MobileFormStepper from '../components/MobileFormStepper.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
@@ -19,7 +18,6 @@ import { todayISODate } from '../lib/datetime';
 import { normalizeLookupProduct } from '../lib/lookups.js';
 import { buildPaymentPayload, requiresBankSelection } from '../lib/payments';
 import { getCurrentCreatorValue } from '../lib/records';
-import { useIsMobile } from '../hooks/useIsMobile.js';
 import { useProductStore } from '../stores/products';
 
 function getProductCategoryName(product = {}) {
@@ -131,7 +129,6 @@ export default function QuickPos() {
   const { businessId, user } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const navigate = useNavigate();
-  const isMobile = useIsMobile('(max-width: 1023px)');
   const { invalidate: invalidateProducts } = useProductStore();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -148,14 +145,7 @@ export default function QuickPos() {
   const [isPaid, setIsPaid] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successState, setSuccessState] = useState(null);
-  const [mobileStep, setMobileStep] = useState('items');
   const [productUnitTypes, setProductUnitTypes] = useState({});
-
-
-  const formSteps = [
-    { id: 'items', label: t('quickPos.items') || 'Items' },
-    { id: 'details', label: t('quickPos.checkout') || 'Details' },
-  ];
 
   const salesTitle = businessProfile?.type === 'cafe'
     ? (businessProfile?.salesFlow?.title || t('quickPos.title'))
@@ -169,8 +159,7 @@ export default function QuickPos() {
       return;
     }
 
-    if (isMobile) setMobileStep('details');
-    else setCheckoutOpen(true);
+    setCheckoutOpen(true);
   };
 
   useEffect(() => {
@@ -275,14 +264,6 @@ export default function QuickPos() {
     [cart],
   );
 
-  const goToNextMobileStep = () => {
-    if (mobileStep === 'items') setMobileStep('details');
-  };
-
-  const goToPreviousMobileStep = () => {
-    if (mobileStep === 'details') setMobileStep('items');
-  };
-
   const getProductById = (productId) => productsById[String(productId)] || null;
 
   const addProductToCart = (product, unitType = 'primary') => {
@@ -377,18 +358,22 @@ export default function QuickPos() {
     if (submitting) return;
     if (!businessId) {
       setStatus({ type: 'error', message: t('errors.businessIdRequired') });
+      showError(t('errors.businessIdRequired'));
       return;
     }
     if (!cart.length) {
       setStatus({ type: 'error', message: t('sales.addFirstItem') });
+      showError(t('sales.addFirstItem'));
       return;
     }
     if (cart.some((item) => item.unitType === 'secondary' && Number(item.conversionRate || 0) <= 0)) {
       setStatus({ type: 'error', message: t('errors.conversionRequired') });
+      showError(t('errors.conversionRequired'));
       return;
     }
     if (requiresBankSelection(checkoutForm, receivedAmount)) {
       setStatus({ type: 'error', message: t('payments.bankRequired') });
+      showError(t('payments.bankRequired'));
       return;
     }
 
@@ -447,6 +432,7 @@ export default function QuickPos() {
       resetSaleFlow();
     } catch (error) {
       setStatus({ type: 'error', message: error.message });
+      showError(error.message);
     } finally {
       setSubmitting(false);
     }
@@ -459,7 +445,7 @@ export default function QuickPos() {
     stopPropagation = false,
   }) => (
     <div
-      className="flex max-w-full items-center gap-3 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold shadow-sm"
+      className="flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-1.5 py-1 text-[11px] font-semibold shadow-sm"
       onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
       onPointerDown={stopPropagation ? (event) => event.stopPropagation() : undefined}
       aria-label={t('products.unitType')}
@@ -590,19 +576,14 @@ export default function QuickPos() {
   };
 
   const footerBar = (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-2 rounded-[24px] bg-slate-100 p-3 sm:p-4">
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2 rounded-[20px] bg-slate-100 p-3 sm:p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <button
               type="button"
               className="flex items-center gap-1.5 text-xs font-semibold text-slate-500"
-              onClick={() => {
-                if (isMobile && mobileStep === 'items') {
-                  setMobileStep('details');
-                }
-                setPartySelectorOpen(true);
-              }}
+              onClick={() => setPartySelectorOpen(true)}
             >
               <UserRound size={12} className="text-primary-600 shrink-0" />
               <span className="truncate">{selectedParty?.name || t('quickPos.walkInCustomer')}</span>
@@ -610,68 +591,34 @@ export default function QuickPos() {
           </div>
           <div className="shrink-0 text-right">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t('sales.grandTotal')}</p>
-            <p className="text-lg font-bold text-slate-900">{money(totals.grandTotal)}</p>
+            <p className="text-base font-bold text-slate-900 sm:text-lg">{money(totals.grandTotal)}</p>
           </div>
         </div>
 
-        {isMobile && (
-          <div className="flex flex-col gap-1 border-t border-slate-200/60 pt-2 text-[10px] font-medium text-slate-500">
-            <div className="flex items-center justify-between">
-              <span>{t('sales.subTotal')}: {money(totals.subTotal)}</span>
-              {totals.taxTotal > 0 && <span>{t('common.tax')}: {money(totals.taxTotal)}</span>}
-            </div>
-            <div className="flex items-center justify-between border-t border-slate-200/40 pt-1">
-              <span>{t('services.amountReceived')}: <span className="text-slate-900 font-bold">{money(receivedAmount)}</span></span>
-              <span>{t('services.dueAmount')}: <span className={dueAmount > 0 ? 'text-rose-600 font-bold' : 'text-emerald-600 font-bold'}>{money(dueAmount)}</span></span>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        {isMobile && mobileStep === 'details' ? (
-          <>
-            <button
-              type="button"
-              className="btn-secondary h-11 justify-center rounded-[18px] text-sm font-bold"
-              onClick={() => setMobileStep('items')}
-            >
-              {t('common.back')}
-            </button>
-            <button
-              type="button"
-              className="btn-primary h-11 justify-center rounded-[18px] text-sm font-bold"
-              onClick={() => setCheckoutOpen(true)}
-              disabled={!cart.length || submitting}
-            >
-              {t('quickPos.completeSale') || 'Complete'}
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              className="btn-secondary h-11 justify-center rounded-[18px] text-sm font-bold"
-              onClick={handleReviewBill}
-            >
-              {isMobile ? t('quickPos.checkout') : t('quickPos.reviewBill')}
-            </button>
-            <button
-              type="button"
-              className="btn-primary h-11 justify-center rounded-[18px] text-sm font-bold"
-              onClick={() => handleSubmit('save')}
-              disabled={!cart.length || submitting}
-            >
-              {submitting ? t('common.saving') : t('quickPos.quickSave')}
-            </button>
-          </>
-        )}
+        <button
+          type="button"
+          className="btn-secondary h-11 justify-center rounded-[18px] text-sm font-bold"
+          onClick={handleReviewBill}
+        >
+          {t('quickPos.reviewBill')}
+        </button>
+        <button
+          type="button"
+          className="btn-primary h-11 justify-center rounded-[18px] text-sm font-bold"
+          onClick={() => handleSubmit('save')}
+          disabled={!cart.length || submitting}
+        >
+          {submitting ? t('common.saving') : t('quickPos.quickSave')}
+        </button>
       </div>
     </div>
   );
 
   return (
-    <div className="min-w-0 space-y-6 pb-28 md:pb-0">
+    <div className="min-w-0 space-y-5 pb-6">
       <PageHeader
         title={salesTitle}
         subtitle={t('quickPos.subtitle')}
@@ -684,24 +631,10 @@ export default function QuickPos() {
         )}
       />
 
-      <div className="md:hidden">
-        <MobileFormStepper
-          steps={formSteps}
-          currentStep={mobileStep}
-          onStepChange={setMobileStep}
-          onNext={goToNextMobileStep}
-          onBack={goToPreviousMobileStep}
-          canProceed={cart.length > 0}
-          backLabel={t('common.back')}
-          nextLabel={mobileStep === 'items' ? t('quickPos.checkout') : t('common.continue')}
-          showNavigation={false}
-        />
-      </div>
-
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className={`space-y-5 ${isMobile && mobileStep !== 'items' ? 'hidden' : ''}`}>
+        <div className="space-y-5">
           <div className="rounded-[28px] border border-secondary-200/70 bg-white/90 p-3 shadow-sm sm:rounded-[32px]">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="relative flex-1">
@@ -853,169 +786,8 @@ export default function QuickPos() {
           )}
         </div>
 
-        {/* --- Mobile Details Step --- */}
-        {isMobile && mobileStep === 'details' && (
-          <div className="space-y-4">
-            <div className="rounded-[32px] border border-secondary-200/70 bg-white/90 p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">{t('quickPos.currentBill')}</p>
-                <button
-                  type="button"
-                  className="btn-ghost rounded-full px-3"
-                  onClick={() => setPartySelectorOpen(true)}
-                >
-                  {selectedParty ? t('common.change') : t('quickPos.selectParty')}
-                </button>
-              </div>
-
-              <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-100 text-primary-700">
-                    <UserRound size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-900">{selectedParty?.name || t('quickPos.walkInCustomer')}</p>
-                    <p className="mt-1 text-sm text-slate-500">{selectedParty?.phone || t('quickPos.walkInHint')}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {cart.length === 0 ? (
-                  <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
-                    <ShoppingBag className="mx-auto text-slate-300" size={28} />
-                    <p className="mt-3 text-sm font-semibold text-slate-700">{t('quickPos.emptyCart')}</p>
-                  </div>
-                ) : (
-                  cart.map((item) => (
-                    <div key={item.productId} className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-slate-900">{item.name}</p>
-                          <div className="mt-1 flex flex-wrap items-center gap-1">
-                            <span className="text-xs text-slate-500">{t('currency.symbol')}</span>
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              className="w-20 border-0 bg-transparent p-0 text-xs font-medium text-slate-600 focus:outline-none focus:ring-0"
-                              value={item.unitPrice}
-                              onChange={(e) => updateCartPrice(item.productId, e.target.value)}
-                            />
-                            {renderUnitSwitcher(item)}
-                          </div>
-                        </div>
-                        <p className="text-sm font-semibold text-primary-700">{money(item.lineTotal)}</p>
-                      </div>
-                      <div className="mt-3 flex items-center gap-2">
-                        <div className="flex min-w-0 flex-1 items-center justify-between rounded-[18px] bg-white px-3 py-1">
-                          <button type="button" className="rounded-full bg-slate-100 p-2 text-slate-600" onClick={() => updateCartQuantity(item.productId, Number(item.quantity) - 1)}>
-                            <Minus size={14} />
-                          </button>
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
-                              value={item.quantity}
-                              onChange={(e) => updateCartQuantity(item.productId, e.target.value)}
-                            />
-                            <span className="text-xs text-slate-500">{getProductUnitLabel(item, item.unitType)}</span>
-                          </div>
-                          <button type="button" className="rounded-full bg-primary p-2 text-white" onClick={() => updateCartQuantity(item.productId, Number(item.quantity) + 1)}>
-                            <Plus size={14} />
-                          </button>
-                        </div>
-                        <button
-                          type="button"
-                          className="rounded-full border border-rose-100 bg-white p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
-                          onClick={() => updateCartQuantity(item.productId, 0)}
-                          aria-label={t('common.delete')}
-                          title={t('common.delete')}
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="mt-5 border-t border-slate-200 pt-4 space-y-4">
-                <div className="flex items-center justify-between text-sm text-slate-500">
-                  <span>{t('sales.subTotal')}</span>
-                  <span>{money(totals.subTotal)}</span>
-                </div>
-
-                {renderBillAdjustmentRows()}
-
-                {selectedParty && (
-                  <div className="flex items-center justify-between text-sm text-slate-500">
-                    <span>{t('services.amountReceived')}</span>
-                    {showAmountReceivedInput && !isPaid ? (
-                      <div className="relative w-28">
-                        <input
-                          autoFocus
-                          className="input h-8 rounded-lg pr-7 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
-                          type="number"
-                          inputMode="decimal"
-                          min="0"
-                          step="0.01"
-                          value={checkoutForm.amountReceived}
-                          onChange={(event) => setCheckoutForm((previous) => ({ ...previous, amountReceived: event.target.value }))}
-                          onBlur={() => setShowAmountReceivedInput(false)}
-                        />
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                          {t('currency.symbol')}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            if (isPaid) setIsPaid(false);
-                            setShowAmountReceivedInput(true);
-                          }}
-                          className="hover:text-primary-600 transition-colors font-medium"
-                        >
-                          {isPaid ? money(totals.grandTotal) : (Number(checkoutForm.amountReceived || 0) > 0 ? money(checkoutForm.amountReceived) : `+ ${t('sales.addReceived')}`)}
-                        </button>
-                        <input
-                          type="checkbox"
-                          className="h-3.5 w-3.5 rounded accent-primary-600 cursor-pointer"
-                          checked={isPaid}
-                          onChange={(e) => setIsPaid(e.target.checked)}
-                          title={t('quickPos.fullyPaid')}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {selectedParty && dueAmount > 0 && (
-                  <div className="flex items-center justify-between text-sm font-semibold text-amber-600">
-                    <span>{t('sales.dueAmount')}</span>
-                    <span>{money(dueAmount)}</span>
-                  </div>
-                )}
-
-                <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3 text-lg font-bold text-slate-900">
-                  <span>{t('sales.grandTotal')}</span>
-                  <span>{money(totals.grandTotal)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[32px] border border-secondary-200/70 bg-white/90 p-5 shadow-sm">
-              <PaymentMethodFields
-                value={checkoutForm}
-                onChange={(patch) => setCheckoutForm((previous) => ({ ...previous, ...patch }))}
-              />
-            </div>
-          </div>
-        )}
-
-        <aside className="hidden xl:block">
-          <div className="sticky top-6 rounded-[32px] border border-secondary-200/70 bg-white/90 p-5 shadow-sm">
+        <aside className="block">
+          <div className="rounded-[28px] border border-secondary-200/70 bg-white/90 p-4 shadow-sm xl:sticky xl:top-6 xl:rounded-[32px] xl:p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">{t('quickPos.currentBill')}</p>
@@ -1173,12 +945,6 @@ export default function QuickPos() {
           </div>
         </aside>
       </div>
-
-      {isMobile ? (
-        <div className="mobile-sticky-actions xl:hidden">
-          {footerBar}
-        </div>
-      ) : null}
 
       <Dialog
         isOpen={checkoutOpen}
