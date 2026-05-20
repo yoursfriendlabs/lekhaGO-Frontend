@@ -60,13 +60,17 @@ function getLineTaxAmount(item) {
   return (Number(item.lineTotal || 0) * Number(item.taxRate || 0)) / 100;
 }
 
-function formatStockLabel(product) {
-  const quantity = Number(product.stockOnHand || 0).toLocaleString(undefined, {
+function formatStockLabel(product, unitType = 'primary') {
+  const stockOnHand = Number(product.stockOnHand || 0);
+  const conversionRate = Number(product.conversionRate || 0);
+  const isSecondary = unitType === 'secondary' && product.secondaryUnit && conversionRate > 0;
+  const quantity = (isSecondary ? stockOnHand * conversionRate : stockOnHand).toLocaleString(undefined, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
+  const unit = isSecondary ? product.secondaryUnit : product.primaryUnit;
 
-  return `${quantity} ${product.primaryUnit || ''}`.trim();
+  return `${quantity} ${unit || ''}`.trim();
 }
 
 function getProductUnitLabel(product, unitType) {
@@ -145,6 +149,7 @@ export default function QuickPos() {
   const [submitting, setSubmitting] = useState(false);
   const [successState, setSuccessState] = useState(null);
   const [mobileStep, setMobileStep] = useState('items');
+  const [productUnitTypes, setProductUnitTypes] = useState({});
 
   const formSteps = [
     { id: 'items', label: t('quickPos.items') || 'Items' },
@@ -269,11 +274,11 @@ export default function QuickPos() {
 
   const getProductById = (productId) => productsById[String(productId)] || null;
 
-  const addProductToCart = (product) => {
+  const addProductToCart = (product, unitType = 'primary') => {
     if (!product?.id) return;
 
     setCart((previous) => {
-      const existingIndex = previous.findIndex((item) => item.productId === product.id && item.unitType === 'primary');
+      const existingIndex = previous.findIndex((item) => item.productId === product.id);
 
       if (existingIndex >= 0) {
         return previous.map((item, index) => {
@@ -287,7 +292,7 @@ export default function QuickPos() {
         });
       }
 
-      return [...previous, buildCartItem(product, 'primary')];
+      return [...previous, buildCartItem(product, unitType)];
     });
   };
 
@@ -345,6 +350,7 @@ export default function QuickPos() {
 
   const resetSaleFlow = () => {
     setCart([]);
+    setProductUnitTypes({});
     setSelectedParty(null);
     setCheckoutOpen(false);
     setCheckoutForm({
@@ -464,6 +470,43 @@ export default function QuickPos() {
     );
   };
 
+  const renderProductUnitSelect = (product, inCart) => {
+    if (!product.secondaryUnit) return null;
+
+    const selectedUnitType = inCart?.unitType || productUnitTypes[product.id] || 'primary';
+    const options = [
+      { value: 'primary', unit: product.primaryUnit || t('products.primaryUnit'), disabled: false },
+      { value: 'secondary', unit: product.secondaryUnit, disabled: false },
+    ];
+
+    return (
+      <select
+        className="h-5 w-[58px] rounded-full border border-slate-200 bg-white px-1 text-[10px] font-semibold text-slate-700 shadow-sm outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-100"
+        value={selectedUnitType}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+        onChange={(event) => {
+          const nextUnitType = event.target.value;
+          if (inCart) {
+            updateCartUnitType(product.id, nextUnitType);
+            return;
+          }
+          setProductUnitTypes((previous) => ({
+            ...previous,
+            [product.id]: nextUnitType,
+          }));
+        }}
+        aria-label={t('products.units.unit')}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value} disabled={option.disabled}>
+            {option.unit}
+          </option>
+        ))}
+      </select>
+    );
+  };
+
   const footerBar = (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 rounded-[24px] bg-slate-100 p-3 sm:p-4">
@@ -550,7 +593,19 @@ export default function QuickPos() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6 pb-28 md:pb-0">
+      <PageHeader
+        title={salesTitle}
+        subtitle={t('quickPos.subtitle')}
+        action={(
+          <div className="flex flex-wrap gap-2">
+            <Link className="btn-ghost justify-center" to="/app/sales">
+              {t('quickPos.detailedSales')}
+            </Link>
+          </div>
+        )}
+      />
+
       <div className="md:hidden">
         <MobileFormStepper
           steps={formSteps}
@@ -563,21 +618,6 @@ export default function QuickPos() {
           nextLabel={mobileStep === 'items' ? t('quickPos.checkout') : t('common.continue')}
           showNavigation={false}
         />
-      </div>
-      <div className="min-w-0 space-y-6 pb-28 md:pb-0">
-
-      <PageHeader
-      id="quick-pos-header"
-        title={salesTitle}
-        subtitle={t('quickPos.subtitle')}
-        action={(
-          <div className="flex flex-wrap gap-2">
-            <Link className="btn-ghost justify-center" to="/app/sales">
-              {t('quickPos.detailedSales')}
-            </Link>
-          </div>
-        )}
-      />
       </div>
 
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
@@ -655,6 +695,8 @@ export default function QuickPos() {
               {filteredProducts.map((product) => {
                 const inCart = cart.find((item) => item.productId === product.id);
                 const inCartQty = inCart ? Number(inCart.quantity).toFixed(0) : '0';
+                const selectedUnitType = inCart?.unitType || productUnitTypes[product.id] || 'primary';
+                const selectedUnitPrice = deriveUnitPrice(product, selectedUnitType);
                 const isOutOfStock = Number(product.stockOnHand || 0) <= 0;
 
                 return (
@@ -665,18 +707,21 @@ export default function QuickPos() {
                     }`}
                   >
                     <div className="flex flex-1 flex-col p-2.5">
-                      <div className="min-w-0">
-                        <p className={`truncate text-xs font-bold text-slate-900 ${isOutOfStock ? 'text-red-900' : ''}`}>{product.name}</p>
-                        <p className={`mt-0.5 truncate text-[12px] text-slate-500 ${isOutOfStock ? 'text-red-600' : ''}`}>
-                          {product.categoryName || product.companyName || t('common.general')}
-                        </p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className={`truncate text-xs font-bold text-slate-900 ${isOutOfStock ? 'text-red-900' : ''}`}>{product.name}</p>
+                          <p className={`mt-0.5 truncate text-[12px] text-slate-500 ${isOutOfStock ? 'text-red-600' : ''}`}>
+                            {product.categoryName || product.companyName || t('common.general')}
+                          </p>
+                        </div>
+                        {renderProductUnitSelect(product, inCart)}
                       </div>
 
                       <div className="mt-auto pt-2">
-                        <div className="flex items-center justify-between gap-1">
-                          <p className={`text-xs font-bold ${isOutOfStock ? 'text-red-700' : 'text-primary-700'}`}>{money(product.sellingPrice || product.salePrice || 0)}</p>
+                        <div className="flex items-end justify-between gap-1">
+                          <p className={`text-xs font-bold ${isOutOfStock ? 'text-red-700' : 'text-primary-700'}`}>{money(inCart?.unitPrice || selectedUnitPrice || product.sellingPrice || product.salePrice || 0)}</p>
                           <p className={`text-[11px] font-medium ${isOutOfStock ? 'text-red-400' : 'text-slate-400'}`}>
-                            {formatStockLabel(product)}
+                            {formatStockLabel(product, selectedUnitType)}
                           </p>
                         </div>
 
@@ -715,7 +760,7 @@ export default function QuickPos() {
                             <button
                               type="button"
                               className="btn-ghost w-full justify-center rounded-full py-1.5 text-xs"
-                              onClick={() => addProductToCart(product)}
+                              onClick={() => addProductToCart(product, selectedUnitType)}
                             >
                               {t('common.add')}
                             </button>
@@ -780,7 +825,6 @@ export default function QuickPos() {
                             />
                             <span className="text-xs text-slate-500">/ {getProductUnitLabel(item, item.unitType) || t('products.units.unit')}</span>
                           </div>
-                          {renderUnitSwitcher(item)}
                         </div>
                         <p className="text-sm font-semibold text-primary-700">{money(item.lineTotal)}</p>
                       </div>
@@ -955,7 +999,7 @@ export default function QuickPos() {
               </button>
             </div>
 
-            <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
+            {/* <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-100 text-primary-700">
                   <UserRound size={18} />
@@ -965,7 +1009,7 @@ export default function QuickPos() {
                   <p className="mt-1 text-sm text-slate-500">{selectedParty?.phone || t('quickPos.walkInHint')}</p>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             <div className="mt-5 max-h-[340px] space-y-3 overflow-y-auto pr-1">
               {cart.length === 0 ? (
@@ -991,11 +1035,10 @@ export default function QuickPos() {
                           />
                           <span className="text-xs text-slate-500">/ {getProductUnitLabel(item, item.unitType) || t('products.units.unit')}</span>
                         </div>
-                        {renderUnitSwitcher(item)}
                       </div>
                       <p className="text-sm font-semibold text-primary-700">{money(item.lineTotal)}</p>
                     </div>
-                    <div className="mt-3 flex items-center justify-between rounded-[18px] bg-white px-3 py-1">
+                    {/* <div className="mt-3 flex items-center justify-between rounded-[18px] bg-white px-3 py-1">
                       <button type="button" className="rounded-full bg-slate-100 p-2 text-slate-600" onClick={() => updateCartQuantity(item.productId, Number(item.quantity) - 1)}>
                         <Minus size={14} />
                       </button>
@@ -1012,7 +1055,7 @@ export default function QuickPos() {
                       <button type="button" className="rounded-full bg-primary p-2 text-white" onClick={() => updateCartQuantity(item.productId, Number(item.quantity) + 1)}>
                         <Plus size={14} />
                       </button>
-                    </div>
+                    </div> */}
                   </div>
                 ))
               )}

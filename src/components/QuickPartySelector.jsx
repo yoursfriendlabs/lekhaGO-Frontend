@@ -99,9 +99,9 @@ export default function QuickPartySelector({
         {includeWalkIn ? (
           <div className="space-y-2">
             <p className="px-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-              {t('common.quickActions') || 'Quick Actions'}
+              {t('quickActions') || 'Quick Actions'}
             </p>
-            <button
+            {/* <button
               type="button"
               onClick={() => {
                 onSelect?.(null);
@@ -124,20 +124,25 @@ export default function QuickPartySelector({
                   {walkInDescription || t('quickPos.walkInHint')}
                 </p>
               </div>
-            </button>
+            </button> */}
           </div>
         ) : null}
 
-        <label className="relative block">
-          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input
-            className="input h-11 rounded-[18px] bg-slate-50 pl-11 text-sm focus:bg-white"
-            value={query}
-            autoFocus
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('quickEntry.searchPartyPlaceholder')}
-          />
-        </label>
+       <label className="relative block">
+  <Search
+    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+    size={18}
+  />
+
+  <input
+    className="input h-11 w-full rounded-[18px] bg-slate-50 pl-12 pr-4 text-sm focus:bg-white"
+    style={{ paddingLeft: '2.75rem', paddingRight: '1rem' }}
+    value={query}
+    autoFocus
+    onChange={(event) => setQuery(event.target.value)}
+    placeholder={t('quickEntry.searchPartyPlaceholder')}
+  />
+</label>
 
         {error ? <Notice title={error} tone="error" /> : null}
 
