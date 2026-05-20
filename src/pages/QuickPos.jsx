@@ -661,7 +661,7 @@ export default function QuickPos() {
               </span>
               {totals.taxTotal > 0 && (
                 <span>
-                  {t("common.tax")}: {money(totals.taxTotal)}
+                  {t("tax")}: {money(totals.taxTotal)}
                 </span>
               )}
             </div>
@@ -1124,7 +1124,7 @@ export default function QuickPos() {
 
                 <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
                   <span className="min-w-0">
-                    <span className="block">{t("common.tax") || "VAT"}</span>
+                    <span className="block">{t("tax") || "VAT"}</span>
                     <span className="block text-[11px] font-semibold text-primary-700">
                       {Number(checkoutForm.taxRate || 0) > 0
                         ? money(totals.taxTotal)
@@ -1399,7 +1399,7 @@ export default function QuickPos() {
 
               <label className="flex items-center justify-between gap-2 text-sm text-slate-500">
                 <span>
-                  <span className="block">{t("common.tax") || "VAT"}</span>
+                  <span className="block">{t("Tax") || "VAT"}</span>
                   <span className="block text-[11px] font-semibold text-primary-700">
                     {Number(checkoutForm.taxRate || 0) > 0
                       ? money(totals.taxTotal)
@@ -1755,7 +1755,7 @@ export default function QuickPos() {
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 space-y-1">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
-                      {t("common.tax") || "VAT"}
+                      {t("tax") || "VAT"}
                     </p>
                     <p className="text-lg font-bold text-blue-700">
                       {Number(checkoutForm.taxRate || 0) > 0
