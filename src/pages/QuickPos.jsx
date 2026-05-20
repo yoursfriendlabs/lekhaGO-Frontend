@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -147,6 +147,9 @@ const emptyCheckoutForm = {
   paymentNote: "",
 };
 
+const MOBILE_PRODUCT_PAGE_SIZE = 9;
+const MOBILE_PRODUCT_SCROLL_THRESHOLD = 120;
+
 export default function QuickPos() {
   const { t } = useI18n();
   const { showError } = useSnackbar();
@@ -172,6 +175,11 @@ export default function QuickPos() {
   const [successState, setSuccessState] = useState(null);
   const [mobileStep, setMobileStep] = useState("items");
   const [productUnitTypes, setProductUnitTypes] = useState({});
+  const [visibleProductCount, setVisibleProductCount] = useState(
+    MOBILE_PRODUCT_PAGE_SIZE,
+  );
+  const mobileProductScrollRef = useRef(null);
+  const mobileProductLoadMoreRef = useRef(null);
 
   const formSteps = [
     { id: "items", label: t("quickPos.items") || "Items" },
@@ -273,6 +281,68 @@ export default function QuickPos() {
       return searchText.includes(query);
     });
   }, [products, search, selectedCategory]);
+
+  useEffect(() => {
+    setVisibleProductCount(
+      isMobile ? MOBILE_PRODUCT_PAGE_SIZE : filteredProducts.length,
+    );
+
+    if (isMobile) {
+      mobileProductScrollRef.current?.scrollTo({ top: 0 });
+    }
+  }, [filteredProducts.length, isMobile, search, selectedCategory]);
+
+  const visibleProducts = useMemo(
+    () =>
+      isMobile
+        ? filteredProducts.slice(0, visibleProductCount)
+        : filteredProducts,
+    [filteredProducts, isMobile, visibleProductCount],
+  );
+
+  const hasMoreMobileProducts =
+    isMobile && visibleProductCount < filteredProducts.length;
+
+  const loadMoreMobileProducts = () => {
+    setVisibleProductCount((previous) =>
+      Math.min(previous + MOBILE_PRODUCT_PAGE_SIZE, filteredProducts.length),
+    );
+  };
+
+  const handleMobileProductScroll = (event) => {
+    if (!hasMoreMobileProducts) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+    if (
+      scrollHeight - scrollTop - clientHeight <=
+      MOBILE_PRODUCT_SCROLL_THRESHOLD
+    ) {
+      loadMoreMobileProducts();
+    }
+  };
+
+  useEffect(() => {
+    if (
+      !hasMoreMobileProducts ||
+      !mobileProductLoadMoreRef.current ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadMoreMobileProducts();
+      },
+      {
+        root: mobileProductScrollRef.current,
+        rootMargin: "96px",
+      },
+    );
+
+    observer.observe(mobileProductLoadMoreRef.current);
+    return () => observer.disconnect();
+  }, [filteredProducts.length, hasMoreMobileProducts, visibleProductCount]);
 
   const totals = useMemo(() => {
     const subTotal = cart.reduce(
@@ -735,7 +805,7 @@ export default function QuickPos() {
     <div className="min-w-0 space-y-6 pb-28 md:pb-0">
       <PageHeader
         title={salesTitle}
-        subtitle={t("quickPos.subtitle")}
+        subtitle={isMobile ? "" : t("quickPos.subtitle")}
         action={
           <div className="flex flex-wrap gap-2">
             <Link className="btn-ghost justify-center" to="/app/sales">
@@ -853,135 +923,154 @@ export default function QuickPos() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-3 2xl:grid-cols-4">
-              {filteredProducts.map((product) => {
-                const inCart = cart.find(
-                  (item) => item.productId === product.id,
-                );
-                const inCartQty = inCart
-                  ? Number(inCart.quantity).toFixed(0)
-                  : "0";
-                const selectedUnitType =
-                  inCart?.unitType || productUnitTypes[product.id] || "primary";
-                const selectedUnitPrice = deriveUnitPrice(
-                  product,
-                  selectedUnitType,
-                );
-                const isOutOfStock = Number(product.stockOnHand || 0) <= 0;
+            <div
+              ref={mobileProductScrollRef}
+              className={
+                isMobile
+                  ? "max-h-[410px] overflow-y-auto pr-1 overscroll-contain"
+                  : ""
+              }
+              onScroll={isMobile ? handleMobileProductScroll : undefined}
+            >
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-3 2xl:grid-cols-4">
+                {visibleProducts.map((product) => {
+                  const inCart = cart.find(
+                    (item) => item.productId === product.id,
+                  );
+                  const inCartQty = inCart
+                    ? Number(inCart.quantity).toFixed(0)
+                    : "0";
+                  const selectedUnitType =
+                    inCart?.unitType ||
+                    productUnitTypes[product.id] ||
+                    "primary";
+                  const selectedUnitPrice = deriveUnitPrice(
+                    product,
+                    selectedUnitType,
+                  );
+                  const isOutOfStock = Number(product.stockOnHand || 0) <= 0;
 
-                return (
-                  <article
-                    key={product.id}
-                    className={`flex flex-col overflow-hidden rounded-[24px] border bg-white shadow-sm transition-all hover:shadow-md ${
-                      isOutOfStock
-                        ? "opacity-75 bg-red-50 border-red-200"
-                        : inCart
-                          ? "border-primary ring-1 ring-primary-500 shadow-sm"
-                          : "border-slate-100 hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="flex flex-1 flex-col p-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p
-                            className={`truncate text-xs font-bold text-slate-900 ${isOutOfStock ? "text-red-900" : ""}`}
-                          >
-                            {product.name}
-                          </p>
-                          <p
-                            className={`mt-0.5 truncate text-[12px] text-slate-500 ${isOutOfStock ? "text-red-600" : ""}`}
-                          >
-                            {product.categoryName ||
-                              product.companyName ||
-                              t("common.general")}
-                          </p>
-                        </div>
-                        {renderProductUnitSelect(product, inCart)}
-                      </div>
-
-                      <div className="mt-auto pt-2">
-                        <div className="flex items-end justify-between gap-1">
-                          <p
-                            className={`text-xs font-bold ${isOutOfStock ? "text-red-700" : "text-primary-700"}`}
-                          >
-                            {money(
-                              inCart?.unitPrice ||
-                                selectedUnitPrice ||
-                                product.sellingPrice ||
-                                product.salePrice ||
-                                0,
-                            )}
-                          </p>
-                          <p
-                            className={`text-[11px] font-medium ${isOutOfStock ? "text-red-400" : "text-slate-400"}`}
-                          >
-                            {formatStockLabel(product, selectedUnitType)}
-                          </p>
+                  return (
+                    <article
+                      key={product.id}
+                      className={`flex flex-col overflow-hidden rounded-[24px] border bg-white shadow-sm transition-all hover:shadow-md ${
+                        isOutOfStock
+                          ? "opacity-75 bg-red-50 border-red-200"
+                          : inCart
+                            ? "border-primary ring-1 ring-primary-500 shadow-sm"
+                            : "border-slate-100 hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex flex-1 flex-col p-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p
+                              className={`truncate text-xs font-bold text-slate-900 ${isOutOfStock ? "text-red-900" : ""}`}
+                            >
+                              {product.name}
+                            </p>
+                            <p
+                              className={`mt-0.5 truncate text-[12px] text-slate-500 ${isOutOfStock ? "text-red-600" : ""}`}
+                            >
+                              {product.categoryName ||
+                                product.companyName ||
+                                t("common.general")}
+                            </p>
+                          </div>
+                          {renderProductUnitSelect(product, inCart)}
                         </div>
 
-                        <div className="mt-2 flex">
-                          {isOutOfStock ? (
-                            <div className="w-full text-center py-1.5 text-[10px] font-bold text-red-600 uppercase tracking-wider">
-                              {t("products.outOfStock") || "Out of Stock"}
-                            </div>
-                          ) : Number(inCartQty) > 0 ? (
-                            <div className="flex w-full items-center justify-between rounded-full bg-primary-50 px-1 py-1">
-                              <button
-                                type="button"
-                                className="rounded-full bg-white p-1 text-primary shadow-sm"
-                                onClick={() =>
-                                  updateCartQuantity(
-                                    product.id,
-                                    Number(inCartQty) - 1,
-                                  )
-                                }
-                              >
-                                <Minus size={12} />
-                              </button>
-                              <div className="flex items-center gap-0.5 min-w-0 flex-1 px-1">
-                                <input
-                                  className="w-full border-0 bg-transparent p-0 text-center text-xs font-bold text-primary-900 focus:outline-none focus:ring-0"
-                                  type="number"
-                                  inputMode="decimal"
-                                  value={inCartQty}
-                                  onChange={(e) =>
+                        <div className="mt-auto pt-2">
+                          <div className="flex items-end justify-between gap-1">
+                            <p
+                              className={`text-xs font-bold ${isOutOfStock ? "text-red-700" : "text-primary-700"}`}
+                            >
+                              {money(
+                                inCart?.unitPrice ||
+                                  selectedUnitPrice ||
+                                  product.sellingPrice ||
+                                  product.salePrice ||
+                                  0,
+                              )}
+                            </p>
+                            <p
+                              className={`text-[11px] font-medium ${isOutOfStock ? "text-red-400" : "text-slate-400"}`}
+                            >
+                              {formatStockLabel(product, selectedUnitType)}
+                            </p>
+                          </div>
+
+                          <div className="mt-2 flex">
+                            {isOutOfStock ? (
+                              <div className="w-full text-center py-1.5 text-[10px] font-bold text-red-600 uppercase tracking-wider">
+                                {t("products.outOfStock") || "Out of Stock"}
+                              </div>
+                            ) : Number(inCartQty) > 0 ? (
+                              <div className="flex w-full items-center justify-between rounded-full bg-primary-50 px-1 py-1">
+                                <button
+                                  type="button"
+                                  className="rounded-full bg-white p-1 text-primary shadow-sm"
+                                  onClick={() =>
                                     updateCartQuantity(
                                       product.id,
-                                      e.target.value,
+                                      Number(inCartQty) - 1,
                                     )
                                   }
-                                />
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <div className="flex items-center gap-0.5 min-w-0 flex-1 px-1">
+                                  <input
+                                    className="w-full border-0 bg-transparent p-0 text-center text-xs font-bold text-primary-900 focus:outline-none focus:ring-0"
+                                    type="number"
+                                    inputMode="decimal"
+                                    value={inCartQty}
+                                    onChange={(e) =>
+                                      updateCartQuantity(
+                                        product.id,
+                                        e.target.value,
+                                      )
+                                    }
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  className="rounded-full bg-primary p-1 text-white shadow-sm"
+                                  onClick={() =>
+                                    updateCartQuantity(
+                                      product.id,
+                                      Number(inCartQty) + 1,
+                                    )
+                                  }
+                                >
+                                  <Plus size={12} />
+                                </button>
                               </div>
+                            ) : (
                               <button
                                 type="button"
-                                className="rounded-full bg-primary p-1 text-white shadow-sm"
+                                className="btn-ghost w-full justify-center rounded-full py-1.5 text-xs"
                                 onClick={() =>
-                                  updateCartQuantity(
-                                    product.id,
-                                    Number(inCartQty) + 1,
-                                  )
+                                  addProductToCart(product, selectedUnitType)
                                 }
                               >
-                                <Plus size={12} />
+                                {t("common.add")}
                               </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              className="btn-ghost w-full justify-center rounded-full py-1.5 text-xs"
-                              onClick={() =>
-                                addProductToCart(product, selectedUnitType)
-                              }
-                            >
-                              {t("common.add")}
-                            </button>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </article>
-                );
-              })}
+                    </article>
+                  );
+                })}
+              </div>
+              {hasMoreMobileProducts ? (
+                <div
+                  ref={mobileProductLoadMoreRef}
+                  className="h-8"
+                  aria-hidden="true"
+                />
+              ) : null}
             </div>
           )}
         </div>
@@ -1934,6 +2023,7 @@ export default function QuickPos() {
       <QuickActionSuccessDialog
         isOpen={Boolean(successState)}
         onClose={() => setSuccessState(null)}
+        closeLabel={t("common.close")}
         title={t("quickPos.saleRecorded")}
         description={
           successState
