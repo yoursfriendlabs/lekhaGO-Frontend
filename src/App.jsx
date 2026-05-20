@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './lib/auth';
 import { ThemeProvider } from './lib/theme';
 import { I18nProvider, useI18n } from './lib/i18n.jsx';
 import { BusinessSettingsProvider, useBusinessSettings } from './lib/businessSettings';
+import { SnackbarProvider } from './lib/snackbar.jsx';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
 import MobileNav from './components/MobileNav';
@@ -308,77 +309,79 @@ export default function App() {
       <I18nProvider>
         <AuthProvider>
           <BusinessSettingsProvider>
-            <Suspense
-              fallback={(
-                <RouteFallback
-                  title="Loading PasalManager"
-                  description="Booting the production shell and restoring your session."
-                />
-              )}
-            >
-              <ScopedRouteBoundary>
-                <Routes>
-                  <Route path="/" element={<IndexRoute />} />
-                  <Route
-                    path="/login"
-                    element={(
-                      <PublicOnlyRoute>
-                        <Login />
-                      </PublicOnlyRoute>
-                    )}
+            <SnackbarProvider>
+              <Suspense
+                fallback={(
+                  <RouteFallback
+                    title="Loading PasalManager"
+                    description="Booting the production shell and restoring your session."
                   />
-                  <Route
-                    path="/register"
-                    element={(
-                      <PublicOnlyRoute>
-                        <Register />
-                      </PublicOnlyRoute>
-                    )}
-                  />
-                  <Route
-                    path="/verify-email"
-                    element={(
-                      <PublicOnlyRoute>
-                        <VerifyEmail />
-                      </PublicOnlyRoute>
-                    )}
-                  />
-                  <Route
-                    path="/forgot-password"
-                    element={(
-                      <PublicOnlyRoute>
-                        <ForgotPassword />
-                      </PublicOnlyRoute>
-                    )}
-                  />
-                  <Route
-                    path="/forgot-password/otp"
-                    element={(
-                      <PublicOnlyRoute>
-                        <ForgotPasswordOtp />
-                      </PublicOnlyRoute>
-                    )}
-                  />
-                  <Route
-                    path="/forgot-password/reset"
-                    element={(
-                      <PublicOnlyRoute>
-                        <ResetPassword />
-                      </PublicOnlyRoute>
-                    )}
-                  />
-                  <Route
-                    path="/app/*"
-                    element={(
-                      <ProtectedRoute>
-                        <AppShell />
-                      </ProtectedRoute>
-                    )}
-                  />
-                </Routes>
-              </ScopedRouteBoundary>
-            </Suspense>
-            <PwaLifecycle />
+                )}
+              >
+                <ScopedRouteBoundary>
+                  <Routes>
+                    <Route path="/" element={<IndexRoute />} />
+                    <Route
+                      path="/login"
+                      element={(
+                        <PublicOnlyRoute>
+                          <Login />
+                        </PublicOnlyRoute>
+                      )}
+                    />
+                    <Route
+                      path="/register"
+                      element={(
+                        <PublicOnlyRoute>
+                          <Register />
+                        </PublicOnlyRoute>
+                      )}
+                    />
+                    <Route
+                      path="/verify-email"
+                      element={(
+                        <PublicOnlyRoute>
+                          <VerifyEmail />
+                        </PublicOnlyRoute>
+                      )}
+                    />
+                    <Route
+                      path="/forgot-password"
+                      element={(
+                        <PublicOnlyRoute>
+                          <ForgotPassword />
+                        </PublicOnlyRoute>
+                      )}
+                    />
+                    <Route
+                      path="/forgot-password/otp"
+                      element={(
+                        <PublicOnlyRoute>
+                          <ForgotPasswordOtp />
+                        </PublicOnlyRoute>
+                      )}
+                    />
+                    <Route
+                      path="/forgot-password/reset"
+                      element={(
+                        <PublicOnlyRoute>
+                          <ResetPassword />
+                        </PublicOnlyRoute>
+                      )}
+                    />
+                    <Route
+                      path="/app/*"
+                      element={(
+                        <ProtectedRoute>
+                          <AppShell />
+                        </ProtectedRoute>
+                      )}
+                    />
+                  </Routes>
+                </ScopedRouteBoundary>
+              </Suspense>
+              <PwaLifecycle />
+            </SnackbarProvider>
           </BusinessSettingsProvider>
         </AuthProvider>
       </I18nProvider>

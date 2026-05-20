@@ -13,6 +13,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { useI18n } from '../lib/i18n.jsx';
+import { useSnackbar } from '../lib/snackbar.jsx';
 import { formatCurrency } from '../lib/currency';
 import { todayISODate } from '../lib/datetime';
 import { normalizeLookupProduct } from '../lib/lookups.js';
@@ -126,6 +127,7 @@ const emptyCheckoutForm = {
 
 export default function QuickPos() {
   const { t } = useI18n();
+  const { showError } = useSnackbar();
   const { businessId, user } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const navigate = useNavigate();
@@ -150,7 +152,6 @@ export default function QuickPos() {
   const [successState, setSuccessState] = useState(null);
   const [mobileStep, setMobileStep] = useState('items');
   const [productUnitTypes, setProductUnitTypes] = useState({});
-      const [currentOption, setCurrentOption] = useState('primary');
 
 
   const formSteps = [
@@ -163,6 +164,16 @@ export default function QuickPos() {
     : t('quickPos.title');
 
   const money = (value) => formatCurrency(value, { symbol: t('currency.symbol') });
+
+  const handleReviewBill = () => {
+    if (!cart.length) {
+      showError(t('sales.addFirstItem'));
+      return;
+    }
+
+    if (isMobile) setMobileStep('details');
+    else setCheckoutOpen(true);
+  };
 
   useEffect(() => {
     if (!businessId) {
@@ -443,108 +454,84 @@ export default function QuickPos() {
     }
   };
 
+  const renderUnitOptionButtons = ({
+    selectedUnitType,
+    options,
+    onChange,
+    stopPropagation = false,
+  }) => (
+    <div
+      className="flex max-w-full items-center gap-3 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold shadow-sm"
+      onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
+      onPointerDown={stopPropagation ? (event) => event.stopPropagation() : undefined}
+      aria-label={t('products.unitType')}
+    >
+      {options.map((option) => {
+        const isSelected = option.value === selectedUnitType;
+
+        return (
+          <button
+            type="button"
+            key={option.value}
+            className={`min-w-0 truncate transition ${
+              isSelected ? 'text-green-600' : 'text-slate-500 hover:text-slate-800'
+            } disabled:cursor-not-allowed disabled:text-slate-300`}
+            onClick={() => onChange(option.value)}
+            disabled={option.disabled}
+          >
+            {option.unit}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   const renderUnitSwitcher = (item) => {
-    if (!item.secondaryUnit) return null;
+    if (!item.secondaryUnit) {
+      return (
+        <span className="text-xs text-slate-500">
+          / {getProductUnitLabel(item, item.unitType) || t('products.units.unit')}
+        </span>
+      );
+    }
 
     const selectedUnitType = item.unitType || 'primary';
     const options = [
-      { unit: 'primary', value: item.primaryUnit || t('products.primaryUnit'), disabled: false },
-      { unit: 'secondary', vlue: item.secondaryUnit, disabled: Number(item.conversionRate || 0) <= 0 },
+      { value: 'primary', unit: item.primaryUnit || t('products.primaryUnit'), disabled: false },
+      { value: 'secondary', unit: item.secondaryUnit, disabled: Number(item.conversionRate || 0) <= 0 },
     ];
 
-
-    return (
-      <label className="mt-2 inline-flex max-w-full items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-sm">
-        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-          {t('products.units.unit')}
-        </span>
-        <select
-          className="min-w-0 max-w-[120px] border-0 bg-transparent p-0 text-xs font-semibold text-slate-700 outline-none focus:ring-0"
-          value={selectedUnitType}
-          onChange={(event) => updateCartUnitType(item.productId, event.target.value)}
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value} disabled={option.disabled}>
-              {option.unit}
-            </option>
-          ))}
-        </select>
-      </label>
-    );
+    return renderUnitOptionButtons({
+      selectedUnitType,
+      options,
+      onChange: (nextUnitType) => updateCartUnitType(item.productId, nextUnitType),
+    });
   };
 
   const renderProductUnitSelect = (product, inCart) => {
     if (!product.secondaryUnit) return null;
 
-    const selectedUnitType = inCart?.unitType || productUnitTypes[product.unit] || 'primary';
+    const selectedUnitType = inCart?.unitType || productUnitTypes[product.id] || 'primary';
     const options = [
       { value: 'primary', unit: product.primaryUnit || t('products.primaryUnit'), disabled: false },
-      { value: 'secondary', unit: product.secondaryUnit, disabled: false },
+      { value: 'secondary', unit: product.secondaryUnit, disabled: Number(product.conversionRate || 0) <= 0 },
     ];
 
-
-    const handleSecodaryUnit = (options) => () => {
-      console.log('options', options);
-      const nextUnitType = options.value;
-      const selectedOption = options.value;
-      setCurrentOption(options.value);
-       if (inCart) {
-            updateCartUnitType(product.id, nextUnitType);
-            return;
-             }
-          setProductUnitTypes((previous) => ({
-            ...previous,
-            [product.id]: nextUnitType,
-          }));
-    }
-
-    return (
-
-
-      <>
-      <div className='flex  gap-3 font-semibold text-xs rounded-full border border-slate-200 bg-white px-2 py-1 shadow-sm'>
-
-
-
-      {
-
-        options.map(option => (
-          <button className={ option.value === currentOption ? ' text text-green-500': ''} onClick={ handleSecodaryUnit(option)}
-
-           key={option.value} >
-            {option.unit}
-
-            </button>
-        ) )
-      }
-      </div>
-
-      {/* <select
-        className="h-5 w-96 rounded-full border border-slate-200 bg-white px-1 text-[10px] font-semibold text-slate-700 shadow-sm outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-100"
-        value={selectedUnitType}
-        onClick={(event) => event.stopPropagation()}
-        onPointerDown={(event) => event.stopPropagation()}
-        onChange={(event) => {
-          const nextUnitType = event.target.value;
-          if (inCart) {
-            updateCartUnitType(product.id, nextUnitType);
-            return;
-          }
-          setProductUnitTypes((previous) => ({
-            ...previous,
-            [product.id]: nextUnitType,
-          }));
-        }}
-        aria-label={t('products.units.unit')}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value} disabled={option.disabled}>
-            {option.unit}
-          </option>
-        ))}
-      </select> */}
-      </>
-    );
+    return renderUnitOptionButtons({
+      selectedUnitType,
+      options,
+      stopPropagation: true,
+      onChange: (nextUnitType) => {
+        if (inCart) {
+          updateCartUnitType(product.id, nextUnitType);
+          return;
+        }
+        setProductUnitTypes((previous) => ({
+          ...previous,
+          [product.id]: nextUnitType,
+        }));
+      },
+    });
   };
 
   const footerBar = (
@@ -610,11 +597,7 @@ export default function QuickPos() {
             <button
               type="button"
               className="btn-secondary h-11 justify-center rounded-[18px] text-sm font-bold"
-              onClick={() => {
-                if (isMobile) setMobileStep('details');
-                else setCheckoutOpen(true);
-              }}
-              disabled={!cart.length}
+              onClick={handleReviewBill}
             >
               {isMobile ? t('quickPos.checkout') : t('quickPos.reviewBill')}
             </button>
@@ -863,7 +846,7 @@ export default function QuickPos() {
                               value={item.unitPrice}
                               onChange={(e) => updateCartPrice(item.productId, e.target.value)}
                             />
-                            <span className="text-xs text-slate-500">/ {getProductUnitLabel(item, item.unitType) || t('products.units.unit')}</span>
+                            {renderUnitSwitcher(item)}
                           </div>
                         </div>
                         <p className="text-sm font-semibold text-primary-700">{money(item.lineTotal)}</p>
@@ -1073,7 +1056,7 @@ export default function QuickPos() {
                             value={item.unitPrice}
                             onChange={(e) => updateCartPrice(item.productId, e.target.value)}
                           />
-                          <span className="text-xs text-slate-500">/ {getProductUnitLabel(item, item.unitType) || t('products.units.unit')}</span>
+                          {renderUnitSwitcher(item)}
                         </div>
                       </div>
                       <p className="text-sm font-semibold text-primary-700">{money(item.lineTotal)}</p>
@@ -1325,9 +1308,8 @@ export default function QuickPos() {
                           value={item.unitPrice}
                           onChange={(e) => updateCartPrice(item.productId, e.target.value)}
                         />
-                        <span className="text-sm text-slate-500">/ {getProductUnitLabel(item, item.unitType) || t('products.units.unit')}</span>
+                        {renderUnitSwitcher(item)}
                       </div>
-                      {renderUnitSwitcher(item)}
                     </div>
                     <div className="flex items-center gap-2 rounded-full border border-primary-100 bg-white px-2 py-1">
                       <button type="button" className="rounded-full bg-slate-100 p-2 text-slate-600" onClick={() => updateCartQuantity(item.productId, Number(item.quantity) - 1)}>
