@@ -91,7 +91,6 @@ function formatStockLabel(product, unitType = "primary") {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
-  const unit = isSecondary ? product.secondaryUnit : product.primaryUnit;
 
   return `${quantity} ${unit || ""}`.trim();
 }
@@ -526,7 +525,6 @@ export default function QuickPos() {
 
   const resetSaleFlow = () => {
     setCart([]);
-    setProductUnitTypes({});
     setSelectedParty(null);
     setCheckoutOpen(false);
     setCheckoutForm({
@@ -747,6 +745,43 @@ export default function QuickPos() {
         }));
       },
     });
+  };
+
+  const renderProductUnitSelect = (product, inCart) => {
+    if (!product.secondaryUnit) return null;
+
+    const selectedUnitType = inCart?.unitType || productUnitTypes[product.id] || 'primary';
+    const options = [
+      { value: 'primary', unit: product.primaryUnit || t('products.primaryUnit'), disabled: false },
+      { value: 'secondary', unit: product.secondaryUnit, disabled: false },
+    ];
+
+    return (
+      <select
+        className="h-5 w-[58px] rounded-full border border-slate-200 bg-white px-1 text-[10px] font-semibold text-slate-700 shadow-sm outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-100"
+        value={selectedUnitType}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+        onChange={(event) => {
+          const nextUnitType = event.target.value;
+          if (inCart) {
+            updateCartUnitType(product.id, nextUnitType);
+            return;
+          }
+          setProductUnitTypes((previous) => ({
+            ...previous,
+            [product.id]: nextUnitType,
+          }));
+        }}
+        aria-label={t('products.units.unit')}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value} disabled={option.disabled}>
+            {option.unit}
+          </option>
+        ))}
+      </select>
+    );
   };
 
   const footerBar = (
