@@ -1,33 +1,53 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, ChevronRight, Minus, Package2, Plus, Search, ShoppingBag, UserRound, X } from 'lucide-react';
-import PageHeader from '../components/PageHeader.jsx';
-import Notice from '../components/Notice.jsx';
-import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
-import QuickPaymentButtons from '../components/QuickPaymentButtons.jsx';
-import QuickPartySelector from '../components/QuickPartySelector.jsx';
-import QuickActionSuccessDialog from '../components/QuickActionSuccessDialog.jsx';
-import { Dialog } from '../components/ui/Dialog.tsx';
-import { api } from '../lib/api';
-import { useAuth } from '../lib/auth';
-import { useBusinessSettings } from '../lib/businessSettings.jsx';
-import { useI18n } from '../lib/i18n.jsx';
-import { useSnackbar } from '../lib/snackbar.jsx';
-import { formatCurrency } from '../lib/currency';
-import { todayISODate } from '../lib/datetime';
-import { normalizeLookupProduct } from '../lib/lookups.js';
-import { buildPaymentPayload, requiresBankSelection } from '../lib/payments';
-import { getCurrentCreatorValue } from '../lib/records';
-import { useProductStore } from '../stores/products';
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  ArrowRight,
+  ChevronRight,
+  Minus,
+  Package2,
+  Plus,
+  Search,
+  ShoppingBag,
+  UserRound,
+  X,
+} from "lucide-react";
+import PageHeader from "../components/PageHeader.jsx";
+import Notice from "../components/Notice.jsx";
+import PaymentMethodFields from "../components/PaymentMethodFields.jsx";
+import QuickPaymentButtons from "../components/QuickPaymentButtons.jsx";
+import QuickPartySelector from "../components/QuickPartySelector.jsx";
+import QuickActionSuccessDialog from "../components/QuickActionSuccessDialog.jsx";
+import { Dialog } from "../components/ui/Dialog.tsx";
+import MobileFormStepper from "../components/MobileFormStepper.jsx";
+import { api } from "../lib/api";
+import { useAuth } from "../lib/auth";
+import { useBusinessSettings } from "../lib/businessSettings.jsx";
+import { useI18n } from "../lib/i18n.jsx";
+import { useSnackbar } from "../lib/snackbar.jsx";
+import { formatCurrency } from "../lib/currency";
+import { todayISODate } from "../lib/datetime";
+import { normalizeLookupProduct } from "../lib/lookups.js";
+import { buildPaymentPayload, requiresBankSelection } from "../lib/payments";
+import { getCurrentCreatorValue } from "../lib/records";
+import { useIsMobile } from "../hooks/useIsMobile.js";
+import { useProductStore } from "../stores/products";
 
 function getProductCategoryName(product = {}) {
-  if (typeof product.categoryName === 'string' && product.categoryName.trim()) return product.categoryName.trim();
-  if (product.category && typeof product.category === 'object' && typeof product.category.name === 'string' && product.category.name.trim()) {
+  if (typeof product.categoryName === "string" && product.categoryName.trim())
+    return product.categoryName.trim();
+  if (
+    product.category &&
+    typeof product.category === "object" &&
+    typeof product.category.name === "string" &&
+    product.category.name.trim()
+  ) {
     return product.category.name.trim();
   }
-  if (typeof product.category === 'string' && product.category.trim()) return product.category.trim();
-  if (typeof product.companyName === 'string' && product.companyName.trim()) return product.companyName.trim();
-  return '';
+  if (typeof product.category === "string" && product.category.trim())
+    return product.category.trim();
+  if (typeof product.companyName === "string" && product.companyName.trim())
+    return product.companyName.trim();
+  return "";
 }
 
 function normalizePosProduct(raw = {}) {
@@ -36,22 +56,22 @@ function normalizePosProduct(raw = {}) {
   return {
     ...raw,
     ...product,
-    id: product.id || String(raw.id || ''),
-    name: product.name || raw.name || 'Item',
+    id: product.id || String(raw.id || ""),
+    name: product.name || raw.name || "Item",
     categoryName: getProductCategoryName(raw),
     taxRate: Number(raw.taxRate ?? product.taxRate ?? 0),
   };
 }
 
-function getItemInitials(name = '') {
-  const trimmed = String(name || '').trim();
-  if (!trimmed) return 'IT';
+function getItemInitials(name = "") {
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return "IT";
 
   return trimmed
     .split(/\s+/)
     .slice(0, 2)
-    .map((chunk) => chunk[0] || '')
-    .join('')
+    .map((chunk) => chunk[0] || "")
+    .join("")
     .toUpperCase();
 }
 
@@ -59,28 +79,32 @@ function getLineTaxAmount(item) {
   return (Number(item.lineTotal || 0) * Number(item.taxRate || 0)) / 100;
 }
 
-function formatStockLabel(product, unitType = 'primary') {
+function formatStockLabel(product, unitType = "primary") {
   const stockOnHand = Number(product.stockOnHand || 0);
   const conversionRate = Number(product.conversionRate || 0);
-  const isSecondary = unitType === 'secondary' && product.secondaryUnit && conversionRate > 0;
-  const quantity = (isSecondary ? stockOnHand * conversionRate : stockOnHand).toLocaleString(undefined, {
+  const isSecondary =
+    unitType === "secondary" && product.secondaryUnit && conversionRate > 0;
+  const quantity = (
+    isSecondary ? stockOnHand * conversionRate : stockOnHand
+  ).toLocaleString(undefined, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
   const unit = isSecondary ? product.secondaryUnit : product.primaryUnit;
 
-  return `${quantity} ${unit || ''}`.trim();
+  return `${quantity} ${unit || ""}`.trim();
 }
 
 function getProductUnitLabel(product, unitType) {
-  if (!product) return '';
-  if (unitType === 'secondary') return product.secondaryUnit || product.primaryUnit || '';
-  return product.primaryUnit || product.secondaryUnit || '';
+  if (!product) return "";
+  if (unitType === "secondary")
+    return product.secondaryUnit || product.primaryUnit || "";
+  return product.primaryUnit || product.secondaryUnit || "";
 }
 
-function deriveUnitPrice(product, unitType = 'primary') {
+function deriveUnitPrice(product, unitType = "primary") {
   if (!product) return 0;
-  if (unitType === 'secondary') {
+  if (unitType === "secondary") {
     const explicitSecondary = Number(product.secondarySalePrice || 0);
     if (explicitSecondary > 0) return explicitSecondary;
     const conversionRate = Number(product.conversionRate || 0);
@@ -92,7 +116,7 @@ function deriveUnitPrice(product, unitType = 'primary') {
   return Number(product.salePrice || product.sellingPrice || 0);
 }
 
-function buildCartItem(product, unitType = 'primary') {
+function buildCartItem(product, unitType = "primary") {
   const unitPrice = deriveUnitPrice(product, unitType);
   return {
     productId: product.id,
@@ -103,8 +127,8 @@ function buildCartItem(product, unitType = 'primary') {
     unitPrice,
     taxRate: Number(product.taxRate || 0),
     lineTotal: unitPrice.toFixed(2),
-    primaryUnit: product.primaryUnit || '',
-    secondaryUnit: product.secondaryUnit || '',
+    primaryUnit: product.primaryUnit || "",
+    secondaryUnit: product.secondaryUnit || "",
     conversionRate: Number(product.conversionRate || 0),
     secondarySalePrice: Number(product.secondarySalePrice || 0),
     salePrice: Number(product.salePrice || product.sellingPrice || 0),
@@ -114,13 +138,13 @@ function buildCartItem(product, unitType = 'primary') {
 
 const emptyCheckoutForm = {
   saleDate: todayISODate(),
-  invoiceNo: '',
-  notes: '',
-  discount: '0',
-  amountReceived: '0',
-  paymentMethod: 'cash',
-  bankId: '',
-  paymentNote: '',
+  invoiceNo: "",
+  notes: "",
+  discount: "0",
+  amountReceived: "0",
+  paymentMethod: "cash",
+  bankId: "",
+  paymentNote: "",
 };
 
 export default function QuickPos() {
@@ -129,37 +153,49 @@ export default function QuickPos() {
   const { businessId, user } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const navigate = useNavigate();
+  const isMobile = useIsMobile("(max-width: 1023px)");
   const { invalidate: invalidateProducts } = useProductStore();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState({ type: 'info', message: '' });
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [status, setStatus] = useState({ type: "info", message: "" });
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [cart, setCart] = useState([]);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [partySelectorOpen, setPartySelectorOpen] = useState(false);
   const [selectedParty, setSelectedParty] = useState(null);
   const [checkoutForm, setCheckoutForm] = useState(emptyCheckoutForm);
+  const [showDiscountInput, setShowDiscountInput] = useState(false);
+  const [showTaxInput, setShowTaxInput] = useState(false);
   const [showAmountReceivedInput, setShowAmountReceivedInput] = useState(false);
-  const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState('');
+  const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState("");
   const [isPaid, setIsPaid] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successState, setSuccessState] = useState(null);
+  const [mobileStep, setMobileStep] = useState("items");
   const [productUnitTypes, setProductUnitTypes] = useState({});
 
-  const salesTitle = businessProfile?.type === 'cafe'
-    ? (businessProfile?.salesFlow?.title || t('quickPos.title'))
-    : t('quickPos.title');
+  const formSteps = [
+    { id: "items", label: t("quickPos.items") || "Items" },
+    { id: "details", label: t("quickPos.checkout") || "Details" },
+  ];
 
-  const money = (value) => formatCurrency(value, { symbol: t('currency.symbol') });
+  const salesTitle =
+    businessProfile?.type === "cafe"
+      ? businessProfile?.salesFlow?.title || t("quickPos.title")
+      : t("quickPos.title");
+
+  const money = (value) =>
+    formatCurrency(value, { symbol: t("currency.symbol") });
 
   const handleReviewBill = () => {
     if (!cart.length) {
-      showError(t('sales.addFirstItem'));
+      showError(t("sales.addFirstItem"));
       return;
     }
 
-    setCheckoutOpen(true);
+    if (isMobile) setMobileStep("details");
+    else setCheckoutOpen(true);
   };
 
   useEffect(() => {
@@ -171,7 +207,7 @@ export default function QuickPos() {
 
     let isActive = true;
     setLoading(true);
-    setStatus({ type: 'info', message: '' });
+    setStatus({ type: "info", message: "" });
 
     Promise.all([
       api.listProducts({ limit: 500 }),
@@ -184,12 +220,12 @@ export default function QuickPos() {
           .filter((product) => product.id);
 
         setProducts(normalizedProducts);
-        setSuggestedInvoiceNo(sequenceResponse?.nextSaleInvoiceNo || '');
+        setSuggestedInvoiceNo(sequenceResponse?.nextSaleInvoiceNo || "");
       })
       .catch((error) => {
         if (!isActive) return;
         setProducts([]);
-        setStatus({ type: 'error', message: error.message });
+        setStatus({ type: "error", message: error.message });
       })
       .finally(() => {
         if (isActive) setLoading(false);
@@ -201,10 +237,17 @@ export default function QuickPos() {
   }, [businessId]);
 
   const categoryOptions = useMemo(() => {
-    const categories = [...new Set(products.map((product) => product.categoryName).filter(Boolean))];
-    return ['all', ...categories];
+    const categories = [
+      ...new Set(
+        products.map((product) => product.categoryName).filter(Boolean),
+      ),
+    ];
+    return ["all", ...categories];
   }, [products]);
-  const quickCategoryOptions = useMemo(() => categoryOptions.slice(0, 3), [categoryOptions]);
+  const quickCategoryOptions = useMemo(
+    () => categoryOptions.slice(0, 3),
+    [categoryOptions],
+  );
   const productsById = useMemo(() => {
     const entries = products.map((product) => [String(product.id), product]);
     return Object.fromEntries(entries);
@@ -214,7 +257,8 @@ export default function QuickPos() {
     const query = search.trim().toLowerCase();
 
     return products.filter((product) => {
-      const matchesCategory = selectedCategory === 'all' || product.categoryName === selectedCategory;
+      const matchesCategory =
+        selectedCategory === "all" || product.categoryName === selectedCategory;
       if (!matchesCategory) return false;
       if (!query) return true;
 
@@ -225,7 +269,7 @@ export default function QuickPos() {
         product.primaryUnit,
       ]
         .filter(Boolean)
-        .join(' ')
+        .join(" ")
         .toLowerCase();
 
       return searchText.includes(query);
@@ -233,12 +277,22 @@ export default function QuickPos() {
   }, [products, search, selectedCategory]);
 
   const totals = useMemo(() => {
-    const subTotal = cart.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
-    const lineTaxTotal = cart.reduce((sum, item) => sum + getLineTaxAmount(item), 0);
+    const subTotal = cart.reduce(
+      (sum, item) => sum + Number(item.lineTotal || 0),
+      0,
+    );
+    const lineTaxTotal = cart.reduce(
+      (sum, item) => sum + getLineTaxAmount(item),
+      0,
+    );
     const headerTaxRate = Number(checkoutForm.taxRate || 0);
-    const headerTaxTotal = headerTaxRate > 0 ? (subTotal * headerTaxRate) / 100 : 0;
+    const headerTaxTotal =
+      headerTaxRate > 0 ? (subTotal * headerTaxRate) / 100 : 0;
     const taxTotal = lineTaxTotal + headerTaxTotal;
-    const discountTotal = Math.min(Math.max(Number(checkoutForm.discount || 0), 0), subTotal + taxTotal);
+    const discountTotal = Math.min(
+      Math.max(Number(checkoutForm.discount || 0), 0),
+      subTotal + taxTotal,
+    );
     const grandTotal = Math.max(subTotal + taxTotal - discountTotal, 0);
 
     return { subTotal, taxTotal, discountTotal, grandTotal };
@@ -252,11 +306,13 @@ export default function QuickPos() {
     }));
   }, [isPaid, totals.grandTotal]);
 
-  const receivedAmount = useMemo(() => (
-    isPaid
-      ? totals.grandTotal
-      : Math.min(Number(checkoutForm.amountReceived || 0), totals.grandTotal)
-  ), [checkoutForm.amountReceived, isPaid, totals.grandTotal]);
+  const receivedAmount = useMemo(
+    () =>
+      isPaid
+        ? totals.grandTotal
+        : Math.min(Number(checkoutForm.amountReceived || 0), totals.grandTotal),
+    [checkoutForm.amountReceived, isPaid, totals.grandTotal],
+  );
   const dueAmount = Math.max(totals.grandTotal - receivedAmount, 0);
 
   const cartCount = useMemo(
@@ -264,13 +320,23 @@ export default function QuickPos() {
     [cart],
   );
 
+  const goToNextMobileStep = () => {
+    if (mobileStep === "items") setMobileStep("details");
+  };
+
+  const goToPreviousMobileStep = () => {
+    if (mobileStep === "details") setMobileStep("items");
+  };
+
   const getProductById = (productId) => productsById[String(productId)] || null;
 
-  const addProductToCart = (product, unitType = 'primary') => {
+  const addProductToCart = (product, unitType = "primary") => {
     if (!product?.id) return;
 
     setCart((previous) => {
-      const existingIndex = previous.findIndex((item) => item.productId === product.id);
+      const existingIndex = previous.findIndex(
+        (item) => item.productId === product.id,
+      );
 
       if (existingIndex >= 0) {
         return previous.map((item, index) => {
@@ -279,7 +345,9 @@ export default function QuickPos() {
           return {
             ...item,
             quantity,
-            lineTotal: Number(quantity * Number(item.unitPrice || 0)).toFixed(2),
+            lineTotal: Number(quantity * Number(item.unitPrice || 0)).toFixed(
+              2,
+            ),
           };
         });
       }
@@ -291,24 +359,26 @@ export default function QuickPos() {
   const updateCartQuantity = (productId, nextQuantity) => {
     if (!productId) return;
 
-    setCart((previous) => previous
-      .map((item) => {
-        if (item.productId !== productId) return item;
-        const quantity = Math.max(Number(nextQuantity || 0), 0);
-        return {
-          ...item,
-          quantity,
-          lineTotal: (quantity * Number(item.unitPrice || 0)).toFixed(2),
-        };
-      })
-      .filter((item) => Number(item.quantity || 0) > 0));
+    setCart((previous) =>
+      previous
+        .map((item) => {
+          if (item.productId !== productId) return item;
+          const quantity = Math.max(Number(nextQuantity || 0), 0);
+          return {
+            ...item,
+            quantity,
+            lineTotal: (quantity * Number(item.unitPrice || 0)).toFixed(2),
+          };
+        })
+        .filter((item) => Number(item.quantity || 0) > 0),
+    );
   };
 
   const updateCartPrice = (productId, nextPrice) => {
     if (!productId) return;
 
-    setCart((previous) => previous
-      .map((item) => {
+    setCart((previous) =>
+      previous.map((item) => {
         if (item.productId !== productId) return item;
         const unitPrice = Math.max(Number(nextPrice || 0), 0);
         return {
@@ -316,28 +386,37 @@ export default function QuickPos() {
           unitPrice,
           lineTotal: (Number(item.quantity || 0) * unitPrice).toFixed(2),
         };
-      }));
+      }),
+    );
   };
 
   const updateCartUnitType = (productId, unitType) => {
     if (!productId) return;
 
-    setCart((previous) => previous.map((item) => {
-      if (item.productId !== productId) return item;
-      const product = getProductById(productId) || item;
-      const unitPrice = deriveUnitPrice(product, unitType);
-      return {
-        ...item,
-        unitType,
-        unitPrice,
-        conversionRate: Number(product.conversionRate || item.conversionRate || 0),
-        secondarySalePrice: Number(product.secondarySalePrice || item.secondarySalePrice || 0),
-        salePrice: Number(product.salePrice || item.salePrice || item.unitPrice || 0),
-        primaryUnit: product.primaryUnit || item.primaryUnit || '',
-        secondaryUnit: product.secondaryUnit || item.secondaryUnit || '',
-        lineTotal: (Number(item.quantity || 0) * unitPrice).toFixed(2),
-      };
-    }));
+    setCart((previous) =>
+      previous.map((item) => {
+        if (item.productId !== productId) return item;
+        const product = getProductById(productId) || item;
+        const unitPrice = deriveUnitPrice(product, unitType);
+        return {
+          ...item,
+          unitType,
+          unitPrice,
+          conversionRate: Number(
+            product.conversionRate || item.conversionRate || 0,
+          ),
+          secondarySalePrice: Number(
+            product.secondarySalePrice || item.secondarySalePrice || 0,
+          ),
+          salePrice: Number(
+            product.salePrice || item.salePrice || item.unitPrice || 0,
+          ),
+          primaryUnit: product.primaryUnit || item.primaryUnit || "",
+          secondaryUnit: product.secondaryUnit || item.secondaryUnit || "",
+          lineTotal: (Number(item.quantity || 0) * unitPrice).toFixed(2),
+        };
+      }),
+    );
   };
 
   const resetSaleFlow = () => {
@@ -348,49 +427,52 @@ export default function QuickPos() {
     setCheckoutForm({
       ...emptyCheckoutForm,
       saleDate: todayISODate(),
-      amountReceived: '0',
+      amountReceived: "0",
     });
     setIsPaid(true);
-    setStatus({ type: 'info', message: '' });
+    setStatus({ type: "info", message: "" });
   };
 
-  const handleSubmit = async (nextAction = 'save') => {
+  const handleSubmit = async (nextAction = "save") => {
     if (submitting) return;
     if (!businessId) {
-      setStatus({ type: 'error', message: t('errors.businessIdRequired') });
-      showError(t('errors.businessIdRequired'));
+      setStatus({ type: "error", message: t("errors.businessIdRequired") });
       return;
     }
     if (!cart.length) {
-      setStatus({ type: 'error', message: t('sales.addFirstItem') });
-      showError(t('sales.addFirstItem'));
+      setStatus({ type: "error", message: t("sales.addFirstItem") });
       return;
     }
-    if (cart.some((item) => item.unitType === 'secondary' && Number(item.conversionRate || 0) <= 0)) {
-      setStatus({ type: 'error', message: t('errors.conversionRequired') });
-      showError(t('errors.conversionRequired'));
+    if (
+      cart.some(
+        (item) =>
+          item.unitType === "secondary" &&
+          Number(item.conversionRate || 0) <= 0,
+      )
+    ) {
+      setStatus({ type: "error", message: t("errors.conversionRequired") });
       return;
     }
     if (requiresBankSelection(checkoutForm, receivedAmount)) {
-      setStatus({ type: 'error', message: t('payments.bankRequired') });
-      showError(t('payments.bankRequired'));
+      setStatus({ type: "error", message: t("payments.bankRequired") });
       return;
     }
 
     try {
       setSubmitting(true);
-      setStatus({ type: 'info', message: '' });
+      setStatus({ type: "info", message: "" });
 
-      const manualInvoiceNo = String(checkoutForm.invoiceNo || '').trim();
-      const { paymentMethod, bankId, paymentNote, discount, ...headerFields } = checkoutForm;
+      const manualInvoiceNo = String(checkoutForm.invoiceNo || "").trim();
+      const { paymentMethod, bankId, paymentNote, discount, ...headerFields } =
+        checkoutForm;
       const payload = {
         ...headerFields,
-        status: dueAmount > 0 ? 'due' : 'paid',
+        status: dueAmount > 0 ? "due" : "paid",
         partyId: selectedParty?.id || null,
         amountReceived: receivedAmount,
         ...(Number(receivedAmount || 0) > 0
           ? buildPaymentPayload({ paymentMethod, bankId, paymentNote })
-          : { paymentMethod: 'cash' }),
+          : { paymentMethod: "cash" }),
         subTotal: totals.subTotal,
         taxTotal: totals.taxTotal,
         discount: totals.discountTotal,
@@ -399,8 +481,12 @@ export default function QuickPos() {
         items: cart.map((item) => ({
           productId: item.productId,
           quantity: Number(item.quantity || 0),
-          unitType: item.unitType || 'primary',
-          conversionRate: Number(item.conversionRate || getProductById(item.productId)?.conversionRate || 0),
+          unitType: item.unitType || "primary",
+          conversionRate: Number(
+            item.conversionRate ||
+              getProductById(item.productId)?.conversionRate ||
+              0,
+          ),
           unitPrice: Number(item.unitPrice || 0),
           taxRate: Number(item.taxRate || 0),
           lineTotal: Number(item.lineTotal || 0),
@@ -415,24 +501,21 @@ export default function QuickPos() {
 
       const creatorValue = getCurrentCreatorValue(user);
       const created = await api.createSale(
-        creatorValue
-          ? { ...payload, createdBy: creatorValue }
-          : payload,
+        creatorValue ? { ...payload, createdBy: creatorValue } : payload,
       );
       const nextSequences = await api.getNextSequences().catch(() => null);
 
       invalidateProducts();
-      setSuggestedInvoiceNo(nextSequences?.nextSaleInvoiceNo || '');
+      setSuggestedInvoiceNo(nextSequences?.nextSaleInvoiceNo || "");
       setSuccessState({
-        id: created?.id || '',
+        id: created?.id || "",
         invoiceNo: created?.invoiceNo || manualInvoiceNo || suggestedInvoiceNo,
         total: totals.grandTotal,
         action: nextAction,
       });
       resetSaleFlow();
     } catch (error) {
-      setStatus({ type: 'error', message: error.message });
-      showError(error.message);
+      setStatus({ type: "error", message: error.message });
     } finally {
       setSubmitting(false);
     }
@@ -445,10 +528,12 @@ export default function QuickPos() {
     stopPropagation = false,
   }) => (
     <div
-      className="flex max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-1.5 py-1 text-[11px] font-semibold shadow-sm"
+      className="flex max-w-full items-center gap-3 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold shadow-sm"
       onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
-      onPointerDown={stopPropagation ? (event) => event.stopPropagation() : undefined}
-      aria-label={t('products.unitType')}
+      onPointerDown={
+        stopPropagation ? (event) => event.stopPropagation() : undefined
+      }
+      aria-label={t("products.unitType")}
     >
       {options.map((option) => {
         const isSelected = option.value === selectedUnitType;
@@ -458,7 +543,9 @@ export default function QuickPos() {
             type="button"
             key={option.value}
             className={`min-w-0 truncate transition ${
-              isSelected ? 'text-green-600' : 'text-slate-500 hover:text-slate-800'
+              isSelected
+                ? "text-green-600"
+                : "text-slate-500 hover:text-slate-800"
             } disabled:cursor-not-allowed disabled:text-slate-300`}
             onClick={() => onChange(option.value)}
             disabled={option.disabled}
@@ -474,31 +561,50 @@ export default function QuickPos() {
     if (!item.secondaryUnit) {
       return (
         <span className="text-xs text-slate-500">
-          / {getProductUnitLabel(item, item.unitType) || t('products.units.unit')}
+          /{" "}
+          {getProductUnitLabel(item, item.unitType) || t("products.units.unit")}
         </span>
       );
     }
 
-    const selectedUnitType = item.unitType || 'primary';
+    const selectedUnitType = item.unitType || "primary";
     const options = [
-      { value: 'primary', unit: item.primaryUnit || t('products.primaryUnit'), disabled: false },
-      { value: 'secondary', unit: item.secondaryUnit, disabled: Number(item.conversionRate || 0) <= 0 },
+      {
+        value: "primary",
+        unit: item.primaryUnit || t("products.primaryUnit"),
+        disabled: false,
+      },
+      {
+        value: "secondary",
+        unit: item.secondaryUnit,
+        disabled: Number(item.conversionRate || 0) <= 0,
+      },
     ];
 
     return renderUnitOptionButtons({
       selectedUnitType,
       options,
-      onChange: (nextUnitType) => updateCartUnitType(item.productId, nextUnitType),
+      onChange: (nextUnitType) =>
+        updateCartUnitType(item.productId, nextUnitType),
     });
   };
 
   const renderProductUnitSelect = (product, inCart) => {
     if (!product.secondaryUnit) return null;
 
-    const selectedUnitType = inCart?.unitType || productUnitTypes[product.id] || 'primary';
+    const selectedUnitType =
+      inCart?.unitType || productUnitTypes[product.id] || "primary";
     const options = [
-      { value: 'primary', unit: product.primaryUnit || t('products.primaryUnit'), disabled: false },
-      { value: 'secondary', unit: product.secondaryUnit, disabled: Number(product.conversionRate || 0) <= 0 },
+      {
+        value: "primary",
+        unit: product.primaryUnit || t("products.primaryUnit"),
+        disabled: false,
+      },
+      {
+        value: "secondary",
+        unit: product.secondaryUnit,
+        disabled: Number(product.conversionRate || 0) <= 0,
+      },
     ];
 
     return renderUnitOptionButtons({
@@ -518,138 +624,175 @@ export default function QuickPos() {
     });
   };
 
-  const renderBillAdjustmentRows = ({ textClass = 'text-sm', inputClass = 'text-xs' } = {}) => {
-    const taxRateValue = Number(checkoutForm.taxRate || 0);
-    const discountValue = Number(checkoutForm.discount || 0);
-
-    return (
-      <>
-      <label className={`flex items-center justify-between gap-3 ${textClass} text-slate-500`}>
-        <span className="min-w-0">
-          <span className="block">{t('common.tax') || 'VAT'}</span>
-          <span className={`mt-0.5 block text-[11px] font-bold ${taxRateValue > 0 ? 'text-slate-400' : 'text-primary-700'}`}>
-            {taxRateValue > 0 ? money(totals.taxTotal) : `+ ${t('sales.addTax')}`}
-          </span>
-        </span>
-        <div className="relative w-24">
-          <input
-            className={`input h-8 w-full rounded-lg border-primary/20 pr-6 text-right font-bold focus:border-primary focus:ring-primary/10 ${inputClass}`}
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.01"
-            value={checkoutForm.taxRate || ''}
-            onChange={(event) => setCheckoutForm((previous) => ({ ...previous, taxRate: event.target.value }))}
-            placeholder="0"
-          />
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-            %
-          </span>
-        </div>
-      </label>
-
-      <label className={`flex items-center justify-between gap-3 ${textClass} text-slate-500`}>
-        <span className="min-w-0">
-          <span className="block">{t('quickPos.discount')}</span>
-          <span className={`mt-0.5 block text-[11px] font-bold ${discountValue > 0 ? 'text-slate-400' : 'text-primary-700'}`}>
-            {discountValue > 0 ? `- ${money(totals.discountTotal)}` : `+ ${t('sales.addDiscount')}`}
-          </span>
-        </span>
-        <div className="relative w-28">
-          <input
-            className={`input h-8 w-full rounded-lg border-primary/20 pr-7 text-right font-bold focus:border-primary focus:ring-primary/10 ${inputClass}`}
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.01"
-            value={checkoutForm.discount}
-            onChange={(event) => setCheckoutForm((previous) => ({ ...previous, discount: event.target.value }))}
-            placeholder="0.00"
-          />
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-            {t('currency.symbol')}
-          </span>
-        </div>
-      </label>
-      </>
-    );
-  };
-
   const footerBar = (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-2 rounded-[20px] bg-slate-100 p-3 sm:p-4">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-2 rounded-[24px] bg-slate-100 p-3 sm:p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <button
               type="button"
               className="flex items-center gap-1.5 text-xs font-semibold text-slate-500"
-              onClick={() => setPartySelectorOpen(true)}
+              onClick={() => {
+                if (isMobile && mobileStep === "items") {
+                  setMobileStep("details");
+                }
+                setPartySelectorOpen(true);
+              }}
             >
               <UserRound size={12} className="text-primary-600 shrink-0" />
-              <span className="truncate">{selectedParty?.name || t('quickPos.walkInCustomer')}</span>
+              <span className="truncate">
+                {selectedParty?.name || t("quickPos.walkInCustomer")}
+              </span>
             </button>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t('sales.grandTotal')}</p>
-            <p className="text-base font-bold text-slate-900 sm:text-lg">{money(totals.grandTotal)}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              {t("sales.grandTotal")}
+            </p>
+            <p className="text-lg font-bold text-slate-900">
+              {money(totals.grandTotal)}
+            </p>
           </div>
         </div>
 
+        {isMobile && (
+          <div className="flex flex-col gap-1 border-t border-slate-200/60 pt-2 text-[10px] font-medium text-slate-500">
+            <div className="flex items-center justify-between">
+              <span>
+                {t("sales.subTotal")}: {money(totals.subTotal)}
+              </span>
+              {totals.taxTotal > 0 && (
+                <span>
+                  {t("common.tax")}: {money(totals.taxTotal)}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center justify-between border-t border-slate-200/40 pt-1">
+              <span>
+                {t("services.amountReceived")}:{" "}
+                <span className="text-slate-900 font-bold">
+                  {money(receivedAmount)}
+                </span>
+              </span>
+              <span>
+                {t("services.dueAmount")}:{" "}
+                <span
+                  className={
+                    dueAmount > 0
+                      ? "text-rose-600 font-bold"
+                      : "text-emerald-600 font-bold"
+                  }
+                >
+                  {money(dueAmount)}
+                </span>
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          className="btn-secondary h-11 justify-center rounded-[18px] text-sm font-bold"
-          onClick={handleReviewBill}
-        >
-          {t('quickPos.reviewBill')}
-        </button>
-        <button
-          type="button"
-          className="btn-primary h-11 justify-center rounded-[18px] text-sm font-bold"
-          onClick={() => handleSubmit('save')}
-          disabled={!cart.length || submitting}
-        >
-          {submitting ? t('common.saving') : t('quickPos.quickSave')}
-        </button>
+        {isMobile && mobileStep === "details" ? (
+          <>
+            <button
+              type="button"
+              className="btn-secondary h-11 justify-center rounded-[18px] text-sm font-bold"
+              onClick={() => setMobileStep("items")}
+            >
+              {t("common.back")}
+            </button>
+            <button
+              type="button"
+              className="btn-primary h-11 justify-center rounded-[18px] text-sm font-bold"
+              onClick={() => setCheckoutOpen(true)}
+              disabled={!cart.length || submitting}
+            >
+              {t("quickPos.completeSale") || "Complete"}
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="btn-secondary h-11 justify-center rounded-[18px] text-sm font-bold"
+              onClick={handleReviewBill}
+            >
+              {isMobile ? t("quickPos.checkout") : t("quickPos.reviewBill")}
+            </button>
+            <button
+              type="button"
+              className="btn-primary h-11 justify-center rounded-[18px] text-sm font-bold"
+              onClick={() => handleSubmit("save")}
+              disabled={!cart.length || submitting}
+            >
+              {submitting ? t("common.saving") : t("quickPos.quickSave")}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
 
   return (
-    <div className="min-w-0 space-y-5 pb-6">
+    <div className="min-w-0 space-y-6 pb-28 md:pb-0">
       <PageHeader
         title={salesTitle}
-        subtitle={t('quickPos.subtitle')}
-        action={(
+        subtitle={t("quickPos.subtitle")}
+        action={
           <div className="flex flex-wrap gap-2">
             <Link className="btn-ghost justify-center" to="/app/sales">
-              {t('quickPos.detailedSales')}
+              {t("quickPos.detailedSales")}
             </Link>
           </div>
-        )}
+        }
       />
 
-      {status.message ? <Notice title={status.message} tone={status.type} /> : null}
+      <div className="md:hidden">
+        <MobileFormStepper
+          steps={formSteps}
+          currentStep={mobileStep}
+          onStepChange={setMobileStep}
+          onNext={goToNextMobileStep}
+          onBack={goToPreviousMobileStep}
+          canProceed={cart.length > 0}
+          backLabel={t("common.back")}
+          nextLabel={
+            mobileStep === "items"
+              ? t("quickPos.checkout")
+              : t("common.continue")
+          }
+          showNavigation={false}
+        />
+      </div>
+
+      {status.message ? (
+        <Notice title={status.message} tone={status.type} />
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-5">
+        <div
+          className={`space-y-5 ${isMobile && mobileStep !== "items" ? "hidden" : ""}`}
+        >
           <div className="rounded-[28px] border border-secondary-200/70 bg-white/90 p-3 shadow-sm sm:rounded-[32px]">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
               <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <Search
+                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={18}
+                />
                 <input
                   className="input h-11 w-full rounded-[18px] bg-slate-50 pl-12 pr-4 text-sm focus:bg-white"
-                  style={{ paddingLeft: '2.75rem', paddingRight: '1rem' }}
+                  style={{ paddingLeft: "2.75rem", paddingRight: "1rem" }}
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder={t('quickPos.searchPlaceholder')}
+                  placeholder={t("quickPos.searchPlaceholder")}
                 />
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row">
-                <label className="sr-only" htmlFor="quick-pos-category">{t('quickPos.allCategories')}</label>
+                <label className="sr-only" htmlFor="quick-pos-category">
+                  {t("quickPos.allCategories")}
+                </label>
                 <select
                   id="quick-pos-category"
                   className="input h-11 min-w-0 rounded-[18px] bg-slate-50 px-4 text-sm font-semibold text-slate-700 focus:bg-white sm:min-w-[190px]"
@@ -658,12 +801,17 @@ export default function QuickPos() {
                 >
                   {categoryOptions.map((category) => (
                     <option key={category} value={category}>
-                      {category === 'all' ? t('quickPos.allCategories') : category}
+                      {category === "all"
+                        ? t("quickPos.allCategories")
+                        : category}
                     </option>
                   ))}
                 </select>
-                <Link className="btn-secondary h-11 flex-1 justify-center rounded-[18px] text-xs sm:flex-none sm:px-4" to="/app/inventory">
-                  {t('quickPos.addNewItem')}
+                <Link
+                  className="btn-secondary h-11 flex-1 justify-center rounded-[18px] text-xs sm:flex-none sm:px-4"
+                  to="/app/inventory"
+                >
+                  {t("quickPos.addNewItem")}
                 </Link>
               </div>
             </div>
@@ -671,7 +819,8 @@ export default function QuickPos() {
             <div className="mt-3 grid grid-cols-3 gap-2">
               {quickCategoryOptions.map((category) => {
                 const isActive = category === selectedCategory;
-                const label = category === 'all' ? t('quickPos.allCategories') : category;
+                const label =
+                  category === "all" ? t("quickPos.allCategories") : category;
 
                 return (
                   <button
@@ -680,8 +829,8 @@ export default function QuickPos() {
                     onClick={() => setSelectedCategory(category)}
                     className={`min-w-0 truncate rounded-full px-3 py-2 text-xs font-semibold transition ${
                       isActive
-                        ? 'bg-primary text-white shadow-md'
-                        : 'bg-white text-slate-600 border border-slate-100'
+                        ? "bg-primary text-white shadow-md"
+                        : "bg-white text-slate-600 border border-slate-100"
                     }`}
                   >
                     {label}
@@ -693,36 +842,60 @@ export default function QuickPos() {
 
           {loading ? (
             <div className="rounded-[32px] border border-dashed border-slate-200 bg-white/70 px-5 py-12 text-center text-slate-500">
-              {t('common.loading')}
+              {t("common.loading")}
             </div>
           ) : filteredProducts.length === 0 ? (
             <div className="rounded-[32px] border border-dashed border-slate-200 bg-white/70 px-5 py-12 text-center">
               <Package2 className="mx-auto text-slate-300" size={34} />
-              <p className="mt-4 text-lg font-semibold text-slate-700">{t('quickPos.noProducts')}</p>
-              <p className="mt-2 text-sm text-slate-500">{t('quickPos.noProductsHint')}</p>
+              <p className="mt-4 text-lg font-semibold text-slate-700">
+                {t("quickPos.noProducts")}
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                {t("quickPos.noProductsHint")}
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-3 2xl:grid-cols-4">
               {filteredProducts.map((product) => {
-                const inCart = cart.find((item) => item.productId === product.id);
-                const inCartQty = inCart ? Number(inCart.quantity).toFixed(0) : '0';
-                const selectedUnitType = inCart?.unitType || productUnitTypes[product.id] || 'primary';
-                const selectedUnitPrice = deriveUnitPrice(product, selectedUnitType);
+                const inCart = cart.find(
+                  (item) => item.productId === product.id,
+                );
+                const inCartQty = inCart
+                  ? Number(inCart.quantity).toFixed(0)
+                  : "0";
+                const selectedUnitType =
+                  inCart?.unitType || productUnitTypes[product.id] || "primary";
+                const selectedUnitPrice = deriveUnitPrice(
+                  product,
+                  selectedUnitType,
+                );
                 const isOutOfStock = Number(product.stockOnHand || 0) <= 0;
 
                 return (
                   <article
                     key={product.id}
                     className={`flex flex-col overflow-hidden rounded-[24px] border bg-white shadow-sm transition-all hover:shadow-md ${
-                      isOutOfStock ? 'opacity-75 bg-red-50 border-red-200' : inCart ? 'border-primary ring-1 ring-primary-500 shadow-sm' : 'border-slate-100 hover:border-slate-300'
+                      isOutOfStock
+                        ? "opacity-75 bg-red-50 border-red-200"
+                        : inCart
+                          ? "border-primary ring-1 ring-primary-500 shadow-sm"
+                          : "border-slate-100 hover:border-slate-300"
                     }`}
                   >
                     <div className="flex flex-1 flex-col p-2.5">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className={`truncate text-xs font-bold text-slate-900 ${isOutOfStock ? 'text-red-900' : ''}`}>{product.name}</p>
-                          <p className={`mt-0.5 truncate text-[12px] text-slate-500 ${isOutOfStock ? 'text-red-600' : ''}`}>
-                            {product.categoryName || product.companyName || t('common.general')}
+                          <p
+                            className={`truncate text-xs font-bold text-slate-900 ${isOutOfStock ? "text-red-900" : ""}`}
+                          >
+                            {product.name}
+                          </p>
+                          <p
+                            className={`mt-0.5 truncate text-[12px] text-slate-500 ${isOutOfStock ? "text-red-600" : ""}`}
+                          >
+                            {product.categoryName ||
+                              product.companyName ||
+                              t("common.general")}
                           </p>
                         </div>
                         {renderProductUnitSelect(product, inCart)}
@@ -730,8 +903,20 @@ export default function QuickPos() {
 
                       <div className="mt-auto pt-2">
                         <div className="flex items-end justify-between gap-1">
-                          <p className={`text-xs font-bold ${isOutOfStock ? 'text-red-700' : 'text-primary-700'}`}>{money(inCart?.unitPrice || selectedUnitPrice || product.sellingPrice || product.salePrice || 0)}</p>
-                          <p className={`text-[11px] font-medium ${isOutOfStock ? 'text-red-400' : 'text-slate-400'}`}>
+                          <p
+                            className={`text-xs font-bold ${isOutOfStock ? "text-red-700" : "text-primary-700"}`}
+                          >
+                            {money(
+                              inCart?.unitPrice ||
+                                selectedUnitPrice ||
+                                product.sellingPrice ||
+                                product.salePrice ||
+                                0,
+                            )}
+                          </p>
+                          <p
+                            className={`text-[11px] font-medium ${isOutOfStock ? "text-red-400" : "text-slate-400"}`}
+                          >
                             {formatStockLabel(product, selectedUnitType)}
                           </p>
                         </div>
@@ -739,14 +924,19 @@ export default function QuickPos() {
                         <div className="mt-2 flex">
                           {isOutOfStock ? (
                             <div className="w-full text-center py-1.5 text-[10px] font-bold text-red-600 uppercase tracking-wider">
-                              {t('products.outOfStock') || 'Out of Stock'}
+                              {t("products.outOfStock") || "Out of Stock"}
                             </div>
                           ) : Number(inCartQty) > 0 ? (
                             <div className="flex w-full items-center justify-between rounded-full bg-primary-50 px-1 py-1">
                               <button
                                 type="button"
                                 className="rounded-full bg-white p-1 text-primary shadow-sm"
-                                onClick={() => updateCartQuantity(product.id, Number(inCartQty) - 1)}
+                                onClick={() =>
+                                  updateCartQuantity(
+                                    product.id,
+                                    Number(inCartQty) - 1,
+                                  )
+                                }
                               >
                                 <Minus size={12} />
                               </button>
@@ -756,13 +946,23 @@ export default function QuickPos() {
                                   type="number"
                                   inputMode="decimal"
                                   value={inCartQty}
-                                  onChange={(e) => updateCartQuantity(product.id, e.target.value)}
+                                  onChange={(e) =>
+                                    updateCartQuantity(
+                                      product.id,
+                                      e.target.value,
+                                    )
+                                  }
                                 />
                               </div>
                               <button
                                 type="button"
                                 className="rounded-full bg-primary p-1 text-white shadow-sm"
-                                onClick={() => updateCartQuantity(product.id, Number(inCartQty) + 1)}
+                                onClick={() =>
+                                  updateCartQuantity(
+                                    product.id,
+                                    Number(inCartQty) + 1,
+                                  )
+                                }
                               >
                                 <Plus size={12} />
                               </button>
@@ -771,9 +971,11 @@ export default function QuickPos() {
                             <button
                               type="button"
                               className="btn-ghost w-full justify-center rounded-full py-1.5 text-xs"
-                              onClick={() => addProductToCart(product, selectedUnitType)}
+                              onClick={() =>
+                                addProductToCart(product, selectedUnitType)
+                              }
                             >
-                              {t('common.add')}
+                              {t("common.add")}
                             </button>
                           )}
                         </div>
@@ -786,19 +988,299 @@ export default function QuickPos() {
           )}
         </div>
 
-        <aside className="block">
-          <div className="rounded-[28px] border border-secondary-200/70 bg-white/90 p-4 shadow-sm xl:sticky xl:top-6 xl:rounded-[32px] xl:p-5">
+        {/* --- Mobile Details Step --- */}
+        {isMobile && mobileStep === "details" && (
+          <div className="space-y-4">
+            <div className="rounded-[32px] border border-secondary-200/70 bg-white/90 p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  {t("quickPos.currentBill")}
+                </p>
+                <button
+                  type="button"
+                  className="btn-ghost rounded-full px-3"
+                  onClick={() => setPartySelectorOpen(true)}
+                >
+                  {selectedParty
+                    ? t("common.change")
+                    : t("quickPos.selectParty")}
+                </button>
+              </div>
+
+              <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-100 text-primary-700">
+                    <UserRound size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-900">
+                      {selectedParty?.name || t("quickPos.walkInCustomer")}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {selectedParty?.phone || t("quickPos.walkInHint")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {cart.length === 0 ? (
+                  <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+                    <ShoppingBag className="mx-auto text-slate-300" size={28} />
+                    <p className="mt-3 text-sm font-semibold text-slate-700">
+                      {t("quickPos.emptyCart")}
+                    </p>
+                  </div>
+                ) : (
+                  cart.map((item) => (
+                    <div
+                      key={item.productId}
+                      className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-slate-900">
+                            {item.name}
+                          </p>
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            <span className="text-xs text-slate-500">
+                              {t("currency.symbol")}
+                            </span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              className="w-20 border-0 bg-transparent p-0 text-xs font-medium text-slate-600 focus:outline-none focus:ring-0"
+                              value={item.unitPrice}
+                              onChange={(e) =>
+                                updateCartPrice(item.productId, e.target.value)
+                              }
+                            />
+                            {renderUnitSwitcher(item)}
+                          </div>
+                        </div>
+                        <p className="text-sm font-semibold text-primary-700">
+                          {money(item.lineTotal)}
+                        </p>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between rounded-[18px] bg-white px-3 py-1">
+                        <button
+                          type="button"
+                          className="rounded-full bg-slate-100 p-2 text-slate-600"
+                          onClick={() =>
+                            updateCartQuantity(
+                              item.productId,
+                              Number(item.quantity) - 1,
+                            )
+                          }
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              updateCartQuantity(item.productId, e.target.value)
+                            }
+                          />
+                          <span className="text-xs text-slate-500">
+                            {getProductUnitLabel(item, item.unitType)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="rounded-full bg-primary p-2 text-white"
+                          onClick={() =>
+                            updateCartQuantity(
+                              item.productId,
+                              Number(item.quantity) + 1,
+                            )
+                          }
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="mt-5 border-t border-slate-200 pt-4 space-y-4">
+                <div className="flex items-center justify-between text-sm text-slate-500">
+                  <span>{t("sales.subTotal")}</span>
+                  <span>{money(totals.subTotal)}</span>
+                </div>
+
+                <div className="flex items-center justify-between text-sm text-slate-500">
+                  <span>{t("common.tax") || "VAT"}</span>
+                  {showTaxInput ? (
+                    <div className="relative w-24">
+                      <input
+                        autoFocus
+                        className="input h-8 rounded-lg pr-6 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={checkoutForm.taxRate || ""}
+                        onChange={(event) =>
+                          setCheckoutForm((previous) => ({
+                            ...previous,
+                            taxRate: event.target.value,
+                          }))
+                        }
+                        onBlur={() => setShowTaxInput(false)}
+                        placeholder="0"
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                        %
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowTaxInput(true)}
+                      className="hover:text-primary-600 transition-colors font-medium"
+                    >
+                      {Number(checkoutForm.taxRate || 0) > 0
+                        ? `${checkoutForm.taxRate}%`
+                        : `+ ${t("sales.addTax")}`}
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between text-sm text-slate-500">
+                  <span>{t("quickPos.discount")}</span>
+                  {showDiscountInput ? (
+                    <div className="relative w-28">
+                      <input
+                        autoFocus
+                        className="input h-8 rounded-lg pr-7 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={checkoutForm.discount}
+                        onChange={(event) =>
+                          setCheckoutForm((previous) => ({
+                            ...previous,
+                            discount: event.target.value,
+                          }))
+                        }
+                        onBlur={() => setShowDiscountInput(false)}
+                        placeholder="0.00"
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                        {t("currency.symbol")}
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowDiscountInput(true)}
+                      className="hover:text-primary-600 transition-colors font-medium"
+                    >
+                      {Number(checkoutForm.discount || 0) > 0
+                        ? money(checkoutForm.discount)
+                        : `+ ${t("sales.addDiscount")}`}
+                    </button>
+                  )}
+                </div>
+
+                {selectedParty && (
+                  <div className="flex items-center justify-between text-sm text-slate-500">
+                    <span>{t("services.amountReceived")}</span>
+                    {showAmountReceivedInput && !isPaid ? (
+                      <div className="relative w-28">
+                        <input
+                          autoFocus
+                          className="input h-8 rounded-lg pr-7 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          step="0.01"
+                          value={checkoutForm.amountReceived}
+                          onChange={(event) =>
+                            setCheckoutForm((previous) => ({
+                              ...previous,
+                              amountReceived: event.target.value,
+                            }))
+                          }
+                          onBlur={() => setShowAmountReceivedInput(false)}
+                        />
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                          {t("currency.symbol")}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            if (isPaid) setIsPaid(false);
+                            setShowAmountReceivedInput(true);
+                          }}
+                          className="hover:text-primary-600 transition-colors font-medium"
+                        >
+                          {isPaid
+                            ? money(totals.grandTotal)
+                            : Number(checkoutForm.amountReceived || 0) > 0
+                              ? money(checkoutForm.amountReceived)
+                              : `+ ${t("sales.addReceived")}`}
+                        </button>
+                        <input
+                          type="checkbox"
+                          className="h-3.5 w-3.5 rounded accent-primary-600 cursor-pointer"
+                          checked={isPaid}
+                          onChange={(e) => setIsPaid(e.target.checked)}
+                          title={t("quickPos.fullyPaid")}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {selectedParty && dueAmount > 0 && (
+                  <div className="flex items-center justify-between text-sm font-semibold text-amber-600">
+                    <span>{t("sales.dueAmount")}</span>
+                    <span>{money(dueAmount)}</span>
+                  </div>
+                )}
+
+                <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3 text-lg font-bold text-slate-900">
+                  <span>{t("sales.grandTotal")}</span>
+                  <span>{money(totals.grandTotal)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-[32px] border border-secondary-200/70 bg-white/90 p-5 shadow-sm">
+              <PaymentMethodFields
+                value={checkoutForm}
+                onChange={(patch) =>
+                  setCheckoutForm((previous) => ({ ...previous, ...patch }))
+                }
+              />
+            </div>
+          </div>
+        )}
+
+        <aside className="hidden xl:block">
+          <div className="sticky top-6 rounded-[32px] border border-secondary-200/70 bg-white/90 p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">{t('quickPos.currentBill')}</p>
-                <h3 className="mt-2 font-serif text-2xl text-slate-900">{suggestedInvoiceNo || t('quickPos.draftBill')}</h3>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  {t("quickPos.currentBill")}
+                </p>
+                <h3 className="mt-2 font-serif text-2xl text-slate-900">
+                  {suggestedInvoiceNo || t("quickPos.draftBill")}
+                </h3>
               </div>
               <button
                 type="button"
                 className="btn-ghost rounded-full px-3"
                 onClick={() => setPartySelectorOpen(true)}
               >
-                {selectedParty ? t('common.change') : t('quickPos.selectParty')}
+                {selectedParty ? t("common.change") : t("quickPos.selectParty")}
               </button>
             </div>
 
@@ -818,56 +1300,82 @@ export default function QuickPos() {
               {cart.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
                   <ShoppingBag className="mx-auto text-slate-300" size={28} />
-                  <p className="mt-3 text-sm font-semibold text-slate-700">{t('quickPos.emptyCart')}</p>
-                  <p className="mt-1 text-xs text-slate-500">{t('quickPos.emptyCartHint')}</p>
+                  <p className="mt-3 text-sm font-semibold text-slate-700">
+                    {t("quickPos.emptyCart")}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {t("quickPos.emptyCartHint")}
+                  </p>
                 </div>
               ) : (
                 cart.map((item) => (
-                  <div key={item.productId} className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div
+                    key={item.productId}
+                    className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-slate-900">{item.name}</p>
+                        <p className="truncate font-semibold text-slate-900">
+                          {item.name}
+                        </p>
                         <div className="mt-1 flex flex-wrap items-center gap-1">
-                          <span className="text-xs text-slate-500">{t('currency.symbol')}</span>
+                          <span className="text-xs text-slate-500">
+                            {t("currency.symbol")}
+                          </span>
                           <input
                             type="number"
                             inputMode="decimal"
                             className="w-20 border-0 bg-transparent p-0 text-xs font-medium text-slate-600 focus:outline-none focus:ring-0"
                             value={item.unitPrice}
-                            onChange={(e) => updateCartPrice(item.productId, e.target.value)}
+                            onChange={(e) =>
+                              updateCartPrice(item.productId, e.target.value)
+                            }
                           />
                           {renderUnitSwitcher(item)}
                         </div>
                       </div>
-                      <p className="text-sm font-semibold text-primary-700">{money(item.lineTotal)}</p>
+                      <p className="text-sm font-semibold text-primary-700">
+                        {money(item.lineTotal)}
+                      </p>
                     </div>
-                    <div className="mt-3 flex items-center gap-2">
-                      <div className="flex min-w-0 flex-1 items-center justify-between rounded-[18px] bg-white px-3 py-1">
-                        <button type="button" className="rounded-full bg-slate-100 p-2 text-slate-600" onClick={() => updateCartQuantity(item.productId, Number(item.quantity) - 1)}>
-                          <Minus size={14} />
-                        </button>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
-                            value={item.quantity}
-                            onChange={(e) => updateCartQuantity(item.productId, e.target.value)}
-                          />
-                          <span className="text-xs text-slate-500">{getProductUnitLabel(item, item.unitType)}</span>
-                        </div>
-                        <button type="button" className="rounded-full bg-primary p-2 text-white" onClick={() => updateCartQuantity(item.productId, Number(item.quantity) + 1)}>
-                          <Plus size={14} />
-                        </button>
+                    <div className="mt-3 flex items-center justify-between rounded-[18px] bg-white px-3 py-1">
+                      <button
+                        type="button"
+                        className="rounded-full bg-slate-100 p-2 text-slate-600"
+                        onClick={() =>
+                          updateCartQuantity(
+                            item.productId,
+                            Number(item.quantity) - 1,
+                          )
+                        }
+                      >
+                        <Minus size={14} />
+                      </button>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
+                          value={item.quantity}
+                          onChange={(e) =>
+                            updateCartQuantity(item.productId, e.target.value)
+                          }
+                        />
+                        <span className="text-xs text-slate-500">
+                          {getProductUnitLabel(item, item.unitType)}
+                        </span>
                       </div>
                       <button
                         type="button"
-                        className="rounded-full border border-rose-100 bg-white p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
-                        onClick={() => updateCartQuantity(item.productId, 0)}
-                        aria-label={t('common.delete')}
-                        title={t('common.delete')}
+                        className="rounded-full bg-primary p-2 text-white"
+                        onClick={() =>
+                          updateCartQuantity(
+                            item.productId,
+                            Number(item.quantity) + 1,
+                          )
+                        }
                       >
-                        <X size={14} />
+                        <Plus size={14} />
                       </button>
                     </div>
                   </div>
@@ -877,15 +1385,87 @@ export default function QuickPos() {
 
             <div className="mt-5 border-t border-slate-200 pt-4 space-y-3">
               <div className="flex items-center justify-between text-sm text-slate-500">
-                <span>{t('sales.subTotal')}</span>
+                <span>{t("sales.subTotal")}</span>
                 <span>{money(totals.subTotal)}</span>
               </div>
 
-              {renderBillAdjustmentRows()}
+              <div className="flex items-center justify-between text-sm text-slate-500">
+                <span>{t("common.tax") || "VAT"}</span>
+                {showTaxInput ? (
+                  <div className="relative w-24">
+                    <input
+                      autoFocus
+                      className="input h-8 rounded-lg pr-6 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={checkoutForm.taxRate || ""}
+                      onChange={(event) =>
+                        setCheckoutForm((previous) => ({
+                          ...previous,
+                          taxRate: event.target.value,
+                        }))
+                      }
+                      onBlur={() => setShowTaxInput(false)}
+                      placeholder="0"
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                      %
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowTaxInput(true)}
+                    className="hover:text-primary-600 transition-colors font-medium"
+                  >
+                    {Number(checkoutForm.taxRate || 0) > 0
+                      ? `${checkoutForm.taxRate}%`
+                      : `+ ${t("sales.addTax")}`}
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-sm text-slate-500">
+                <span>{t("quickPos.discount")}</span>
+                {showDiscountInput ? (
+                  <div className="relative w-28">
+                    <input
+                      autoFocus
+                      className="input h-8 rounded-lg pr-7 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={checkoutForm.discount}
+                      onChange={(event) =>
+                        setCheckoutForm((previous) => ({
+                          ...previous,
+                          discount: event.target.value,
+                        }))
+                      }
+                      onBlur={() => setShowDiscountInput(false)}
+                      placeholder="0.00"
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                      {t("currency.symbol")}
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowDiscountInput(true)}
+                    className="hover:text-primary-600 transition-colors font-medium"
+                  >
+                    {Number(checkoutForm.discount || 0) > 0
+                      ? money(checkoutForm.discount)
+                      : `+ ${t("sales.addDiscount")}`}
+                  </button>
+                )}
+              </div>
 
               {selectedParty && (
                 <div className="flex items-center justify-between text-sm text-slate-500">
-                  <span>{t('services.amountReceived')}</span>
+                  <span>{t("services.amountReceived")}</span>
                   {showAmountReceivedInput && !isPaid ? (
                     <div className="relative w-28">
                       <input
@@ -896,11 +1476,16 @@ export default function QuickPos() {
                         min="0"
                         step="0.01"
                         value={checkoutForm.amountReceived}
-                        onChange={(event) => setCheckoutForm((previous) => ({ ...previous, amountReceived: event.target.value }))}
+                        onChange={(event) =>
+                          setCheckoutForm((previous) => ({
+                            ...previous,
+                            amountReceived: event.target.value,
+                          }))
+                        }
                         onBlur={() => setShowAmountReceivedInput(false)}
                       />
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                        {t('currency.symbol')}
+                        {t("currency.symbol")}
                       </div>
                     </div>
                   ) : (
@@ -912,14 +1497,18 @@ export default function QuickPos() {
                         }}
                         className="hover:text-primary-600 transition-colors font-medium"
                       >
-                        {isPaid ? money(totals.grandTotal) : (Number(checkoutForm.amountReceived || 0) > 0 ? money(checkoutForm.amountReceived) : `+ ${t('sales.addReceived')}`)}
+                        {isPaid
+                          ? money(totals.grandTotal)
+                          : Number(checkoutForm.amountReceived || 0) > 0
+                            ? money(checkoutForm.amountReceived)
+                            : `+ ${t("sales.addReceived")}`}
                       </button>
                       <input
                         type="checkbox"
                         className="h-3.5 w-3.5 rounded accent-primary-600 cursor-pointer"
                         checked={isPaid}
                         onChange={(e) => setIsPaid(e.target.checked)}
-                        title={t('quickPos.fullyPaid')}
+                        title={t("quickPos.fullyPaid")}
                       />
                     </div>
                   )}
@@ -928,256 +1517,431 @@ export default function QuickPos() {
 
               {selectedParty && dueAmount > 0 && (
                 <div className="flex items-center justify-between text-sm font-semibold text-amber-600">
-                  <span>{t('sales.dueAmount')}</span>
+                  <span>{t("sales.dueAmount")}</span>
                   <span>{money(dueAmount)}</span>
                 </div>
               )}
 
               <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3 text-lg font-bold text-slate-900">
-                <span>{t('sales.grandTotal')}</span>
+                <span>{t("sales.grandTotal")}</span>
                 <span>{money(totals.grandTotal)}</span>
               </div>
             </div>
 
-            <div className="mt-5">
-              {footerBar}
-            </div>
+            <div className="mt-5">{footerBar}</div>
           </div>
         </aside>
       </div>
 
+      {isMobile ? (
+        <div className="mobile-sticky-actions xl:hidden">{footerBar}</div>
+      ) : null}
+
       <Dialog
         isOpen={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
-        title={t('quickPos.confirmSale')}
+        title={t("quickPos.confirmSale")}
         size="full"
-        footer={(
+        footer={
           <div className="flex w-full flex-col gap-3 md:flex-row">
             <button
               type="button"
               className="btn-secondary w-full justify-center rounded-[22px] md:w-auto md:flex-1"
-              onClick={() => handleSubmit('print')}
+              onClick={() => handleSubmit("print")}
               disabled={!cart.length || submitting}
             >
-              {t('quickPos.saveAndPrint')}
+              {t("quickPos.saveAndPrint")}
             </button>
             <button
               type="button"
               className="btn-primary w-full justify-center rounded-[22px] md:w-auto md:flex-1"
-              onClick={() => handleSubmit('save')}
+              onClick={() => handleSubmit("save")}
               disabled={!cart.length || submitting}
             >
-              {submitting ? t('common.saving') : t('quickPos.saveOnly')}
+              {submitting ? t("common.saving") : t("quickPos.saveOnly")}
             </button>
           </div>
-        )}
+        }
       >
-        <div className="space-y-4">
-          <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1.35fr]">
-            <label className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                {t('quickPos.invoiceNumber')}
+        <div className="space-y-2">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                {t("quickPos.invoiceNumber")}
               </span>
+
               <input
                 className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0"
                 value={checkoutForm.invoiceNo}
-                onChange={(event) => setCheckoutForm((previous) => ({
-                  ...previous,
-                  invoiceNo: event.target.value,
-                }))}
-                placeholder={suggestedInvoiceNo || t('quickPos.autoInvoice')}
+                onChange={(event) =>
+                  setCheckoutForm((previous) => ({
+                    ...previous,
+                    invoiceNo: event.target.value,
+                  }))
+                }
+                placeholder={suggestedInvoiceNo || t("quickPos.autoInvoice")}
               />
             </label>
 
-            <label className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm transition focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                {t('common.date')}
+            <label className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                {t("common.date")}
               </span>
+
               <input
                 className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-0"
                 type="date"
                 value={checkoutForm.saleDate}
-                onChange={(event) => setCheckoutForm((previous) => ({
-                  ...previous,
-                  saleDate: event.target.value,
-                }))}
+                onChange={(event) =>
+                  setCheckoutForm((previous) => ({
+                    ...previous,
+                    saleDate: event.target.value,
+                  }))
+                }
               />
             </label>
-
-            <section className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-100 text-primary-700">
-                    <UserRound size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900">{selectedParty?.name || t('quickPos.walkInCustomer')}</p>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">{selectedParty?.phone || t('quickPos.walkInHint')}</p>
-                  </div>
-                </div>
-                <button type="button" className="btn-ghost h-9 shrink-0 rounded-full px-3 text-xs" onClick={() => setPartySelectorOpen(true)}>
-                  {selectedParty ? t('common.change') : t('quickPos.selectParty')}
-                </button>
-              </div>
-            </section>
           </div>
 
-          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-              <p className="text-sm font-semibold text-slate-900">{t('quickPos.billingItems', { count: cart.length })}</p>
-              <button type="button" className="btn-ghost h-9 rounded-full px-4 text-xs" onClick={() => setCheckoutOpen(false)}>
-                {t('quickPos.addItems')}
+          <div className="rounded-[28px] border border-slate-200 bg-white px-4 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-100 text-primary-700">
+                  <UserRound size={20} />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-xl font-semibold text-slate-900">
+                    {selectedParty?.name || t("quickPos.walkInCustomer")}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {selectedParty?.phone || t("quickPos.walkInHint")}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost rounded-full px-4"
+                onClick={() => setPartySelectorOpen(true)}
+              >
+                {selectedParty ? t("common.change") : t("quickPos.selectParty")}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-[28px] border border-slate-200 bg-white px-4 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-lg font-semibold text-slate-900">
+                {t("quickPos.billingItems", { count: cart.length })}
+              </p>
+              <button
+                type="button"
+                className="btn-ghost rounded-full px-4"
+                onClick={() => setCheckoutOpen(false)}
+              >
+                {t("quickPos.addItems")}
               </button>
             </div>
 
-            <div className="divide-y divide-slate-100">
+            <div className="mt-4 space-y-3">
               {cart.map((item) => (
-                <div key={item.productId} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                  <div className="min-w-[180px] flex-1">
-                    <p className="truncate text-sm font-semibold text-slate-900">{item.name}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      <span className="text-xs text-slate-500">{t('currency.symbol')}</span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        className="w-20 border-0 bg-transparent p-0 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-0"
-                        value={item.unitPrice}
-                        onChange={(e) => updateCartPrice(item.productId, e.target.value)}
-                      />
-                      {renderUnitSwitcher(item)}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 rounded-full border border-primary-100 bg-slate-50 px-2 py-1">
-                      <button type="button" className="rounded-full bg-white p-2 text-slate-600 shadow-sm" onClick={() => updateCartQuantity(item.productId, Number(item.quantity) - 1)}>
-                        <Minus size={14} />
-                      </button>
-                      <div className="flex items-center gap-1 px-1">
+                <div
+                  key={item.productId}
+                  className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold text-slate-900">
+                        {item.name}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        <span className="text-sm text-slate-500">
+                          {t("currency.symbol")}
+                        </span>
                         <input
                           type="number"
                           inputMode="decimal"
-                          className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
-                          value={item.quantity}
-                          onChange={(e) => updateCartQuantity(item.productId, e.target.value)}
+                          className="w-24 border-0 bg-transparent p-0 text-sm font-medium text-slate-600 focus:outline-none focus:ring-0"
+                          value={item.unitPrice}
+                          onChange={(e) =>
+                            updateCartPrice(item.productId, e.target.value)
+                          }
                         />
-                        <span className="text-xs text-slate-500">{getProductUnitLabel(item, item.unitType)}</span>
+                        {renderUnitSwitcher(item)}
                       </div>
-                      <button type="button" className="rounded-full bg-primary p-2 text-white shadow-sm" onClick={() => updateCartQuantity(item.productId, Number(item.quantity) + 1)}>
-                        <Plus size={14} />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 rounded-full border border-primary-100 bg-white px-2 py-1">
+                        <button
+                          type="button"
+                          className="rounded-full bg-slate-100 p-2 text-slate-600"
+                          onClick={() =>
+                            updateCartQuantity(
+                              item.productId,
+                              Number(item.quantity) - 1,
+                            )
+                          }
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              updateCartQuantity(item.productId, e.target.value)
+                            }
+                          />
+                          <span className="text-xs text-slate-500">
+                            {getProductUnitLabel(item, item.unitType)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="rounded-full bg-primary p-2 text-white"
+                          onClick={() =>
+                            updateCartQuantity(
+                              item.productId,
+                              Number(item.quantity) + 1,
+                            )
+                          }
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        className="rounded-full border border-rose-100 bg-white p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
+                        onClick={() => updateCartQuantity(item.productId, 0)}
+                        aria-label={t("common.delete")}
+                        title={t("common.delete")}
+                      >
+                        <X size={14} />
                       </button>
                     </div>
-                    <p className="w-24 text-right text-sm font-bold text-primary-700">{money(item.lineTotal)}</p>
-                    <button
-                      type="button"
-                      className="rounded-full border border-rose-100 bg-white p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
-                      onClick={() => updateCartQuantity(item.productId, 0)}
-                      aria-label={t('common.delete')}
-                      title={t('common.delete')}
-                    >
-                      <X size={14} />
-                    </button>
                   </div>
                 </div>
               ))}
             </div>
-          </section>
+          </div>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-4">
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <PaymentMethodFields
-                  value={checkoutForm}
-                  onChange={(patch) => setCheckoutForm((previous) => ({ ...previous, ...patch }))}
-                />
-              </section>
+              <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-5">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      {t("quickPos.discount")}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowDiscountInput(true)}
+                      className="text-[15px] font-bold text-primary-700 hover:text-primary-800 transition-colors"
+                    >
+                      {Number(checkoutForm.discount || 0) > 0
+                        ? money(checkoutForm.discount)
+                        : `+ ${t("sales.addDiscount")}`}
+                    </button>
+                  </div>
+                  <div className="relative flex-1 max-w-[140px] flex justify-end">
+                    {showDiscountInput && (
+                      <div className="relative w-full">
+                        <input
+                          autoFocus
+                          className="input h-11 rounded-2xl pr-8 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10"
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          step="0.01"
+                          value={checkoutForm.discount}
+                          onChange={(event) =>
+                            setCheckoutForm((previous) => ({
+                              ...previous,
+                              discount: event.target.value,
+                            }))
+                          }
+                          onBlur={() => setShowDiscountInput(false)}
+                          placeholder="0.00"
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                          {t("currency.symbol")}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t('common.notes')}</p>
+              <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-5">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                      {t("common.tax") || "VAT"}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowTaxInput(true)}
+                      className="text-[15px] font-bold text-primary-700 hover:text-primary-800 transition-colors"
+                    >
+                      {Number(checkoutForm.taxRate || 0) > 0
+                        ? `${checkoutForm.taxRate}%`
+                        : `+ ${t("sales.addTax")}`}
+                    </button>
+                  </div>
+                  <div className="relative flex-1 max-w-[140px] flex justify-end">
+                    {showTaxInput && (
+                      <div className="relative w-full">
+                        <input
+                          autoFocus
+                          className="input h-11 rounded-2xl pr-8 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10"
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          step="0.01"
+                          value={checkoutForm.taxRate || ""}
+                          onChange={(event) =>
+                            setCheckoutForm((previous) => ({
+                              ...previous,
+                              taxRate: event.target.value,
+                            }))
+                          }
+                          onBlur={() => setShowTaxInput(false)}
+                          placeholder="0"
+                        />
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                          %
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  {t("common.notes")}
+                </p>
                 <textarea
-                  className="input mt-3 min-h-[82px] resize-none rounded-2xl border-slate-100 text-sm focus:border-primary focus:ring-primary/5"
+                  className="input mt-3 min-h-[90px] resize-none rounded-2xl text-sm border-slate-100 focus:border-primary focus:ring-primary/5"
                   value={checkoutForm.notes}
-                  onChange={(event) => setCheckoutForm((previous) => ({ ...previous, notes: event.target.value }))}
-                  placeholder={t('quickPos.notesPlaceholder')}
+                  onChange={(event) =>
+                    setCheckoutForm((previous) => ({
+                      ...previous,
+                      notes: event.target.value,
+                    }))
+                  }
+                  placeholder={t("quickPos.notesPlaceholder")}
                 />
-              </section>
+              </div>
             </div>
 
-            <aside className="space-y-4">
-              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="space-y-4">
+              <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-5">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-                    <span>{t('sales.subTotal')}</span>
+                    <span>{t("sales.subTotal")}</span>
                     <span>{money(totals.subTotal)}</span>
                   </div>
-                  {renderBillAdjustmentRows({ textClass: 'text-xs font-medium', inputClass: 'text-xs' })}
-                  <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-lg font-bold text-slate-900">
-                    <span>{t('sales.grandTotal')}</span>
+                  <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+                    <span>{t("sales.taxTotal")}</span>
+                    <span>{money(totals.taxTotal)}</span>
+                  </div>
+                  {totals.discountTotal > 0 ? (
+                    <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+                      <span>{t("quickPos.discount")}</span>
+                      <span>- {money(totals.discountTotal)}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xl font-bold text-slate-900">
+                    <span>{t("sales.grandTotal")}</span>
                     <span>{money(totals.grandTotal)}</span>
                   </div>
                 </div>
-              </section>
+              </div>
 
               {selectedParty && (
-                <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
+                <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-5">
+                  <div className="flex items-center justify-between">
                     <div className="space-y-1">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{t('services.amountReceived')}</p>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                        {t("services.amountReceived")}
+                      </p>
                       <button
                         type="button"
                         onClick={() => {
                           if (!isPaid) setShowAmountReceivedInput(true);
                           else setIsPaid(false);
                         }}
-                        className={`text-sm font-bold transition-colors ${isPaid ? 'text-slate-400' : 'text-primary-700'}`}
+                        className={`text-[15px] font-bold transition-colors ${isPaid ? "text-slate-400" : "text-primary-700"}`}
                       >
-                        {isPaid ? money(totals.grandTotal) : (Number(checkoutForm.amountReceived || 0) > 0 ? money(checkoutForm.amountReceived) : `+ ${t('sales.addReceived')}`)}
+                        {isPaid
+                          ? money(totals.grandTotal)
+                          : Number(checkoutForm.amountReceived || 0) > 0
+                            ? money(checkoutForm.amountReceived)
+                            : `+ ${t("sales.addReceived")}`}
                       </button>
                     </div>
-                    <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded-full border border-slate-100 bg-slate-50 px-3 py-1.5 text-[10px] font-bold text-slate-600 transition hover:bg-slate-100">
+                    <label className="flex items-center gap-2 rounded-full border border-slate-100 bg-slate-50 px-3 py-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:bg-slate-100 transition">
                       <input
                         type="checkbox"
                         className="h-3.5 w-3.5 rounded accent-primary-600"
                         checked={isPaid}
                         onChange={(event) => {
                           setIsPaid(event.target.checked);
-                          if (event.target.checked) setShowAmountReceivedInput(false);
+                          if (event.target.checked)
+                            setShowAmountReceivedInput(false);
                         }}
                       />
-                      {t('quickPos.fullyPaid')}
+                      {t("quickPos.fullyPaid")}
                     </label>
                   </div>
 
                   {showAmountReceivedInput && !isPaid && (
-                    <div className="relative mt-3 w-full">
+                    <div className="mt-4 relative w-full">
                       <input
                         autoFocus
-                        className="input h-10 w-full rounded-2xl border-primary/20 pr-10 text-base font-bold focus:border-primary focus:ring-primary/10"
+                        className="input h-11 rounded-2xl text-lg font-bold pr-10 w-full border-primary/20 focus:border-primary focus:ring-primary/10"
                         type="number"
                         inputMode="decimal"
                         min="0"
                         step="0.01"
                         value={checkoutForm.amountReceived}
-                        onChange={(event) => setCheckoutForm((previous) => ({ ...previous, amountReceived: event.target.value }))}
+                        onChange={(event) =>
+                          setCheckoutForm((previous) => ({
+                            ...previous,
+                            amountReceived: event.target.value,
+                          }))
+                        }
                         onBlur={() => setShowAmountReceivedInput(false)}
                       />
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                        {t('currency.symbol')}
+                        {t("currency.symbol")}
                       </div>
                     </div>
                   )}
 
-                  <div className={`mt-3 flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-semibold ${
-                    dueAmount > 0
-                      ? 'border border-amber-100 bg-amber-50 text-amber-700'
-                      : 'border border-emerald-100 bg-emerald-50 text-emerald-700'
-                  }`}>
-                    <span>{t('sales.dueAmount')}</span>
+                  <div
+                    className={`mt-4 rounded-2xl px-4 py-3 text-sm font-semibold flex justify-between items-center ${
+                      dueAmount > 0
+                        ? "border border-amber-100 bg-amber-50 text-amber-700"
+                        : "border border-emerald-100 bg-emerald-50 text-emerald-700"
+                    }`}
+                  >
+                    <span>{t("sales.dueAmount")}</span>
                     <span>{money(dueAmount)}</span>
                   </div>
-                </section>
+                </div>
               )}
-            </aside>
+
+              <div className="rounded-[28px] border border-slate-200 bg-white px-4 py-4">
+                <PaymentMethodFields
+                  value={checkoutForm}
+                  onChange={(patch) =>
+                    setCheckoutForm((previous) => ({ ...previous, ...patch }))
+                  }
+                />
+              </div>
+            </div>
           </div>
         </div>
       </Dialog>
@@ -1189,43 +1953,52 @@ export default function QuickPos() {
         selectedParty={selectedParty}
         type="customer"
         includeWalkIn
-        walkInLabel={t('quickPos.walkInCustomer')}
-        walkInDescription={t('quickPos.walkInHint')}
-        title={t('quickPos.selectPartyTitle')}
+        walkInLabel={t("quickPos.walkInCustomer")}
+        walkInDescription={t("quickPos.walkInHint")}
+        title={t("quickPos.selectPartyTitle")}
       />
 
       <QuickActionSuccessDialog
         isOpen={Boolean(successState)}
         onClose={() => setSuccessState(null)}
-        title={t('quickPos.saleRecorded')}
-        description={successState ? t('quickPos.saleRecordedDescription', {
-          invoice: successState.invoiceNo || t('quickPos.draftBill'),
-          amount: money(successState.total),
-        }) : ''}
-        primaryAction={successState?.id ? (
-          <button
-            type="button"
-            className="btn-primary h-14 w-full justify-center rounded-[22px] text-base"
-            onClick={() => {
-              const target = successState.action === 'print'
-                ? `/app/invoice/sales/${successState.id}?print=1`
-                : `/app/invoice/sales/${successState.id}`;
-              setSuccessState(null);
-              navigate(target);
-            }}
-          >
-            {successState?.action === 'print' ? t('quickPos.openPrintPreview') : t('quickPos.viewInvoice')}
-          </button>
-        ) : null}
-        secondaryAction={(
+        title={t("quickPos.saleRecorded")}
+        description={
+          successState
+            ? t("quickPos.saleRecordedDescription", {
+                invoice: successState.invoiceNo || t("quickPos.draftBill"),
+                amount: money(successState.total),
+              })
+            : ""
+        }
+        primaryAction={
+          successState?.id ? (
+            <button
+              type="button"
+              className="btn-primary h-14 w-full justify-center rounded-[22px] text-base"
+              onClick={() => {
+                const target =
+                  successState.action === "print"
+                    ? `/app/invoice/sales/${successState.id}?print=1`
+                    : `/app/invoice/sales/${successState.id}`;
+                setSuccessState(null);
+                navigate(target);
+              }}
+            >
+              {successState?.action === "print"
+                ? t("quickPos.openPrintPreview")
+                : t("quickPos.viewInvoice")}
+            </button>
+          ) : null
+        }
+        secondaryAction={
           <button
             type="button"
             className="btn-ghost h-14 w-full justify-center rounded-[22px] text-base"
             onClick={() => setSuccessState(null)}
           >
-            {t('quickPos.newSale')}
+            {t("quickPos.newSale")}
           </button>
-        )}
+        }
       />
     </div>
   );
