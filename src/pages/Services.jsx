@@ -2669,20 +2669,22 @@ export default function Services() {
                 <div className="border-b border-slate-200/70 bg-slate-50/60 px-8 py-5 dark:border-slate-800/70 dark:bg-slate-900/30">
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-black">Bill To</p>
-                      <p className="font-semibold text-slate-900">{invoiceOrder.Party?.name || invoiceOrder.partyName || '—'}</p>
-                      {invoiceOrder.Party?.phone && <p className="mt-0.5 text-sm text-black">{invoiceOrder.Party?.phone}</p>}
-                      <p className="mt-2 text-sm text-black">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">Bill To</p>
+                      <p className="font-semibold text-slate-900 dark:text-white">{invoiceOrder.Party?.name || invoiceOrder.partyName || '—'}</p>
+                      {invoiceOrder.Party?.phone && <p className="mt-0.5 text-sm text-slate-900 dark:text-white">{invoiceOrder.Party?.phone}</p>}
+                      <p className="mt-2 text-sm text-slate-900 dark:text-white">
                         Created By:{' '}
-                        <span className="font-medium text-black">{getCreatorDisplayName(invoiceOrder)}</span>
+                        <span className="font-medium text-slate-900 dark:text-white">{getCreatorDisplayName(invoiceOrder)}</span>
                       </p>
                     </div>
-                    {invoiceOrder.notes && (
-                      <div>
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-black" >Notes</p>
-                        <p className="whitespace-pre-wrap text-sm text-black">{invoiceOrder.notes}</p>
-                      </div>
-                    )}
+                    <div className="min-h-[72px]">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">Notes</p>
+                      {invoiceOrder.notes ? (
+                        <p className="whitespace-pre-wrap text-sm text-slate-900 dark:text-white">{invoiceOrder.notes}</p>
+                      ) : (
+                        <p className="text-sm text-slate-400">—</p>
+                      )}
+                    </div>
                   </div>
                   {showGoldJewelleryDetails && (invoiceJewellery.metalType || invoiceJewellery.metalPurity || invoiceJewellery.actualWeight || invoiceJewellery.wastagePercent || invoiceJewellery.totalWeight || invoiceJewellery.diamondType || invoiceJewellery.diamondWeight || invoiceJewellery.diamondCarat || invoiceJewellery.diamondCharge) && (
                     <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5">

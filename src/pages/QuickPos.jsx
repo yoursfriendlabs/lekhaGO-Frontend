@@ -165,8 +165,6 @@ export default function QuickPos() {
   const [partySelectorOpen, setPartySelectorOpen] = useState(false);
   const [selectedParty, setSelectedParty] = useState(null);
   const [checkoutForm, setCheckoutForm] = useState(emptyCheckoutForm);
-  const [showDiscountInput, setShowDiscountInput] = useState(false);
-  const [showTaxInput, setShowTaxInput] = useState(false);
   const [showAmountReceivedInput, setShowAmountReceivedInput] = useState(false);
   const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState("");
   const [isPaid, setIsPaid] = useState(true);
@@ -990,15 +988,15 @@ export default function QuickPos() {
 
         {/* --- Mobile Details Step --- */}
         {isMobile && mobileStep === "details" && (
-          <div className="space-y-4">
-            <div className="rounded-[32px] border border-secondary-200/70 bg-white/90 p-5 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-secondary-200/70 bg-white/95 p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <p className="min-w-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                   {t("quickPos.currentBill")}
                 </p>
                 <button
                   type="button"
-                  className="btn-ghost rounded-full px-3"
+                  className="btn-ghost h-8 shrink-0 rounded-full px-2.5 text-[11px]"
                   onClick={() => setPartySelectorOpen(true)}
                 >
                   {selectedParty
@@ -1007,23 +1005,23 @@ export default function QuickPos() {
                 </button>
               </div>
 
-              <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-100 text-primary-700">
-                    <UserRound size={18} />
+              <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-700">
+                    <UserRound size={16} />
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-slate-900">
+                    <p className="truncate text-sm font-semibold text-slate-900">
                       {selectedParty?.name || t("quickPos.walkInCustomer")}
                     </p>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="truncate text-xs text-slate-500">
                       {selectedParty?.phone || t("quickPos.walkInHint")}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4 space-y-3">
+              <div className="mt-3 space-y-2.5">
                 {cart.length === 0 ? (
                   <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
                     <ShoppingBag className="mx-auto text-slate-300" size={28} />
@@ -1035,11 +1033,11 @@ export default function QuickPos() {
                   cart.map((item) => (
                     <div
                       key={item.productId}
-                      className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3"
+                      className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="truncate font-semibold text-slate-900">
+                          <p className="truncate text-sm font-semibold text-slate-900">
                             {item.name}
                           </p>
                           <div className="mt-1 flex flex-wrap items-center gap-1">
@@ -1058,48 +1056,59 @@ export default function QuickPos() {
                             {renderUnitSwitcher(item)}
                           </div>
                         </div>
-                        <p className="text-sm font-semibold text-primary-700">
+                        <p className="shrink-0 text-sm font-semibold text-primary-700">
                           {money(item.lineTotal)}
                         </p>
                       </div>
-                      <div className="mt-3 flex items-center justify-between rounded-[18px] bg-white px-3 py-1">
-                        <button
-                          type="button"
-                          className="rounded-full bg-slate-100 p-2 text-slate-600"
-                          onClick={() =>
-                            updateCartQuantity(
-                              item.productId,
-                              Number(item.quantity) - 1,
-                            )
-                          }
-                        >
-                          <Minus size={14} />
-                        </button>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
-                            value={item.quantity}
-                            onChange={(e) =>
-                              updateCartQuantity(item.productId, e.target.value)
+                      <div className="mt-2.5 flex min-w-0 items-center justify-between gap-2 rounded-2xl bg-white px-2 py-1">
+                        <div className="flex items-center gap-1 rounded-full border border-primary-100 bg-white px-1">
+                          <button
+                            type="button"
+                            className="rounded-full bg-slate-100 p-2 text-slate-600"
+                            onClick={() =>
+                              updateCartQuantity(
+                                item.productId,
+                                Number(item.quantity) - 1,
+                              )
                             }
-                          />
-                          <span className="text-xs text-slate-500">
-                            {getProductUnitLabel(item, item.unitType)}
-                          </span>
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <div className="flex min-w-0 items-center justify-center gap-1 px-1">
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
+                              value={item.quantity}
+                              onChange={(e) =>
+                                updateCartQuantity(item.productId, e.target.value)
+                              }
+                            />
+                            <span className="min-w-0 truncate text-xs text-slate-500">
+                              {getProductUnitLabel(item, item.unitType)}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="rounded-full bg-primary p-2 text-white"
+                            onClick={() =>
+                              updateCartQuantity(
+                                item.productId,
+                                Number(item.quantity) + 1,
+                              )
+                            }
+                          >
+                            <Plus size={14} />
+                          </button>
                         </div>
                         <button
                           type="button"
-                          className="rounded-full bg-primary p-2 text-white"
-                          onClick={() =>
-                            updateCartQuantity(
-                              item.productId,
-                              Number(item.quantity) + 1,
-                            )
-                          }
+                          className="rounded-full border border-rose-100 bg-white p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
+                          onClick={() => updateCartQuantity(item.productId, 0)}
+                          aria-label={t("common.delete")}
+                          title={t("common.delete")}
                         >
-                          <Plus size={14} />
+                          <X size={14} />
                         </button>
                       </div>
                     </div>
@@ -1107,91 +1116,79 @@ export default function QuickPos() {
                 )}
               </div>
 
-              <div className="mt-5 border-t border-slate-200 pt-4 space-y-4">
-                <div className="flex items-center justify-between text-sm text-slate-500">
+              <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
+                <div className="flex items-center justify-between gap-2 text-sm text-slate-500">
                   <span>{t("sales.subTotal")}</span>
                   <span>{money(totals.subTotal)}</span>
                 </div>
 
-                <div className="flex items-center justify-between text-sm text-slate-500">
-                  <span>{t("common.tax") || "VAT"}</span>
-                  {showTaxInput ? (
-                    <div className="relative w-24">
-                      <input
-                        autoFocus
-                        className="input h-8 rounded-lg pr-6 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        step="0.01"
-                        value={checkoutForm.taxRate || ""}
-                        onChange={(event) =>
-                          setCheckoutForm((previous) => ({
-                            ...previous,
-                            taxRate: event.target.value,
-                          }))
-                        }
-                        onBlur={() => setShowTaxInput(false)}
-                        placeholder="0"
-                      />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                        %
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowTaxInput(true)}
-                      className="hover:text-primary-600 transition-colors font-medium"
-                    >
+                <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+                  <span className="min-w-0">
+                    <span className="block">{t("common.tax") || "VAT"}</span>
+                    <span className="block text-[11px] font-semibold text-primary-700">
                       {Number(checkoutForm.taxRate || 0) > 0
-                        ? `${checkoutForm.taxRate}%`
+                        ? money(totals.taxTotal)
                         : `+ ${t("sales.addTax")}`}
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between text-sm text-slate-500">
-                  <span>{t("quickPos.discount")}</span>
-                  {showDiscountInput ? (
-                    <div className="relative w-28">
-                      <input
-                        autoFocus
-                        className="input h-8 rounded-lg pr-7 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        step="0.01"
-                        value={checkoutForm.discount}
-                        onChange={(event) =>
-                          setCheckoutForm((previous) => ({
-                            ...previous,
-                            discount: event.target.value,
-                          }))
-                        }
-                        onBlur={() => setShowDiscountInput(false)}
-                        placeholder="0.00"
-                      />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                        {t("currency.symbol")}
-                      </div>
+                    </span>
+                  </span>
+                  <div className="relative w-24 shrink-0">
+                    <input
+                      className="input h-8 w-full rounded-lg border-primary/20 pr-6 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={checkoutForm.taxRate || ""}
+                      onChange={(event) =>
+                        setCheckoutForm((previous) => ({
+                          ...previous,
+                          taxRate: event.target.value,
+                        }))
+                      }
+                      placeholder="0"
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                      %
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setShowDiscountInput(true)}
-                      className="hover:text-primary-600 transition-colors font-medium"
-                    >
+                  </div>
+                </label>
+
+                <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+                  <span className="min-w-0">
+                    <span className="block">{t("quickPos.discount")}</span>
+                    <span className="block text-[11px] font-semibold text-primary-700">
                       {Number(checkoutForm.discount || 0) > 0
-                        ? money(checkoutForm.discount)
+                        ? `- ${money(totals.discountTotal)}`
                         : `+ ${t("sales.addDiscount")}`}
-                    </button>
-                  )}
-                </div>
+                    </span>
+                  </span>
+                  <div className="relative w-28 shrink-0">
+                    <input
+                      className="input h-8 w-full rounded-lg border-primary/20 pr-7 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={checkoutForm.discount}
+                      onChange={(event) =>
+                        setCheckoutForm((previous) => ({
+                          ...previous,
+                          discount: event.target.value,
+                        }))
+                      }
+                      placeholder="0.00"
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                      {t("currency.symbol")}
+                    </div>
+                  </div>
+                </label>
 
                 {selectedParty && (
-                  <div className="flex items-center justify-between text-sm text-slate-500">
-                    <span>{t("services.amountReceived")}</span>
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+                    <span className="min-w-0">{t("services.amountReceived")}</span>
                     {showAmountReceivedInput && !isPaid ? (
-                      <div className="relative w-28">
+                      <div className="relative w-28 shrink-0">
                         <input
                           autoFocus
                           className="input h-8 rounded-lg pr-7 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
@@ -1213,7 +1210,7 @@ export default function QuickPos() {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
+                      <div className="flex shrink-0 items-center gap-2">
                         <button
                           onClick={() => {
                             if (isPaid) setIsPaid(false);
@@ -1246,7 +1243,7 @@ export default function QuickPos() {
                   </div>
                 )}
 
-                <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3 text-lg font-bold text-slate-900">
+                <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
                   <span>{t("sales.grandTotal")}</span>
                   <span>{money(totals.grandTotal)}</span>
                 </div>
@@ -1338,44 +1335,55 @@ export default function QuickPos() {
                         {money(item.lineTotal)}
                       </p>
                     </div>
-                    <div className="mt-3 flex items-center justify-between rounded-[18px] bg-white px-3 py-1">
-                      <button
-                        type="button"
-                        className="rounded-full bg-slate-100 p-2 text-slate-600"
-                        onClick={() =>
-                          updateCartQuantity(
-                            item.productId,
-                            Number(item.quantity) - 1,
-                          )
-                        }
-                      >
-                        <Minus size={14} />
-                      </button>
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
-                          value={item.quantity}
-                          onChange={(e) =>
-                            updateCartQuantity(item.productId, e.target.value)
+                    <div className="mt-3 flex items-center justify-between gap-2 rounded-[18px] bg-white px-3 py-1">
+                      <div className="flex items-center gap-2 rounded-full border border-primary-100 bg-white px-1">
+                        <button
+                          type="button"
+                          className="rounded-full bg-slate-100 p-2 text-slate-600"
+                          onClick={() =>
+                            updateCartQuantity(
+                              item.productId,
+                              Number(item.quantity) - 1,
+                            )
                           }
-                        />
-                        <span className="text-xs text-slate-500">
-                          {getProductUnitLabel(item, item.unitType)}
-                        </span>
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
+                            value={item.quantity}
+                            onChange={(e) =>
+                              updateCartQuantity(item.productId, e.target.value)
+                            }
+                          />
+                          <span className="text-xs text-slate-500">
+                            {getProductUnitLabel(item, item.unitType)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          className="rounded-full bg-primary p-2 text-white"
+                          onClick={() =>
+                            updateCartQuantity(
+                              item.productId,
+                              Number(item.quantity) + 1,
+                            )
+                          }
+                        >
+                          <Plus size={14} />
+                        </button>
                       </div>
                       <button
                         type="button"
-                        className="rounded-full bg-primary p-2 text-white"
-                        onClick={() =>
-                          updateCartQuantity(
-                            item.productId,
-                            Number(item.quantity) + 1,
-                          )
-                        }
+                        className="rounded-full border border-rose-100 bg-white p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
+                        onClick={() => updateCartQuantity(item.productId, 0)}
+                        aria-label={t("common.delete")}
+                        title={t("common.delete")}
                       >
-                        <Plus size={14} />
+                        <X size={14} />
                       </button>
                     </div>
                   </div>
@@ -1389,79 +1397,67 @@ export default function QuickPos() {
                 <span>{money(totals.subTotal)}</span>
               </div>
 
-              <div className="flex items-center justify-between text-sm text-slate-500">
-                <span>{t("common.tax") || "VAT"}</span>
-                {showTaxInput ? (
-                  <div className="relative w-24">
-                    <input
-                      autoFocus
-                      className="input h-8 rounded-lg pr-6 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.01"
-                      value={checkoutForm.taxRate || ""}
-                      onChange={(event) =>
-                        setCheckoutForm((previous) => ({
-                          ...previous,
-                          taxRate: event.target.value,
-                        }))
-                      }
-                      onBlur={() => setShowTaxInput(false)}
-                      placeholder="0"
-                    />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                      %
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowTaxInput(true)}
-                    className="hover:text-primary-600 transition-colors font-medium"
-                  >
+              <label className="flex items-center justify-between gap-2 text-sm text-slate-500">
+                <span>
+                  <span className="block">{t("common.tax") || "VAT"}</span>
+                  <span className="block text-[11px] font-semibold text-primary-700">
                     {Number(checkoutForm.taxRate || 0) > 0
-                      ? `${checkoutForm.taxRate}%`
+                      ? money(totals.taxTotal)
                       : `+ ${t("sales.addTax")}`}
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between text-sm text-slate-500">
-                <span>{t("quickPos.discount")}</span>
-                {showDiscountInput ? (
-                  <div className="relative w-28">
-                    <input
-                      autoFocus
-                      className="input h-8 rounded-lg pr-7 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.01"
-                      value={checkoutForm.discount}
-                      onChange={(event) =>
-                        setCheckoutForm((previous) => ({
-                          ...previous,
-                          discount: event.target.value,
-                        }))
-                      }
-                      onBlur={() => setShowDiscountInput(false)}
-                      placeholder="0.00"
-                    />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                      {t("currency.symbol")}
-                    </div>
+                  </span>
+                </span>
+                <div className="relative w-24 shrink-0">
+                  <input
+                    className="input h-8 w-full rounded-lg border-primary/20 pr-6 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={checkoutForm.taxRate || ""}
+                    onChange={(event) =>
+                      setCheckoutForm((previous) => ({
+                        ...previous,
+                        taxRate: event.target.value,
+                      }))
+                    }
+                    placeholder="0"
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                    %
                   </div>
-                ) : (
-                  <button
-                    onClick={() => setShowDiscountInput(true)}
-                    className="hover:text-primary-600 transition-colors font-medium"
-                  >
+                </div>
+              </label>
+
+              <label className="flex items-center justify-between gap-2 text-sm text-slate-500">
+                <span>
+                  <span className="block">{t("quickPos.discount")}</span>
+                  <span className="block text-[11px] font-semibold text-primary-700">
                     {Number(checkoutForm.discount || 0) > 0
-                      ? money(checkoutForm.discount)
+                      ? `- ${money(totals.discountTotal)}`
                       : `+ ${t("sales.addDiscount")}`}
-                  </button>
-                )}
-              </div>
+                  </span>
+                </span>
+                <div className="relative w-28 shrink-0">
+                  <input
+                    className="input h-8 w-full rounded-lg border-primary/20 pr-7 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={checkoutForm.discount}
+                    onChange={(event) =>
+                      setCheckoutForm((previous) => ({
+                        ...previous,
+                        discount: event.target.value,
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                    {t("currency.symbol")}
+                  </div>
+                </div>
+              </label>
 
               {selectedParty && (
                 <div className="flex items-center justify-between text-sm text-slate-500">
@@ -1563,15 +1559,14 @@ export default function QuickPos() {
           </div>
         }
       >
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="grid gap-2 sm:grid-cols-2">
-            <label className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+            <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 transition focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-200">
+              <span className="text-xs font-medium uppercase text-slate-500">
                 {t("quickPos.invoiceNumber")}
               </span>
-
               <input
-                className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0"
+                className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0"
                 value={checkoutForm.invoiceNo}
                 onChange={(event) =>
                   setCheckoutForm((previous) => ({
@@ -1583,13 +1578,12 @@ export default function QuickPos() {
               />
             </label>
 
-            <label className="rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+            <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 transition focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-200">
+              <span className="text-xs font-medium uppercase text-slate-500">
                 {t("common.date")}
               </span>
-
               <input
-                className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-800 focus:outline-none focus:ring-0"
+                className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
                 type="date"
                 value={checkoutForm.saleDate}
                 onChange={(event) =>
@@ -1602,24 +1596,26 @@ export default function QuickPos() {
             </label>
           </div>
 
-          <div className="rounded-[28px] border border-slate-200 bg-white px-4 py-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-100 text-primary-700">
-                  <UserRound size={20} />
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary-700">
+                  <UserRound size={18} />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-xl font-semibold text-slate-900">
+                  <p className="truncate text-sm font-semibold text-slate-900">
                     {selectedParty?.name || t("quickPos.walkInCustomer")}
                   </p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    {selectedParty?.phone || t("quickPos.walkInHint")}
-                  </p>
+                  {selectedParty?.phone && (
+                    <p className="truncate text-xs text-slate-500">
+                      {selectedParty.phone}
+                    </p>
+                  )}
                 </div>
               </div>
               <button
                 type="button"
-                className="btn-ghost rounded-full px-4"
+                className="btn-ghost rounded-md px-2 text-xs font-semibold"
                 onClick={() => setPartySelectorOpen(true)}
               >
                 {selectedParty ? t("common.change") : t("quickPos.selectParty")}
@@ -1627,39 +1623,35 @@ export default function QuickPos() {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-slate-200 bg-white px-4 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-lg font-semibold text-slate-900">
+          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase text-slate-600">
                 {t("quickPos.billingItems", { count: cart.length })}
               </p>
               <button
                 type="button"
-                className="btn-ghost rounded-full px-4"
+                className="btn-ghost rounded-md px-2 text-xs"
                 onClick={() => setCheckoutOpen(false)}
               >
                 {t("quickPos.addItems")}
               </button>
             </div>
 
-            <div className="mt-4 space-y-3">
+            <div className="mt-2 space-y-1.5 max-h-[180px] overflow-y-auto">
               {cart.map((item) => (
                 <div
                   key={item.productId}
-                  className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3"
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs hover:bg-slate-50 transition"
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-base font-semibold text-slate-900">
-                        {item.name}
-                      </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-1">
-                        <span className="text-sm text-slate-500">
-                          {t("currency.symbol")}
-                        </span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-900">{item.name}</p>
+                      <div className="mt-0.5 flex items-center gap-1 text-slate-600">
+                        <span>{t("currency.symbol")}</span>
                         <input
                           type="number"
                           inputMode="decimal"
-                          className="w-24 border-0 bg-transparent p-0 text-sm font-medium text-slate-600 focus:outline-none focus:ring-0"
+                          className="w-16 border-0 bg-transparent p-0 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-0"
                           value={item.unitPrice}
                           onChange={(e) =>
                             updateCartPrice(item.productId, e.target.value)
@@ -1668,11 +1660,11 @@ export default function QuickPos() {
                         {renderUnitSwitcher(item)}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-2 rounded-full border border-primary-100 bg-white px-2 py-1">
+                    <div className="flex shrink-0 items-center gap-1">
+                      <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1">
                         <button
                           type="button"
-                          className="rounded-full bg-slate-100 p-2 text-slate-600"
+                          className="p-0.5 text-slate-600 hover:text-slate-900"
                           onClick={() =>
                             updateCartQuantity(
                               item.productId,
@@ -1680,25 +1672,20 @@ export default function QuickPos() {
                             )
                           }
                         >
-                          <Minus size={14} />
+                          <Minus size={10} />
                         </button>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
-                            value={item.quantity}
-                            onChange={(e) =>
-                              updateCartQuantity(item.productId, e.target.value)
-                            }
-                          />
-                          <span className="text-xs text-slate-500">
-                            {getProductUnitLabel(item, item.unitType)}
-                          </span>
-                        </div>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          className="w-8 border-0 bg-transparent p-0 text-center text-xs font-semibold text-slate-900 focus:outline-none focus:ring-0"
+                          value={item.quantity}
+                          onChange={(e) =>
+                            updateCartQuantity(item.productId, e.target.value)
+                          }
+                        />
                         <button
                           type="button"
-                          className="rounded-full bg-primary p-2 text-white"
+                          className="p-0.5 text-primary hover:text-primary-700"
                           onClick={() =>
                             updateCartQuantity(
                               item.productId,
@@ -1706,18 +1693,18 @@ export default function QuickPos() {
                             )
                           }
                         >
-                          <Plus size={14} />
+                          <Plus size={10} />
                         </button>
                       </div>
                       <button
                         type="button"
-                        className="rounded-full border border-rose-100 bg-white p-2 text-rose-500 transition hover:bg-rose-50 hover:text-rose-600"
+                        className="p-0.5 text-rose-500 hover:text-rose-600"
                         onClick={() => updateCartQuantity(item.productId, 0)}
-                        aria-label={t("common.delete")}
                         title={t("common.delete")}
                       >
-                        <X size={14} />
+                        <X size={10} />
                       </button>
+                      <span className="font-bold text-primary-700">{money(item.lineTotal)}</span>
                     </div>
                   </div>
                 </div>
@@ -1726,103 +1713,87 @@ export default function QuickPos() {
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-            <div className="space-y-4">
-              <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-5">
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-amber-200/40 bg-gradient-to-br from-amber-50/60 to-yellow-50/40 px-4 py-4 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
                       {t("quickPos.discount")}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowDiscountInput(true)}
-                      className="text-[15px] font-bold text-primary-700 hover:text-primary-800 transition-colors"
-                    >
+                    <p className="text-lg font-bold text-amber-700">
                       {Number(checkoutForm.discount || 0) > 0
-                        ? money(checkoutForm.discount)
-                        : `+ ${t("sales.addDiscount")}`}
-                    </button>
+                        ? `- ${money(totals.discountTotal)}`
+                        : t("sales.addDiscount")}
+                    </p>
                   </div>
-                  <div className="relative flex-1 max-w-[140px] flex justify-end">
-                    {showDiscountInput && (
-                      <div className="relative w-full">
-                        <input
-                          autoFocus
-                          className="input h-11 rounded-2xl pr-8 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10"
-                          type="number"
-                          inputMode="decimal"
-                          min="0"
-                          step="0.01"
-                          value={checkoutForm.discount}
-                          onChange={(event) =>
-                            setCheckoutForm((previous) => ({
-                              ...previous,
-                              discount: event.target.value,
-                            }))
-                          }
-                          onBlur={() => setShowDiscountInput(false)}
-                          placeholder="0.00"
-                        />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                          {t("currency.symbol")}
-                        </div>
+                  <div className="relative flex-1 max-w-[130px] flex justify-end">
+                    <div className="relative w-full">
+                      <input
+                        className="input h-10 w-full rounded-xl border-amber-300/30 bg-white/80 pr-8 text-right font-semibold text-sm focus:border-amber-400 focus:ring-amber-100/50"
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={checkoutForm.discount}
+                        onChange={(event) =>
+                          setCheckoutForm((previous) => ({
+                            ...previous,
+                            discount: event.target.value,
+                          }))
+                        }
+                        placeholder="0"
+                      />
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-500">
+                        {t("currency.symbol")}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-5">
+              <div className="rounded-2xl border border-blue-200/40 bg-gradient-to-br from-blue-50/60 to-cyan-50/40 px-4 py-4 shadow-sm">
                 <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
                       {t("common.tax") || "VAT"}
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => setShowTaxInput(true)}
-                      className="text-[15px] font-bold text-primary-700 hover:text-primary-800 transition-colors"
-                    >
+                    <p className="text-lg font-bold text-blue-700">
                       {Number(checkoutForm.taxRate || 0) > 0
-                        ? `${checkoutForm.taxRate}%`
-                        : `+ ${t("sales.addTax")}`}
-                    </button>
+                        ? money(totals.taxTotal)
+                        : t("sales.addTax")}
+                    </p>
                   </div>
-                  <div className="relative flex-1 max-w-[140px] flex justify-end">
-                    {showTaxInput && (
-                      <div className="relative w-full">
-                        <input
-                          autoFocus
-                          className="input h-11 rounded-2xl pr-8 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10"
-                          type="number"
-                          inputMode="decimal"
-                          min="0"
-                          step="0.01"
-                          value={checkoutForm.taxRate || ""}
-                          onChange={(event) =>
-                            setCheckoutForm((previous) => ({
-                              ...previous,
-                              taxRate: event.target.value,
-                            }))
-                          }
-                          onBlur={() => setShowTaxInput(false)}
-                          placeholder="0"
-                        />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                          %
-                        </div>
+                  <div className="relative flex-1 max-w-[130px] flex justify-end">
+                    <div className="relative w-full">
+                      <input
+                        className="input h-10 w-full rounded-xl border-blue-300/30 bg-white/80 pr-8 text-right font-semibold text-sm focus:border-blue-400 focus:ring-blue-100/50"
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={checkoutForm.taxRate || ""}
+                        onChange={(event) =>
+                          setCheckoutForm((previous) => ({
+                            ...previous,
+                            taxRate: event.target.value,
+                          }))
+                        }
+                        placeholder="0"
+                      />
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-500">
+                        %
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
                   {t("common.notes")}
                 </p>
                 <textarea
-                  className="input mt-3 min-h-[90px] resize-none rounded-2xl text-sm border-slate-100 focus:border-primary focus:ring-primary/5"
+                  className="input mt-2.5 min-h-[80px] resize-none rounded-xl text-sm border-slate-200 focus:border-primary focus:ring-primary/10"
                   value={checkoutForm.notes}
                   onChange={(event) =>
                     setCheckoutForm((previous) => ({
@@ -1835,24 +1806,26 @@ export default function QuickPos() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-5">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+            <div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-600">
                     <span>{t("sales.subTotal")}</span>
-                    <span>{money(totals.subTotal)}</span>
+                    <span className="font-semibold text-slate-900">{money(totals.subTotal)}</span>
                   </div>
-                  <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-                    <span>{t("sales.taxTotal")}</span>
-                    <span>{money(totals.taxTotal)}</span>
-                  </div>
-                  {totals.discountTotal > 0 ? (
-                    <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-                      <span>{t("quickPos.discount")}</span>
-                      <span>- {money(totals.discountTotal)}</span>
+                  {totals.taxTotal > 0 && (
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span>{t("sales.taxTotal")}</span>
+                      <span className="font-semibold text-slate-900">{money(totals.taxTotal)}</span>
                     </div>
-                  ) : null}
-                  <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-xl font-bold text-slate-900">
+                  )}
+                  {totals.discountTotal > 0 && (
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span>{t("quickPos.discount")}</span>
+                      <span className="font-semibold text-slate-900">- {money(totals.discountTotal)}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-bold text-slate-900">
                     <span>{t("sales.grandTotal")}</span>
                     <span>{money(totals.grandTotal)}</span>
                   </div>
@@ -1860,10 +1833,10 @@ export default function QuickPos() {
               </div>
 
               {selectedParty && (
-                <div className="rounded-[28px] border border-slate-200 bg-white px-5 py-5">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-3 mt-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase text-slate-600">
                         {t("services.amountReceived")}
                       </p>
                       <button
@@ -1872,7 +1845,7 @@ export default function QuickPos() {
                           if (!isPaid) setShowAmountReceivedInput(true);
                           else setIsPaid(false);
                         }}
-                        className={`text-[15px] font-bold transition-colors ${isPaid ? "text-slate-400" : "text-primary-700"}`}
+                        className={`text-sm font-bold transition-colors mt-1 ${isPaid ? "text-slate-400" : "text-primary-700"}`}
                       >
                         {isPaid
                           ? money(totals.grandTotal)
@@ -1881,7 +1854,7 @@ export default function QuickPos() {
                             : `+ ${t("sales.addReceived")}`}
                       </button>
                     </div>
-                    <label className="flex items-center gap-2 rounded-full border border-slate-100 bg-slate-50 px-3 py-1.5 text-[10px] font-bold text-slate-600 cursor-pointer hover:bg-slate-100 transition">
+                    <label className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 cursor-pointer hover:bg-slate-100 transition shrink-0">
                       <input
                         type="checkbox"
                         className="h-3.5 w-3.5 rounded accent-primary-600"
@@ -1897,10 +1870,10 @@ export default function QuickPos() {
                   </div>
 
                   {showAmountReceivedInput && !isPaid && (
-                    <div className="mt-4 relative w-full">
+                    <div className="mt-3 relative w-full">
                       <input
                         autoFocus
-                        className="input h-11 rounded-2xl text-lg font-bold pr-10 w-full border-primary/20 focus:border-primary focus:ring-primary/10"
+                        className="input h-9 rounded-lg text-sm font-bold pr-8 w-full border-slate-200 focus:border-primary focus:ring-primary/10"
                         type="number"
                         inputMode="decimal"
                         min="0"
@@ -1914,7 +1887,7 @@ export default function QuickPos() {
                         }
                         onBlur={() => setShowAmountReceivedInput(false)}
                       />
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">
                         {t("currency.symbol")}
                       </div>
                     </div>
