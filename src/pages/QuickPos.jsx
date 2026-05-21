@@ -182,8 +182,8 @@ export default function QuickPos() {
   const mobileProductLoadMoreRef = useRef(null);
 
   const formSteps = [
-    { id: "items", label: t("quickPos.items") || "Items" },
-    { id: "details", label: t("quickPos.checkout") || "Details" },
+    { id: "items", label: t("Items") || "Items" },
+    { id: "details", label: t("Checkout") || "Details" },
   ];
 
   const salesTitle =
@@ -775,7 +775,7 @@ export default function QuickPos() {
               onClick={() => setCheckoutOpen(true)}
               disabled={!cart.length || submitting}
             >
-              {t("quickPos.completeSale") || "Complete"}
+              {t("CompleteSale") || "Complete"}
             </button>
           </>
         ) : (
@@ -785,7 +785,7 @@ export default function QuickPos() {
               className="btn-secondary h-11 justify-center rounded-[18px] text-sm font-bold"
               onClick={handleReviewBill}
             >
-              {isMobile ? t("quickPos.checkout") : t("quickPos.reviewBill")}
+              {isMobile ? t("Checkout") : t("quickPos.reviewBill")}
             </button>
             <button
               type="button"
