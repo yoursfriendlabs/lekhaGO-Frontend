@@ -22,6 +22,7 @@ import dayjs, { formatMaybeDate } from '../lib/datetime';
 import { useI18n } from '../lib/i18n.jsx';
 import { normalizeLookupParty, toPartyLookupOption } from '../lib/lookups.js';
 import { getPaymentTypeDisplay, hasPaymentTypeData } from '../lib/paymentType';
+import { printElement } from '../lib/print';
 
 function formatStatementDate(value) {
   if (!value) return '-';
@@ -51,7 +52,25 @@ function formatMoney(value, t) {
   return t('currency.formatted', {
     symbol: t('currency.symbol'),
     amount: Number(value).toFixed(2),
-  });
+  }).replace(/\u00a0/g, ' ');
+}
+
+function toCsvCell(value) {
+  const text = String(value ?? '');
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map(toCsvCell).join(',')).join('\r\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 function getLedgerTypeMeta(type, t) {
@@ -388,34 +407,57 @@ export default function Ledger() {
     });
   };
 
+  const handleDownloadExcel = () => {
+    const rows = [
+      [t('ledger.statementTitle')],
+      [t('ledger.party'), selectedPartyLabel],
+      [t('common.date'), timeSpanLabel],
+      ['Exported', dayjs().format('D MMM YYYY, HH:mm')],
+      [],
+      [balanceLabel, formatMoney(summary.currentBalance, t)],
+      [t('ledger.totalDebit'), formatMoney(summary.totalDebit, t)],
+      [t('ledger.totalCredit'), formatMoney(summary.totalCredit, t)],
+      [t('ledger.totalEntries'), summary.entries],
+      [],
+      [
+        t('common.date'),
+        t('ledger.referenceNo'),
+        t('ledger.party'),
+        t('ledger.type'),
+        t('common.status'),
+        t('payments.paymentMethod'),
+        t('ledger.debit'),
+        t('ledger.credit'),
+        t('ledger.runningBalance'),
+      ],
+      ...statementRows.map((row) => [
+        formatStatementDate(row.date),
+        row.referenceDisplay,
+        row.partyDisplay,
+        row.typeMeta.label,
+        row.statusDisplay,
+        [row.paymentDisplay.label, row.paymentDisplay.balanceText].filter(Boolean).join(' - '),
+        row.debit > 0 ? formatMoney(row.debit, t) : '',
+        row.credit > 0 ? formatMoney(row.credit, t) : '',
+        formatMoney(row.runningBalance, t),
+      ]),
+    ];
+
+    downloadCsv(`ledger-${dayjs().format('YYYY-MM-DD-HHmm')}.csv`, rows);
+  };
+
   const handlePrint = () => {
-    const source = printRef.current;
-    if (!source) {
-      window.print();
-      return;
-    }
-
-    const clone = source.cloneNode(true);
-    clone.classList.add('print-clone');
-    clone.style.cssText = '';
-
     const now = dayjs();
-    clone.querySelectorAll('[data-printed-at]').forEach((node) => {
-      node.textContent = now.format('D MMM YYYY, HH:mm');
+    printElement(printRef.current, {
+      prepareClone: (clone) => {
+        clone.querySelectorAll('[data-printed-at]').forEach((node) => {
+          node.textContent = now.format('D MMM YYYY, HH:mm');
+        });
+        clone.querySelectorAll('[data-printed-date]').forEach((node) => {
+          node.textContent = now.format('D MMM YYYY');
+        });
+      },
     });
-    clone.querySelectorAll('[data-printed-date]').forEach((node) => {
-      node.textContent = now.format('D MMM YYYY');
-    });
-
-    document.body.appendChild(clone);
-
-    const cleanup = () => {
-      if (document.body.contains(clone)) document.body.removeChild(clone);
-      window.removeEventListener('afterprint', cleanup);
-    };
-
-    window.addEventListener('afterprint', cleanup);
-    window.print();
   };
 
   const handleRefresh = () => {
@@ -475,18 +517,14 @@ export default function Ledger() {
                 {loading || refreshing ? t('common.loading') : t('topbar.refresh')}
               </button>
               <button
-                className="btn-primary inline-flex items-center justify-center gap-2 opacity-60 disabled:cursor-not-allowed disabled:opacity-60"
+                className="btn-primary inline-flex items-center justify-center gap-2"
                 type="button"
-                disabled
-                aria-disabled="true"
-                title={t('ledger.exportUnavailable')}
+                onClick={handleDownloadExcel}
+                disabled={loading}
               >
                 <Download size={16} /> {t('ledger.downloadExcel')}
               </button>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {t('ledger.exportUnavailable')}
-            </p>
           </div>
         )}
       />

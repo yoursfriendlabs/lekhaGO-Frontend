@@ -173,8 +173,18 @@ body {
     position: static !important;
     box-sizing: border-box !important;
     width: 100% !important;
+    max-width: none !important;
     margin: 0 !important;
     padding: 0.8cm !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  .print-clone * {
+    visibility: visible !important;
   }
 
   .print-clone .card,

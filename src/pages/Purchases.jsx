@@ -168,6 +168,7 @@ export default function Purchases() {
   const [refreshingPurchases, setRefreshingPurchases] = useState(false);
   const [pageSize, setPageSize] = useState(10);
   const [mobileStep, setMobileStep] = useState('details');
+  const manualStatusRef = useRef(false);
 
   const isExpense = header.entryType === 'expense';
   const money = (value) => (
@@ -249,6 +250,7 @@ export default function Purchases() {
 
   useEffect(() => {
     if (isPaid) return;
+    if (manualStatusRef.current) return;
     if (header.status === 'ordered') return;
     if (dueAmount > 0 && header.status === 'received') {
       setHeader((prev) => ({ ...prev, status: 'due' }));
@@ -259,11 +261,17 @@ export default function Purchases() {
 
   const handleHeaderChange = (event) => {
     const { name, value } = event.target;
+    if (name === 'status') {
+      manualStatusRef.current = true;
+      if (value === 'due' || value === 'ordered') setIsPaid(false);
+      if (value === 'received') setIsPaid(true);
+    }
     setHeader((prev) => ({ ...prev, [name]: value }));
   };
 
   const applyQuickPaidAmount = (nextAmount, { markPaid = false } = {}) => {
     const normalizedAmount = Math.min(Math.max(Number(nextAmount || 0), 0), totals.grandTotal);
+    manualStatusRef.current = false;
     setIsPaid(markPaid && totals.grandTotal > 0);
     setHeader((prev) => ({ ...prev, amountReceived: normalizedAmount.toFixed(2) }));
   };
@@ -493,6 +501,7 @@ export default function Purchases() {
   const pagedPurchases = filteredPurchases;
 
   const resetForm = (entryType = 'expense') => {
+    manualStatusRef.current = false;
     setHeader({
       entryType,
       partyId: '',
@@ -531,7 +540,7 @@ export default function Purchases() {
 
     setOpeningPurchaseForm(true);
     resetForm(entryType);
-    setMobileStep(isMobile ? 'items' : 'details');
+    setMobileStep('details');
     setStatus({ type: 'info', message: '' });
     setPayDialog(null);
     setIsOpen(true);
@@ -569,6 +578,7 @@ export default function Purchases() {
 
   const openEdit = async (purchaseId) => {
     try {
+      manualStatusRef.current = false;
       setStatus({ type: 'info', message: '' });
       setPayDialog(null);
       const purchase = await api.getPurchase(purchaseId);

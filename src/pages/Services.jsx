@@ -22,6 +22,7 @@ import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
 import { getServicesDisplayLabel } from '../lib/businessTypeConfig.js';
 import { useI18n } from '../lib/i18n.jsx';
+import { printElement } from '../lib/print.js';
 import FileUpload from '../components/FileUpload';
 import DynamicAttributes from '../components/DynamicAttributes';
 import {
@@ -1432,19 +1433,7 @@ export default function Services() {
   const invoicePrintRef = useRef(null);
 
   const handlePrint = () => {
-    const source = invoicePrintRef.current;
-    if (!source) { window.print(); return; }
-    const clone = source.cloneNode(true);
-    clone.classList.add('print-clone');
-    // Ensure inline styles don't hide it on screen before print fires
-    clone.style.cssText = '';
-    document.body.appendChild(clone);
-    const cleanup = () => {
-      if (document.body.contains(clone)) document.body.removeChild(clone);
-      window.removeEventListener('afterprint', cleanup);
-    };
-    window.addEventListener('afterprint', cleanup);
-    window.print();
+    printElement(invoicePrintRef.current);
   };
 
   const showDetailsStep = mobileStep === 'details';
@@ -2679,7 +2668,7 @@ export default function Services() {
                   />
                 </div>
 
-                {/* ── Customer + Notes + Attributes ── */}
+                {/* ── Customer + Attributes ── */}
                 <div className="border-b border-slate-200/70 bg-slate-50/60 px-8 py-5 dark:border-slate-800/70 dark:bg-slate-900/30">
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div>
@@ -2690,14 +2679,6 @@ export default function Services() {
                         Created By:{' '}
                         <span className="font-medium text-slate-900 dark:text-white">{getCreatorDisplayName(invoiceOrder)}</span>
                       </p>
-                    </div>
-                    <div className="min-h-[72px]">
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">Notes</p>
-                      {invoiceOrder.notes ? (
-                        <p className="whitespace-pre-wrap text-sm text-slate-900 dark:text-white">{invoiceOrder.notes}</p>
-                      ) : (
-                        <p className="text-sm text-slate-400">—</p>
-                      )}
                     </div>
                   </div>
                   {showGoldJewelleryDetails && (invoiceJewellery.metalType || invoiceJewellery.metalPurity || invoiceJewellery.actualWeight || invoiceJewellery.wastagePercent || invoiceJewellery.totalWeight || invoiceJewellery.diamondType || invoiceJewellery.diamondWeight || invoiceJewellery.diamondCarat || invoiceJewellery.diamondCharge) && (
