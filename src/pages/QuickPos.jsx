@@ -596,7 +596,7 @@ export default function QuickPos() {
     stopPropagation = false,
   }) => (
     <div
-      className="flex flex-wrap max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold shadow-sm"
+      className="grid w-full grid-cols-2 gap-1 rounded-full border border-slate-200 bg-white px-1 py-1 text-xs font-semibold shadow-sm sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:px-2"
       onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
       onPointerDown={
         stopPropagation ? (event) => event.stopPropagation() : undefined
@@ -610,7 +610,7 @@ export default function QuickPos() {
           <button
             type="button"
             key={option.value}
-            className={`min-w-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs transition ${
+            className={`w-full rounded-full px-2 py-1 text-center text-xs transition sm:w-auto ${
               isSelected
                 ? "text-green-600"
                 : "text-slate-500 hover:text-slate-800"
@@ -802,13 +802,13 @@ export default function QuickPos() {
   );
 
   return (
-    <div className="min-w-0 space-y-6 pb-28 md:pb-0">
+    <div className="min-w-0 space-y-5 pb-28 md:pb-0">
       <PageHeader
         title={salesTitle}
         subtitle={isMobile ? "" : t("quickPos.subtitle")}
         action={
-          <div className="flex flex-wrap gap-2">
-            <Link className="btn-ghost justify-center" to="/app/sales">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Link className="btn-ghost h-11 justify-center rounded-[18px]" to="/app/sales">
               {t("quickPos.detailedSales")}
             </Link>
           </div>
@@ -837,12 +837,12 @@ export default function QuickPos() {
         <Notice title={status.message} tone={status.type} />
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div
           className={`space-y-5 ${isMobile && mobileStep !== "items" ? "hidden" : ""}`}
         >
           <div className="rounded-[28px] border border-secondary-200/70 bg-white/90 p-3 shadow-sm sm:rounded-[32px]">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
               <div className="relative flex-1">
                 <Search
                   className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
@@ -857,13 +857,13 @@ export default function QuickPos() {
                 />
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center w-full">
                 <label className="sr-only" htmlFor="quick-pos-category">
                   {t("quickPos.allCategories")}
                 </label>
                 <select
                   id="quick-pos-category"
-                  className="input h-11 min-w-0 rounded-[18px] bg-slate-50 px-4 text-sm font-semibold text-slate-700 focus:bg-white sm:min-w-[190px]"
+                  className="input h-11 w-full min-w-0 rounded-[18px] bg-slate-50 px-4 text-sm font-semibold text-slate-700 focus:bg-white sm:w-auto sm:min-w-[160px]"
                   value={selectedCategory}
                   onChange={(event) => setSelectedCategory(event.target.value)}
                 >
@@ -876,7 +876,7 @@ export default function QuickPos() {
                   ))}
                 </select>
                 <Link
-                  className="btn-secondary h-11 flex-1 justify-center rounded-[18px] text-xs sm:flex-none sm:px-4"
+                  className="btn-secondary h-11 w-full justify-center rounded-[18px] text-xs sm:w-auto sm:flex-none sm:px-4"
                   to="/app/inventory"
                 >
                   {t("quickPos.addNewItem")}
@@ -884,7 +884,7 @@ export default function QuickPos() {
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               {quickCategoryOptions.map((category) => {
                 const isActive = category === selectedCategory;
                 const label =
@@ -895,7 +895,7 @@ export default function QuickPos() {
                     key={category}
                     type="button"
                     onClick={() => setSelectedCategory(category)}
-                    className={`min-w-0 truncate rounded-full px-3 py-2 text-xs font-semibold transition ${
+                    className={`min-w-0 flex-1 truncate rounded-full px-3 py-2 text-xs font-semibold transition sm:flex-none ${
                       isActive
                         ? "bg-primary text-white shadow-md"
                         : "bg-white text-slate-600 border border-slate-100"
@@ -932,7 +932,7 @@ export default function QuickPos() {
               }
               onScroll={isMobile ? handleMobileProductScroll : undefined}
             >
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-3 2xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-3 2xl:grid-cols-4">
                 {visibleProducts.map((product) => {
                   const inCart = cart.find(
                     (item) => item.productId === product.id,
