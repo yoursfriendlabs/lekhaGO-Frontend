@@ -161,7 +161,7 @@ function OtpInput({ digits, onChange, disabled }) {
   return (
     <div className="grid grid-cols-6 gap-2 sm:gap-3">
       {digits.map((digit, index) => (
-        <input
+        <input id={"otp-length-" + index}
           key={index}
           ref={(element) => {
             inputRefs.current[index] = element;
@@ -399,12 +399,12 @@ export default function VerifyEmail() {
               <div>
                 <div className="flex items-center justify-between gap-3">
                   <label className="label !text-slate-700 dark:!text-slate-200">{t('auth.otpCode')}</label>
-                  <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                  <span  className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
                     {OTP_LENGTH} digits
                   </span>
                 </div>
                 <div className="mt-3">
-                  <OtpInput digits={digits} onChange={setDigits} disabled={!canVerify || verifying} />
+                  <OtpInput id="otp-length"  digits={digits} onChange={setDigits} disabled={!canVerify || verifying} />
                 </div>
               </div>
 
@@ -423,7 +423,7 @@ export default function VerifyEmail() {
               </div>
 
               <div className="space-y-3">
-                <button
+                <button id='verify-button'
                   className="btn-primary w-full rounded-2xl py-3 text-base"
                   type="submit"
                   disabled={verifying || !canVerify || otpCode.length !== OTP_LENGTH}
