@@ -610,7 +610,7 @@ export default function QuickPos() {
           <button
             type="button"
             key={option.value}
-            className={`w-full rounded-full px-2 py-1 text-center text-xs transition sm:w-auto ${
+            className={`w-full min-w-0 rounded-full px-2 py-1 text-center text-xs transition sm:w-auto sm:min-w-[4.5rem] ${
               isSelected
                 ? "text-green-600"
                 : "text-slate-500 hover:text-slate-800"
@@ -1214,7 +1214,7 @@ export default function QuickPos() {
                 </div>
 
                 <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
-                  <span className="min-w-0">
+                  <span className="min-w-0 max-w-full">
                     <span className="block">{t("tax") || "VAT"}</span>
                     <span className="block text-[11px] font-semibold text-primary-700">
                       {Number(checkoutForm.taxRate || 0) > 0
@@ -1222,30 +1222,32 @@ export default function QuickPos() {
                         : `+ ${t("sales.addTax")}`}
                     </span>
                   </span>
-                  <div className="relative w-24 shrink-0">
-                    <input
-                      className="input h-8 w-full rounded-lg border-primary/20 pr-6 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.01"
-                      value={checkoutForm.taxRate || ""}
-                      onChange={(event) =>
-                        setCheckoutForm((previous) => ({
-                          ...previous,
-                          taxRate: event.target.value,
-                        }))
-                      }
-                      placeholder="0"
-                    />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                      %
+                  <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
+                    <div className="relative">
+                      <input
+                        className="input h-8 w-full rounded-lg border-primary/20 pr-9 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={checkoutForm.taxRate || ""}
+                        onChange={(event) =>
+                          setCheckoutForm((previous) => ({
+                            ...previous,
+                            taxRate: event.target.value,
+                          }))
+                        }
+                        placeholder="0"
+                      />
+                      <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                        %
+                      </div>
                     </div>
                   </div>
                 </label>
 
                 <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
-                  <span className="min-w-0">
+                  <span className="min-w-0 max-w-full">
                     <span className="block">{t("quickPos.discount")}</span>
                     <span className="block text-[11px] font-semibold text-primary-700">
                       {Number(checkoutForm.discount || 0) > 0
@@ -1253,24 +1255,26 @@ export default function QuickPos() {
                         : `+ ${t("sales.addDiscount")}`}
                     </span>
                   </span>
-                  <div className="relative w-28 shrink-0">
-                    <input
-                      className="input h-8 w-full rounded-lg border-primary/20 pr-7 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.01"
-                      value={checkoutForm.discount}
-                      onChange={(event) =>
-                        setCheckoutForm((previous) => ({
-                          ...previous,
-                          discount: event.target.value,
-                        }))
-                      }
-                      placeholder="0.00"
-                    />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                      {t("currency.symbol")}
+                  <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
+                    <div className="relative">
+                      <input
+                        className="input h-8 w-full rounded-lg border-primary/20 pr-10 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={checkoutForm.discount}
+                        onChange={(event) =>
+                          setCheckoutForm((previous) => ({
+                            ...previous,
+                            discount: event.target.value,
+                          }))
+                        }
+                        placeholder="0.00"
+                      />
+                      <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                        {t("currency.symbol")}
+                      </div>
                     </div>
                   </div>
                 </label>
@@ -1279,25 +1283,27 @@ export default function QuickPos() {
                   <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
                     <span className="min-w-0">{t("services.amountReceived")}</span>
                     {showAmountReceivedInput && !isPaid ? (
-                      <div className="relative w-28 shrink-0">
-                        <input
-                          autoFocus
-                          className="input h-8 rounded-lg pr-7 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
-                          type="number"
-                          inputMode="decimal"
-                          min="0"
-                          step="0.01"
-                          value={checkoutForm.amountReceived}
-                          onChange={(event) =>
-                            setCheckoutForm((previous) => ({
-                              ...previous,
-                              amountReceived: event.target.value,
-                            }))
-                          }
-                          onBlur={() => setShowAmountReceivedInput(false)}
-                        />
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                          {t("currency.symbol")}
+                      <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
+                        <div className="relative">
+                          <input
+                            autoFocus
+                            className="input h-8 rounded-lg pr-10 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            step="0.01"
+                            value={checkoutForm.amountReceived}
+                            onChange={(event) =>
+                              setCheckoutForm((previous) => ({
+                                ...previous,
+                                amountReceived: event.target.value,
+                              }))
+                            }
+                            onBlur={() => setShowAmountReceivedInput(false)}
+                          />
+                          <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                            {t("currency.symbol")}
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1401,8 +1407,8 @@ export default function QuickPos() {
                     key={item.productId}
                     className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold text-slate-900">
                           {item.name}
                         </p>
@@ -1422,11 +1428,11 @@ export default function QuickPos() {
                           {renderUnitSwitcher(item)}
                         </div>
                       </div>
-                      <p className="text-sm font-semibold text-primary-700">
+                      <p className="shrink-0 text-sm font-semibold text-primary-700">
                         {money(item.lineTotal)}
                       </p>
                     </div>
-                    <div className="mt-3 flex items-center justify-between gap-2 rounded-[18px] bg-white px-3 py-1">
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-[18px] bg-white px-3 py-1">
                       <div className="flex items-center gap-2 rounded-full border border-primary-100 bg-white px-1">
                         <button
                           type="button"
@@ -1488,8 +1494,8 @@ export default function QuickPos() {
                 <span>{money(totals.subTotal)}</span>
               </div>
 
-              <label className="flex items-center justify-between gap-2 text-sm text-slate-500">
-                <span>
+              <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+                <span className="min-w-0 max-w-full">
                   <span className="block">{t("Tax") || "VAT"}</span>
                   <span className="block text-[11px] font-semibold text-primary-700">
                     {Number(checkoutForm.taxRate || 0) > 0
@@ -1497,30 +1503,32 @@ export default function QuickPos() {
                       : `+ ${t("sales.addTax")}`}
                   </span>
                 </span>
-                <div className="relative w-24 shrink-0">
-                  <input
-                    className="input h-8 w-full rounded-lg border-primary/20 pr-6 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="0.01"
-                    value={checkoutForm.taxRate || ""}
-                    onChange={(event) =>
-                      setCheckoutForm((previous) => ({
-                        ...previous,
-                        taxRate: event.target.value,
-                      }))
-                    }
-                    placeholder="0"
-                  />
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                    %
+                <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
+                  <div className="relative">
+                    <input
+                      className="input h-8 w-full rounded-lg border-primary/20 pr-9 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={checkoutForm.taxRate || ""}
+                      onChange={(event) =>
+                        setCheckoutForm((previous) => ({
+                          ...previous,
+                          taxRate: event.target.value,
+                        }))
+                      }
+                      placeholder="0"
+                    />
+                    <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                      %
+                    </div>
                   </div>
                 </div>
               </label>
 
-              <label className="flex items-center justify-between gap-2 text-sm text-slate-500">
-                <span>
+              <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+                <span className="min-w-0 max-w-full">
                   <span className="block">{t("quickPos.discount")}</span>
                   <span className="block text-[11px] font-semibold text-primary-700">
                     {Number(checkoutForm.discount || 0) > 0
@@ -1528,51 +1536,55 @@ export default function QuickPos() {
                       : `+ ${t("sales.addDiscount")}`}
                   </span>
                 </span>
-                <div className="relative w-28 shrink-0">
-                  <input
-                    className="input h-8 w-full rounded-lg border-primary/20 pr-7 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="0.01"
-                    value={checkoutForm.discount}
-                    onChange={(event) =>
-                      setCheckoutForm((previous) => ({
-                        ...previous,
-                        discount: event.target.value,
-                      }))
-                    }
-                    placeholder="0.00"
-                  />
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                    {t("currency.symbol")}
+                <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
+                  <div className="relative">
+                    <input
+                      className="input h-8 w-full rounded-lg border-primary/20 pr-10 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={checkoutForm.discount}
+                      onChange={(event) =>
+                        setCheckoutForm((previous) => ({
+                          ...previous,
+                          discount: event.target.value,
+                        }))
+                      }
+                      placeholder="0.00"
+                    />
+                    <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                      {t("currency.symbol")}
+                    </div>
                   </div>
                 </div>
               </label>
 
               {selectedParty && (
-                <div className="flex items-center justify-between text-sm text-slate-500">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
                   <span>{t("services.amountReceived")}</span>
                   {showAmountReceivedInput && !isPaid ? (
-                    <div className="relative w-28">
-                      <input
-                        autoFocus
-                        className="input h-8 rounded-lg pr-7 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        step="0.01"
-                        value={checkoutForm.amountReceived}
-                        onChange={(event) =>
-                          setCheckoutForm((previous) => ({
-                            ...previous,
-                            amountReceived: event.target.value,
-                          }))
-                        }
-                        onBlur={() => setShowAmountReceivedInput(false)}
-                      />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                        {t("currency.symbol")}
+                    <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
+                      <div className="relative">
+                        <input
+                          autoFocus
+                          className="input h-8 rounded-lg pr-10 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          step="0.01"
+                          value={checkoutForm.amountReceived}
+                          onChange={(event) =>
+                            setCheckoutForm((previous) => ({
+                              ...previous,
+                              amountReceived: event.target.value,
+                            }))
+                          }
+                          onBlur={() => setShowAmountReceivedInput(false)}
+                        />
+                        <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                          {t("currency.symbol")}
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -1603,13 +1615,13 @@ export default function QuickPos() {
               )}
 
               {selectedParty && dueAmount > 0 && (
-                <div className="flex items-center justify-between text-sm font-semibold text-amber-600">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-semibold text-amber-600">
                   <span>{t("sales.dueAmount")}</span>
                   <span>{money(dueAmount)}</span>
                 </div>
               )}
 
-              <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3 text-lg font-bold text-slate-900">
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-lg font-bold text-slate-900">
                 <span>{t("sales.grandTotal")}</span>
                 <span>{money(totals.grandTotal)}</span>
               </div>
