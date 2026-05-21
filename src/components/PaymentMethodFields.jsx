@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import SearchableSelect from './SearchableSelect';
+import NoteTextarea from './NoteTextarea.jsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 import { getEffectivePaymentMethod } from '../lib/payments';
@@ -134,6 +135,9 @@ export default function PaymentMethodFields({
   const fieldClassName =
     'h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100';
 
+  const noteFieldClassName =
+    'min-h-[88px] w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100';
+
   const labelClassName =
     'mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400';
 
@@ -217,8 +221,8 @@ export default function PaymentMethodFields({
             {noteLabel || t('payments.paymentNote')}
           </label>
 
-          <input
-            className={fieldClassName}
+          <NoteTextarea
+            className={noteFieldClassName}
             value={value.paymentNote || ''}
             onChange={(event) =>
               updateValue({

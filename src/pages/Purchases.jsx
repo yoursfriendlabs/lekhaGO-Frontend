@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import RefreshButton from '../components/RefreshButton.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import NoteTextarea from '../components/NoteTextarea.jsx';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import MobileFormStepper from '../components/MobileFormStepper.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
@@ -1055,11 +1056,10 @@ export default function Purchases() {
                 title={t('purchases.notes')}
                 className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
               >
-                <textarea
+                <NoteTextarea
                   className="input h-28 resize-none"
                   name="notes"
                   value={header.notes}
-                  maxLength={10000}
                   onChange={handleHeaderChange}
                 />
               </FormSectionCard>

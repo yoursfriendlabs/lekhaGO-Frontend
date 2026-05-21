@@ -55,6 +55,7 @@ const dictionaries = {
       view: 'View',
       yes: 'Yes',
       no: 'No',
+      words: 'words',
     },
     errors: {
       businessIdRequired: 'Add your Business ID first.',
@@ -1533,6 +1534,7 @@ const dictionaries = {
       view: 'हेर्नुहोस्',
       yes: 'हो',
       no: 'होइन',
+      words: 'शब्द',
     },
     filters: {
       createdBy: 'सिर्जना गर्ने',

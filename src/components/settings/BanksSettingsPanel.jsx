@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Power, Trash2 } from 'lucide-react';
 import ActionMenu from '../ActionMenu.jsx';
+import NoteTextarea from '../NoteTextarea.jsx';
 import Notice from '../Notice';
 import Pagination from '../Pagination';
 import { Dialog } from '../ui/Dialog.tsx';
@@ -441,11 +442,10 @@ export default function BanksSettingsPanel() {
 
           <div>
             <label className="label">{t('common.notes')}</label>
-            <textarea
+            <NoteTextarea
               className="input mt-1 h-24 resize-none"
               name="notes"
               value={form.notes}
-              maxLength={10000}
               onChange={handleChange}
             />
           </div>

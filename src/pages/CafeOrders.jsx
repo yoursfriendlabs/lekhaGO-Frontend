@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import NoteTextarea from '../components/NoteTextarea.jsx';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
@@ -928,10 +929,9 @@ export default function CafeOrders() {
 
                 <div className="sm:col-span-2 xl:col-span-4">
                   <label className="label">Notes</label>
-                  <textarea
+                  <NoteTextarea
                     className="input mt-1 h-24 resize-none"
                     value={orderFields.notes}
-                    maxLength={10000}
                     onChange={(event) => setOrderFields((prev) => ({ ...prev, notes: event.target.value }))}
                     placeholder="Special instructions"
                   />

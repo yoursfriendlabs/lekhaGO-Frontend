@@ -14,6 +14,7 @@ import {
 import PageHeader from "../components/PageHeader.jsx";
 import Notice from "../components/Notice.jsx";
 import PaymentMethodFields from "../components/PaymentMethodFields.jsx";
+import NoteTextarea from "../components/NoteTextarea.jsx";
 import QuickPaymentButtons from "../components/QuickPaymentButtons.jsx";
 import QuickPartySelector from "../components/QuickPartySelector.jsx";
 import QuickActionSuccessDialog from "../components/QuickActionSuccessDialog.jsx";
@@ -1894,7 +1895,7 @@ export default function QuickPos() {
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
                   {t("common.notes")}
                 </p>
-                <textarea
+                <NoteTextarea
                   className="input mt-2.5 min-h-[80px] resize-none rounded-xl text-sm border-slate-200 focus:border-primary focus:ring-primary/10"
                   value={checkoutForm.notes}
                   onChange={(event) =>
