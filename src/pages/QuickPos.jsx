@@ -597,7 +597,7 @@ export default function QuickPos() {
     stopPropagation = false,
   }) => (
     <div
-      className="flex flex-wrap max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold shadow-sm"
+      className="grid w-full grid-cols-2 gap-1 rounded-full border border-slate-200 bg-white px-1 py-1 text-xs font-semibold shadow-sm sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:px-2"
       onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
       onPointerDown={
         stopPropagation ? (event) => event.stopPropagation() : undefined
@@ -611,7 +611,7 @@ export default function QuickPos() {
           <button
             type="button"
             key={option.value}
-            className={`min-w-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs transition ${
+            className={`w-full rounded-full px-2 py-1 text-center text-xs transition sm:w-auto ${
               isSelected
                 ? "text-green-600"
                 : "text-slate-500 hover:text-slate-800"
