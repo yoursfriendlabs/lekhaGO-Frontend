@@ -1079,8 +1079,8 @@ export default function QuickPos() {
 
         {/* --- Mobile Details Step --- */}
         {isMobile && mobileStep === "details" && (
-          <div className="space-y-3">
-            <div className="rounded-2xl border border-secondary-200/70 bg-white/95 p-3 shadow-sm">
+          <div className="min-w-0 max-w-full space-y-3 overflow-hidden">
+            <div className="min-w-0 overflow-hidden rounded-2xl border border-secondary-200/70 bg-white/95 p-3 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <p className="min-w-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                   {t("quickPos.currentBill")}
@@ -1207,22 +1207,22 @@ export default function QuickPos() {
                 )}
               </div>
 
-              <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
+              <div className="mt-4 min-w-0 space-y-3 border-t border-slate-200 pt-4">
                 <div className="flex items-center justify-between gap-2 text-sm text-slate-500">
-                  <span>{t("sales.subTotal")}</span>
-                  <span>{money(totals.subTotal)}</span>
+                  <span className="min-w-0">{t("sales.subTotal")}</span>
+                  <span className="shrink-0 text-right">{money(totals.subTotal)}</span>
                 </div>
 
-                <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
-                  <span className="min-w-0 max-w-full">
+                <label className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(6.5rem,8rem)] items-center gap-2 text-sm text-slate-500">
+                  <span className="min-w-0">
                     <span className="block">{t("tax") || "VAT"}</span>
-                    <span className="block text-[11px] font-semibold text-primary-700">
+                    <span className="block truncate text-[11px] font-semibold text-primary-700">
                       {Number(checkoutForm.taxRate || 0) > 0
                         ? money(totals.taxTotal)
                         : `+ ${t("sales.addTax")}`}
                     </span>
                   </span>
-                  <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
+                  <div className="min-w-0">
                     <div className="relative">
                       <input
                         className="input h-8 w-full rounded-lg border-primary/20 pr-9 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
@@ -1246,16 +1246,16 @@ export default function QuickPos() {
                   </div>
                 </label>
 
-                <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
-                  <span className="min-w-0 max-w-full">
+                <label className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(6.5rem,8rem)] items-center gap-2 text-sm text-slate-500">
+                  <span className="min-w-0">
                     <span className="block">{t("quickPos.discount")}</span>
-                    <span className="block text-[11px] font-semibold text-primary-700">
+                    <span className="block truncate text-[11px] font-semibold text-primary-700">
                       {Number(checkoutForm.discount || 0) > 0
                         ? `- ${money(totals.discountTotal)}`
                         : `+ ${t("sales.addDiscount")}`}
                     </span>
                   </span>
-                  <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
+                  <div className="min-w-0">
                     <div className="relative">
                       <input
                         className="input h-8 w-full rounded-lg border-primary/20 pr-10 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
@@ -1280,10 +1280,10 @@ export default function QuickPos() {
                 </label>
 
                 {selectedParty && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
-                    <span className="min-w-0">{t("services.amountReceived")}</span>
+                  <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(6.5rem,8rem)] items-center gap-2 text-sm text-slate-500">
+                    <span className="min-w-0 truncate">{t("services.amountReceived")}</span>
                     {showAmountReceivedInput && !isPaid ? (
-                      <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
+                      <div className="min-w-0">
                         <div className="relative">
                           <input
                             autoFocus
@@ -1307,13 +1307,13 @@ export default function QuickPos() {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex min-w-0 items-center justify-end gap-2">
                         <button
                           onClick={() => {
                             if (isPaid) setIsPaid(false);
                             setShowAmountReceivedInput(true);
                           }}
-                          className="hover:text-primary-600 transition-colors font-medium"
+                          className="min-w-0 truncate text-right font-medium transition-colors hover:text-primary-600"
                         >
                           {isPaid
                             ? money(totals.grandTotal)
@@ -1334,20 +1334,20 @@ export default function QuickPos() {
                 )}
 
                 {selectedParty && dueAmount > 0 && (
-                  <div className="flex items-center justify-between text-sm font-semibold text-amber-600">
-                    <span>{t("sales.dueAmount")}</span>
-                    <span>{money(dueAmount)}</span>
+                  <div className="flex items-center justify-between gap-2 text-sm font-semibold text-amber-600">
+                    <span className="min-w-0">{t("sales.dueAmount")}</span>
+                    <span className="shrink-0 text-right">{money(dueAmount)}</span>
                   </div>
                 )}
 
                 <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
-                  <span>{t("sales.grandTotal")}</span>
-                  <span>{money(totals.grandTotal)}</span>
+                  <span className="min-w-0">{t("sales.grandTotal")}</span>
+                  <span className="shrink-0 text-right">{money(totals.grandTotal)}</span>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-secondary-200/70 bg-white/90 p-5 shadow-sm">
+            <div className="min-w-0 overflow-hidden rounded-[28px] border border-secondary-200/70 bg-white/90 p-4 shadow-sm">
               <PaymentMethodFields
                 value={checkoutForm}
                 onChange={(patch) =>
