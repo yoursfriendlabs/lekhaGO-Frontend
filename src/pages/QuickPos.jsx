@@ -1662,7 +1662,7 @@ export default function QuickPos() {
           </div>
         }
       >
-        <div className="space-y-3">
+        <div className="space-y-3 overflow-x-hidden">
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 transition focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-200">
               <span className="text-xs font-medium uppercase text-slate-500">
@@ -1740,7 +1740,7 @@ export default function QuickPos() {
               </button>
             </div>
 
-            <div className="mt-2 space-y-1.5 max-h-[180px] overflow-y-auto">
+            <div className="mt-2 space-y-1.5 max-h-[180px] overflow-y-auto overflow-x-hidden">
               {cart.map((item) => (
                 <div
                   key={item.productId}
@@ -1749,7 +1749,7 @@ export default function QuickPos() {
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium text-slate-900">{item.name}</p>
-                      <div className="mt-0.5 flex items-center gap-1 text-slate-600">
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1 text-slate-600">
                         <span>{t("currency.symbol")}</span>
                         <input
                           type="number"
@@ -1760,7 +1760,6 @@ export default function QuickPos() {
                             updateCartPrice(item.productId, e.target.value)
                           }
                         />
-                        {renderUnitSwitcher(item)}
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
