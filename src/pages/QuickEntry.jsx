@@ -4,6 +4,7 @@ import { ArrowRight, Briefcase, ChevronRight, CircleDollarSign, ReceiptText, Wal
 import PageHeader from '../components/PageHeader.jsx';
 import Notice from '../components/Notice.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import NoteTextarea from '../components/NoteTextarea.jsx';
 import QuickActionSuccessDialog from '../components/QuickActionSuccessDialog.jsx';
 import QuickAmountPad, { evaluateQuickExpression } from '../components/QuickAmountPad.jsx';
 import QuickPartySelector from '../components/QuickPartySelector.jsx';
@@ -339,7 +340,7 @@ export default function QuickEntry() {
 
                 <label>
                   <span className="label">{t('common.notes')}</span>
-                  <textarea
+                  <NoteTextarea
                     className="input mt-2 min-h-[96px] resize-none rounded-[18px]"
                     value={form.notes}
                     onChange={(event) => setForm((previous) => ({ ...previous, notes: event.target.value }))}

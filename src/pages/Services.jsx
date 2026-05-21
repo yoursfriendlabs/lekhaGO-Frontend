@@ -5,6 +5,7 @@ import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
 import RefreshButton from '../components/RefreshButton.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import NoteTextarea from '../components/NoteTextarea.jsx';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import QuickPaymentButtons from '../components/QuickPaymentButtons.jsx';
@@ -1979,11 +1980,10 @@ export default function Services() {
                           <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                             <div>
                               <label className="label">{t('services.notes')}</label>
-                              <textarea
+                              <NoteTextarea
                                 className="input mt-1 h-32 resize-none"
                                 name="notes"
                                 value={header.notes}
-                                maxLength={10000}
                                 onChange={handleHeaderChange}
                                 placeholder={t('services.notesPlaceholder')}
                               />

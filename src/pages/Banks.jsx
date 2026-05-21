@@ -3,6 +3,7 @@ import { Landmark, Pencil, Plus, Power, Trash2, WalletCards } from 'lucide-react
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
+import NoteTextarea from '../components/NoteTextarea.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { useI18n } from '../lib/i18n.jsx';
@@ -513,9 +514,12 @@ export default function Banks() {
 
           <div>
             <label className="label">{t('common.notes')}</label>
-            <textarea className="input mt-1 h-24 resize-none" name="notes" value={form.notes}
-            maxLength={10000}
-             onChange={handleChange} />
+            <NoteTextarea
+              className="input mt-1 h-24 resize-none"
+              name="notes"
+              value={form.notes}
+              onChange={handleChange}
+            />
           </div>
 
           <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800/40">
