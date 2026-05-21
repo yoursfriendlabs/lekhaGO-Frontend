@@ -407,18 +407,41 @@ export default function QuickPos() {
         (item) => item.productId === product.id,
       );
 
+      const stockOnHand = Number(product.stockOnHand || 0);
+
       if (existingIndex >= 0) {
+        const currentItem = previous[existingIndex];
+        const currentQty = Number(currentItem.quantity || 0);
+        const newQty = currentQty + 1;
+
+        // Check stock availability
+        if (newQty > stockOnHand) {
+          showError(
+            t("sales.insufficientStock") ||
+            `Insufficient stock for ${product.name}. Available: ${stockOnHand}`
+          );
+          return previous;
+        }
+
         return previous.map((item, index) => {
           if (index !== existingIndex) return item;
-          const quantity = Number(item.quantity || 0) + 1;
           return {
             ...item,
-            quantity,
-            lineTotal: Number(quantity * Number(item.unitPrice || 0)).toFixed(
+            quantity: newQty,
+            lineTotal: Number(newQty * Number(item.unitPrice || 0)).toFixed(
               2,
             ),
           };
         });
+      }
+
+      // Check stock availability for new item
+      if (1 > stockOnHand) {
+        showError(
+          t("sales.insufficientStock") ||
+          `Insufficient stock for ${product.name}. Available: ${stockOnHand}`
+        );
+        return previous;
       }
 
       return [...previous, buildCartItem(product, unitType)];
@@ -428,11 +451,24 @@ export default function QuickPos() {
   const updateCartQuantity = (productId, nextQuantity) => {
     if (!productId) return;
 
+    const product = getProductById(productId);
+    const stockOnHand = Number(product?.stockOnHand || 0);
+    const requestedQty = Math.max(Number(nextQuantity || 0), 0);
+
+    // Validate stock availability
+    if (requestedQty > 0 && requestedQty > stockOnHand) {
+      showError(
+        t("sales.insufficientStock") ||
+        `Insufficient stock for ${product?.name}. Available: ${stockOnHand}`
+      );
+      return;
+    }
+
     setCart((previous) =>
       previous
         .map((item) => {
           if (item.productId !== productId) return item;
-          const quantity = Math.max(Number(nextQuantity || 0), 0);
+          const quantity = requestedQty;
           return {
             ...item,
             quantity,
@@ -522,6 +558,26 @@ export default function QuickPos() {
       setStatus({ type: "error", message: t("errors.conversionRequired") });
       return;
     }
+
+    // Validate stock availability before submission
+    const insufficientStockItems = cart.filter((item) => {
+      const product = getProductById(item.productId);
+      const stock = Number(product?.stockOnHand || 0);
+      return Number(item.quantity || 0) > stock;
+    });
+
+    if (insufficientStockItems.length > 0) {
+      const itemNames = insufficientStockItems
+        .map((item) => item.name)
+        .join(", ");
+      setStatus({
+        type: "error",
+        message: t("sales.insufficientStock") ||
+          `Insufficient stock: ${itemNames}`,
+      });
+      return;
+    }
+
     if (requiresBankSelection(checkoutForm, receivedAmount)) {
       setStatus({ type: "error", message: t("payments.bankRequired") });
       return;
@@ -597,7 +653,7 @@ export default function QuickPos() {
     stopPropagation = false,
   }) => (
     <div
-      className="grid w-full grid-cols-2 gap-1 rounded-full border border-slate-200 bg-white px-1 py-1 text-xs font-semibold shadow-sm sm:flex sm:flex-wrap sm:items-center sm:gap-2 sm:px-2"
+      className="inline-grid w-auto grid-cols-2 gap-0.5 rounded-full border border-slate-200 bg-white px-0.5 py-0.5 text-[9px] font-semibold shadow-sm sm:flex sm:flex-wrap sm:items-center sm:gap-0.5 sm:px-0.5"
       onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
       onPointerDown={
         stopPropagation ? (event) => event.stopPropagation() : undefined
@@ -611,7 +667,7 @@ export default function QuickPos() {
           <button
             type="button"
             key={option.value}
-            className={`w-full min-w-0 rounded-full px-2 py-1 text-center text-xs transition sm:w-auto sm:min-w-[4.5rem] ${
+            className={`min-w-0 rounded-full px-1 py-0.5 text-center text-[9px] transition sm:min-w-[3rem] ${
               isSelected
                 ? "text-green-600"
                 : "text-slate-500 hover:text-slate-800"
