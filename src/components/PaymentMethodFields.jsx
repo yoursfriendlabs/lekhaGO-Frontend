@@ -114,16 +114,22 @@ export default function PaymentMethodFields({
 
   const bankOptions = useMemo(
     () =>
-      banks.map((bank) => ({
-        value: bank.id,
-        label: [
-          bank.name || t('banks.unnamed'),
+      banks.map((bank) => {
+        const label = bank.name || t('banks.unnamed');
+        const description = [
           bank.accountNumber || bank.accountName,
           formatMoney(bank.currentBalance),
         ]
           .filter(Boolean)
-          .join(' • '),
-      })),
+          .join(' • ');
+
+        return {
+          value: bank.id,
+          label,
+          description,
+          searchText: [label, bank.accountNumber, bank.accountName].filter(Boolean).join(' '),
+        };
+      }),
     [banks, t]
   );
 
