@@ -1814,7 +1814,7 @@ export default function QuickPos() {
             </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-3">
               <div className="rounded-2xl border border-amber-200/40 bg-gradient-to-br from-amber-50/60 to-yellow-50/40 px-4 py-4 shadow-sm">
                 <div className="flex items-center justify-between">
@@ -1908,7 +1908,7 @@ export default function QuickPos() {
               </div>
             </div>
 
-            <div>
+            <div className="min-w-0 space-y-3">
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs text-slate-600">
@@ -2008,7 +2008,7 @@ export default function QuickPos() {
                 </div>
               )}
 
-              <div className="rounded-[28px] border border-slate-200 bg-white px-4 py-4">
+              <div className="rounded-[28px] border border-slate-200 bg-white px-4 py-4 min-w-0">
                 <PaymentMethodFields
                   value={checkoutForm}
                   onChange={(patch) =>
