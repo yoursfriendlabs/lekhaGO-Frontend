@@ -596,7 +596,7 @@ export default function QuickPos() {
     stopPropagation = false,
   }) => (
     <div
-      className="flex max-w-full items-center gap-3 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold shadow-sm"
+      className="flex flex-wrap max-w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold shadow-sm"
       onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
       onPointerDown={
         stopPropagation ? (event) => event.stopPropagation() : undefined
@@ -610,7 +610,7 @@ export default function QuickPos() {
           <button
             type="button"
             key={option.value}
-            className={`min-w-0 truncate transition ${
+            className={`min-w-0 whitespace-nowrap rounded-full px-2 py-0.5 text-xs transition ${
               isSelected
                 ? "text-green-600"
                 : "text-slate-500 hover:text-slate-800"
@@ -962,8 +962,8 @@ export default function QuickPos() {
                       }`}
                     >
                       <div className="flex flex-1 flex-col p-2.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
+<div className="flex flex-wrap items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
                             <p
                               className={`truncate text-xs font-bold text-slate-900 ${isOutOfStock ? "text-red-900" : ""}`}
                             >
@@ -977,7 +977,9 @@ export default function QuickPos() {
                                 t("common.general")}
                             </p>
                           </div>
-                          {renderProductUnitSelect(product, inCart)}
+                          <div className="shrink-0 w-full max-w-full sm:w-auto">
+                            {renderProductUnitSelect(product, inCart)}
+                          </div>
                         </div>
 
                         <div className="mt-auto pt-2">
