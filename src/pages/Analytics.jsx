@@ -77,6 +77,16 @@ const EMPTY_PROFIT_LOSS = Object.freeze({
   },
 });
 
+const EMPTY_POPULAR_ANALYTICS = Object.freeze({
+  range: {
+    from: null,
+    to: null,
+    limit: 10,
+  },
+  items: [],
+  total: 0,
+});
+
 function asNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -485,10 +495,88 @@ function metricToneClasses(tone, value) {
   return 'text-slate-500 dark:text-slate-400';
 }
 
+function formatQuantityValue(value) {
+  return asNumber(value).toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+}
+
+function PopularRankingCard({
+  title,
+  subtitle,
+  rows,
+  loading,
+  error,
+  emptyLabel,
+  typeLabel,
+  t,
+  formatMoney,
+}) {
+  return (
+    <div className="card">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="font-serif text-xl text-slate-900 dark:text-white">{title}</h3>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+          Top 10
+        </span>
+      </div>
+
+      {loading ? (
+        <p className="mt-4 text-sm text-slate-500">{t('common.loading')}</p>
+      ) : error ? (
+        <Notice title={error} tone="error" />
+      ) : rows.length === 0 ? (
+        <p className="mt-4 text-sm text-slate-500">{emptyLabel}</p>
+      ) : (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[620px] text-sm text-slate-600 dark:text-slate-300">
+            <thead className="text-xs uppercase tracking-[0.14em] text-slate-400">
+              <tr>
+                <th className="py-2 text-left">{t('analytics.rank')}</th>
+                <th className="py-2 text-left">{typeLabel}</th>
+                <th className="py-2 text-right">{t('analytics.quantity')}</th>
+                <th className="py-2 text-right">{t('analytics.orderCount')}</th>
+                <th className="py-2 text-right">{t('analytics.revenue')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={`${row.rank}-${row.productId || row.categoryId || row.name || row.categoryName}`} className="border-t border-slate-200/70 dark:border-slate-800/70">
+                  <td className="py-3 font-semibold text-slate-900 dark:text-white">#{row.rank}</td>
+                  <td className="py-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900 dark:text-white">{row.name || row.categoryName || '-'}</p>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                        {row.sku ? <span>{t('analytics.sku')}: {row.sku}</span> : null}
+                        {row.categoryName && row.name ? <span>{t('analytics.categoryName')}: {row.categoryName}</span> : null}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-3 text-right font-medium text-slate-900 dark:text-white">{formatQuantityValue(row.totalQuantity)}</td>
+                  <td className="py-3 text-right">{formatQuantityValue(row.orderCount)}</td>
+                  <td className="py-3 text-right font-semibold text-slate-900 dark:text-white">{formatMoney(row.totalRevenue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Analytics() {
   const { t } = useI18n();
   const [summary, setSummary] = useState(() => EMPTY_SUMMARY);
   const [profitLoss, setProfitLoss] = useState(() => EMPTY_PROFIT_LOSS);
+  const [popularItems, setPopularItems] = useState(() => EMPTY_POPULAR_ANALYTICS);
+  const [popularCategories, setPopularCategories] = useState(() => EMPTY_POPULAR_ANALYTICS);
+  const [popularItemsError, setPopularItemsError] = useState('');
+  const [popularCategoriesError, setPopularCategoriesError] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -517,13 +605,25 @@ export default function Analytics() {
     Promise.allSettled([
       api.getAnalyticsSummary(params),
       api.getAnalyticsProfitLoss(params),
+      api.getPopularItemsAnalytics({
+        from: filters.fromDate || undefined,
+        to: filters.toDate || undefined,
+        limit: 10,
+      }),
+      api.getPopularCategoriesAnalytics({
+        from: filters.fromDate || undefined,
+        to: filters.toDate || undefined,
+        limit: 10,
+      }),
     ])
-      .then(([summaryResult, profitLossResult]) => {
+      .then(([summaryResult, profitLossResult, popularItemsResult, popularCategoriesResult]) => {
         if (!isActive) return;
 
         if (summaryResult.status !== 'fulfilled') {
           setSummary(EMPTY_SUMMARY);
           setProfitLoss(EMPTY_PROFIT_LOSS);
+          setPopularItems(EMPTY_POPULAR_ANALYTICS);
+          setPopularCategories(EMPTY_POPULAR_ANALYTICS);
           setStatus(summaryResult.reason?.message || t('auth.errors.generic'));
           return;
         }
@@ -533,15 +633,32 @@ export default function Analytics() {
 
         if (profitLossResult.status === 'fulfilled') {
           setProfitLoss(normalizeProfitLossResponse(profitLossResult.value));
-          return;
+        } else {
+          setProfitLoss(buildProfitLossFallback(nextSummary));
         }
 
-        setProfitLoss(buildProfitLossFallback(nextSummary));
+        if (popularItemsResult.status === 'fulfilled') {
+          setPopularItems(popularItemsResult.value || EMPTY_POPULAR_ANALYTICS);
+          setPopularItemsError('');
+        } else {
+          setPopularItems(EMPTY_POPULAR_ANALYTICS);
+          setPopularItemsError(popularItemsResult.reason?.message || t('auth.errors.generic'));
+        }
+
+        if (popularCategoriesResult.status === 'fulfilled') {
+          setPopularCategories(popularCategoriesResult.value || EMPTY_POPULAR_ANALYTICS);
+          setPopularCategoriesError('');
+        } else {
+          setPopularCategories(EMPTY_POPULAR_ANALYTICS);
+          setPopularCategoriesError(popularCategoriesResult.reason?.message || t('auth.errors.generic'));
+        }
       })
       .catch((error) => {
         if (!isActive) return;
         setSummary(EMPTY_SUMMARY);
         setProfitLoss(EMPTY_PROFIT_LOSS);
+        setPopularItems(EMPTY_POPULAR_ANALYTICS);
+        setPopularCategories(EMPTY_POPULAR_ANALYTICS);
         setStatus(error.message || t('auth.errors.generic'));
       })
       .finally(() => {
@@ -772,6 +889,31 @@ export default function Analytics() {
             <PieChart data={pieData} height={350} />
           </div>
         </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <PopularRankingCard
+          title={t('analytics.popularItems')}
+          subtitle={t('analytics.popularSubtitle')}
+          rows={popularItems.items}
+          loading={loading}
+          error={popularItemsError}
+          emptyLabel={t('analytics.noPopularItems')}
+          typeLabel={t('nav.items')}
+          t={t}
+          formatMoney={formatMoney}
+        />
+        <PopularRankingCard
+          title={t('analytics.popularCategories')}
+          subtitle={t('analytics.popularSubtitle')}
+          rows={popularCategories.items}
+          loading={loading}
+          error={popularCategoriesError}
+          emptyLabel={t('analytics.noPopularCategories')}
+          typeLabel={t('analytics.categoryName')}
+          t={t}
+          formatMoney={formatMoney}
+        />
       </div>
 
       <div className="card">

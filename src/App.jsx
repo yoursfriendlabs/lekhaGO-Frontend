@@ -13,6 +13,7 @@ import Notice from './components/Notice';
 import RouteFallback from './components/RouteFallback';
 import PwaLifecycle from './components/PwaLifecycle';
 import SubscriptionStatusBanner from './components/subscription/SubscriptionStatusBanner.jsx';
+import { getFeatureAccessLevel as getPermissionAccessLevel } from './lib/accessControl';
 import { hasUnverifiedEmail, isStaffActivationRequired } from './lib/authFlow';
 import { getSubscriptionGuard, getSubscriptionStatusState, humanizeKey } from './lib/subscription';
 import { buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB } from './lib/settingsTabs';
@@ -52,6 +53,10 @@ export function ProtectedRoute({ children }) {
 function RoleGuard({ children, allowedRoles = OWNER_AND_STAFF_ROLES, redirectTo = '/app' }) {
   const { role } = useAuth();
 
+  if (role === 'admin' || role === 'super_admin') {
+    return children;
+  }
+
   if (role && !allowedRoles.includes(role)) {
     return <Navigate to={redirectTo} replace />;
   }
@@ -61,11 +66,36 @@ function RoleGuard({ children, allowedRoles = OWNER_AND_STAFF_ROLES, redirectTo 
 
 export function SubscriptionFeatureRoute({ children, featureKey, redirectTo = buildSettingsTabPath(SUBSCRIPTION_SETTINGS_TAB) }) {
   const location = useLocation();
-  const { hasFeatureAccess, subscription } = useAuth();
+  const {
+    accessControl,
+    canViewFeature,
+    hasSubscriptionFeatureAccess,
+    role,
+    subscription,
+  } = useAuth();
   const { t } = useI18n();
 
-  if (hasFeatureAccess(featureKey)) {
+  if (canViewFeature(featureKey)) {
     return children;
+  }
+
+  const permissionLevel = getPermissionAccessLevel(accessControl, featureKey, role);
+
+  if (permissionLevel === 'none' && hasSubscriptionFeatureAccess(featureKey)) {
+    return (
+      <Navigate
+        to="/app"
+        replace
+        state={{
+          notice: {
+            title: t('appAccess.permissionRedirectTitle'),
+            description: t('appAccess.permissionRedirectDescription', { feature: humanizeKey(featureKey) }),
+            tone: 'warn',
+            from: `${location.pathname}${location.search}`,
+          },
+        }}
+      />
+    );
   }
 
   const subscriptionState = getSubscriptionStatusState(subscription);
@@ -125,7 +155,7 @@ function ActivationOnlyRoute({ children }) {
 
 function InvoiceAccessRoute({ children }) {
   const { type } = useParams();
-  const allowedRoles = type === 'purchases' ? OWNER_ONLY_ROLES : OWNER_AND_STAFF_ROLES;
+  const allowedRoles = OWNER_AND_STAFF_ROLES;
   const featureKey = type === 'purchases' ? 'purchases' : 'sales';
 
   return (
@@ -151,6 +181,7 @@ function AppShell() {
   const { businessId, role, user, subscription, subscriptionAccess } = useAuth();
   const { t } = useI18n();
   const { businessProfile } = useBusinessSettings();
+  const location = useLocation();
   const showVerificationBanner = hasUnverifiedEmail(user);
   const requiresActivation = isStaffActivationRequired(user, role);
   const servicesEnabled = businessProfile?.modules?.services !== false;
@@ -186,6 +217,7 @@ function AppShell() {
             tone: 'info',
           }
           : null;
+  const routeNotice = location.state?.notice || null;
 
   return (
     <div className="gradient-bg min-h-[100dvh] overflow-x-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 md:h-screen md:overflow-hidden">
@@ -200,6 +232,15 @@ function AppShell() {
                   title={t('notices.businessRequiredTitle')}
                   description={t('notices.businessRequiredDesc')}
                   tone="warn"
+                />
+              </div>
+            ) : null}
+            {routeNotice ? (
+              <div className="mb-6">
+                <Notice
+                  title={routeNotice.title}
+                  description={routeNotice.description}
+                  tone={routeNotice.tone}
                 />
               </div>
             ) : null}
@@ -253,7 +294,7 @@ function AppShell() {
                   <Route path="/" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="dashboard"><Dashboard /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="products" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="inventory"><Navigate to="/app/inventory" replace /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="inventory" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="inventory"><Inventory /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="purchases" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><SubscriptionFeatureRoute featureKey="purchases"><Purchases /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="purchases" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="purchases"><Purchases /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route
                     path="orders"
                     element={(
@@ -280,10 +321,10 @@ function AppShell() {
                       </EmailActivationRequiredRoute>
                     )}
                   />
-                  <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><SubscriptionFeatureRoute featureKey="parties"><Parties /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="parties"><Parties /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="banks" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="banks"><Banks /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="ledger" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="ledger"><Ledger /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="analytics" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><SubscriptionFeatureRoute featureKey="analytics"><Analytics /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="analytics" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="analytics"><Analytics /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="admin" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><SubscriptionFeatureRoute featureKey="admin"><Admin /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route
                     path="order-attributes"

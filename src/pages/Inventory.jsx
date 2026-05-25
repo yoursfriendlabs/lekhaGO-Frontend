@@ -7,6 +7,7 @@ import FormSectionCard from '../components/FormSectionCard.jsx';
 import CategorySearchCreateField from '../components/CategorySearchCreateField.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
+import { useAuth } from '../lib/auth.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import { getPurityOptionsForMetal, METAL_TYPE_OPTIONS } from '../lib/jewellery.js';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
@@ -137,7 +138,9 @@ function getItemTypeLabel(itemType, itemTypeOptions, t) {
 
 export default function Inventory() {
   const { t } = useI18n();
+  const { canManageFeature } = useAuth();
   const { businessProfile } = useBusinessSettings();
+  const canManageInventory = canManageFeature('inventory');
   const {
     products,
     loading: productsLoading,
@@ -459,6 +462,7 @@ export default function Inventory() {
   };
 
   const openCreateDialog = () => {
+    if (!canManageInventory) return;
     // Generate a unique item code (SKU)
     // We check existing products to find the highest numeric suffix if they follow a pattern like ITEM-001
     // Otherwise, we can use a timestamp or a simple increment.
@@ -495,6 +499,7 @@ export default function Inventory() {
   };
 
   const openEditDialog = (itemId) => {
+    if (!canManageInventory) return;
     const product = products.find((entry) => String(entry.id) === String(itemId));
     if (!product) {
       setStatus({ type: 'error', message: t('common.noData') });
@@ -508,6 +513,7 @@ export default function Inventory() {
   };
 
   const openRestockDialog = (itemId) => {
+    if (!canManageInventory) return;
     const product = products.find((entry) => String(entry.id) === String(itemId));
     if (!product) {
       setStatus({ type: 'error', message: t('common.noData') });
@@ -539,6 +545,10 @@ export default function Inventory() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (!canManageInventory) {
+      setStatus({ type: 'error', message: t('staffManagement.permissionError') });
+      return;
+    }
     setSaving(true);
     setStatus({ type: 'info', message: '' });
 
@@ -586,6 +596,10 @@ export default function Inventory() {
 
   const handleRestockSubmit = async (event) => {
     event.preventDefault();
+    if (!canManageInventory) {
+      setStatus({ type: 'error', message: t('staffManagement.permissionError') });
+      return;
+    }
 
     if (!restockProduct) return;
 
@@ -664,9 +678,11 @@ export default function Inventory() {
             {/*<button className="btn-secondary w-full sm:w-auto" type="button">*/}
             {/*  <Upload size={16} /> {t('inventory.importItems')}*/}
             {/*</button>*/}
-            <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreateDialog}>
-              <Plus size={16} /> {t('inventory.addNewItem')}
-            </button>
+            {canManageInventory ? (
+              <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreateDialog}>
+                <Plus size={16} /> {t('inventory.addNewItem')}
+              </button>
+            ) : null}
           </div>
         )}
       />
@@ -761,24 +777,26 @@ export default function Inventory() {
                   <span>{t('products.salePrice')}: <strong className="text-slate-700 dark:text-slate-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.salePrice.toFixed(2) })}</strong></span>
                   <span>{t('products.purchasePrice')}: <strong className="text-slate-700 dark:text-slate-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.purchasePrice.toFixed(2) })}</strong></span>
                 </div>
-                <div className="mt-3 flex gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
-                  {isRestockableProduct(item) ? (
+                {canManageInventory ? (
+                  <div className="mt-3 flex gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                    {isRestockableProduct(item) ? (
+                      <button
+                        className="btn-secondary flex-1 justify-center sm:w-auto"
+                        type="button"
+                        onClick={() => openRestockDialog(item.id)}
+                      >
+                        <Plus size={16} /> {t('inventory.restock')}
+                      </button>
+                    ) : null}
                     <button
-                      className="btn-secondary flex-1 justify-center sm:w-auto"
+                      className={`${isRestockableProduct(item) ? 'btn-ghost flex-1' : 'btn-ghost w-full'} justify-center sm:w-auto`}
                       type="button"
-                      onClick={() => openRestockDialog(item.id)}
+                      onClick={() => openEditDialog(item.id)}
                     >
-                      <Plus size={16} /> {t('inventory.restock')}
+                      <Pencil size={16} /> {t('common.edit')}
                     </button>
-                  ) : null}
-                  <button
-                    className={`${isRestockableProduct(item) ? 'btn-ghost flex-1' : 'btn-ghost w-full'} justify-center sm:w-auto`}
-                    type="button"
-                    onClick={() => openEditDialog(item.id)}
-                  >
-                    <Pencil size={16} /> {t('common.edit')}
-                  </button>
-                </div>
+                  </div>
+                ) : null}
               </div>
             ))
           )}
@@ -840,24 +858,28 @@ export default function Inventory() {
                       {item.quantity.toFixed(2)} {item.unit || ''}
                     </td>
                     <td className="py-3 text-right">
-                      <div className="flex justify-end gap-2">
-                        {isRestockableProduct(item) ? (
+                      {canManageInventory ? (
+                        <div className="flex justify-end gap-2">
+                          {isRestockableProduct(item) ? (
+                            <button
+                              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
+                              type="button"
+                              onClick={() => openRestockDialog(item.id)}
+                            >
+                              <Plus size={14} /> {t('inventory.restock')}
+                            </button>
+                          ) : null}
                           <button
-                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
+                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                             type="button"
-                            onClick={() => openRestockDialog(item.id)}
+                            onClick={() => openEditDialog(item.id)}
                           >
-                            <Plus size={14} /> {t('inventory.restock')}
+                            <Pencil size={14} /> {t('common.edit')}
                           </button>
-                        ) : null}
-                        <button
-                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                          type="button"
-                          onClick={() => openEditDialog(item.id)}
-                        >
-                          <Pencil size={14} /> {t('common.edit')}
-                        </button>
-                      </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs font-medium text-slate-400">{t('common.view')}</span>
+                      )}
                     </td>
                   </tr>
                 ))
