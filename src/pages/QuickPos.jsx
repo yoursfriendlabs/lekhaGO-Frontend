@@ -92,7 +92,7 @@ function formatStockLabel(product, unitType = "primary") {
     maximumFractionDigits: 2,
   });
 
-  return `${quantity} ${unit || ""}`.trim();
+  return `${quantity} ${unitType || ""}`.trim();
 }
 
 function getProductUnitLabel(product, unitType) {
