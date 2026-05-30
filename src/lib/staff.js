@@ -14,6 +14,16 @@ function pickString(...values) {
   return '';
 }
 
+function pickNumber(...values) {
+  for (const value of values) {
+    if (value === null || value === undefined || value === '') continue;
+    const number = Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+
+  return null;
+}
+
 export const EMPTY_STAFF_SUMMARY = Object.freeze({
   maxUsers: 0,
   totalUsers: 0,
@@ -94,6 +104,11 @@ export function normalizeStaffMember(member, meta) {
       description: pickString(source.category?.description, category?.description) || null,
     },
     jobTitle: pickString(source.jobTitle) || null,
+    joinedDate: pickString(source.joinedDate, source.joinedAt) || null,
+    shift: pickString(source.shift) || null,
+    address: pickString(source.address, user.address) || null,
+    compensation: pickNumber(source.compensation, source.salary),
+    totalReceived: pickNumber(source.totalReceived),
     permissions: normalizePermissionMap(source.permissions),
     user: {
       id: pickString(user.id),

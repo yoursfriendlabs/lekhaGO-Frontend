@@ -4,7 +4,7 @@ import Notice from './Notice';
 import ConfirmDialog from './ui/ConfirmDialog.jsx';
 import { Dialog } from './ui/Dialog.tsx';
 import { api } from '../lib/api';
-import { formatMaybeDate } from '../lib/datetime';
+import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 import {
@@ -21,6 +21,11 @@ function formatDate(value) {
   return formatMaybeDate(value, 'MMM D, YYYY');
 }
 
+function toDateInputValue(value) {
+  if (!value) return '';
+  return String(value).slice(0, 10);
+}
+
 function buildEmptyForm(meta, role = 'staff') {
   const defaultCategory = meta.categories.find((category) => category.key !== 'owner')?.key || meta.categories[0]?.key || '';
   return {
@@ -32,6 +37,11 @@ function buildEmptyForm(meta, role = 'staff') {
     role,
     staffCategory: defaultCategory,
     jobTitle: '',
+    joinedDate: todayISODate(),
+    shift: '',
+    address: '',
+    compensation: '',
+    totalReceived: '',
     isActive: true,
     permissions: getCategoryPermissions(meta, defaultCategory),
     permissionsDirty: false,
@@ -288,6 +298,69 @@ function StaffFormDialog({
                     placeholder={t('staffManagement.jobTitlePlaceholder')}
                   />
                 </div>
+                <div>
+                  <label className="label" htmlFor="staff-joined-date">{t('staffManagement.joinedDate')}</label>
+                  <input
+                    id="staff-joined-date"
+                    className="input mt-1"
+                    type="date"
+                    value={form.joinedDate}
+                    onChange={(event) => onFieldChange('joinedDate', event.target.value)}
+                    disabled={readOnly}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="staff-shift">{t('staffManagement.shift')}</label>
+                  <input
+                    id="staff-shift"
+                    className="input mt-1"
+                    value={form.shift}
+                    onChange={(event) => onFieldChange('shift', event.target.value)}
+                    disabled={readOnly}
+                    placeholder={t('staffManagement.shiftPlaceholder')}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="staff-address">{t('staffManagement.address')}</label>
+                  <input
+                    id="staff-address"
+                    className="input mt-1"
+                    value={form.address}
+                    onChange={(event) => onFieldChange('address', event.target.value)}
+                    disabled={readOnly}
+                    placeholder={t('staffManagement.addressPlaceholder')}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="staff-compensation">{t('staffManagement.compensation')}</label>
+                  <input
+                    id="staff-compensation"
+                    className="input mt-1"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={form.compensation}
+                    onChange={(event) => onFieldChange('compensation', event.target.value)}
+                    disabled={readOnly}
+                    placeholder={t('staffManagement.compensationPlaceholder')}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="staff-total-received">{t('staffManagement.totalReceived')}</label>
+                  <input
+                    id="staff-total-received"
+                    className="input mt-1"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={form.totalReceived}
+                    onChange={(event) => onFieldChange('totalReceived', event.target.value)}
+                    disabled={readOnly}
+                    placeholder={t('staffManagement.totalReceivedPlaceholder')}
+                  />
+                </div>
               </div>
 
               {!isCreate ? (
@@ -396,6 +469,8 @@ export default function StaffManagement({ businessId }) {
           member.user?.email,
           member.user?.phone,
           member.jobTitle,
+          member.shift,
+          member.address,
           member.category?.label,
         ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery));
       const matchesStatus = statusFilter === 'all'
@@ -457,6 +532,11 @@ export default function StaffManagement({ businessId }) {
       role: member.role || 'staff',
       staffCategory: member.staffCategory || '',
       jobTitle: member.jobTitle || '',
+      joinedDate: toDateInputValue(member.joinedDate || member.joinedAt),
+      shift: member.shift || '',
+      address: member.address || '',
+      compensation: member.compensation ?? '',
+      totalReceived: member.totalReceived ?? '',
       isActive: member.user?.isActive !== false,
       permissions: { ...member.permissions },
       permissionsDirty: false,
@@ -475,6 +555,11 @@ export default function StaffManagement({ businessId }) {
       role: member.role || 'staff',
       staffCategory: member.staffCategory || '',
       jobTitle: member.jobTitle || '',
+      joinedDate: toDateInputValue(member.joinedDate || member.joinedAt),
+      shift: member.shift || '',
+      address: member.address || '',
+      compensation: member.compensation ?? '',
+      totalReceived: member.totalReceived ?? '',
       isActive: member.user?.isActive !== false,
       permissions: { ...member.permissions },
       permissionsDirty: false,
@@ -536,6 +621,12 @@ export default function StaffManagement({ businessId }) {
       role: form.role,
       staffCategory: form.staffCategory,
       jobTitle: form.jobTitle.trim(),
+      joinedDate: form.joinedDate || null,
+      joinedAt: form.joinedDate || null,
+      shift: form.shift.trim(),
+      address: form.address.trim(),
+      compensation: form.compensation === '' ? null : Number(form.compensation),
+      totalReceived: form.totalReceived === '' ? null : Number(form.totalReceived),
       permissions: form.permissions,
     };
 
