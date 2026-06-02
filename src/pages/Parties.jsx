@@ -47,6 +47,7 @@ const makeEmptyTx = () => ({
 
 const TX_PAGE_SIZE = 10;
 const PARTY_PAGE_SIZE = 20;
+const SUCCESS_NOTICE_TIMEOUT_MS = 3000;
 
 function formatDate(value) {
   if (!value) return '-';
@@ -168,6 +169,20 @@ export default function Parties() {
   const partyListSessionRef = useRef(0);
   const submitPartyRequestRef = useRef(false);
   const supportsIntersectionObserver = typeof IntersectionObserver !== 'undefined';
+
+  useEffect(() => {
+    if (status.type !== 'success' || !status.message) return undefined;
+
+    const timerId = window.setTimeout(() => {
+      setStatus((current) =>
+        current.type === 'success' && current.message === status.message
+          ? { type: 'info', message: '' }
+          : current
+      );
+    }, SUCCESS_NOTICE_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timerId);
+  }, [status.message, status.type]);
 
   const loadPartyPage = useCallback(
     async ({ offset = 0, append = false, session = partyListSessionRef.current, force = false } = {}) => {

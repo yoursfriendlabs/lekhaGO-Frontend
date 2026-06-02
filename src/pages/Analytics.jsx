@@ -793,6 +793,7 @@ export default function Analytics() {
               onChange={handlePartyFilterChange}
               placeholder={t('services.allParties')}
               searchPlaceholder={t('parties.searchPlaceholder')}
+              showPhone={false}
             />
           </div>
           <div>

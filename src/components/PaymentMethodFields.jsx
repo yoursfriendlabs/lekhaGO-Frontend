@@ -19,6 +19,7 @@ function uniqById(items = []) {
 export default function PaymentMethodFields({
   value = {},
   onChange,
+  bankAccountError = '',
   showPaymentNote = true,
   noteLabel,
   notePlaceholder,
@@ -211,6 +212,12 @@ export default function PaymentMethodFields({
                   {t('payments.noBanks')}
                 </p>
               )}
+
+            {bankAccountError && (
+              <p className={`${helperClassName} font-semibold text-rose-600`}>
+                {bankAccountError}
+              </p>
+            )}
 
             {bankError && (
               <p className={`${helperClassName} text-rose-600`}>

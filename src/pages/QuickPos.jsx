@@ -91,8 +91,9 @@ function formatStockLabel(product, unitType = "primary") {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
+  const unitLabel = getProductUnitLabel(product, unitType);
 
-  return `${quantity} ${unitType || ""}`.trim();
+  return `${quantity} ${unitLabel}`.trim();
 }
 
 function getProductUnitLabel(product, unitType) {
@@ -193,6 +194,19 @@ export default function QuickPos() {
 
   const money = (value) =>
     formatCurrency(value, { symbol: t("currency.symbol") });
+  const bankRequiredMessage = t("payments.bankRequired");
+  const bankAccountError =
+    status.type === "error" && status.message === bankRequiredMessage
+      ? bankRequiredMessage
+      : "";
+
+  const handleCheckoutPaymentChange = (patch) => {
+    setCheckoutForm((previous) => ({ ...previous, ...patch }));
+
+    if ((patch.bankId || patch.paymentMethod === "cash") && bankAccountError) {
+      setStatus({ type: "info", message: "" });
+    }
+  };
 
   const handleReviewBill = () => {
     if (!cart.length) {
@@ -577,7 +591,7 @@ export default function QuickPos() {
     }
 
     if (requiresBankSelection(checkoutForm, receivedAmount)) {
-      setStatus({ type: "error", message: t("payments.bankRequired") });
+      setStatus({ type: "error", message: bankRequiredMessage });
       return;
     }
 
@@ -1030,7 +1044,7 @@ export default function QuickPos() {
                             >
                               {product.categoryName ||
                                 product.companyName ||
-                                t("common.general")}
+                                t("general")}
                             </p>
                           </div>
                           <div className="shrink-0 w-full max-w-full sm:w-auto">
@@ -1406,9 +1420,8 @@ export default function QuickPos() {
             <div className="min-w-0 overflow-hidden rounded-[28px] border border-secondary-200/70 bg-white/90 p-4 shadow-sm">
               <PaymentMethodFields
                 value={checkoutForm}
-                onChange={(patch) =>
-                  setCheckoutForm((previous) => ({ ...previous, ...patch }))
-                }
+                onChange={handleCheckoutPaymentChange}
+                bankAccountError={bankAccountError}
               />
             </div>
           </div>
@@ -2067,9 +2080,8 @@ export default function QuickPos() {
               <div className="rounded-[28px] border border-slate-200 bg-white px-4 py-4 min-w-0">
                 <PaymentMethodFields
                   value={checkoutForm}
-                  onChange={(patch) =>
-                    setCheckoutForm((previous) => ({ ...previous, ...patch }))
-                  }
+                  onChange={handleCheckoutPaymentChange}
+                  bankAccountError={bankAccountError}
                 />
               </div>
             </div>

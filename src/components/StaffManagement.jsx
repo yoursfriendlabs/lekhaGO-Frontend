@@ -4,6 +4,7 @@ import Notice from './Notice';
 import ConfirmDialog from './ui/ConfirmDialog.jsx';
 import { Dialog } from './ui/Dialog.tsx';
 import { api } from '../lib/api';
+import { getPermissionKeyForFeature, normalizePermissionMap } from '../lib/accessControl';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
@@ -411,23 +412,29 @@ function StaffFormDialog({
             <div className="mt-5 space-y-4">
               {meta.features.map((feature) => (
                 <div key={feature.key} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="min-w-0">
-                      <p className="font-medium text-slate-900 dark:text-white">{feature.label}</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                        {feature.description || t('staffManagement.permissionDescriptionFallback')}
-                      </p>
-                    </div>
-                    <div className="w-full lg:w-[19rem]">
-                      <PermissionSelector
-                        value={form.permissions[feature.key] || 'none'}
-                        levels={levels}
-                        disabled={readOnly}
-                        onChange={(value) => onPermissionChange(feature.key, value)}
-                        t={t}
-                      />
-                    </div>
-                  </div>
+                  {(() => {
+                    const permissionKey = getPermissionKeyForFeature(feature.key) || feature.key;
+
+                    return (
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-900 dark:text-white">{feature.label}</p>
+                          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                            {feature.description || t('staffManagement.permissionDescriptionFallback')}
+                          </p>
+                        </div>
+                        <div className="w-full lg:w-[19rem]">
+                          <PermissionSelector
+                            value={form.permissions[permissionKey] || 'none'}
+                            levels={levels}
+                            disabled={readOnly}
+                            onChange={(value) => onPermissionChange(permissionKey, value)}
+                            t={t}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -627,7 +634,7 @@ export default function StaffManagement({ businessId }) {
       address: form.address.trim(),
       compensation: form.compensation === '' ? null : Number(form.compensation),
       totalReceived: form.totalReceived === '' ? null : Number(form.totalReceived),
-      permissions: form.permissions,
+      permissions: normalizePermissionMap(form.permissions),
     };
 
     if (dialogMode === 'create') {
