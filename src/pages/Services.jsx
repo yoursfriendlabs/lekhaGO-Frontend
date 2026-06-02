@@ -84,7 +84,6 @@ const emptyItem = {
 };
 
 const TABLE_ROW_OPTIONS = [10, 20, 30, 40, 50];
-const PARTY_CREATED_NOTICE_TIMEOUT_MS = 3000;
 
 const makeEmptyHeader = () => ({
   partyId: '',
@@ -431,6 +430,33 @@ function StatusBadge({ status }) {
   );
 }
 
+const STATUS_STEPS = [
+  {
+    value: 'open',
+    label: 'Open',
+    desc: 'Awaiting work to begin',
+    selectedClass: 'border-blue-400 bg-blue-50 dark:bg-blue-900/20',
+    dotClass: 'bg-blue-500',
+    checkClass: 'text-blue-600',
+  },
+  {
+    value: 'in_progress',
+    label: 'In Progress',
+    desc: 'Currently being worked on',
+    selectedClass: 'border-amber-400 bg-amber-50 dark:bg-amber-900/20',
+    dotClass: 'bg-amber-500',
+    checkClass: 'text-amber-600',
+  },
+  {
+    value: 'closed',
+    label: 'Closed',
+    desc: 'Work completed',
+    selectedClass: 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20',
+    dotClass: 'bg-emerald-500',
+    checkClass: 'text-emerald-600',
+  },
+];
+
 export default function Services() {
   const { t } = useI18n();
   const { businessId, user, canManageFeature } = useAuth();
@@ -476,20 +502,6 @@ export default function Services() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formNotice, setFormNotice] = useState({ type: '', message: '' });
 
-  useEffect(() => {
-    if (formNotice.type !== 'success' || !formNotice.message) return undefined;
-
-    const timerId = window.setTimeout(() => {
-      setFormNotice((current) =>
-        current.type === 'success' && current.message === formNotice.message
-          ? { type: '', message: '' }
-          : current
-      );
-    }, PARTY_CREATED_NOTICE_TIMEOUT_MS);
-
-    return () => window.clearTimeout(timerId);
-  }, [formNotice.message, formNotice.type]);
-
   // ── Payment dialog ──
   const [payDialog, setPayDialog] = useState(null);
   const [payAmount, setPayAmount] = useState('');
@@ -497,6 +509,11 @@ export default function Services() {
   const [payPaymentMethod, setPayPaymentMethod] = useState('cash');
   const [payBankId, setPayBankId] = useState('');
   const [payError, setPayError] = useState('');
+
+  // ── Status dialog ──
+  const [statusDialog, setStatusDialog] = useState(null);
+  const [newStatus, setNewStatus] = useState('');
+  const [statusError, setStatusError] = useState('');
 
   // ── Party filter ──
   const [partyFilterId, setPartyFilterId] = useState('');
@@ -1298,6 +1315,15 @@ export default function Services() {
     { value: 'closed', label: t('services.closed') },
   ]), [t]);
 
+  // ── Status dialog ──
+  const openStatusDialog = (order) => {
+    if (!canManageServices) return;
+    setStatusDialog(order);
+    setNewStatus(order.status || 'open');
+    setStatusError('');
+  };
+  const closeStatusDialog = () => setStatusDialog(null);
+
   const openInvoiceModal = async (order) => {
     setInvoiceOrder(normalizeServiceOrder(order));
     setInvoiceLoading(true);
@@ -1308,6 +1334,18 @@ export default function Services() {
       // use list data if full fetch fails
     } finally {
       setInvoiceLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (!canManageServices) return;
+    if (!statusDialog) return;
+    try {
+      await api.updateService(statusDialog.id, { status: newStatus });
+      closeStatusDialog();
+      loadServices();
+    } catch (err) {
+      setStatusError(err.message);
     }
   };
 
@@ -1670,7 +1708,9 @@ export default function Services() {
                           {order.status !== 'closed' ? <DeliveryBadge date={order.deliveryDate} /> : <ClosedDeliveryLabel />}
                         </td>
                         <td className="py-3 pr-4">
-                          <StatusBadge status={order.status} />
+                          <button type="button" className="transition hover:opacity-75" onClick={() => openStatusDialog(order)}>
+                            <StatusBadge status={order.status} />
+                          </button>
                         </td>
                         <td className="py-3 pr-4">
                           <PaymentTypeSummary source={order} />
@@ -2824,6 +2864,49 @@ export default function Services() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Status Update Modal ── */}
+      {statusDialog && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4" onClick={(e) => { if (e.target === e.currentTarget) closeStatusDialog(); }}>
+          <div className="w-full max-w-sm rounded-t-3xl bg-white shadow-2xl dark:bg-slate-950 sm:rounded-3xl">
+            <div className="flex items-center justify-between border-b border-slate-200/70 px-6 py-4 dark:border-slate-800/70">
+              <h2 className="font-serif text-xl text-slate-900 dark:text-white">{t('services.updateStatus')}</h2>
+              <button type="button" onClick={closeStatusDialog} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><X size={18} /></button>
+            </div>
+              <div className="space-y-4 p-6">
+              {statusError ? <Notice title={statusError} tone="error" /> : null}
+              <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-900/60">
+                <p className="font-semibold text-slate-800 dark:text-slate-200">{statusDialog.orderNo || statusDialog.id.slice(0, 8)}</p>
+                {statusDialog.Party?.name ? <p className="text-slate-500">{statusDialog.partyName}</p> : null}
+              </div>
+              <div className="space-y-2">
+                {STATUS_STEPS.map((step) => {
+                  const isSelected = newStatus === step.value;
+                  return (
+                    <button
+                      key={step.value}
+                      type="button"
+                      onClick={() => setNewStatus(step.value)}
+                      className={`flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition ${isSelected ? step.selectedClass : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600'}`}
+                    >
+                      <span className={`h-3 w-3 shrink-0 rounded-full ${step.dotClass}`} />
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-800 dark:text-slate-200">{step.label}</p>
+                        <p className="text-xs text-slate-500">{step.desc}</p>
+                      </div>
+                      {isSelected && <Check size={16} className={step.checkClass} />}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row">
+                <button type="button" className="btn-ghost flex-1" onClick={closeStatusDialog}>{t('common.cancel')}</button>
+                <button type="button" className="btn-primary flex-1" onClick={handleUpdateStatus} disabled={newStatus === statusDialog.status}>{t('services.updateStatus')}</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
