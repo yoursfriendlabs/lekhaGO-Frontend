@@ -721,7 +721,14 @@ export default function Purchases() {
       <Dialog isOpen={Boolean(payDialog)} onClose={closePayDialog} title={t('RecordPayment')} size="sm">
         {payDialog && (
           <form className="space-y-4" onSubmit={handleRecordPayment}>
-            {payError && <Notice title={payError} tone="error" />}
+            {payError ? (
+              <div className="space-y-3">
+                <Notice title={payError} tone="error" />
+                <button type="button" className="btn-secondary w-full sm:w-auto" onClick={() => setPayError('')}>
+                  {t('common.back')}
+                </button>
+              </div>
+            ) : null}
             <div className="rounded-[22px] bg-slate-50 p-4 text-sm dark:bg-slate-900/60">
               <p className="font-semibold text-slate-800 dark:text-slate-200">{payDialog.invoiceNo || payDialog.id.slice(0, 8)}</p>
               {getSupplierName(payDialog) && <p className="text-slate-500 dark:text-slate-400">{getSupplierName(payDialog)}</p>}

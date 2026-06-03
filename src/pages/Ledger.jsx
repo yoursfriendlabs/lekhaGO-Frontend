@@ -709,6 +709,7 @@ export default function Ledger() {
                     onChange={handlePartyFilterChange}
                     placeholder={t('ledger.allParties')}
                     searchPlaceholder={t('ledger.searchPlaceholder')}
+                    showPhone={false}
                   />
                   <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
                     {hasActivePartyFilter ? `${t('ledger.party')}: ${selectedPartyLabel}` : t('ledger.allParties')}

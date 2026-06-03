@@ -1732,6 +1732,9 @@ export default function QuickPos() {
         }
       >
         <div className="space-y-3 overflow-x-hidden">
+          {status.message ? (
+            <Notice title={status.message} tone={status.type} />
+          ) : null}
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 transition focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-200">
               <span className="text-xs font-medium uppercase text-slate-500">

@@ -41,6 +41,8 @@ import {
   Pencil,
   FileText,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Phone,
   ArrowRight,
   CalendarDays,
@@ -88,7 +90,7 @@ const TABLE_ROW_OPTIONS = [10, 20, 30, 40, 50];
 const makeEmptyHeader = () => ({
   partyId: '',
   orderNo: '',
-  status: 'open',
+  status: 'in_progress',
   notes: '',
   deliveryDate: todayISODate(),
   paymentMethod: 'cash',
@@ -175,14 +177,14 @@ function AttachmentStrip({ urls = [], onOpen, maxVisible = 3, size = 'sm' }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {visibleUrls.map((url) => (
-        <AttachmentPreview key={url} url={url} onOpen={onOpen} size={size} />
+      {visibleUrls.map((url, i) => (
+        <AttachmentPreview key={url} url={url} onOpen={() => onOpen(urls, i)} size={size} />
       ))}
       {hiddenCount > 0 ? (
         <button
           type="button"
           className="inline-flex h-9 min-w-9 items-center justify-center rounded-2xl bg-slate-100 px-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
-          onClick={() => onOpen(hiddenUrls[0])}
+          onClick={() => onOpen(urls, visibleUrls.length)}
           title="Open more attachments"
         >
           +{hiddenCount}
@@ -420,7 +422,7 @@ function StatusBadge({ status }) {
   };
   const label =
     status === 'in_progress' ? t('services.inProgress')
-    : status === 'open' ? t('services.open')
+    // : status === 'open' ? t('services.open')
     : status === 'closed' ? t('services.closed')
     : '—';
   return (
@@ -431,14 +433,6 @@ function StatusBadge({ status }) {
 }
 
 const STATUS_STEPS = [
-  {
-    value: 'open',
-    label: 'Open',
-    desc: 'Awaiting work to begin',
-    selectedClass: 'border-blue-400 bg-blue-50 dark:bg-blue-900/20',
-    dotClass: 'bg-blue-500',
-    checkClass: 'text-blue-600',
-  },
   {
     value: 'in_progress',
     label: 'In Progress',
@@ -527,7 +521,28 @@ export default function Services() {
   const [deleteService, setDeleteService] = useState(null);
 
   // ── Lightbox ──
-  const [lightboxUrl, setLightboxUrl] = useState(null);
+  const [lightboxState, setLightboxState] = useState(null);
+
+  const openLightbox = (urls = [], index = 0) => {
+    const normalized = Array.isArray(urls) ? urls : [urls];
+    const abs = normalized.map((u) => (u && String(u).startsWith('http') ? u : String(u || '')));
+    setLightboxState({ urls: abs, index: Math.max(0, Math.min(index || 0, abs.length - 1)) });
+  };
+
+  const closeLightbox = () => setLightboxState(null);
+  const showPrev = () => setLightboxState((s) => (s ? { ...s, index: Math.max(0, s.index - 1) } : s));
+  const showNext = () => setLightboxState((s) => (s ? { ...s, index: Math.min(s.urls.length - 1, s.index + 1) } : s));
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (!lightboxState) return;
+      if (e.key === 'ArrowLeft') showPrev();
+      if (e.key === 'ArrowRight') showNext();
+      if (e.key === 'Escape') closeLightbox();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightboxState]);
 
   // ── Invoice modal ──
   const [invoiceOrder, setInvoiceOrder] = useState(null);
@@ -1294,6 +1309,7 @@ export default function Services() {
 
   const serviceOverview = useMemo(() => {
     const openCount = safeServiceList.filter((order) => order.status === 'open').length;
+    const closedCount = safeServiceList.filter((order) => order.status === 'closed').length;
     const inProgressCount = safeServiceList.filter((order) => order.status === 'in_progress').length;
     const pendingCollection = safeServiceList.reduce(
       (sum, order) => sum + Math.max(Number(order.grandTotal || 0) - Number(order.receivedTotal || 0), 0),
@@ -1303,6 +1319,7 @@ export default function Services() {
     return {
       totalOrders: safeServiceList.length,
       openCount,
+      closedCount,
       inProgressCount,
       pendingCollection,
     };
@@ -1491,7 +1508,7 @@ export default function Services() {
 
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-hide sm:grid sm:grid-cols-2 xl:grid-cols-4">
             <OverviewMetric icon={LayoutList} label={t('services.totalOrders')} value={serviceOverview.totalOrders} />
-            <OverviewMetric icon={Wrench} label={t('services.open')} value={serviceOverview.openCount} tone="blue" />
+            <OverviewMetric icon={Check} label={t('services.closed')} value={serviceOverview.closedCount} tone="emerald" />
             <OverviewMetric icon={CalendarDays} label={t('services.activeJobs')} value={serviceOverview.inProgressCount} tone="amber" />
             <OverviewMetric icon={Wallet} label={t('services.pendingCollection')} value={money(serviceOverview.pendingCollection)} tone="rose" />
           </div>
@@ -1579,7 +1596,17 @@ export default function Services() {
                           <p className="truncate text-base font-semibold text-slate-900 dark:text-white">
                             {order.orderNo || order.id.slice(0, 8)}
                           </p>
-                          <StatusBadge status={order.status} />
+                          {canManageServices ? (
+                            <button
+                              type="button"
+                              className="transition hover:opacity-75"
+                              onClick={() => openStatusDialog(order)}
+                            >
+                              <StatusBadge status={order.status} />
+                            </button>
+                          ) : (
+                            <StatusBadge status={order.status} />
+                          )}
                         </div>
 
                         <div className="mt-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
@@ -1648,7 +1675,7 @@ export default function Services() {
                         <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                           {t('services.attachment')}
                         </p>
-                        <AttachmentStrip urls={attachmentUrls} onOpen={setLightboxUrl} size="md" />
+                        <AttachmentStrip urls={attachmentUrls} onOpen={openLightbox} size="md" />
                       </div>
                     ) : null}
                   </div>
@@ -1717,7 +1744,7 @@ export default function Services() {
                         </td>
                         <td className="py-3 pr-2">
                           {attachmentUrls.length > 0 ? (
-                            <AttachmentStrip urls={attachmentUrls} onOpen={setLightboxUrl} maxVisible={2} />
+                            <AttachmentStrip urls={attachmentUrls} onOpen={openLightbox} maxVisible={2} />
                           ) : (
                             <span className="text-slate-300">—</span>
                           )}
@@ -1978,7 +2005,6 @@ export default function Services() {
                             <div>
                               <label className="label">{t('services.status')}</label>
                               <select className="input mt-1" name="status" value={header.status} onChange={handleHeaderChange}>
-                                <option value="open">{t('services.open')}</option>
                                 <option value="in_progress">{t('services.inProgress')}</option>
                                 <option value="closed">{t('services.closed')}</option>
                               </select>
@@ -2636,17 +2662,26 @@ export default function Services() {
       )}
 
       {/* ── Attachment Lightbox ── */}
-      {lightboxUrl && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4" onClick={() => setLightboxUrl(null)}>
-          <button type="button" className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onClick={() => setLightboxUrl(null)}>
+      {lightboxState && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4" onClick={closeLightbox}>
+          <button type="button" className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); closeLightbox(); }}>
             <X size={20} />
           </button>
-          {isPdfAttachment(lightboxUrl) ? (
-            <a href={lightboxUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-white px-6 py-4 text-slate-800 font-semibold" onClick={(e) => e.stopPropagation()}>
+
+          <button type="button" className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); showPrev(); }} aria-label="Previous">
+            <ChevronLeft size={22} />
+          </button>
+
+          <button type="button" className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); showNext(); }} aria-label="Next">
+            <ChevronRight size={22} />
+          </button>
+
+          {isPdfAttachment(lightboxState.urls[lightboxState.index]) ? (
+            <a href={lightboxState.urls[lightboxState.index]} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-white px-6 py-4 text-slate-800 font-semibold" onClick={(e) => e.stopPropagation()}>
               Open PDF in new tab
             </a>
           ) : (
-            <img src={lightboxUrl} alt="Attachment" className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+            <img src={lightboxState.urls[lightboxState.index]} alt="Attachment" className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
           )}
         </div>
       )}
@@ -2851,7 +2886,7 @@ export default function Services() {
                 {invoiceAttachmentUrls.length > 0 && (
                   <div className="border-t border-slate-200/70 px-8 py-5 dark:border-slate-800/70">
                     <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-black">Attachment</p>
-                    <AttachmentStrip urls={invoiceAttachmentUrls} onOpen={setLightboxUrl} maxVisible={4} size="lg" />
+                    <AttachmentStrip urls={invoiceAttachmentUrls} onOpen={openLightbox} maxVisible={4} size="lg" />
                   </div>
                 )}
 
@@ -2920,7 +2955,18 @@ export default function Services() {
               <button type="button" onClick={() => setPayDialog(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><X size={18} /></button>
             </div>
             <form onSubmit={handleRecordPayment} className="space-y-4 p-6">
-              {payError ? <Notice title={payError} tone="error" /> : null}
+              {payError ? (
+                <div className="space-y-3">
+                  <Notice title={payError} tone="error" />
+                  <button
+                    type="button"
+                    className="btn-secondary w-full sm:w-auto"
+                    onClick={() => setPayError('')}
+                  >
+                    {t('common.back')}
+                  </button>
+                </div>
+              ) : null}
               <div className="rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-900/60">
                 <p className="font-semibold text-slate-800 dark:text-slate-200">{payDialog.orderNo || payDialog.id.slice(0, 8)}</p>
                 {payDialog.partyName ? <p className="text-slate-500">{payDialog.partyName}</p> : null}
