@@ -495,6 +495,7 @@ export default function Services() {
   // ── New order dialog ──
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formNotice, setFormNotice] = useState({ type: '', message: '' });
+  const formNoticeTimerRef = useRef(null);
 
   // ── Payment dialog ──
   const [payDialog, setPayDialog] = useState(null);
@@ -1206,7 +1207,10 @@ export default function Services() {
       setEditLoading(false);
     }
   };
-  const closeDialog = () => { setDialogOpen(false); resetForm(); };
+  const closeDialog = () => {
+
+    resetForm();
+  };
 
   const goToNextMobileStep = () => {
     if (!canGoForwardStep) return;
@@ -1226,6 +1230,7 @@ export default function Services() {
   // ── Submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!canManageServices) { setFormNotice({ type: 'error', message: t('staffManagement.permissionError') }); return; }
     if (!businessId) { setFormNotice({ type: 'error', message: t('errors.businessIdRequired') }); return; }
     // Customer is optional for services (walk-in support)
@@ -1236,7 +1241,22 @@ export default function Services() {
       return Number(getProductById(i.productId)?.conversionRate || 0) <= 0;
     });
     if (invalidConversion) { setFormNotice({ type: 'error', message: t('errors.conversionRequired') }); return; }
-    if (!chargeableItems.length) { setFormNotice({ type: 'error', message: t('services.addFirstItem') }); return; }
+    if (!chargeableItems.length) {
+      setFormNotice({ type: 'error', message: t('services.addFirstItem') });
+      try {
+        clearTimeout(formNoticeTimerRef.current);
+        formNoticeTimerRef.current = setTimeout(() => {
+          try {
+            setFormNotice({ type: '', message: '' });
+          } catch (err) {
+            console.error('Error clearing notice:', err);
+          }
+        }, 2000);
+      } catch (err) {
+        console.error('Error setting timeout:', err);
+      }
+      return;
+    }
     if (Number(discount || 0) < 0) { setFormNotice({ type: 'error', message: t('services.discountInvalid') }); return; }
     const normalizedAttributes = showGoldJewelleryDetails
       ? normalizeJewelleryAttributes(header.attributes)
@@ -1248,8 +1268,26 @@ export default function Services() {
       setFormNotice({ type: 'error', message: 'Wastage percent must be between 5 and 15.' });
       return;
     }
-    if (requiresBankSelection(header, totals.received)) {
-      setFormNotice({ type: 'error', message: t('payments.bankRequired') });
+    const receivedAmount = isPaid
+      ? Number(totals.grandTotal || 0)
+      : Number(amountReceived || 0);
+
+    if (requiresBankSelection(header, receivedAmount)) {
+      setMobileStep('payment');
+      setFormNotice({
+        type: 'error',
+        message: t('payments.bankRequired'),
+      });
+
+      clearTimeout(formNoticeTimerRef.current);
+
+      formNoticeTimerRef.current = setTimeout(() => {
+        setFormNotice({
+          type: '',
+          message: '',
+        });
+      }, 2000);
+
       return;
     }
     try {
@@ -2701,7 +2739,7 @@ export default function Services() {
             ) : (
               <div ref={invoicePrintRef} className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950">
                 {/* ── Header ── */}
-                <div className="px-8 pt-0">
+                <div className="px-4 pt-0 sm:px-8">
                     <InvoiceHeader
                       biz={bizSettings}
                       invoiceType="Service Invoice"
@@ -2719,7 +2757,7 @@ export default function Services() {
                 </div>
 
                 {/* ── Customer + Attributes ── */}
-                <div className="border-b border-slate-200/70 bg-slate-50/60 px-8 py-5 dark:border-slate-800/70 dark:bg-slate-900/30">
+                <div className="border-b border-slate-200/70 bg-slate-50/60 px-4 py-5 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div>
                       <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">Bill To</p>
@@ -2794,40 +2832,40 @@ export default function Services() {
                 </div>
 
                 {/* ── Line Items ── */}
-                <div className="px-8 py-6">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto px-4 py-6 sm:px-8">
+                  <table className="w-full min-w-[540px] text-sm">
                     <thead>
                       <tr className="border-b-2 border-slate-200/70 dark:border-slate-700/70">
-                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider tblack w-8"></th>
-                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider tblack">Description</th>
-                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider tblack">Product Name</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider tblack">Qty</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider tblack">Unit Price</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider tblack">{t('services.tax')}</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider tblack">{t('services.taxTotal')}</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider tblack">Amount</th>
+                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">Item</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">Qty</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">Rate</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">{t('services.tax')}</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                       {invoiceItems.map((item, idx) => (
                         <tr key={`${item.productId || item.description || 'service'}-${idx}`}>
-                          <td className="py-3 pr-2">
-                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}>
-                              {item.itemType === 'labor' ? 'Service' : 'Product'}
-                            </span>
-                          </td>
-                          <td className="py-3 pr-4 font-medium text-black">
-                            {item.description || item.productName || '—'}
-                          </td>
-                          <td className="py-3 pr-4 font-medium text-black">
-                            { item.productName || '—'}
+                          <td className="py-3 pr-4">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-block shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}>
+                                {item.itemType === 'labor' ? 'Service' : 'Product'}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-black">
+                                  {item.description || item.productName || '—'}
+                                </p>
+                                {item.productName && item.description && item.description !== item.productName && (
+                                  <p className="truncate text-xs text-slate-500">{item.productName}</p>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td className="py-3 text-right text-slate-900">
                             {Number(item.quantity || 0).toFixed(item.quantity % 1 ? 3 : 0)}
                           </td>
                           <td className="py-3 text-right text-black">{money(item.unitPrice)}</td>
                           <td className="py-3 text-right text-black">{Number(item.taxRate || 0).toFixed(2)}%</td>
-                          <td className="py-3 text-right text-black">{money(getVatAmount(item.lineTotal, item.taxRate))}</td>
                           <td className="py-3 text-right font-semibold text-black">{money(item.lineTotal)}</td>
                         </tr>
                       ))}
@@ -2836,7 +2874,7 @@ export default function Services() {
                 </div>
 
                 {/* ── Totals ── */}
-                <div className="border-t border-slate-200/70 dark:border-slate-800/70 px-8 py-6">
+                <div className="border-t border-slate-200/70 dark:border-slate-800/70 px-4 py-6 sm:px-8">
                   <div className="ml-auto max-w-xs space-y-2 text-sm">
                     <div className="flex justify-between text-black">
                       <span>{t('services.subTotal')}</span><span>{money(invoiceTotals.subTotal)}</span>
@@ -2884,14 +2922,14 @@ export default function Services() {
 
                 {/* ── Attachment ── */}
                 {invoiceAttachmentUrls.length > 0 && (
-                  <div className="border-t border-slate-200/70 px-8 py-5 dark:border-slate-800/70">
+                  <div className="border-t border-slate-200/70 px-4 py-5 dark:border-slate-800/70 sm:px-8">
                     <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-black">Attachment</p>
                     <AttachmentStrip urls={invoiceAttachmentUrls} onOpen={openLightbox} maxVisible={4} size="lg" />
                   </div>
                 )}
 
                 {/* ── Footer ── */}
-                <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-8 py-4 dark:border-slate-800/70 dark:bg-slate-900/30">
+                <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-4 py-4 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
                   <p className="text-xs text-black">Thank you for your business!</p>
                   <p className="text-xs text-black">
                     Printed {dayjs().format('D MMM YYYY')}

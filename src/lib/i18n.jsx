@@ -162,6 +162,7 @@ const dictionaries = {
         saving: 'Saving...',
         saveCta: 'Save Settings',
         saved: 'Saved',
+        invalidEmail: 'Please enter a valid email address (must contain @).',
       },
       profile: {
         eyebrow: 'Profile',
@@ -1745,6 +1746,7 @@ const dictionaries = {
         saving: 'सेभ हुँदै...',
         saveCta: 'सेटिङ सेभ गर्नुहोस्',
         saved: 'सेभ भयो',
+        invalidEmail: 'कृपया मान्य इमेल ठेगाना प्रविष्ट गर्नुहोस् (@ हुनुपर्छ)।',
       },
       profile: {
         eyebrow: 'प्रोफाइल',

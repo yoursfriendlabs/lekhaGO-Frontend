@@ -214,6 +214,12 @@ export default function Settings() {
       return;
     }
 
+    const email = (form.email || '').trim();
+    if (email && !email.includes('@')) {
+      setError(t('settingsPage.general.invalidEmail'));
+      return;
+    }
+
     setSaving(true);
     setSaved(false);
     setError('');
