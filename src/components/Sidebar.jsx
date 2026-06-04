@@ -75,7 +75,7 @@ export default function Sidebar() {
       <div className="mt-auto space-y-3">
         <UpgradeSubscriptionCta variant="sidebar" />
         <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-xs text-slate-500 dark:border-slate-800/60 dark:bg-slate-900/60 dark:text-slate-400">
-          {t('notices.businessRequiredDesc')}
+          {/* {t('notices.businessRequiredDesc')} */}
         </div>
       </div>
     </aside>
