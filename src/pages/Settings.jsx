@@ -83,11 +83,7 @@ export default function Settings() {
         label: t('settingsPage.tabs.profile'),
         description: t('settingsPage.descriptions.profile'),
       },
-      {
-        key: SUBSCRIPTION_SETTINGS_TAB,
-        label: t('settingsPage.tabs.subscription'),
-        description: t('settingsPage.descriptions.subscription'),
-      },
+
       {
         key: ACCOUNT_SETTINGS_TAB,
         label: t('settingsPage.tabs.account'),
@@ -134,6 +130,13 @@ export default function Settings() {
         description: t('settingsPage.descriptions.orderAttributes'),
       });
     }
+    if (canManageFeature('subscription-settings')) {
+      nextTabs.push(
+      {
+        key: SUBSCRIPTION_SETTINGS_TAB,
+        label: t('settingsPage.tabs.subscription'),
+        description: t('settingsPage.descriptions.subscription'),
+    }); }
 
     return nextTabs;
   }, [canManageFeature, canViewFeature, generalLocked, isOwner, t]);
