@@ -1208,8 +1208,8 @@ export default function Services() {
     }
   };
   const closeDialog = () => {
-
     resetForm();
+    setDialogOpen(false);
   };
 
   const goToNextMobileStep = () => {
