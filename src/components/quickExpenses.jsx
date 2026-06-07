@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Car,
-  ShoppingBag,
   Tag,
   Utensils,
   UserRound,
   Wallet,
-  Wrench,
   Zap,
 } from 'lucide-react';
 
@@ -107,22 +105,6 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
         activeColor: 'border-yellow-400 bg-yellow-50 dark:border-yellow-500/50 dark:bg-yellow-900/20',
         iconWrap: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
         badge: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
-      },
-      {
-        id: 'supplies',
-        label: t('quickExpense.categories.supplies'),
-        icon: ShoppingBag,
-        activeColor: 'border-purple-400 bg-purple-50 dark:border-purple-500/50 dark:bg-purple-900/20',
-        iconWrap: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-        badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-      },
-      {
-        id: 'maintenance',
-        label: t('quickEntry.categories.maintenance'),
-        icon: Wrench,
-        activeColor: 'border-slate-400 bg-slate-50 dark:border-slate-500/50 dark:bg-slate-800/30',
-        iconWrap: 'bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-300',
-        badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300',
       },
     ];
 

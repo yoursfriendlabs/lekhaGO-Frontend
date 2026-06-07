@@ -384,9 +384,12 @@ export default function Purchases() {
       const { paymentMethod, bankId, paymentNote, ...headerFields } = header;
       const payload = { ...headerFields, partyId: header.partyId || null, partyName: header.entryType === 'expense' ? header.partyName || null : null, amountReceived: paidAmount, ...(Number(paidAmount || 0) > 0 ? buildPaymentPayload({ paymentMethod, bankId, paymentNote }) : { paymentMethod: 'cash' }), ...totals, items: [...items.map((item) => ({ ...item, quantity: Number(item.quantity), unitType: item.unitType || 'primary', conversionRate: Number(getProductById(item.productId)?.conversionRate || 0), unitPrice: Number(item.unitPrice), taxRate: Number(item.taxRate), lineTotal: Number(item.lineTotal), itemType: item.itemType || (header.entryType === 'expense' ? 'expense' : 'part'), description: item.description || '' })), ...deletedItemIds.map((id) => ({ id, _delete: true }))] };
       if (manualInvoiceNo) payload.invoiceNo = manualInvoiceNo; else delete payload.invoiceNo;
-      if (formMode === 'edit' && editingId) { await api.updatePurchase(editingId, payload); setStatus({ type: 'success', message: t('purchases.messages.updated') }); }
-      else { await api.createPurchase(payload); setStatus({ type: 'success', message: t('purchases.messages.created') }); }
-      resetForm(); setIsOpen(false); useProductStore.getState().invalidate(); invalidatePurchases(); fetchPurchases(listParams, true);
+      const successMsg = formMode === 'edit' && editingId ? t('purchases.messages.updated') : t('purchases.messages.created');
+      if (formMode === 'edit' && editingId) { await api.updatePurchase(editingId, payload); }
+      else { await api.createPurchase(payload); }
+      resetForm(); setIsOpen(false); useProductStore.getState().invalidate(); invalidatePurchases();
+      try { await fetchPurchases(listParams, true); } catch { /* list refresh failure is non-critical */ }
+      setStatus({ type: 'success', message: successMsg });
     } catch (err) { setStatus({ type: 'error', message: err.message }); }
     finally { setSavingPurchase(false); }
   };
@@ -748,6 +751,7 @@ export default function Purchases() {
           PURCHASES LIST
       ══════════════════════════════════════════ */}
       <div className="card">
+        {!isOpen && status.message && <Notice title={status.message} tone={status.type} />}
         <div className="grid gap-3 sm:grid-cols-2 xl:max-w-3xl xl:grid-cols-[1fr_1fr_auto] xl:items-end">
           <div><label className="label">{t('inventory.itemType')}</label><select className="input mt-1" value={entryTypeFilter} onChange={(e) => setEntryTypeFilter(e.target.value)}>{entryTypeFilterOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
           <div><label className="label">{t('common.status')}</label><select className="input mt-1" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>{statusFilterOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
