@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Car,
   ShoppingBag,
@@ -52,62 +52,104 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
   const [staffSelectorOpen, setStaffSelectorOpen] = useState(false);
   const [quickSaving, setQuickSaving] = useState(false);
   const [quickStatus, setQuickStatus] = useState({ type: 'info', message: '' });
+  const [managedCategories, setManagedCategories] = useState([]);
 
   const money = (value) => t('currency.formatted', {
     symbol: t('currency.symbol'),
     amount: Number(value || 0).toFixed(2),
   });
 
-  const categories = useMemo(() => ([
-    {
-      id: 'food',
-      label: t('quickExpense.categories.food'),
-      icon: Utensils,
-      activeColor: 'border-orange-400 bg-orange-50 dark:border-orange-500/50 dark:bg-orange-900/20',
-      iconWrap: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
-      badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
-    },
-    {
-      id: 'transport',
-      label: t('quickEntry.categories.transport'),
-      icon: Car,
-      activeColor: 'border-blue-400 bg-blue-50 dark:border-blue-500/50 dark:bg-blue-900/20',
-      iconWrap: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-      badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-    },
-    {
-      id: 'utilities',
-      label: t('quickEntry.categories.utilities'),
-      icon: Zap,
-      activeColor: 'border-yellow-400 bg-yellow-50 dark:border-yellow-500/50 dark:bg-yellow-900/20',
-      iconWrap: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
-      badge: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
-    },
-    {
-      id: 'supplies',
-      label: t('quickExpense.categories.supplies'),
-      icon: ShoppingBag,
-      activeColor: 'border-purple-400 bg-purple-50 dark:border-purple-500/50 dark:bg-purple-900/20',
-      iconWrap: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-      badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
-    },
-    {
-      id: 'maintenance',
-      label: t('quickEntry.categories.maintenance'),
-      icon: Wrench,
-      activeColor: 'border-slate-400 bg-slate-50 dark:border-slate-500/50 dark:bg-slate-800/30',
-      iconWrap: 'bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-300',
-      badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300',
-    },
-    {
-      id: CUSTOM_CATEGORY,
-      label: t('quickExpense.categories.custom'),
-      icon: Tag,
-      activeColor: 'border-emerald-400 bg-emerald-50 dark:border-emerald-500/50 dark:bg-emerald-900/20',
-      iconWrap: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-      badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-    },
-  ]), [t]);
+  useEffect(() => {
+    let active = true;
+
+    if (!businessId) {
+      setManagedCategories([]);
+      return undefined;
+    }
+
+    api.listCategories({ type: 'expense', limit: 100, offset: 0 })
+      .then((response) => {
+        if (!active) return;
+        setManagedCategories(response.items || []);
+      })
+      .catch(() => {
+        if (!active) return;
+        setManagedCategories([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [businessId]);
+
+  const categories = useMemo(() => {
+    const defaultCategories = [
+      {
+        id: 'food',
+        label: t('quickExpense.categories.food'),
+        icon: Utensils,
+        activeColor: 'border-orange-400 bg-orange-50 dark:border-orange-500/50 dark:bg-orange-900/20',
+        iconWrap: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+        badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+      },
+      {
+        id: 'transport',
+        label: t('quickEntry.categories.transport'),
+        icon: Car,
+        activeColor: 'border-blue-400 bg-blue-50 dark:border-blue-500/50 dark:bg-blue-900/20',
+        iconWrap: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+        badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+      },
+      {
+        id: 'utilities',
+        label: t('quickEntry.categories.utilities'),
+        icon: Zap,
+        activeColor: 'border-yellow-400 bg-yellow-50 dark:border-yellow-500/50 dark:bg-yellow-900/20',
+        iconWrap: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+        badge: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+      },
+      {
+        id: 'supplies',
+        label: t('quickExpense.categories.supplies'),
+        icon: ShoppingBag,
+        activeColor: 'border-purple-400 bg-purple-50 dark:border-purple-500/50 dark:bg-purple-900/20',
+        iconWrap: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+        badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300',
+      },
+      {
+        id: 'maintenance',
+        label: t('quickEntry.categories.maintenance'),
+        icon: Wrench,
+        activeColor: 'border-slate-400 bg-slate-50 dark:border-slate-500/50 dark:bg-slate-800/30',
+        iconWrap: 'bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-300',
+        badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300',
+      },
+    ];
+
+    const managedOptions = managedCategories
+      .filter((category) => category?.id && category?.name)
+      .map((category) => ({
+        id: `expense-category-${category.id}`,
+        label: category.name,
+        icon: Wallet,
+        activeColor: 'border-teal-400 bg-teal-50 dark:border-teal-500/50 dark:bg-teal-900/20',
+        iconWrap: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+        badge: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+      }));
+
+    return [
+      ...defaultCategories,
+      ...managedOptions,
+      {
+        id: CUSTOM_CATEGORY,
+        label: t('quickExpense.categories.custom'),
+        icon: Tag,
+        activeColor: 'border-emerald-400 bg-emerald-50 dark:border-emerald-500/50 dark:bg-emerald-900/20',
+        iconWrap: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+        badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+      },
+    ];
+  }, [managedCategories, t]);
 
   const quickGrandTotal = useMemo(() => quickLines.reduce((sum, line) => {
     return sum + Math.max(Number(line.amount || 0), 0);

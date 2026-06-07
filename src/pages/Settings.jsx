@@ -7,6 +7,7 @@ import AccountSecurityPanel from '../components/account/AccountSecurityPanel.jsx
 import StaffManagement from '../components/StaffManagement';
 import BanksSettingsPanel from '../components/settings/BanksSettingsPanel.jsx';
 import CategoriesSettingsPanel from '../components/settings/CategoriesSettingsPanel.jsx';
+import ExpensesCategoriesSettingsPanel from '../components/settings/ExpensesCategoriesSettingsPanel.jsx';
 import OrderAttributesSettingsPanel from '../components/settings/OrderAttributesSettingsPanel.jsx';
 import ProfileSettingsPanel from '../components/settings/ProfileSettingsPanel.jsx';
 import SubscriptionSettingsPanel from '../components/settings/SubscriptionSettingsPanel.jsx';
@@ -20,6 +21,7 @@ import {
   ACCOUNT_SETTINGS_TAB,
   BANKS_SETTINGS_TAB,
   CATEGORIES_SETTINGS_TAB,
+  EXPENSE_CATEGORIES_SETTINGS_TAB,
   GENERAL_SETTINGS_TAB,
   ORDER_ATTRIBUTES_SETTINGS_TAB,
   PROFILE_SETTINGS_TAB,
@@ -100,11 +102,18 @@ export default function Settings() {
     }
 
     if (canManageFeature('categories')) {
-      nextTabs.push({
-        key: CATEGORIES_SETTINGS_TAB,
-        label: t('settingsPage.tabs.categories'),
-        description: t('settingsPage.descriptions.categories'),
-      });
+      nextTabs.push(
+        {
+          key: CATEGORIES_SETTINGS_TAB,
+          label: t('settingsPage.tabs.categories'),
+          description: t('settingsPage.descriptions.categories'),
+        },
+        {
+          key: EXPENSE_CATEGORIES_SETTINGS_TAB,
+          label: t('settingsPage.tabs.expenseCategories'),
+          description: t('settingsPage.descriptions.expenseCategories'),
+        },
+      );
     }
 
     if (canManageFeature('units')) {
@@ -515,6 +524,7 @@ export default function Settings() {
       {activeTab === ACCOUNT_SETTINGS_TAB ? <AccountSecurityPanel /> : null}
       {activeTab === STAFF_SETTINGS_TAB ? <StaffManagement businessId={businessId} /> : null}
       {activeTab === CATEGORIES_SETTINGS_TAB ? <CategoriesSettingsPanel /> : null}
+      {activeTab === EXPENSE_CATEGORIES_SETTINGS_TAB ? <ExpensesCategoriesSettingsPanel /> : null}
       {activeTab === UNITS_SETTINGS_TAB ? <UnitsSettingsPanel /> : null}
       {activeTab === BANKS_SETTINGS_TAB ? <BanksSettingsPanel /> : null}
       {activeTab === ORDER_ATTRIBUTES_SETTINGS_TAB ? <OrderAttributesSettingsPanel /> : null}
