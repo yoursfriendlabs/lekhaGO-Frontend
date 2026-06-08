@@ -58,6 +58,13 @@ export default function Banks() {
   const [form, setForm] = useState(emptyForm);
   const [listError, setListError] = useState('');
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   const [submitting, setSubmitting] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [deleteBank, setDeleteBank] = useState(null);

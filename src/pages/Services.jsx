@@ -488,6 +488,13 @@ export default function Services() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [listError, setListError] = useState('');
   const [listNotice, setListNotice] = useState({ type: '', message: '' });
+
+  useEffect(() => {
+    if (listNotice.type !== 'success' && listNotice.type !== 'error') return;
+    const timer = setTimeout(() => setListNotice({ type: '', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [listNotice]);
+
   const [page, setPage] = useState(1);
   const [refreshingServices, setRefreshingServices] = useState(false);
   const [pageSize, setPageSize] = useState(10);

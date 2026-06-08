@@ -82,6 +82,13 @@ export default function CafeOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formMode, setFormMode] = useState('create');
   const [editingId, setEditingId] = useState(null);

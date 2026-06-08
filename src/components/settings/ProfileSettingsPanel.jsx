@@ -23,6 +23,12 @@ export default function ProfileSettingsPanel({ isOwner = false }) {
   const [status, setStatus] = useState({ type: 'info', message: '' });
 
   useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
+  useEffect(() => {
     setForm({
       name: user?.name || '',
       phone: user?.phone || '',

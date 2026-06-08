@@ -88,6 +88,12 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!saved) return;
+    const timer = setTimeout(() => setSaved(false), 3000);
+    return () => clearTimeout(timer);
+  }, [saved]);
   const [logoUploading, setLogoUploading] = useState(false);
   const [staffSummary, setStaffSummary] = useState(EMPTY_STAFF_SUMMARY);
   const [staffSummaryLoading, setStaffSummaryLoading] = useState(false);
