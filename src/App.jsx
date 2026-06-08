@@ -19,7 +19,6 @@ import { getSubscriptionGuard, getSubscriptionStatusState, humanizeKey } from '.
 import { buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB } from './lib/settingsTabs';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Admin = lazy(() => import('./pages/Admin'));
 const Inventory = lazy(() => import('./pages/Inventory'));
 const Purchases = lazy(() => import('./pages/Purchases'));
 const Sales = lazy(() => import('./pages/Sales'));
@@ -42,7 +41,6 @@ const Landing = lazy(() => import('./pages/Landing'));
 const Invoice = lazy(() => import('./pages/Invoice'));
 
 const OWNER_AND_STAFF_ROLES = ['owner', 'staff'];
-const OWNER_ONLY_ROLES = ['owner'];
 
 export function ProtectedRoute({ children }) {
   const { token } = useAuth();
@@ -325,7 +323,7 @@ function AppShell() {
                   <Route path="banks" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="banks"><Banks /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="ledger" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="ledger"><Ledger /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="analytics" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="analytics"><Analytics /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="admin" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_ONLY_ROLES}><SubscriptionFeatureRoute featureKey="admin"><Admin /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="admin" element={<Navigate to="/app/settings" replace />} />
                   <Route
                     path="order-attributes"
                     element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="order-attributes"><Navigate to={buildSettingsTabPath(ORDER_ATTRIBUTES_SETTINGS_TAB)} replace /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>}

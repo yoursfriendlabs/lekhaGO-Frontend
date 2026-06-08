@@ -119,7 +119,7 @@ function PermissionSelector({ value, levels, disabled, onChange, t }) {
             type="button"
             disabled={disabled}
             onClick={() => onChange(level.key)}
-            className={`px-3 py-2 text-sm font-medium transition ${
+            className={`min-h-[2.9rem] px-3 py-2.5 text-[13px] font-semibold transition sm:text-sm ${
               active
                 ? 'bg-primary-600 text-white'
                 : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800'
@@ -161,7 +161,7 @@ function StaffFormDialog({
         : mode === 'edit'
           ? t('staffManagement.editTitle')
           : t('staffManagement.viewTitle')}
-      size="full"
+      size="wide"
       footer={readOnly ? (
         <button type="button" className="btn-secondary w-full sm:w-auto" onClick={onClose}>
           {t('common.close')}
@@ -182,264 +182,259 @@ function StaffFormDialog({
       )}
     >
       <form id="staff-management-form" className="space-y-6" onSubmit={onSubmit}>
-        <div className="grid gap-6 xl:grid-cols-[1.15fr,0.85fr]">
-          <div className="space-y-6">
-            <section className="rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 dark:border-slate-800/70 dark:bg-slate-900/60">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('staffManagement.detailsTitle')}</h3>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.detailsSubtitle')}</p>
-                </div>
-                {readOnly ? (
-                  <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    {t('staffManagement.viewOnly')}
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="label" htmlFor="staff-name">{t('auth.name')}</label>
-                  <input
-                    id="staff-name"
-                    className="input mt-1"
-                    value={form.name}
-                    onChange={(event) => onFieldChange('name', event.target.value)}
-                    disabled={readOnly}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-phone">{t('auth.phone')}</label>
-                  <input
-                    id="staff-phone"
-                    className="input mt-1"
-                    value={form.phone}
-                    onChange={(event) => onFieldChange('phone', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={t('auth.phonePlaceholder')}
-                  />
-                </div>
-                {isCreate ? (
-                  <div>
-                    <label className="label" htmlFor="staff-email">{t('auth.emailAddress')}</label>
-                    <input
-                      id="staff-email"
-                      className="input mt-1"
-                      type="email"
-                      value={form.email}
-                      onChange={(event) => onFieldChange('email', event.target.value)}
-                      disabled={readOnly}
-                      required
-                    />
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{t('auth.emailAddress')}</p>
-                    <p className="mt-2 text-sm font-medium text-slate-800 dark:text-slate-100">{form.email || '-'}</p>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.emailImmutable')}</p>
-                  </div>
-                )}
-                <div>
-                  <label className="label" htmlFor="staff-password">
-                    {isCreate ? t('auth.password') : t('staffManagement.newPassword')}
-                  </label>
-                  <input
-                    id="staff-password"
-                    className="input mt-1"
-                    type="password"
-                    value={form.password}
-                    onChange={(event) => onFieldChange('password', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={isCreate ? t('staffManagement.passwordCreateHint') : t('staffManagement.passwordEditHint')}
-                    required={isCreate}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-role">{t('staffManagement.roleLabel')}</label>
-                  <select
-                    id="staff-role"
-                    className="input mt-1"
-                    value={form.role}
-                    onChange={(event) => onFieldChange('role', event.target.value)}
-                    disabled={readOnly || !isCreate}
-                  >
-                    <option value="staff">{t('staffManagement.roles.staff')}</option>
-                    {form.role === 'owner' ? <option value="owner">{t('staffManagement.roles.owner')}</option> : null}
-                  </select>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.roleHelper')}</p>
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-category">{t('staffManagement.categoryLabel')}</label>
-                  <select
-                    id="staff-category"
-                    className="input mt-1"
-                    value={form.staffCategory}
-                    onChange={(event) => onFieldChange('staffCategory', event.target.value)}
-                    disabled={readOnly}
-                  >
-                    {meta.categories
-                      .filter((category) => category.key !== 'owner' || form.role === 'owner')
-                      .map((category) => (
-                        <option key={category.key} value={category.key}>{category.label}</option>
-                      ))}
-                  </select>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {selectedCategory?.description || t('staffManagement.categoryHelper')}
-                  </p>
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-job-title">{t('staffManagement.jobTitle')}</label>
-                  <input
-                    id="staff-job-title"
-                    className="input mt-1"
-                    value={form.jobTitle}
-                    onChange={(event) => onFieldChange('jobTitle', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={t('staffManagement.jobTitlePlaceholder')}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-joined-date">{t('staffManagement.joinedDate')}</label>
-                  <input
-                    id="staff-joined-date"
-                    className="input mt-1"
-                    type="date"
-                    value={form.joinedDate}
-                    onChange={(event) => onFieldChange('joinedDate', event.target.value)}
-                    disabled={readOnly}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-shift">{t('staffManagement.shift')}</label>
-                  <input
-                    id="staff-shift"
-                    className="input mt-1"
-                    value={form.shift}
-                    onChange={(event) => onFieldChange('shift', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={t('staffManagement.shiftPlaceholder')}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-address">{t('staffManagement.address')}</label>
-                  <input
-                    id="staff-address"
-                    className="input mt-1"
-                    value={form.address}
-                    onChange={(event) => onFieldChange('address', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={t('staffManagement.addressPlaceholder')}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-compensation">{t('staffManagement.compensation')}</label>
-                  <input
-                    id="staff-compensation"
-                    className="input mt-1"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="0.01"
-                    value={form.compensation}
-                    onChange={(event) => onFieldChange('compensation', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={t('staffManagement.compensationPlaceholder')}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-total-received">{t('staffManagement.totalReceived')}</label>
-                  <input
-                    id="staff-total-received"
-                    className="input mt-1"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="0.01"
-                    value={form.totalReceived}
-                    onChange={(event) => onFieldChange('totalReceived', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={t('staffManagement.totalReceivedPlaceholder')}
-                  />
-                </div>
-              </div>
-
-              {!isCreate ? (
-                <label className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm text-slate-700 dark:border-slate-800/70 dark:bg-slate-950/50 dark:text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={form.isActive}
-                    onChange={(event) => onFieldChange('isActive', event.target.checked)}
-                    disabled={readOnly}
-                  />
-                  {t('staffManagement.activeAccount')}
-                </label>
-              ) : null}
-            </section>
+        <section className="rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 md:p-6 dark:border-slate-800/70 dark:bg-slate-900/60">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('staffManagement.detailsTitle')}</h3>
+              <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.detailsSubtitle')}</p>
+            </div>
+            {readOnly ? (
+              <span className="inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                {t('staffManagement.viewOnly')}
+              </span>
+            ) : null}
           </div>
 
-          <section className="rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 dark:border-slate-800/70 dark:bg-slate-900/60">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('staffManagement.permissionsTitle')}</h3>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.permissionsSubtitle')}</p>
-              </div>
-              {!readOnly ? (
-                <button type="button" className="btn-secondary w-full justify-center sm:w-auto" onClick={onApplyPreset}>
-                  {t('staffManagement.resetToPreset')}
-                </button>
-              ) : null}
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div>
+              <label className="label" htmlFor="staff-name">{t('auth.name')}</label>
+              <input
+                id="staff-name"
+                className="input mt-1"
+                value={form.name}
+                onChange={(event) => onFieldChange('name', event.target.value)}
+                disabled={readOnly}
+                required
+              />
             </div>
+            <div>
+              <label className="label" htmlFor="staff-phone">{t('auth.phone')}</label>
+              <input
+                id="staff-phone"
+                className="input mt-1"
+                value={form.phone}
+                onChange={(event) => onFieldChange('phone', event.target.value)}
+                disabled={readOnly}
+                placeholder={t('auth.phonePlaceholder')}
+              />
+            </div>
+            {isCreate ? (
+              <div className="md:col-span-2 xl:col-span-1">
+                <label className="label" htmlFor="staff-email">{t('auth.emailAddress')}</label>
+                <input
+                  id="staff-email"
+                  className="input mt-1"
+                  type="email"
+                  value={form.email}
+                  onChange={(event) => onFieldChange('email', event.target.value)}
+                  disabled={readOnly}
+                  required
+                />
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 md:col-span-2 xl:col-span-1 dark:border-slate-800/70 dark:bg-slate-950/50">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{t('auth.emailAddress')}</p>
+                <p className="mt-2 break-words text-sm font-medium text-slate-800 dark:text-slate-100">{form.email || '-'}</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.emailImmutable')}</p>
+              </div>
+            )}
+            <div>
+              <label className="label" htmlFor="staff-password">
+                {isCreate ? t('auth.password') : t('staffManagement.newPassword')}
+              </label>
+              <input
+                id="staff-password"
+                className="input mt-1"
+                type="password"
+                value={form.password}
+                onChange={(event) => onFieldChange('password', event.target.value)}
+                disabled={readOnly}
+                placeholder={isCreate ? t('staffManagement.passwordCreateHint') : t('staffManagement.passwordEditHint')}
+                required={isCreate}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="staff-role">{t('staffManagement.roleLabel')}</label>
+              <select
+                id="staff-role"
+                className="input mt-1"
+                value={form.role}
+                onChange={(event) => onFieldChange('role', event.target.value)}
+                disabled={readOnly || !isCreate}
+              >
+                <option value="staff">{t('staffManagement.roles.staff')}</option>
+                {form.role === 'owner' ? <option value="owner">{t('staffManagement.roles.owner')}</option> : null}
+              </select>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.roleHelper')}</p>
+            </div>
+            <div>
+              <label className="label" htmlFor="staff-category">{t('staffManagement.categoryLabel')}</label>
+              <select
+                id="staff-category"
+                className="input mt-1"
+                value={form.staffCategory}
+                onChange={(event) => onFieldChange('staffCategory', event.target.value)}
+                disabled={readOnly}
+              >
+                {meta.categories
+                  .filter((category) => category.key !== 'owner' || form.role === 'owner')
+                  .map((category) => (
+                    <option key={category.key} value={category.key}>{category.label}</option>
+                  ))}
+              </select>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {selectedCategory?.description || t('staffManagement.categoryHelper')}
+              </p>
+            </div>
+            <div>
+              <label className="label" htmlFor="staff-job-title">{t('staffManagement.jobTitle')}</label>
+              <input
+                id="staff-job-title"
+                className="input mt-1"
+                value={form.jobTitle}
+                onChange={(event) => onFieldChange('jobTitle', event.target.value)}
+                disabled={readOnly}
+                placeholder={t('staffManagement.jobTitlePlaceholder')}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="staff-joined-date">{t('staffManagement.joinedDate')}</label>
+              <input
+                id="staff-joined-date"
+                className="input mt-1"
+                type="date"
+                value={form.joinedDate}
+                onChange={(event) => onFieldChange('joinedDate', event.target.value)}
+                disabled={readOnly}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="staff-shift">{t('staffManagement.shift')}</label>
+              <input
+                id="staff-shift"
+                className="input mt-1"
+                value={form.shift}
+                onChange={(event) => onFieldChange('shift', event.target.value)}
+                disabled={readOnly}
+                placeholder={t('staffManagement.shiftPlaceholder')}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="staff-compensation">{t('staffManagement.compensation')}</label>
+              <input
+                id="staff-compensation"
+                className="input mt-1"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                value={form.compensation}
+                onChange={(event) => onFieldChange('compensation', event.target.value)}
+                disabled={readOnly}
+                placeholder={t('staffManagement.compensationPlaceholder')}
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="staff-total-received">{t('staffManagement.totalReceived')}</label>
+              <input
+                id="staff-total-received"
+                className="input mt-1"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                value={form.totalReceived}
+                onChange={(event) => onFieldChange('totalReceived', event.target.value)}
+                disabled={readOnly}
+                placeholder={t('staffManagement.totalReceivedPlaceholder')}
+              />
+            </div>
+            <div className="md:col-span-2 xl:col-span-3">
+              <label className="label" htmlFor="staff-address">{t('staffManagement.address')}</label>
+              <input
+                id="staff-address"
+                className="input mt-1"
+                value={form.address}
+                onChange={(event) => onFieldChange('address', event.target.value)}
+                disabled={readOnly}
+                placeholder={t('staffManagement.addressPlaceholder')}
+              />
+            </div>
+          </div>
 
-            <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
+          {!isCreate ? (
+            <label className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm text-slate-700 dark:border-slate-800/70 dark:bg-slate-950/50 dark:text-slate-300">
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(event) => onFieldChange('isActive', event.target.checked)}
+                disabled={readOnly}
+              />
+              {t('staffManagement.activeAccount')}
+            </label>
+          ) : null}
+        </section>
+
+        <section className="rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 md:p-6 dark:border-slate-800/70 dark:bg-slate-900/60">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('staffManagement.permissionsTitle')}</h3>
+              <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.permissionsSubtitle')}</p>
+            </div>
+            {!readOnly ? (
+              <button type="button" className="btn-secondary w-full justify-center sm:w-auto" onClick={onApplyPreset}>
+                {t('staffManagement.resetToPreset')}
+              </button>
+            ) : null}
+          </div>
+
+          <div
+            className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
               permissionsCustomized
                 ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200'
                 : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-200'
             }`}
-            >
-              <p className="font-semibold">
-                {permissionsCustomized
-                  ? t('staffManagement.permissionPresetCustomized')
-                  : t('staffManagement.permissionPresetApplied', { category: selectedCategory?.label || '-' })}
-              </p>
-              <p className="mt-1 text-xs opacity-80">
-                {permissionsCustomized
-                  ? t('staffManagement.permissionPresetCustomizedHint')
-                  : t('staffManagement.permissionPresetAppliedHint')}
-              </p>
-            </div>
+          >
+            <p className="font-semibold">
+              {permissionsCustomized
+                ? t('staffManagement.permissionPresetCustomized')
+                : t('staffManagement.permissionPresetApplied', { category: selectedCategory?.label || '-' })}
+            </p>
+            <p className="mt-1 text-xs opacity-80">
+              {permissionsCustomized
+                ? t('staffManagement.permissionPresetCustomizedHint')
+                : t('staffManagement.permissionPresetAppliedHint')}
+            </p>
+          </div>
 
-            <div className="mt-5 space-y-4">
-              {meta.features.map((feature) => (
+          <div className="mt-5 grid gap-4 xl:grid-cols-2">
+            {meta.features.map((feature) => {
+              const permissionKey = getPermissionKeyForFeature(feature.key) || feature.key;
+
+              return (
                 <div key={feature.key} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
-                  {(() => {
-                    const permissionKey = getPermissionKeyForFeature(feature.key) || feature.key;
-
-                    return (
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-900 dark:text-white">{feature.label}</p>
-                          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                            {feature.description || t('staffManagement.permissionDescriptionFallback')}
-                          </p>
-                        </div>
-                        <div className="w-full lg:w-[19rem]">
-                          <PermissionSelector
-                            value={form.permissions[permissionKey] || 'none'}
-                            levels={levels}
-                            disabled={readOnly}
-                            onChange={(value) => onPermissionChange(permissionKey, value)}
-                            t={t}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  <div className="flex h-full flex-col gap-4">
+                    <div className="min-w-0">
+                      <p className="font-medium text-slate-900 dark:text-white">{feature.label}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        {feature.description || t('staffManagement.permissionDescriptionFallback')}
+                      </p>
+                    </div>
+                    <div className="w-full">
+                      <PermissionSelector
+                        value={form.permissions[permissionKey] || 'none'}
+                        levels={levels}
+                        disabled={readOnly}
+                        onChange={(value) => onPermissionChange(permissionKey, value)}
+                        t={t}
+                      />
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </section>
-        </div>
+              );
+            })}
+          </div>
+        </section>
       </form>
     </Dialog>
   );

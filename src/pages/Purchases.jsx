@@ -523,7 +523,7 @@ export default function Purchases() {
         isOpen={quickExpenseOpen}
         onClose={closeQuickExpense}
         title={t('purchases.quickExpense')}
-        size="lg"
+        size="xl"
       >
         <QuickExpense
           listParams={listParams}

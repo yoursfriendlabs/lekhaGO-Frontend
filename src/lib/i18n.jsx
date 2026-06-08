@@ -107,6 +107,23 @@ const dictionaries = {
     settingsPage: {
       title: 'Settings',
       subtitle: 'Manage business details, staff access, categories, banks, and custom order fields from one place.',
+      overview: {
+        currentPlan: 'Current plan',
+        noPlan: 'Not set',
+        planTrialHint: '{{count}} days left in the current trial.',
+        planExpiredHint: 'The current access period has ended.',
+        planPaymentSetupHint: 'Payment setup is still needed to unlock the next plan step.',
+        planPendingHint: 'A plan change is pending review or payment confirmation.',
+        planActiveHint: 'Subscription access is active for this workspace.',
+        yourAccess: 'Your access',
+        noAccessLabel: 'Not set',
+        accessHint: 'This is the access level currently signed in to the workspace.',
+        accessBusinessHint: 'Signed in to {{business}}.',
+        teamSeats: 'Team seats',
+        teamSeatsHint: '{{used}} of {{total}} seats are currently used.',
+        openSlots: 'Open slots',
+        businessMissingHint: 'Select a business to load live workspace stats.',
+      },
       tabs: {
         general: 'General',
         profile: 'Profile',
@@ -1194,9 +1211,15 @@ const dictionaries = {
       customCategoryRequired: 'Enter a name for your custom expense category.',
       saveFailed: 'Failed to save expense.',
       lineLabel: 'Line {{number}}',
+      addLine: 'Add another line',
+      removeLine: 'Remove line',
       staff: 'Staff',
       selectStaff: 'Select staff',
       selectStaffTitle: 'Select staff',
+      linkPartyOptional: 'Optional payee',
+      selectPayee: 'Select payee',
+      selectPayeeTitle: 'Select payee for expense',
+      payeeHelper: 'Link a supplier or payee when this expense belongs to someone.',
       categoryName: 'Category name',
       categoryNamePlaceholder: 'e.g. Marketing',
       categories: {
@@ -1714,6 +1737,23 @@ const dictionaries = {
     settingsPage: {
       title: 'सेटिङ',
       subtitle: 'व्यापार विवरण, कर्मचारी पहुँच, श्रेणी, बैंक, र अर्डरका अतिरिक्त फिल्डहरू एकै ठाउँमा व्यवस्थापन गर्नुहोस्।',
+      overview: {
+        currentPlan: 'हालको प्लान',
+        noPlan: 'सेट गरिएको छैन',
+        planTrialHint: 'हालको ट्रायलमा {{count}} दिन बाँकी छ।',
+        planExpiredHint: 'हालको पहुँच अवधि समाप्त भइसकेको छ।',
+        planPaymentSetupHint: 'अर्को प्लान चरण खोल्न payment setup अझै पूरा गर्न बाँकी छ।',
+        planPendingHint: 'प्लान परिवर्तन अहिले समीक्षा वा भुक्तानी पुष्टि पर्खिरहेको छ।',
+        planActiveHint: 'यो workspace का लागि subscription access सक्रिय छ।',
+        yourAccess: 'तपाईंको पहुँच',
+        noAccessLabel: 'सेट गरिएको छैन',
+        accessHint: 'यो अहिले workspace मा साइन-इन गरिएको पहुँच स्तर हो।',
+        accessBusinessHint: '{{business}} मा साइन-इन गरिएको छ।',
+        teamSeats: 'टीम सिट',
+        teamSeatsHint: '{{total}} मध्ये {{used}} सिट अहिले प्रयोग भइरहेका छन्।',
+        openSlots: 'खुला सिट',
+        businessMissingHint: 'live workspace stats हेर्न पहिले व्यवसाय छान्नुहोस्।',
+      },
       tabs: {
         general: 'सामान्य',
         profile: 'प्रोफाइल',
@@ -2801,9 +2841,15 @@ const dictionaries = {
       customCategoryRequired: 'कस्टम खर्च श्रेणीको नाम लेख्नुहोस्।',
       saveFailed: 'खर्च सेभ गर्न सकिएन।',
       lineLabel: 'लाइन {{number}}',
+      addLine: 'अर्को लाइन थप्नुहोस्',
+      removeLine: 'लाइन हटाउनुहोस्',
       staff: 'स्टाफ',
       selectStaff: 'स्टाफ छान्नुहोस्',
       selectStaffTitle: 'स्टाफ छान्नुहोस्',
+      linkPartyOptional: 'वैकल्पिक पाउने पक्ष',
+      selectPayee: 'पाउने पक्ष छान्नुहोस्',
+      selectPayeeTitle: 'खर्चका लागि पाउने पक्ष छान्नुहोस्',
+      payeeHelper: 'यो खर्च कसैसँग जोडिन्छ भने सप्लायर वा पाउने पक्ष छान्नुहोस्।',
       categoryName: 'श्रेणी नाम',
       categoryNamePlaceholder: 'जस्तै: मार्केटिङ',
       categories: {
@@ -3230,11 +3276,20 @@ const dictionaries = {
   },
 };
 
-const I18nContext = createContext({
+const I18N_CONTEXT_DEFAULT = {
   locale: 'en',
   setLocale: () => {},
   t: (key) => key,
-});
+};
+
+const I18N_CONTEXT_KEY = '__mms_i18n_context__';
+const I18nContext = typeof globalThis === 'undefined'
+  ? createContext(I18N_CONTEXT_DEFAULT)
+  : globalThis[I18N_CONTEXT_KEY] || (globalThis[I18N_CONTEXT_KEY] = createContext(I18N_CONTEXT_DEFAULT));
+
+I18nContext.displayName = 'I18nContext';
+
+const normalizeLocale = (value) => (value === 'ne' ? 'ne' : 'en');
 
 const getNestedValue = (obj, key) => {
   if (!obj || !key) return undefined;
@@ -3266,14 +3321,14 @@ const interpolate = (value, vars = {}) =>
   String(value).replace(/\{\{(\w+)\}\}/g, (_, token) => (vars[token] !== undefined ? vars[token] : ''));
 
 export function I18nProvider({ children }) {
-  const [locale, setLocaleState] = useState(() => localStorage.getItem('locale') || 'en');
+  const [locale, setLocaleState] = useState(() => normalizeLocale(localStorage.getItem('locale')));
 
   useEffect(() => {
     localStorage.setItem('locale', locale);
   }, [locale]);
 
   const setLocale = useCallback((next) => {
-    setLocaleState(next);
+    setLocaleState(normalizeLocale(next));
   }, []);
 
   const t = useCallback(

@@ -13,6 +13,11 @@ import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 import { buildPaymentPayload, requiresBankSelection } from '../lib/payments';
 import { todayISODate } from '../lib/datetime';
+import {
+  CUSTOM_EXPENSE_CATEGORY,
+  resolveExpenseCategoryLabel,
+  useExpenseCategories,
+} from '../hooks/useExpenseCategories.js';
 
 const QUICK_ENTRY_TABS = [
   { key: 'sale', icon: CircleDollarSign },
@@ -25,6 +30,7 @@ const QUICK_ENTRY_TABS = [
 
 const emptyEntryForm = {
   category: '',
+  customCategory: '',
   notes: '',
   paymentMethod: 'cash',
   bankId: '',
@@ -34,7 +40,7 @@ const emptyEntryForm = {
 
 export default function QuickEntry() {
   const { t } = useI18n();
-  const { businessId } = useAuth();
+  const { businessId, canManageFeature, canViewFeature } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('expense');
   const [expression, setExpression] = useState('');
@@ -44,19 +50,20 @@ export default function QuickEntry() {
   const [status, setStatus] = useState({ type: 'info', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const [successState, setSuccessState] = useState(null);
-
-  const expenseCategories = useMemo(() => ([
-    { value: 'stock_refill', label: t('quickEntry.categories.stockRefill') },
-    { value: 'transport', label: t('quickEntry.categories.transport') },
-    { value: 'utilities', label: t('quickEntry.categories.utilities') },
-    { value: 'salary', label: t('quickEntry.categories.salary') },
-    { value: 'maintenance', label: t('quickEntry.categories.maintenance') },
-    { value: 'miscellaneous', label: t('quickEntry.categories.miscellaneous') },
-  ]), [t]);
+  const canManagePurchases = canManageFeature('purchases');
+  const canViewParties = canViewFeature('parties');
+  const canManageParties = canManageFeature('parties');
+  const { categories: expenseCategories } = useExpenseCategories({ businessId, includeCustom: true });
 
   const amount = useMemo(() => evaluateQuickExpression(expression), [expression]);
   const isInstantForm = ['expense', 'payment_in', 'payment_out'].includes(activeTab);
-  const selectedCategoryLabel = expenseCategories.find((option) => option.value === form.category)?.label || '';
+  const selectedCategoryLabel = resolveExpenseCategoryLabel(
+    expenseCategories,
+    form.category,
+    form.customCategory,
+    t,
+  );
+  const isCustomExpenseCategory = form.category === CUSTOM_EXPENSE_CATEGORY;
 
   const resetInstantForm = () => {
     setExpression('');
@@ -109,12 +116,24 @@ export default function QuickEntry() {
       setStatus({ type: 'error', message: t('errors.businessIdRequired') });
       return;
     }
+    if (activeTab === 'expense' && !canManagePurchases) {
+      setStatus({ type: 'error', message: t('staffManagement.permissionError') });
+      return;
+    }
+    if ((activeTab === 'payment_in' || activeTab === 'payment_out') && !canManageParties) {
+      setStatus({ type: 'error', message: t('staffManagement.permissionError') });
+      return;
+    }
     if (amount <= 0) {
       setStatus({ type: 'error', message: t('quickEntry.amountRequired') });
       return;
     }
     if (activeTab === 'expense' && !form.category) {
       setStatus({ type: 'error', message: t('quickEntry.categoryRequired') });
+      return;
+    }
+    if (activeTab === 'expense' && isCustomExpenseCategory && !form.customCategory.trim()) {
+      setStatus({ type: 'error', message: t('quickExpense.customCategoryRequired') });
       return;
     }
     if ((activeTab === 'payment_in' || activeTab === 'payment_out') && !selectedParty?.id) {
@@ -132,13 +151,14 @@ export default function QuickEntry() {
 
       if (activeTab === 'expense') {
         const categoryName = selectedCategoryLabel || t('purchases.expense');
+        const notes = form.notes.trim();
         await api.createPurchase({
           entryType: 'expense',
           partyId: selectedParty?.id || null,
           partyName: selectedParty?.name || categoryName,
           purchaseDate: form.txDate,
           status: 'received',
-          notes: form.notes.trim(),
+          notes,
           amountReceived: amount,
           subTotal: amount,
           taxTotal: 0,
@@ -146,7 +166,7 @@ export default function QuickEntry() {
           ...(amount > 0 ? buildPaymentPayload(form) : { paymentMethod: 'cash' }),
           items: [
             {
-              description: categoryName,
+              description: notes ? `${categoryName} - ${notes}` : categoryName,
               quantity: 1,
               unitType: 'primary',
               unitPrice: amount,
@@ -285,12 +305,16 @@ export default function QuickEntry() {
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   {expenseCategories.map((category) => {
-                    const isActive = category.value === form.category;
+                    const isActive = category.id === form.category;
                     return (
                       <button
-                        key={category.value}
+                        key={category.id}
                         type="button"
-                        onClick={() => setForm((previous) => ({ ...previous, category: category.value }))}
+                        onClick={() => setForm((previous) => ({
+                          ...previous,
+                          category: category.id,
+                          customCategory: category.id === CUSTOM_EXPENSE_CATEGORY ? previous.customCategory : '',
+                        }))}
                         className={`rounded-[20px] border px-3 py-3 text-left text-sm font-semibold transition ${
                           isActive
                             ? 'border-primary-300 bg-primary-50 text-primary-800 shadow-sm'
@@ -302,6 +326,49 @@ export default function QuickEntry() {
                     );
                   })}
                 </div>
+                {isCustomExpenseCategory ? (
+                  <label className="mt-4 block">
+                    <span className="label">{t('quickExpense.categoryName')}</span>
+                    <input
+                      className="input mt-2 h-12 rounded-[18px]"
+                      type="text"
+                      value={form.customCategory}
+                      onChange={(event) => setForm((previous) => ({ ...previous, customCategory: event.target.value }))}
+                      placeholder={t('quickExpense.categoryNamePlaceholder')}
+                    />
+                  </label>
+                ) : null}
+                {canViewParties ? (
+                  <div className="mt-4 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setPartySelectorOpen(true)}
+                      className="w-full rounded-[24px] border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-left transition hover:border-primary-200 hover:bg-primary-50/40"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t('quickExpense.linkPartyOptional')}</p>
+                          <p className="mt-2 text-base font-semibold text-slate-900">
+                            {selectedParty?.name || t('quickExpense.selectPayee')}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {selectedParty?.phone || t('quickExpense.payeeHelper')}
+                          </p>
+                        </div>
+                        <ChevronRight className="text-slate-400" size={20} />
+                      </div>
+                    </button>
+                    {selectedParty ? (
+                      <button
+                        type="button"
+                        className="btn-ghost w-full justify-center rounded-[18px] sm:w-auto"
+                        onClick={() => setSelectedParty(null)}
+                      >
+                        {t('common.clear')}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : (
               <button
@@ -369,7 +436,7 @@ export default function QuickEntry() {
         onSelect={setSelectedParty}
         selectedParty={selectedParty}
         type={activeTab === 'expense' ? 'supplier' : 'both'}
-        title={t('quickEntry.selectPartyTitle')}
+        title={activeTab === 'expense' ? t('quickExpense.selectPayeeTitle') : t('quickEntry.selectPartyTitle')}
       />
 
       <QuickActionSuccessDialog

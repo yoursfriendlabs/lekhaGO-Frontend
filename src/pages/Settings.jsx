@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { Building2, CheckCircle, Upload, X } from 'lucide-react';
+import { Building2, CheckCircle, Package2, ShieldCheck, Upload, Users, X } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import AccountSecurityPanel from '../components/account/AccountSecurityPanel.jsx';
@@ -16,7 +16,8 @@ import { api, API_BASE } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
 import { useI18n } from '../lib/i18n.jsx';
-import { getSubscriptionGuard } from '../lib/subscription';
+import { EMPTY_STAFF_SUMMARY } from '../lib/staff';
+import { getSubscriptionGuard, getSubscriptionStatusState, humanizeKey } from '../lib/subscription';
 import {
   ACCOUNT_SETTINGS_TAB,
   BANKS_SETTINGS_TAB,
@@ -51,10 +52,36 @@ function scrollToGrowthPlan() {
   }, 0);
 }
 
+function SettingsStatCard({ label, value, hint, icon: Icon }) {
+  return (
+    <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-5 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</p>
+          <p className="mt-3 break-words text-2xl font-semibold text-slate-900 dark:text-white">{value}</p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{hint}</p>
+        </div>
+        <div className="rounded-2xl bg-slate-100 p-3 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+          <Icon size={20} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { t } = useI18n();
   const location = useLocation();
-  const { businessId, role, subscription, canManageFeature, canViewFeature } = useAuth();
+  const {
+    accessControl,
+    business,
+    businessId,
+    role,
+    subscription,
+    subscriptionAccess,
+    canManageFeature,
+    canViewFeature,
+  } = useAuth();
   const { settings, loading: settingsLoading, saveSettings, reloadSettings } = useBusinessSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [form, setForm] = useState({ ...EMPTY, ...settings });
@@ -62,10 +89,12 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [logoUploading, setLogoUploading] = useState(false);
+  const [staffSummary, setStaffSummary] = useState(EMPTY_STAFF_SUMMARY);
+  const [staffSummaryLoading, setStaffSummaryLoading] = useState(false);
   const fileRef = useRef(null);
   const isOwner = role === 'owner';
-  const subscriptionAccess = subscription?.access || null;
   const subscriptionGuard = getSubscriptionGuard(subscription);
+  const subscriptionState = getSubscriptionStatusState(subscription);
   const generalLocked = isOwner && !canManageFeature('general-settings');
 
   const tabs = useMemo(() => {
@@ -173,6 +202,35 @@ export default function Settings() {
   }, [businessId, reloadSettings]);
 
   useEffect(() => {
+    if (!businessId || !canViewFeature('staff')) {
+      setStaffSummary(EMPTY_STAFF_SUMMARY);
+      setStaffSummaryLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    setStaffSummaryLoading(true);
+
+    api.listStaff()
+      .then((payload) => {
+        if (!active) return;
+        setStaffSummary(payload?.summary || EMPTY_STAFF_SUMMARY);
+      })
+      .catch(() => {
+        if (!active) return;
+        setStaffSummary(EMPTY_STAFF_SUMMARY);
+      })
+      .finally(() => {
+        if (!active) return;
+        setStaffSummaryLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [businessId, canViewFeature]);
+
+  useEffect(() => {
     setForm({ ...EMPTY, ...settings });
   }, [settings]);
 
@@ -271,10 +329,99 @@ export default function Settings() {
       ? form.logoUrl
       : `${API_BASE}${form.logoUrl}`
     : null;
+  const planLabel = subscription?.currentPlan?.label
+    || (subscription?.access?.planKey ? humanizeKey(subscription.access.planKey) : t('settingsPage.overview.noPlan'));
+  const planHint = subscriptionState.isTrialActive && typeof subscriptionState.trial?.daysRemaining === 'number'
+    ? t('settingsPage.overview.planTrialHint', { count: subscriptionState.trial.daysRemaining })
+    : subscriptionState.isExpired
+      ? t('settingsPage.overview.planExpiredHint')
+      : subscriptionAccess?.requiresPaymentSetup
+        ? t('settingsPage.overview.planPaymentSetupHint')
+        : subscriptionAccess?.requiresManualReview || subscriptionAccess?.hasPendingChange
+          ? t('settingsPage.overview.planPendingHint')
+          : t('settingsPage.overview.planActiveHint');
+  const accessLabel = accessControl?.category?.label
+    || (role ? humanizeKey(role) : t('settingsPage.overview.noAccessLabel'));
+  const accessHint = accessControl?.jobTitle || t('settingsPage.overview.accessHint');
+  const seatUsageValue = !businessId
+    ? '-'
+    : staffSummaryLoading
+      ? '...'
+      : staffSummary.maxUsers > 0
+        ? `${staffSummary.totalUsers} / ${staffSummary.maxUsers}`
+        : String(staffSummary.totalUsers || 0);
+  const seatUsageHint = !businessId
+    ? t('settingsPage.overview.businessMissingHint')
+    : staffSummary.maxUsers > 0
+      ? t('settingsPage.overview.teamSeatsHint', {
+        used: staffSummary.totalUsers,
+        total: staffSummary.maxUsers,
+      })
+      : t('staffManagement.summary.totalUsersHint');
+  const openSlotsValue = !businessId
+    ? '-'
+    : staffSummaryLoading
+      ? '...'
+      : String(staffSummary.availableSlots || 0);
+  const businessName = form.companyName?.trim()
+    || settings?.companyName?.trim()
+    || business?.name
+    || business?.businessName
+    || '';
+  const overviewCards = [
+    {
+      key: 'plan',
+      label: t('settingsPage.overview.currentPlan'),
+      value: planLabel,
+      hint: planHint,
+      icon: Package2,
+    },
+    {
+      key: 'access',
+      label: t('settingsPage.overview.yourAccess'),
+      value: accessLabel,
+      hint: businessName
+        ? t('settingsPage.overview.accessBusinessHint', { business: businessName })
+        : accessHint,
+      icon: ShieldCheck,
+    },
+    ...(canViewFeature('staff')
+      ? [
+        {
+          key: 'seats',
+          label: t('settingsPage.overview.teamSeats'),
+          value: seatUsageValue,
+          hint: seatUsageHint,
+          icon: Users,
+        },
+        {
+          key: 'open-slots',
+          label: t('settingsPage.overview.openSlots'),
+          value: openSlotsValue,
+          hint: !businessId
+            ? t('settingsPage.overview.businessMissingHint')
+            : t('staffManagement.summary.availableSlotsHint'),
+          icon: Users,
+        },
+      ]
+      : []),
+  ];
 
   return (
     <div className="min-w-0 max-w-6xl space-y-6 overflow-x-hidden">
       <PageHeader title={t('settingsPage.title')} subtitle={activeTabMeta?.description || t('settingsPage.subtitle')} />
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {overviewCards.map((card) => (
+          <SettingsStatCard
+            key={card.key}
+            label={card.label}
+            value={card.value}
+            hint={card.hint}
+            icon={card.icon}
+          />
+        ))}
+      </section>
 
       <div className="flex flex-wrap items-end gap-8 border-b border-slate-200/80 pb-1 dark:border-slate-800">
         <button

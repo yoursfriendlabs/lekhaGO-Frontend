@@ -17,7 +17,6 @@ const NAV_ROLE_MAP = {
   ledger: ['owner', 'staff', 'admin', 'super_admin'],
   analytics: ['owner', 'staff', 'admin', 'super_admin'],
   settings: ['owner', 'staff', 'admin', 'super_admin'],
-  admin: ['owner'],
 };
 
 export default function Sidebar() {
@@ -44,10 +43,7 @@ export default function Sidebar() {
 
   const visibleNavItems = navigation
     .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
-    .filter((item) => hasFeatureAccess(item.key))
-    .concat((role === 'owner' || role === 'admin' || role === 'super_admin') && hasFeatureAccess('admin')
-      ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }]
-      : []);
+    .filter((item) => hasFeatureAccess(item.key));
 
   return (
     <aside className="hidden h-full w-64 flex-col gap-6 border-r border-slate-200/70 bg-white/80 p-6 dark:border-slate-800/70 dark:bg-slate-950/70 md:fixed md:inset-y-0 md:left-0 md:flex md:overflow-y-auto">
