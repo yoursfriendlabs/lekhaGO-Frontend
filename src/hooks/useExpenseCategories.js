@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Briefcase,
   Car,
   Tag,
   Utensils,
   Wallet,
-  Wrench,
   Zap,
 } from 'lucide-react';
 
@@ -68,10 +66,6 @@ function buildDefaultCategories(t) {
     { id: 'food', label: t('quickExpense.categories.food'), icon: Utensils },
     { id: 'transport', label: t('quickEntry.categories.transport'), icon: Car },
     { id: 'utilities', label: t('quickEntry.categories.utilities'), icon: Zap },
-    { id: 'salary', label: t('quickEntry.categories.salary'), icon: Briefcase },
-    { id: 'maintenance', label: t('quickEntry.categories.maintenance'), icon: Wrench },
-    { id: 'supplies', label: t('quickExpense.categories.supplies'), icon: Wallet },
-    { id: 'miscellaneous', label: t('quickEntry.categories.miscellaneous'), icon: Wallet },
   ];
 
   return defaults.map((category, index) => ({
