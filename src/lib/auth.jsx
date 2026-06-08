@@ -223,6 +223,12 @@ export function AuthProvider({ children }) {
       return accessLevel;
     }
 
+    // Staff management must stay hidden for staff users unless the backend
+    // explicitly grants access through accessControl.permissions.staff.
+    if (featureKey === 'staff' && role === 'staff') {
+      return 'none';
+    }
+
     return hasSubscriptionFeatureAccess(featureKey) ? 'manage' : 'none';
   }, [accessControl, hasSubscriptionFeatureAccess, role]);
 

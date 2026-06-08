@@ -681,7 +681,7 @@ export default function StaffManagement({ businessId }) {
   };
 
   if (!canViewStaff) {
-    return <Notice title={t('staffManagement.permissionError')} tone="warn" />;
+    return null;
   }
 
   return (
