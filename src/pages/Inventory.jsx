@@ -661,6 +661,11 @@ export default function Inventory() {
   const currentRestockStock = restockProduct ? getCurrentStock(restockProduct) : 0;
   const nextRestockStock = currentRestockStock + parseNumber(restockQuantity);
   const restockUnitSuffix = restockProduct?.primaryUnit ? ` ${restockProduct.primaryUnit}` : '';
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
 
   return (
     <div className="space-y-8">
