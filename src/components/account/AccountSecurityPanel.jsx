@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, ShieldAlert, ShieldCheck } from 'lucide-react';
 import Notice from '../Notice.jsx';
@@ -24,6 +24,13 @@ export default function AccountSecurityPanel() {
     confirmPassword: '',
   });
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   const [saving, setSaving] = useState(false);
 
   const newPasswordError = useMemo(

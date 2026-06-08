@@ -144,6 +144,13 @@ export default function Parties() {
 
   const [form, setForm] = useState(emptyForm);
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [filterType, setFilterType] = useState('all');

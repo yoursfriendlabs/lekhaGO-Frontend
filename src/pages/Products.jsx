@@ -199,6 +199,13 @@ export default function Products() {
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(makeEmptyProduct());
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   const [listStatus, setListStatus] = useState({ type: 'info', message: '' });
   const [toast, setToast] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(false);

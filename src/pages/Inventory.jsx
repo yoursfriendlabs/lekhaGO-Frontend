@@ -161,6 +161,13 @@ export default function Inventory() {
   const inventorySubtitle = inventoryProfile.subtitle || t('inventory.itemsSubtitle');
 
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   const [toast, setToast] = useState({ type: '', message: '' });
   const [query, setQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');

@@ -95,6 +95,13 @@ export default function Purchases() {
   const [itemDraft, setItemDraft] = useState(getEmptyItem('purchase'));
   const [editingItemIdx, setEditingItemIdx] = useState(null);
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   const [itemStatus, setItemStatus] = useState({ type: 'info', message: '' });
   const [isOpen, setIsOpen] = useState(false);
   const [payDialog, setPayDialog] = useState(null);
