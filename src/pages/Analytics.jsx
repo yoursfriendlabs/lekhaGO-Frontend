@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import PageHeader from "../components/PageHeader";
 import Notice from "../components/Notice";
 import BarGraph from "../components/BarGraph";
 import PieChart from "../components/PieChart";
 import PartyFilterSelect from "../components/PartyFilterSelect.jsx";
 import CreatorFilterSelect from "../components/CreatorFilterSelect.jsx";
-import { api } from "../lib/api";
+import RefreshButton from "../components/RefreshButton.jsx";
+import { api, invalidateApiCache } from "../lib/api";
 import { formatCurrency } from "../lib/currency";
 import { useI18n } from "../lib/i18n.jsx";
-import dayjs, { todayISODate } from "../lib/datetime";
+import dayjs, { formatMaybeDate, todayISODate } from "../lib/datetime";
 
 const EMPTY_METRIC_TOTALS = Object.freeze({
   count: 0,
@@ -85,6 +86,19 @@ const EMPTY_POPULAR_ANALYTICS = Object.freeze({
   },
   items: [],
   total: 0,
+});
+
+const EMPTY_EXPENSE_CATEGORY_ANALYTICS = Object.freeze({
+  hasCategoryContract: false,
+  summary: {
+    totalCategories: 0,
+    categorizedCategories: 0,
+    uncategorizedCategories: 0,
+    categorizedAmount: 0,
+    uncategorizedAmount: 0,
+    topCategory: null,
+  },
+  breakdown: [],
 });
 
 function asNumber(value) {
@@ -658,6 +672,115 @@ function formatQuantityValue(value) {
   });
 }
 
+function normalizeShareRatio(value) {
+  const parsed = asNumber(value);
+
+  if (parsed <= 0) return 0;
+  if (parsed <= 1) return parsed;
+  if (parsed <= 100) return parsed / 100;
+  return 0;
+}
+
+function formatPercentValue(value) {
+  const normalized = normalizeShareRatio(value);
+
+  return normalized.toLocaleString(undefined, {
+    style: "percent",
+    minimumFractionDigits: normalized > 0 && normalized < 0.1 ? 1 : 0,
+    maximumFractionDigits: 1,
+  });
+}
+
+function normalizeExpenseCategoryRow(item, index = 0) {
+  const total = firstNumber(item, ["total", "amount"]) ?? 0;
+  const cashPaid = firstNumber(item, ["cashPaid"]) ?? 0;
+
+  return {
+    rank: asNumber(item?.rank) || index + 1,
+    categoryKey: String(item?.categoryKey || item?.key || `category-${index + 1}`),
+    categoryName: String(item?.categoryName || item?.name || "").trim(),
+    expenseCount: asNumber(item?.expenseCount),
+    lineCount: asNumber(item?.lineCount),
+    total,
+    cashPaid,
+    pending: firstNumber(item, ["pending"]) ?? Math.max(total - cashPaid, 0),
+    averageExpenseTotal:
+      firstNumber(item, ["averageExpenseTotal", "averageTotal"]) ?? 0,
+    shareOfTotal: normalizeShareRatio(
+      firstNumber(item, ["shareOfTotal", "share"]) ?? 0,
+    ),
+    lastExpenseDate: item?.lastExpenseDate || item?.lastDate || null,
+  };
+}
+
+function normalizeExpenseAnalyticsResponse(payload = {}) {
+  const source = payload && typeof payload === "object" ? payload : {};
+  const categories =
+    source?.categories && typeof source.categories === "object"
+      ? source.categories
+      : null;
+
+  if (!categories) {
+    return EMPTY_EXPENSE_CATEGORY_ANALYTICS;
+  }
+
+  const summarySource =
+    categories.summary && typeof categories.summary === "object"
+      ? categories.summary
+      : {};
+  const breakdown = (
+    Array.isArray(categories.breakdown) ? categories.breakdown : []
+  )
+    .map((item, index) => normalizeExpenseCategoryRow(item, index))
+    .sort((left, right) => right.total - left.total || left.rank - right.rank);
+  const expensesTotals = normalizeMetricTotals(source?.totals?.expenses, "cashPaid");
+  const breakdownTotal = breakdown.reduce((sum, row) => sum + row.total, 0);
+  const categorizedAmount =
+    firstNumber(summarySource, ["categorizedAmount"]) ?? breakdownTotal;
+  const uncategorizedAmount =
+    firstNumber(summarySource, ["uncategorizedAmount"]) ?? 0;
+  const topCategory =
+    summarySource.topCategory && typeof summarySource.topCategory === "object"
+      ? normalizeExpenseCategoryRow(summarySource.topCategory, 0)
+      : breakdown[0] || null;
+  const categorizedCategories = Math.max(
+    asNumber(summarySource.categorizedCategories),
+    breakdown.length,
+  );
+  const uncategorizedCategories = Math.max(
+    asNumber(summarySource.uncategorizedCategories),
+    uncategorizedAmount > 0 ? 1 : 0,
+  );
+  const totalCategories = Math.max(
+    asNumber(summarySource.totalCategories),
+    categorizedCategories + uncategorizedCategories,
+  );
+
+  return {
+    hasCategoryContract: true,
+    totals: expensesTotals,
+    summary: {
+      totalCategories,
+      categorizedCategories,
+      uncategorizedCategories,
+      categorizedAmount,
+      uncategorizedAmount,
+      topCategory:
+        topCategory && (topCategory.total > 0 || topCategory.categoryName)
+          ? topCategory
+          : null,
+    },
+    breakdown,
+  };
+}
+
+function resolveExpenseCategoryName(row, t) {
+  const label = String(row?.categoryName || "").trim();
+  if (label) return label;
+
+  return t("analytics.uncategorizedCategory");
+}
+
 function PopularRankingCard({
   title,
   subtitle,
@@ -750,20 +873,344 @@ function PopularRankingCard({
   );
 }
 
+function ExpenseCategoryAnalyticsSection({
+  analytics,
+  loading,
+  error,
+  onRetry,
+  t,
+  formatMoney,
+}) {
+  const rows = analytics.breakdown;
+  const hasRows = rows.length > 0;
+  const hasUncategorizedAmount = analytics.summary.uncategorizedAmount > 0;
+  const topCategory = analytics.summary.topCategory;
+  const chartData = rows
+    .filter((row) => row.total > 0)
+    .slice(0, 5)
+    .map((row) => ({
+      name: resolveExpenseCategoryName(row, t),
+      value: row.total,
+    }));
+  const showEmpty =
+    !loading &&
+    !error &&
+    !hasRows &&
+    analytics.summary.categorizedAmount <= 0 &&
+    analytics.summary.uncategorizedAmount <= 0;
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
+            {t("analytics.expenseCategoriesTitle")}
+          </h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {t("analytics.expenseCategoriesSubtitle")}
+          </p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+          {t("analytics.totalCategories")}:{" "}
+          {formatQuantityValue(analytics.summary.totalCategories)}
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="card">
+          <p className="text-sm text-slate-500">{t("common.loading")}</p>
+        </div>
+      ) : error ? (
+        <div className="card space-y-4">
+          <Notice title={error} tone="error" />
+          <div>
+            <button className="btn-secondary" type="button" onClick={onRetry}>
+              {t("common.retry")}
+            </button>
+          </div>
+        </div>
+      ) : showEmpty ? (
+        <div className="card">
+          <p className="text-sm text-slate-500">
+            {t("analytics.noExpenseCategories")}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="card">
+              <p className="text-xs uppercase text-slate-400">
+                {t("analytics.totalCategories")}
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                {formatQuantityValue(analytics.summary.totalCategories)}
+              </p>
+              <div className="mt-3 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                <p className="flex items-center justify-between gap-3">
+                  <span>{t("analytics.categorizedCategories")}</span>
+                  <span className="font-medium text-slate-900 dark:text-white">
+                    {formatQuantityValue(analytics.summary.categorizedCategories)}
+                  </span>
+                </p>
+                <p className="flex items-center justify-between gap-3">
+                  <span>{t("analytics.uncategorizedCategories")}</span>
+                  <span className="font-medium text-slate-900 dark:text-white">
+                    {formatQuantityValue(
+                      analytics.summary.uncategorizedCategories,
+                    )}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            <div className="card">
+              <p className="text-xs uppercase text-slate-400">
+                {t("analytics.categorizedAmount")}
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                {formatMoney(analytics.summary.categorizedAmount)}
+              </p>
+              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                {t("analytics.shareOfTotal")}:{" "}
+                {formatPercentValue(
+                  analytics.summary.categorizedAmount > 0 &&
+                    analytics.summary.categorizedAmount +
+                      analytics.summary.uncategorizedAmount >
+                      0
+                    ? analytics.summary.categorizedAmount /
+                        (analytics.summary.categorizedAmount +
+                          analytics.summary.uncategorizedAmount)
+                    : 0,
+                )}
+              </p>
+            </div>
+
+            <div className="card">
+              <p className="text-xs uppercase text-slate-400">
+                {t("analytics.topCategory")}
+              </p>
+              <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
+                {topCategory
+                  ? resolveExpenseCategoryName(topCategory, t)
+                  : t("common.notAvailable")}
+              </p>
+              <div className="mt-3 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                <p className="flex items-center justify-between gap-3">
+                  <span>{t("common.total")}</span>
+                  <span className="font-medium text-slate-900 dark:text-white">
+                    {topCategory ? formatMoney(topCategory.total) : "—"}
+                  </span>
+                </p>
+                <p className="flex items-center justify-between gap-3">
+                  <span>{t("analytics.shareOfTotal")}</span>
+                  <span className="font-medium text-slate-900 dark:text-white">
+                    {topCategory ? formatPercentValue(topCategory.shareOfTotal) : "—"}
+                  </span>
+                </p>
+                <p className="flex items-center justify-between gap-3">
+                  <span>{t("analytics.lastExpenseDate")}</span>
+                  <span className="font-medium text-slate-900 dark:text-white">
+                    {topCategory?.lastExpenseDate
+                      ? formatMaybeDate(topCategory.lastExpenseDate, "D MMM YYYY")
+                      : "—"}
+                  </span>
+                </p>
+              </div>
+            </div>
+
+            {hasUncategorizedAmount ? (
+              <div className="card">
+                <p className="text-xs uppercase text-slate-400">
+                  {t("analytics.uncategorizedAmount")}
+                </p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                  {formatMoney(analytics.summary.uncategorizedAmount)}
+                </p>
+                <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                  {t("analytics.shareOfTotal")}:{" "}
+                  {formatPercentValue(
+                    analytics.summary.categorizedAmount +
+                      analytics.summary.uncategorizedAmount >
+                      0
+                      ? analytics.summary.uncategorizedAmount /
+                          (analytics.summary.categorizedAmount +
+                            analytics.summary.uncategorizedAmount)
+                      : 0,
+                  )}
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          {hasUncategorizedAmount ? (
+            <Notice
+              title={t("analytics.uncategorizedHintTitle")}
+              description={t("analytics.uncategorizedHintDescription")}
+              tone="warn"
+            />
+          ) : null}
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            <div className="card xl:col-span-1">
+              <h4 className="font-serif text-xl text-slate-900 dark:text-white">
+                {t("analytics.expenseCategoryChart")}
+              </h4>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                {t("analytics.expenseCategoryChartSubtitle")}
+              </p>
+
+              {chartData.length === 0 ? (
+                <p className="mt-6 text-sm text-slate-500">
+                  {t("analytics.noExpenseCategories")}
+                </p>
+              ) : (
+                <div className="mt-4 h-[320px]">
+                  <PieChart
+                    data={chartData}
+                    height={320}
+                    valueFormatter={formatMoney}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="card xl:col-span-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-serif text-xl text-slate-900 dark:text-white">
+                    {t("analytics.expenseCategoryRanking")}
+                  </h4>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    {t("analytics.expenseCategoryRankingSubtitle")}
+                  </p>
+                </div>
+                <span className="text-xs text-slate-500">
+                  {formatQuantityValue(rows.length)} {t("analytics.points")}
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {rows.map((row) => (
+                  <div
+                    key={`${row.categoryKey}-${row.rank}`}
+                    className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-500 shadow-sm dark:bg-slate-950 dark:text-slate-300">
+                            #{row.rank}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-base font-semibold text-slate-900 dark:text-white">
+                              {resolveExpenseCategoryName(row, t)}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                              {t("analytics.shareOfTotal")}:{" "}
+                              {formatPercentValue(row.shareOfTotal)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-left sm:text-right">
+                        <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                          {formatMoney(row.total)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          {t("analytics.averageExpenseTotal")}:{" "}
+                          {formatMoney(row.averageExpenseTotal)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+                      <div
+                        className="h-full rounded-full bg-primary-500"
+                        style={{
+                          width: `${Math.min(
+                            Math.max(row.shareOfTotal * 100, 0),
+                            100,
+                          )}%`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="mt-4 grid gap-3 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-2 xl:grid-cols-3">
+                      <div>
+                        <p className="uppercase tracking-[0.14em]">
+                          {t("analytics.paid")}
+                        </p>
+                        <p className="mt-1 font-medium text-emerald-600 dark:text-emerald-400">
+                          {formatMoney(row.cashPaid)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="uppercase tracking-[0.14em]">
+                          {t("analytics.pending")}
+                        </p>
+                        <p className="mt-1 font-medium text-rose-600 dark:text-rose-400">
+                          {formatMoney(row.pending)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="uppercase tracking-[0.14em]">
+                          {t("analytics.expenseCount")}
+                        </p>
+                        <p className="mt-1 font-medium text-slate-900 dark:text-white">
+                          {formatQuantityValue(row.expenseCount)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="uppercase tracking-[0.14em]">
+                          {t("analytics.lineCount")}
+                        </p>
+                        <p className="mt-1 font-medium text-slate-900 dark:text-white">
+                          {formatQuantityValue(row.lineCount)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="uppercase tracking-[0.14em]">
+                          {t("analytics.lastExpenseDate")}
+                        </p>
+                        <p className="mt-1 font-medium text-slate-900 dark:text-white">
+                          {row.lastExpenseDate
+                            ? formatMaybeDate(row.lastExpenseDate, "D MMM YYYY")
+                            : "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function Analytics() {
   const { t } = useI18n();
   const [summary, setSummary] = useState(() => EMPTY_SUMMARY);
   const [profitLoss, setProfitLoss] = useState(() => EMPTY_PROFIT_LOSS);
+  const [expenseCategoryAnalytics, setExpenseCategoryAnalytics] = useState(
+    () => EMPTY_EXPENSE_CATEGORY_ANALYTICS,
+  );
   const [popularItems, setPopularItems] = useState(
     () => EMPTY_POPULAR_ANALYTICS,
   );
   const [popularCategories, setPopularCategories] = useState(
     () => EMPTY_POPULAR_ANALYTICS,
   );
+  const [expenseCategoryError, setExpenseCategoryError] = useState("");
   const [popularItemsError, setPopularItemsError] = useState("");
   const [popularCategoriesError, setPopularCategoriesError] = useState("");
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [filters, setFilters] = useState({
     fromDate: dayjs().startOf("month").format("YYYY-MM-DD"),
     toDate: todayISODate(),
@@ -773,39 +1220,50 @@ export default function Analytics() {
   });
   const [selectedPartyFilterOption, setSelectedPartyFilterOption] =
     useState(null);
+  const refreshModeRef = useRef(false);
 
   useEffect(() => {
     let isActive = true;
+    const isRefreshRequest = refreshModeRef.current;
 
-    setLoading(true);
+    if (isRefreshRequest) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setStatus("");
+    setExpenseCategoryError("");
 
-    const params = {
+    const sharedParams = {
       from: filters.fromDate || undefined,
       to: filters.toDate || undefined,
       groupBy: filters.groupBy || "auto",
       partyId: filters.partyId || undefined,
+    };
+    const analyticsParams = {
+      ...sharedParams,
       createdBy: filters.createdBy || undefined,
+    };
+    const rankingParams = {
+      from: filters.fromDate || undefined,
+      to: filters.toDate || undefined,
+      partyId: filters.partyId || undefined,
+      createdBy: filters.createdBy || undefined,
+      limit: 10,
     };
 
     Promise.allSettled([
-      api.getAnalyticsSummary(params),
-      api.getAnalyticsProfitLoss(params),
-      api.getPopularItemsAnalytics({
-        from: filters.fromDate || undefined,
-        to: filters.toDate || undefined,
-        limit: 10,
-      }),
-      api.getPopularCategoriesAnalytics({
-        from: filters.fromDate || undefined,
-        to: filters.toDate || undefined,
-        limit: 10,
-      }),
+      api.getAnalyticsSummary(analyticsParams),
+      api.getAnalyticsProfitLoss(analyticsParams),
+      api.getAnalyticsExpenses(analyticsParams),
+      api.getPopularItemsAnalytics(rankingParams),
+      api.getPopularCategoriesAnalytics(rankingParams),
     ])
       .then(
         ([
           summaryResult,
           profitLossResult,
+          expenseAnalyticsResult,
           popularItemsResult,
           popularCategoriesResult,
         ]) => {
@@ -814,6 +1272,8 @@ export default function Analytics() {
           if (summaryResult.status !== "fulfilled") {
             setSummary(EMPTY_SUMMARY);
             setProfitLoss(EMPTY_PROFIT_LOSS);
+            setExpenseCategoryAnalytics(EMPTY_EXPENSE_CATEGORY_ANALYTICS);
+            setExpenseCategoryError("");
             setPopularItems(EMPTY_POPULAR_ANALYTICS);
             setPopularCategories(EMPTY_POPULAR_ANALYTICS);
             setStatus(
@@ -829,6 +1289,19 @@ export default function Analytics() {
             setProfitLoss(normalizeProfitLossResponse(profitLossResult.value));
           } else {
             setProfitLoss(buildProfitLossFallback(nextSummary));
+          }
+
+          if (expenseAnalyticsResult.status === "fulfilled") {
+            setExpenseCategoryAnalytics(
+              normalizeExpenseAnalyticsResponse(expenseAnalyticsResult.value),
+            );
+            setExpenseCategoryError("");
+          } else {
+            setExpenseCategoryAnalytics(EMPTY_EXPENSE_CATEGORY_ANALYTICS);
+            setExpenseCategoryError(
+              expenseAnalyticsResult.reason?.message ||
+                t("auth.errors.generic"),
+            );
           }
 
           if (popularItemsResult.status === "fulfilled") {
@@ -861,6 +1334,8 @@ export default function Analytics() {
         if (!isActive) return;
         setSummary(EMPTY_SUMMARY);
         setProfitLoss(EMPTY_PROFIT_LOSS);
+        setExpenseCategoryAnalytics(EMPTY_EXPENSE_CATEGORY_ANALYTICS);
+        setExpenseCategoryError("");
         setPopularItems(EMPTY_POPULAR_ANALYTICS);
         setPopularCategories(EMPTY_POPULAR_ANALYTICS);
         setStatus(error.message || t("auth.errors.generic"));
@@ -868,6 +1343,8 @@ export default function Analytics() {
       .finally(() => {
         if (!isActive) return;
         setLoading(false);
+        setRefreshing(false);
+        refreshModeRef.current = false;
       });
 
     return () => {
@@ -879,6 +1356,7 @@ export default function Analytics() {
     filters.groupBy,
     filters.partyId,
     filters.toDate,
+    refreshTick,
     t,
   ]);
 
@@ -900,6 +1378,13 @@ export default function Analytics() {
   const handlePartyFilterChange = (option) => {
     setSelectedPartyFilterOption(option || null);
     setFilters((prev) => ({ ...prev, partyId: option?.value || "" }));
+  };
+
+  const handleRefresh = () => {
+    if (loading || refreshing) return;
+    invalidateApiCache(["analytics"]);
+    refreshModeRef.current = true;
+    setRefreshTick((prev) => prev + 1);
   };
 
   const formatMoney = (value) => {
@@ -992,6 +1477,7 @@ export default function Analytics() {
     "net",
     profitLoss.summary.profitLoss.amount,
   );
+  const isBusy = loading || refreshing;
 
   return (
     <div className="space-y-8">
@@ -1003,67 +1489,77 @@ export default function Analytics() {
       {status ? <Notice title={status} tone="error" /> : null}
 
       <div className="card space-y-4">
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <div>
-            <label className="label">{t("common.from")}</label>
-            <input
-              type="date"
-              className="input mt-1"
-              name="fromDate"
-              value={filters.fromDate}
-              onChange={handleFilterChange}
-            />
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="grid flex-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div>
+              <label className="label">{t("common.from")}</label>
+              <input
+                type="date"
+                className="input mt-1"
+                name="fromDate"
+                value={filters.fromDate}
+                onChange={handleFilterChange}
+              />
+            </div>
+            <div>
+              <label className="label">{t("common.to")}</label>
+              <input
+                type="date"
+                className="input mt-1"
+                name="toDate"
+                value={filters.toDate}
+                onChange={handleFilterChange}
+              />
+            </div>
+            <div>
+              <label className="label">{t("analytics.filters.groupBy")}</label>
+              <select
+                className="input mt-1"
+                name="groupBy"
+                value={filters.groupBy}
+                onChange={handleFilterChange}
+              >
+                <option value="auto">{t("analytics.filters.auto")}</option>
+                <option value="day">{t("analytics.filters.day")}</option>
+                <option value="week">{t("analytics.filters.week")}</option>
+                <option value="month">{t("analytics.filters.month")}</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">{t("services.filterByParty")}</label>
+              <PartyFilterSelect
+                className="mt-1"
+                value={filters.partyId}
+                selectedOption={selectedPartyFilterOption}
+                onChange={handlePartyFilterChange}
+                placeholder={t("services.allParties")}
+                searchPlaceholder={t("parties.searchPlaceholder")}
+                showPhone={false}
+              />
+            </div>
+            <div>
+              <label className="label">{t("filters.createdBy")}</label>
+              <CreatorFilterSelect
+                className="mt-1"
+                value={filters.createdBy}
+                onChange={(value) =>
+                  setFilters((prev) => ({ ...prev, createdBy: value }))
+                }
+              />
+            </div>
           </div>
-          <div>
-            <label className="label">{t("common.to")}</label>
-            <input
-              type="date"
-              className="input mt-1"
-              name="toDate"
-              value={filters.toDate}
-              onChange={handleFilterChange}
-            />
-          </div>
-          <div>
-            <label className="label">{t("analytics.filters.groupBy")}</label>
-            <select
-              className="input mt-1"
-              name="groupBy"
-              value={filters.groupBy}
-              onChange={handleFilterChange}
-            >
-              <option value="auto">{t("analytics.filters.auto")}</option>
-              <option value="day">{t("analytics.filters.day")}</option>
-              <option value="week">{t("analytics.filters.week")}</option>
-              <option value="month">{t("analytics.filters.month")}</option>
-            </select>
-          </div>
-          {/* <div>
-            <label className="label">{t('services.filterByParty')}</label>
-            <PartyFilterSelect
-              className="mt-1"
-              type="customer"
-              value={filters.partyId}
-              selectedOption={selectedPartyFilterOption}
-              onChange={handlePartyFilterChange}
-              placeholder={t('services.allParties')}
-              searchPlaceholder={t('parties.searchPlaceholder')}
-              showPhone={false}
-            />
-          </div> */}
-          <div>
-            <label className="label">{t("filters.createdBy")}</label>
-            <CreatorFilterSelect
-              className="mt-1"
-              value={filters.createdBy}
-              onChange={(value) =>
-                setFilters((prev) => ({ ...prev, createdBy: value }))
-              }
+
+          <div className="xl:pb-0.5">
+            <RefreshButton
+              className="min-h-[44px] w-full xl:w-auto"
+              refreshing={refreshing}
+              onClick={handleRefresh}
             />
           </div>
         </div>
+
         <p className="text-xs text-slate-500">
-          {loading ? t("common.loading") : seriesCaption}
+          {isBusy ? t("common.loading") : seriesCaption}
         </p>
       </div>
 
@@ -1220,17 +1716,26 @@ export default function Analytics() {
             {t("analytics.overallMix")}
           </h3>
           <div className="h-[350px]">
-            <PieChart data={pieData} height={350} />
+            <PieChart data={pieData} height={350} valueFormatter={formatMoney} />
           </div>
         </div>
       </div>
+
+      <ExpenseCategoryAnalyticsSection
+        analytics={expenseCategoryAnalytics}
+        loading={isBusy}
+        error={expenseCategoryError}
+        onRetry={handleRefresh}
+        t={t}
+        formatMoney={formatMoney}
+      />
 
       <div className="grid gap-4 xl:grid-cols-2">
         <PopularRankingCard
           title={t("analytics.popularItems")}
           subtitle={t("analytics.popularSubtitle")}
           rows={popularItems.items}
-          loading={loading}
+          loading={isBusy}
           error={popularItemsError}
           emptyLabel={t("analytics.noPopularItems")}
           typeLabel={t("nav.items")}
@@ -1241,7 +1746,7 @@ export default function Analytics() {
           title={t("analytics.popularCategories")}
           subtitle={t("analytics.popularSubtitle")}
           rows={popularCategories.items}
-          loading={loading}
+          loading={isBusy}
           error={popularCategoriesError}
           emptyLabel={t("analytics.noPopularCategories")}
           typeLabel={t("analytics.categoryName")}
