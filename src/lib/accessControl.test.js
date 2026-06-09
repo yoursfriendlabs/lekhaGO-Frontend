@@ -9,6 +9,17 @@ import {
 } from './staff';
 
 describe('access control helpers', () => {
+  it('keeps owners fully accessible even when access control has empty permissions', () => {
+    const accessControl = normalizeAccessControl({
+      role: 'owner',
+      permissions: {},
+    });
+
+    expect(getFeatureAccessLevel(accessControl, 'dashboard', 'owner')).toBe('manage');
+    expect(getFeatureAccessLevel(accessControl, 'inventory', 'owner')).toBe('manage');
+    expect(getFeatureAccessLevel(accessControl, 'settings', 'owner')).toBe('manage');
+  });
+
   it('maps frontend features to backend permissions and preserves view/manage levels', () => {
     const accessControl = normalizeAccessControl({
       role: 'staff',
