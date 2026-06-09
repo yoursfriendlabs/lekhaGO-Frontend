@@ -3,7 +3,7 @@ import { RefreshCw, Search, ShieldCheck, Users } from 'lucide-react';
 import Notice from './Notice';
 import ConfirmDialog from './ui/ConfirmDialog.jsx';
 import { Dialog } from './ui/Dialog.tsx';
-import { api } from '../lib/api';
+import { api, invalidateApiCache } from '../lib/api';
 import { getPermissionKeyForFeature, normalizePermissionMap } from '../lib/accessControl';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useAuth } from '../lib/auth';
@@ -513,6 +513,11 @@ export default function StaffManagement({ businessId }) {
     }
   };
 
+  const handleRefresh = () => {
+    invalidateApiCache(['staff']);
+    reloadStaff();
+  };
+
   useEffect(() => {
     setNotice({ type: '', message: '' });
     reloadStaff();
@@ -693,7 +698,7 @@ export default function StaffManagement({ businessId }) {
             <p className="mt-2 max-w-3xl text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.subtitle')}</p>
           </div>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-            <button type="button" className="btn-secondary justify-center" onClick={reloadStaff} disabled={loading}>
+            <button type="button" className="btn-secondary justify-center" onClick={handleRefresh} disabled={loading}>
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
               {t('staffManagement.refresh')}
             </button>

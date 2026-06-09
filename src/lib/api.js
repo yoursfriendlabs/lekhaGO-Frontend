@@ -849,11 +849,11 @@ export const api = {
       params,
       listCache(["reports", "dashboard"], CACHE_TTL.report),
     ),
-  ledgerReport: (params = {}) =>
+  ledgerReport: (params = {}, options = {}) =>
     listRequest(
       "/api/reports/ledger",
       params,
-      listCache(["reports", "party-statements"], CACHE_TTL.short),
+      listCache(["reports", "party-statements"], CACHE_TTL.short, options),
     ).then((payload) => normalizeLedgerReportResponse(payload)),
   partyReport: (params = {}) =>
     collectionRequest(
