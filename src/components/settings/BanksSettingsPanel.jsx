@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Power, Trash2 } from 'lucide-react';
 import ActionMenu from '../ActionMenu.jsx';
+import NoteTextarea from '../NoteTextarea.jsx';
 import Notice from '../Notice';
 import Pagination from '../Pagination';
 import { Dialog } from '../ui/Dialog.tsx';
@@ -54,6 +55,13 @@ export default function BanksSettingsPanel() {
   const [form, setForm] = useState(emptyForm);
   const [listError, setListError] = useState('');
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   const [submitting, setSubmitting] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [deleteBank, setDeleteBank] = useState(null);
@@ -441,11 +449,10 @@ export default function BanksSettingsPanel() {
 
           <div>
             <label className="label">{t('common.notes')}</label>
-            <textarea
+            <NoteTextarea
               className="input mt-1 h-24 resize-none"
               name="notes"
               value={form.notes}
-              maxLength={10000}
               onChange={handleChange}
             />
           </div>

@@ -4,6 +4,7 @@ export const SUBSCRIPTION_SETTINGS_TAB = 'subscription';
 export const ACCOUNT_SETTINGS_TAB = 'account';
 export const STAFF_SETTINGS_TAB = 'staff';
 export const CATEGORIES_SETTINGS_TAB = 'categories';
+export const EXPENSE_CATEGORIES_SETTINGS_TAB = 'expense-categories';
 export const UNITS_SETTINGS_TAB = 'units';
 export const BANKS_SETTINGS_TAB = 'banks';
 export const ORDER_ATTRIBUTES_SETTINGS_TAB = 'order-attributes';
@@ -15,6 +16,7 @@ export const SETTINGS_TABS = [
   ACCOUNT_SETTINGS_TAB,
   STAFF_SETTINGS_TAB,
   CATEGORIES_SETTINGS_TAB,
+  EXPENSE_CATEGORIES_SETTINGS_TAB,
   UNITS_SETTINGS_TAB,
   BANKS_SETTINGS_TAB,
   ORDER_ATTRIBUTES_SETTINGS_TAB,

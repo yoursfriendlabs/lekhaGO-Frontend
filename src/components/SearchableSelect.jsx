@@ -16,6 +16,8 @@ function normalizeOption(option) {
     ...option,
     value: String(value),
     label: String(option.label ?? value),
+    description: option.description ? String(option.description) : '',
+    searchText: option.searchText ? String(option.searchText) : '',
   };
 }
 
@@ -48,7 +50,13 @@ export default function SearchableSelect({
   const selected = safeOptions.find((o) => o.value === String(value) && o.value !== '');
 
   const filtered = query.trim()
-    ? safeOptions.filter((o) => o.label.toLowerCase().includes(query.toLowerCase().trim()))
+    ? safeOptions.filter((o) =>
+        [o.label, o.description, o.searchText]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(query.toLowerCase().trim())
+      )
     : safeOptions;
 
   const updateDropdownPosition = useCallback(() => {
@@ -194,7 +202,12 @@ export default function SearchableSelect({
                   }`}
                   onClick={() => handleSelect(opt)}
                 >
-                  {opt.label}
+                  <span className="block truncate">{opt.label}</span>
+                  {opt.description ? (
+                    <span className="mt-0.5 block truncate text-xs font-normal text-slate-400">
+                      {opt.description}
+                    </span>
+                  ) : null}
                 </li>
               ))
             )}

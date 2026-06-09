@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Pencil, FileText, Package, Plus, Printer, Trash2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import NoteTextarea from '../components/NoteTextarea.jsx';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import MobileFormStepper from '../components/MobileFormStepper.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
+import QuickPaymentButtons from '../components/QuickPaymentButtons.jsx';
 import PartySearchCreateField from '../components/PartySearchCreateField.jsx';
 import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
 import CreatorFilterSelect from '../components/CreatorFilterSelect.jsx';
@@ -80,9 +83,12 @@ function getCustomerName(sale) {
 
 export default function Sales() {
   const { t } = useI18n();
-  const { businessId, user } = useAuth();
+  const { businessId, user, canManageFeature } = useAuth();
+  const canManageSales = canManageFeature('sales');
   const { businessProfile } = useBusinessSettings();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const createIntentHandledRef = useRef(false);
   const salesFlow = businessProfile?.salesFlow || {};
   const salesTitle = salesFlow.title || t('sales.title');
   const salesSubtitle = salesFlow.attributeSectionHint || t('sales.subtitle');
@@ -119,16 +125,26 @@ export default function Sales() {
     attributes: {},
   });
   const [items, setItems] = useState([]);
+  const quantityInputRef = useRef(null);
   const [showItemDialog, setShowItemDialog] = useState(false);
   const [itemDraft, setItemDraft] = useState({ ...emptyItem });
   const [editingItemIdx, setEditingItemIdx] = useState(null);
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   const [isOpen, setIsOpen] = useState(false);
   const [formMode, setFormMode] = useState('create');
   const [editingId, setEditingId] = useState(null);
   const [deletedItemIds, setDeletedItemIds] = useState([]);
   const [deleteSale, setDeleteSale] = useState(null);
   const [deletingSaleId, setDeletingSaleId] = useState('');
+  const [savingSale, setSavingSale] = useState(false);
+  const [openingSaleForm, setOpeningSaleForm] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [mobileStep, setMobileStep] = useState('details');
@@ -199,6 +215,12 @@ export default function Sales() {
   const handleHeaderChange = (event) => {
     const { name, value } = event.target;
     setHeader((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const applyQuickReceivedAmount = (nextAmount, { markPaid = false } = {}) => {
+    const normalizedAmount = Math.min(Math.max(Number(nextAmount || 0), 0), totals.grandTotal);
+    setIsPaid(markPaid && totals.grandTotal > 0);
+    setHeader((prev) => ({ ...prev, amountReceived: normalizedAmount.toFixed(2) }));
   };
 
   const getProductById = (id) => {
@@ -272,6 +294,11 @@ export default function Sales() {
 
     if (product) {
       syncDraftDefaults(product);
+      // Auto-focus quantity input after product selection for faster grocery entry
+      setTimeout(() => {
+        quantityInputRef.current?.focus();
+        quantityInputRef.current?.select();
+      }, 100);
     }
   };
 
@@ -442,20 +469,45 @@ export default function Sales() {
   };
 
   const openCreate = async () => {
+    if (!canManageSales) return;
+    if (openingSaleForm) return;
+
+    setOpeningSaleForm(true);
     resetForm();
+    setMobileStep(isMobile ? 'items' : 'details');
     setIsOpen(true);
 
-    if (businessId) {
-      try {
-        const data = await api.getNextSequences();
-        setSuggestedInvoiceNo(data?.nextSaleInvoiceNo || '');
-      } catch {
-        setSuggestedInvoiceNo('');
+    try {
+      if (businessId) {
+        try {
+          const data = await api.getNextSequences();
+          setSuggestedInvoiceNo(data?.nextSaleInvoiceNo || '');
+        } catch {
+          setSuggestedInvoiceNo('');
+        }
       }
+    } finally {
+      setOpeningSaleForm(false);
     }
   };
 
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') {
+      createIntentHandledRef.current = false;
+      return;
+    }
+
+    if (createIntentHandledRef.current) return;
+    createIntentHandledRef.current = true;
+    openCreate();
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('create');
+    setSearchParams(nextParams, { replace: true });
+  }, [openCreate, searchParams, setSearchParams]);
+
   const openEdit = async (saleId) => {
+    if (!canManageSales) return;
     setStatus({ type: 'info', message: '' });
     try {
       const sale = await api.getSale(saleId);
@@ -508,6 +560,8 @@ export default function Sales() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (!canManageSales) { setStatus({ type: 'error', message: t('staffManagement.permissionError') }); return; }
+    if (savingSale) return;
     if (!businessId) { setStatus({ type: 'error', message: t('errors.businessIdRequired') }); return; }
     if (!header.saleDate) { setStatus({ type: 'error', message: t('errors.saleDateRequired') }); return; }
     if (!items.length) { setStatus({ type: 'error', message: t('sales.addFirstItem') }); return; }
@@ -524,6 +578,7 @@ export default function Sales() {
     }
 
     try {
+      setSavingSale(true);
       const derivedStatus = dueAmount > 0 ? 'due' : 'paid';
       const manualInvoiceNo = String(header.invoiceNo || '').trim();
       const { paymentMethod, bankId, paymentNote, ...headerFields } = header;
@@ -570,6 +625,8 @@ export default function Sales() {
       fetchSales(listParams, true);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
+    } finally {
+      setSavingSale(false);
     }
   };
 
@@ -580,6 +637,7 @@ export default function Sales() {
 
   const handleDeleteSale = async () => {
     if (!deleteSale) return;
+    if (deletingSaleId === deleteSale.id) return;
 
     setDeletingSaleId(deleteSale.id);
     setStatus({ type: 'info', message: '' });
@@ -637,10 +695,12 @@ export default function Sales() {
         title={salesTitle}
         subtitle={salesSubtitle}
         action={
-          <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreate}>
-            <Plus size={16} className="mr-1.5 inline" />
-            {createSaleLabel}
-          </button>
+          canManageSales ? (
+            <Link className="btn-primary w-full sm:w-auto" to="/app/pos">
+              <Plus size={16} className="mr-1.5 inline" />
+              {createSaleLabel}
+            </Link>
+          ) : null
         }
       />
 
@@ -650,7 +710,8 @@ export default function Sales() {
         onClose={closeDialog}
         title={formMode === 'edit' ? t('sales.editSale') : createSaleLabel}
         size="full"
-        headerContent={isMobile ? (
+      >
+        <div className="md:hidden">
           <MobileFormStepper
             steps={saleSteps}
             currentStep={mobileStep}
@@ -662,17 +723,20 @@ export default function Sales() {
             backLabel={t('common.back') || 'Back'}
             showNavigation={false}
           />
-        ) : null}
-      >
+        </div>
+
         <form className="space-y-5" onSubmit={handleSubmit}>
           {/* {status.message ? <Notice title={status.message} tone={status.type} /> : null} */}
 
           {showDetailsStep ? (
             <>
-              <FormSectionCard hint={t('sales.customerOptional')}>
+              <FormSectionCard>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="sm:col-span-2 lg:col-span-1">
-                    <label className="label">{t('sales.customer')}</label>
+                    <div className="flex items-center justify-between">
+                      <label className="label">{t('sales.customer')}</label>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('common.optional')}</span>
+                    </div>
                     <div className="mt-1">
                       <PartySearchCreateField
                         type="customer"
@@ -705,9 +769,13 @@ export default function Sales() {
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div className="order-2 lg:order-1">
                     <label className="label">{t('sales.notes')}</label>
-                    <textarea className="input mt-1 h-24 resize-none" name="notes" value={header.notes}
-                    maxLength={10000}
-                    onChange={handleHeaderChange} placeholder={t('sales.notesPlaceholder')} />
+                    <NoteTextarea
+                      className="input mt-1 h-24 resize-none"
+                      name="notes"
+                      value={header.notes}
+                      onChange={handleHeaderChange}
+                      placeholder={t('sales.notesPlaceholder')}
+                    />
                   </div>
                   <div className="order-1 lg:order-2">
                     <FileUpload
@@ -857,8 +925,10 @@ export default function Sales() {
                   <div>
                     <label className="label">{t('sales.qty')}</label>
                     <input
+                      ref={quantityInputRef}
                       className="input mt-1"
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       step="1"
                       value={itemDraft.quantity}
@@ -882,6 +952,7 @@ export default function Sales() {
                     <input
                       className="input mt-1"
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       step="0.01"
                       value={itemDraft.unitPrice}
@@ -893,6 +964,7 @@ export default function Sales() {
                     <input
                       className="input mt-1"
                       type="number"
+                      inputMode="decimal"
                       min="0"
                       step="1"
                       value={itemDraft.taxRate}
@@ -903,20 +975,20 @@ export default function Sales() {
               </div>
 
               <div className="rounded-[28px] border border-primary-200 bg-primary-50/60 p-4 shadow-sm dark:border-primary-900/40 dark:bg-primary-900/15">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-200">{t('common.total')}</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</p>
-                <div className="mt-4 space-y-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-200">{t('common.total')}</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</p>
+                <div className="mt-4 flex flex-col gap-3">
                   <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('sales.taxTotal')}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{money(itemDraftVatAmount)}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('sales.taxTotal')}</p>
+                    <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-200">{money(itemDraftVatAmount)}</p>
                   </div>
                   <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('sales.product')}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{itemDraftProduct?.name || '—'}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('sales.product')}</p>
+                    <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{itemDraftProduct?.name || '—'}</p>
                   </div>
                   <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{t('products.unitType')}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">{getUnitLabel(itemDraftProduct, itemDraft.unitType) || t('products.primaryUnit')}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('products.unitType')}</p>
+                    <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{getUnitLabel(itemDraftProduct, itemDraft.unitType) || t('products.primaryUnit')}</p>
                   </div>
                 </div>
               </div>
@@ -925,26 +997,26 @@ export default function Sales() {
 
           {showPaymentStep ? (
             <FormSectionCard title={t('payments.summaryTitle')}>
-              <div className="grid gap-3 text-sm sm:grid-cols-3">
-                <div className="flex justify-between sm:flex-col sm:gap-0.5">
+              <div className="grid gap-3 text-sm">
+                <div className="flex justify-between gap-3">
                   <span className="text-slate-500">{t('sales.subTotal')}</span>
                   <span className="font-semibold text-slate-800">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</span>
                 </div>
-                <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                <div className="flex justify-between gap-3">
                   <span className="text-slate-500">{t('sales.taxTotal')}</span>
                   <span className="font-semibold text-slate-800">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</span>
                 </div>
-                <div className="flex justify-between sm:flex-col sm:gap-0.5">
+                <div className="flex justify-between gap-3">
                   <span className="text-slate-500">{t('sales.grandTotal')}</span>
                   <span className="text-lg font-bold text-slate-900">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</span>
                 </div>
               </div>
 
-              <div className="mt-4 border-t border-slate-200/70 pt-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="flex-1">
-                    <label className="label">{t('services.amountReceived')}</label>
-                    <input
+                <div className="mt-4 border-t border-slate-200/70 pt-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="flex-1">
+                      <label className="label">{t('services.amountReceived')}</label>
+                      <input
                       className="input mt-1"
                       type="number"
                       step="0.01"
@@ -952,10 +1024,16 @@ export default function Sales() {
                       value={isPaid ? totals.grandTotal.toFixed(2) : header.amountReceived}
                       disabled={isPaid}
                       onChange={(e) => setHeader((prev) => ({ ...prev, amountReceived: e.target.value }))}
-                    />
-                  </div>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 sm:mb-0.5">
-                    <input
+                      />
+                      <QuickPaymentButtons
+                        disabled={totals.grandTotal <= 0}
+                        onNoPayment={() => applyQuickReceivedAmount(0)}
+                        onHalfPayment={() => applyQuickReceivedAmount(totals.grandTotal / 2)}
+                        onFullPayment={() => applyQuickReceivedAmount(totals.grandTotal, { markPaid: true })}
+                      />
+                    </div>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 sm:mb-0.5">
+                      <input
                       type="checkbox"
                       className="h-4 w-4 rounded accent-primary-600"
                       checked={isPaid}
@@ -998,7 +1076,11 @@ export default function Sales() {
                 {t('common.continue')}
               </button>
             ) : (
-              <button className="btn-primary w-full sm:w-auto" type="submit">{formMode === 'edit' ? t('sales.updateSale') : t('sales.saveSale')}</button>
+              <button className="btn-primary w-full sm:w-auto" type="submit" disabled={savingSale}>
+                {savingSale
+                  ? t('common.saving')
+                  : formMode === 'edit' ? t('sales.updateSale') : t('sales.saveSale')}
+              </button>
             )}
           </div>
         </form>
@@ -1110,16 +1192,18 @@ export default function Sales() {
                   <div className="mt-3 flex items-center justify-end border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
                     <ActionMenu
                       actions={[
-                        { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) },
+                        ...(canManageSales ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) }] : []),
                         { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
                         { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
-                        {
-                          label: t('common.delete'),
-                          icon: Trash2,
-                          tone: 'danger',
-                          disabled: deletingSaleId === sale.id,
-                          onClick: () => setDeleteSale(sale),
-                        },
+                        ...(canManageSales
+                          ? [{
+                            label: t('common.delete'),
+                            icon: Trash2,
+                            tone: 'danger',
+                            disabled: deletingSaleId === sale.id,
+                            onClick: () => setDeleteSale(sale),
+                          }]
+                          : []),
                       ]}
                     />
                   </div>
@@ -1207,16 +1291,18 @@ export default function Sales() {
                       <td className="py-2.5 text-right">
                         <ActionMenu
                           actions={[
-                            { label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) },
+                            ...(canManageSales ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) }] : []),
                             { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
                             { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
-                            {
-                              label: t('common.delete'),
-                              icon: Trash2,
-                              tone: 'danger',
-                              disabled: deletingSaleId === sale.id,
-                              onClick: () => setDeleteSale(sale),
-                            },
+                            ...(canManageSales
+                              ? [{
+                                label: t('common.delete'),
+                                icon: Trash2,
+                                tone: 'danger',
+                                disabled: deletingSaleId === sale.id,
+                                onClick: () => setDeleteSale(sale),
+                              }]
+                              : []),
                           ]}
                         />
                       </td>

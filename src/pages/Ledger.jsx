@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   ArrowDownLeft,
@@ -7,6 +7,7 @@ import {
   Download,
   FilterX,
   Printer,
+  RefreshCw,
   ScrollText,
   Users,
   WalletCards,
@@ -15,16 +16,17 @@ import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
 import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
-import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import { API_BASE, api } from '../lib/api';
 import { useBusinessSettings } from '../lib/businessSettings';
+import dayjs, { formatMaybeDate } from '../lib/datetime';
 import { useI18n } from '../lib/i18n.jsx';
-import dayjs, { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { normalizeLookupParty, toPartyLookupOption } from '../lib/lookups.js';
+import { getPaymentTypeDisplay, hasPaymentTypeData } from '../lib/paymentType';
+import { printElement } from '../lib/print';
 
 function formatStatementDate(value) {
   if (!value) return '-';
-  return formatMaybeDate(value, 'D MMM');
+  return formatMaybeDate(value, 'D MMM YYYY');
 }
 
 function formatRangeDate(value) {
@@ -32,18 +34,43 @@ function formatRangeDate(value) {
   return formatMaybeDate(value, 'D MMM YYYY');
 }
 
-function buildRange(period) {
-  const now = dayjs();
+function formatLedgerText(value) {
+  const text = String(value ?? '').trim();
+  return text || '-';
+}
 
-  if (period === 'month') {
-    return { from: now.startOf('month').format('YYYY-MM-DD'), to: now.format('YYYY-MM-DD') };
+function formatStatusText(value) {
+  const text = formatLedgerText(value);
+  return text === '-' ? text : text.replace(/_/g, ' ');
+}
+
+function formatMoney(value, t) {
+  if (value === null || value === undefined || value === '' || !Number.isFinite(Number(value))) {
+    return '-';
   }
 
-  if (period === 'year') {
-    return { from: now.startOf('year').format('YYYY-MM-DD'), to: now.format('YYYY-MM-DD') };
-  }
+  return t('currency.formatted', {
+    symbol: t('currency.symbol'),
+    amount: Number(value).toFixed(2),
+  }).replace(/\u00a0/g, ' ');
+}
 
-  return { from: '', to: '' };
+function toCsvCell(value) {
+  const text = String(value ?? '');
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map(toCsvCell).join(',')).join('\r\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 function getLedgerTypeMeta(type, t) {
@@ -56,48 +83,46 @@ function getLedgerTypeMeta(type, t) {
     payment_out: { label: t('parties.paymentOut'), className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
   };
 
-  return map[type] || { label: type || t('ledger.transaction'), className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' };
+  return map[type] || {
+    label: formatLedgerText(type),
+    className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+  };
+}
+
+function getStatusToneClass(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+
+  if (['paid', 'completed', 'received', 'settled', 'success', 'active'].includes(normalized)) {
+    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
+  }
+
+  if (['pending', 'draft', 'open', 'in_progress', 'processing'].includes(normalized)) {
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
+  }
+
+  if (['cancelled', 'void', 'failed', 'inactive'].includes(normalized)) {
+    return 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300';
+  }
+
+  return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
 }
 
 function getBalanceToneClass(value) {
-  const amount = Number(value || 0);
+  if (!Number.isFinite(Number(value))) return 'text-slate-700 dark:text-slate-300';
 
+  const amount = Number(value);
   if (amount > 0) return 'text-rose-700 dark:text-rose-300';
   if (amount < 0) return 'text-emerald-700 dark:text-emerald-300';
   return 'text-slate-700 dark:text-slate-300';
 }
 
 function getBalanceLabel(value, t) {
-  const amount = Number(value || 0);
+  if (!Number.isFinite(Number(value))) return t('ledger.currentBalance');
 
+  const amount = Number(value);
   if (amount > 0) return t('parties.toGive');
   if (amount < 0) return t('parties.toReceive');
   return t('parties.settled');
-}
-
-function buildLedgerLabel(row, t) {
-  const reference = row.referenceNo ? ` ${row.referenceNo}` : '';
-
-  if (row.type === 'sale') return `${t('ledger.salesInvoice')}${reference}`;
-  if (row.type === 'purchase') return `${t('ledger.purchaseInvoice')}${reference}`;
-  if (row.type === 'expense') return `${t('purchases.expense')}${reference}`;
-  if (row.type === 'service') return `${t('parties.serviceOrder')}${reference}`;
-  if (row.type === 'payment_in') return `${t('parties.paymentIn')}${reference}`;
-  if (row.type === 'payment_out') return `${t('parties.paymentOut')}${reference}`;
-
-  return row.referenceNo || t('ledger.transaction');
-}
-
-function normalizeLedgerRow(row, t) {
-  return {
-    ...row,
-    id: row.id || row.referenceNo || `${row.type}-${row.date}`,
-    partyName: row.partyName || '—',
-    debit: Number(row.debit || 0),
-    credit: Number(row.credit || 0),
-    runningBalance: Number(row.runningBalance || 0),
-    label: buildLedgerLabel(row, t),
-  };
 }
 
 function toResolvedPartyOption(raw) {
@@ -106,23 +131,57 @@ function toResolvedPartyOption(raw) {
   return toPartyLookupOption(party);
 }
 
+function PaymentMethodCell({ paymentDisplay, align = 'left' }) {
+  const alignClass = align === 'right' ? 'text-right' : '';
+
+  return (
+    <div className={`min-w-0 ${alignClass}`}>
+      <p className={`truncate text-sm font-medium text-slate-700 dark:text-slate-300 ${alignClass}`}>
+        {paymentDisplay.label}
+      </p>
+      {paymentDisplay.balanceText ? (
+        <p className={`truncate text-xs text-slate-500 dark:text-slate-400 ${alignClass}`}>
+          {paymentDisplay.balanceText}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function StatusPill({ status }) {
+  const label = formatStatusText(status);
+
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${getStatusToneClass(status)}`}>
+      {label}
+    </span>
+  );
+}
+
 export default function Ledger() {
   const { t } = useI18n();
   const { settings: biz } = useBusinessSettings();
   const [searchParams, setSearchParams] = useSearchParams();
+  const defaultFrom = useMemo(() => dayjs().startOf('month').format('YYYY-MM-DD'), []);
+  const defaultTo = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
   const initialPartyId = searchParams.get('partyId') || '';
+  const initialFrom = searchParams.get('from') || defaultFrom;
+  const initialTo = searchParams.get('to') || defaultTo;
 
   const [ledger, setLedger] = useState({ items: [], total: 0, limit: 25, offset: 0 });
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [status, setStatus] = useState('');
   const [selectedPartyId, setSelectedPartyId] = useState(initialPartyId);
   const [selectedPartyOption, setSelectedPartyOption] = useState(null);
-  const [period, setPeriod] = useState('month');
+  const [filters, setFilters] = useState(() => ({ from: initialFrom, to: initialTo }));
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [pullDistance, setPullDistance] = useState(0);
   const printRef = useRef(null);
-
-  const { from, to } = useMemo(() => buildRange(period), [period]);
+  const requestIdRef = useRef(0);
+  const pullStartYRef = useRef(null);
+  const pullActiveRef = useRef(false);
 
   useEffect(() => {
     setSelectedPartyId(initialPartyId);
@@ -132,10 +191,6 @@ export default function Ledger() {
         : null
     ));
   }, [initialPartyId]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [period, selectedPartyId]);
 
   useEffect(() => {
     if (!selectedPartyId) {
@@ -170,54 +225,88 @@ export default function Ledger() {
     };
   }, [ledger.items, selectedPartyId, selectedPartyOption]);
 
-  useEffect(() => {
-    const params = {
-      limit: pageSize,
-      offset: (page - 1) * pageSize,
-      ...(selectedPartyId ? { partyId: selectedPartyId } : {}),
-      ...(from ? { from } : {}),
-      ...(to ? { to } : {}),
-    };
+  const updateSearchState = useCallback((nextValues) => {
+    const nextParams = new URLSearchParams(searchParams);
+    const nextPartyId = String(nextValues.partyId || '').trim();
+    const nextFrom = String(nextValues.from || '').trim();
+    const nextTo = String(nextValues.to || '').trim();
 
-    let isActive = true;
-    setLoading(true);
+    if (nextPartyId) nextParams.set('partyId', nextPartyId);
+    else nextParams.delete('partyId');
+
+    if (nextFrom) nextParams.set('from', nextFrom);
+    else nextParams.delete('from');
+
+    if (nextTo) nextParams.set('to', nextTo);
+    else nextParams.delete('to');
+
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const fetchLedger = useCallback(async ({ refresh = false, force = false } = {}) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
     setStatus('');
 
-    api.ledgerReport(params)
-      .then((data) => {
-        if (!isActive) return;
+    try {
+      const response = await api.ledgerReport({
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+        ...(selectedPartyId ? { partyId: selectedPartyId } : {}),
+        ...(filters.from ? { from: filters.from } : {}),
+        ...(filters.to ? { to: filters.to } : {}),
+      }, { force });
+
+      if (requestId !== requestIdRef.current) return;
+      setLedger(response);
+    } catch (error) {
+      if (requestId !== requestIdRef.current) return;
+      setStatus(error?.message || t('common.noData'));
+
+      if (!refresh) {
         setLedger({
-          items: Array.isArray(data?.items) ? data.items : [],
-          total: Number(data?.total || 0),
-          limit: Number(data?.limit || pageSize),
-          offset: Number(data?.offset || 0),
+          items: [],
+          total: 0,
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
         });
-      })
-      .catch((error) => {
-        if (!isActive) return;
-        setStatus(error.message);
-        setLedger({ items: [], total: 0, limit: pageSize, offset: 0 });
-      })
-      .finally(() => {
-        if (isActive) setLoading(false);
-      });
+      }
+    } finally {
+      if (requestId !== requestIdRef.current) return;
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [filters.from, filters.to, page, pageSize, selectedPartyId, t]);
 
-    return () => {
-      isActive = false;
-    };
-  }, [from, page, pageSize, selectedPartyId, to]);
+  useEffect(() => {
+    fetchLedger();
+  }, [fetchLedger]);
 
-  const statementRows = useMemo(
-    () => ledger.items.map((row) => normalizeLedgerRow(row, t)),
-    [ledger.items, t]
-  );
+  const statementRows = useMemo(() => ledger.items.map((row) => ({
+    ...row,
+    referenceDisplay: formatLedgerText(row.referenceNo),
+    partyDisplay: formatLedgerText(row.partyName),
+    statusDisplay: formatStatusText(row.status),
+    typeMeta: getLedgerTypeMeta(row.type, t),
+    paymentDisplay: hasPaymentTypeData(row)
+      ? getPaymentTypeDisplay(row, {
+          cashLabel: t('payments.cash'),
+          bankLabel: t('payments.bank'),
+          balancePrefix: t('payments.balancePrefix'),
+          formatMoney: (amount) => formatMoney(amount, t),
+        })
+      : { label: '-', balanceText: '' },
+  })), [ledger.items, t]);
 
   const summary = useMemo(() => {
-    const totalDebit = statementRows.reduce((sum, row) => sum + row.debit, 0);
-    const totalCredit = statementRows.reduce((sum, row) => sum + row.credit, 0);
+    const totalDebit = statementRows.reduce((sum, row) => sum + Number(row.debit || 0), 0);
+    const totalCredit = statementRows.reduce((sum, row) => sum + Number(row.credit || 0), 0);
     const currentBalance = statementRows.length
       ? statementRows[statementRows.length - 1].runningBalance
-      : 0;
+      : null;
 
     return {
       totalDebit,
@@ -230,8 +319,11 @@ export default function Ledger() {
   const selectedPartyLabel = selectedPartyId
     ? selectedPartyOption?.entity?.name || selectedPartyOption?.label || t('ledger.party')
     : t('ledger.allParties');
-  const timeSpanLabel = from || to
-    ? `${t('ledger.from')}: ${formatRangeDate(from)}  ·  ${t('ledger.to')}: ${formatRangeDate(to)}`
+  const hasActivePartyFilter = Boolean(selectedPartyId);
+  const hasCustomDateFilter = filters.from !== defaultFrom || filters.to !== defaultTo;
+  const hasAnyFilter = hasActivePartyFilter || hasCustomDateFilter;
+  const timeSpanLabel = filters.from || filters.to
+    ? `${t('ledger.from')}: ${formatRangeDate(filters.from)}  ·  ${t('ledger.to')}: ${formatRangeDate(filters.to)}`
     : t('ledger.allTime');
   const logoSrc = useMemo(() => {
     if (!biz?.logoUrl) return null;
@@ -239,17 +331,12 @@ export default function Ledger() {
   }, [biz?.logoUrl]);
   const balanceToneClass = getBalanceToneClass(summary.currentBalance);
   const balanceLabel = getBalanceLabel(summary.currentBalance, t);
-  const currentPeriodLabel = period === 'month'
-    ? t('ledger.thisMonth')
-    : period === 'year'
-      ? t('ledger.thisYear')
-      : t('ledger.allTime');
-  const hasActivePartyFilter = Boolean(selectedPartyId);
+  const pullReady = pullDistance >= 72;
   const summaryCards = [
     {
       key: 'balance',
       label: balanceLabel,
-      value: t('currency.formatted', { symbol: t('currency.symbol'), amount: Math.abs(summary.currentBalance).toFixed(2) }),
+      value: formatMoney(summary.currentBalance, t),
       icon: WalletCards,
       valueClassName: balanceToneClass,
       accentClassName: 'bg-white/80 text-primary-700 ring-1 ring-primary-100',
@@ -257,7 +344,7 @@ export default function Ledger() {
     {
       key: 'debit',
       label: t('ledger.totalDebit'),
-      value: t('currency.formatted', { symbol: t('currency.symbol'), amount: summary.totalDebit.toFixed(2) }),
+      value: formatMoney(summary.totalDebit, t),
       icon: ArrowDownLeft,
       valueClassName: 'text-rose-700 dark:text-rose-300',
       accentClassName: 'bg-rose-50 text-rose-700 ring-1 ring-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/40',
@@ -265,7 +352,7 @@ export default function Ledger() {
     {
       key: 'credit',
       label: t('ledger.totalCredit'),
-      value: t('currency.formatted', { symbol: t('currency.symbol'), amount: summary.totalCredit.toFixed(2) }),
+      value: formatMoney(summary.totalCredit, t),
       icon: ArrowUpRight,
       valueClassName: 'text-emerald-700 dark:text-emerald-300',
       accentClassName: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/40',
@@ -284,79 +371,128 @@ export default function Ledger() {
     const partyId = option?.value || '';
     setSelectedPartyId(partyId);
     setSelectedPartyOption(option || null);
-
-    const nextParams = new URLSearchParams(searchParams);
-    if (partyId) nextParams.set('partyId', partyId);
-    else nextParams.delete('partyId');
-    setSearchParams(nextParams);
+    setPage(1);
+    updateSearchState({
+      partyId,
+      from: filters.from,
+      to: filters.to,
+    });
   };
 
-  const handlePrint = () => {
-    const source = printRef.current;
-    if (!source) {
-      window.print();
-      return;
-    }
-
-    const clone = source.cloneNode(true);
-    clone.classList.add('print-clone');
-    clone.style.cssText = '';
-
-    const now = dayjs();
-    clone.querySelectorAll('[data-printed-at]').forEach((node) => {
-      node.textContent = now.format('D MMM YYYY, HH:mm');
-    });
-    clone.querySelectorAll('[data-printed-date]').forEach((node) => {
-      node.textContent = now.format('D MMM YYYY');
-    });
-
-    document.body.appendChild(clone);
-
-    const cleanup = () => {
-      if (document.body.contains(clone)) document.body.removeChild(clone);
-      window.removeEventListener('afterprint', cleanup);
+  const handleDateChange = (field, value) => {
+    const nextFilters = {
+      ...filters,
+      [field]: value,
     };
 
-    window.addEventListener('afterprint', cleanup);
-    window.print();
+    setFilters(nextFilters);
+    setPage(1);
+    updateSearchState({
+      partyId: selectedPartyId,
+      from: nextFilters.from,
+      to: nextFilters.to,
+    });
+  };
+
+  const handleResetFilters = () => {
+    const nextFilters = { from: defaultFrom, to: defaultTo };
+    setSelectedPartyId('');
+    setSelectedPartyOption(null);
+    setFilters(nextFilters);
+    setPage(1);
+    updateSearchState({
+      partyId: '',
+      from: nextFilters.from,
+      to: nextFilters.to,
+    });
   };
 
   const handleDownloadExcel = () => {
     const rows = [
+      [t('ledger.statementTitle')],
+      [t('ledger.party'), selectedPartyLabel],
+      [t('common.date'), timeSpanLabel],
+      ['Exported', dayjs().format('D MMM YYYY, HH:mm')],
+      [],
+      [balanceLabel, formatMoney(summary.currentBalance, t)],
+      [t('ledger.totalDebit'), formatMoney(summary.totalDebit, t)],
+      [t('ledger.totalCredit'), formatMoney(summary.totalCredit, t)],
+      [t('ledger.totalEntries'), summary.entries],
+      [],
       [
         t('common.date'),
-        ...(selectedPartyId ? [] : [t('ledger.party')]),
-        t('ledger.transaction'),
-        t('common.payment'),
+        t('ledger.referenceNo'),
+        t('ledger.party'),
+        t('ledger.type'),
+        t('common.status'),
+        t('payments.paymentMethod'),
         t('ledger.debit'),
         t('ledger.credit'),
         t('ledger.runningBalance'),
       ],
-      ...statementRows.map((row) => ([
+      ...statementRows.map((row) => [
         formatStatementDate(row.date),
-        ...(selectedPartyId ? [] : [row.partyName || '—']),
-        row.label,
-        row.paymentType?.label || '',
-        row.debit > 0 ? row.debit.toFixed(2) : '',
-        row.credit > 0 ? row.credit.toFixed(2) : '',
-        row.runningBalance.toFixed(2),
-      ])),
+        row.referenceDisplay,
+        row.partyDisplay,
+        row.typeMeta.label,
+        row.statusDisplay,
+        [row.paymentDisplay.label, row.paymentDisplay.balanceText].filter(Boolean).join(' - '),
+        row.debit > 0 ? formatMoney(row.debit, t) : '',
+        row.credit > 0 ? formatMoney(row.credit, t) : '',
+        formatMoney(row.runningBalance, t),
+      ]),
     ];
 
-    const csv = rows
-      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
+    downloadCsv(`ledger-${dayjs().format('YYYY-MM-DD-HHmm')}.csv`, rows);
+  };
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const partySlug = selectedPartyId
-      ? String(selectedPartyLabel).replace(/\s+/g, '-').toLowerCase()
-      : 'all';
-    link.download = `ledger-${partySlug}-${period}-${todayISODate()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const handlePrint = () => {
+    const now = dayjs();
+    printElement(printRef.current, {
+      prepareClone: (clone) => {
+        clone.querySelectorAll('[data-printed-at]').forEach((node) => {
+          node.textContent = now.format('D MMM YYYY, HH:mm');
+        });
+        clone.querySelectorAll('[data-printed-date]').forEach((node) => {
+          node.textContent = now.format('D MMM YYYY');
+        });
+      },
+    });
+  };
+
+  const handleRefresh = () => {
+    fetchLedger({ refresh: true, force: true });
+  };
+
+  const resetPullState = () => {
+    pullStartYRef.current = null;
+    pullActiveRef.current = false;
+    setPullDistance(0);
+  };
+
+  const handleTouchStart = (event) => {
+    if (typeof window === 'undefined' || window.innerWidth >= 768 || window.scrollY > 0 || loading || refreshing) {
+      pullActiveRef.current = false;
+      pullStartYRef.current = null;
+      return;
+    }
+
+    pullActiveRef.current = true;
+    pullStartYRef.current = event.touches?.[0]?.clientY ?? null;
+  };
+
+  const handleTouchMove = (event) => {
+    if (!pullActiveRef.current || pullStartYRef.current === null) return;
+
+    const currentY = event.touches?.[0]?.clientY ?? pullStartYRef.current;
+    const nextDistance = Math.max(currentY - pullStartYRef.current, 0);
+    setPullDistance(Math.min(nextDistance, 96));
+  };
+
+  const handleTouchEnd = () => {
+    const shouldRefresh = pullReady;
+    resetPullState();
+    if (shouldRefresh) handleRefresh();
   };
 
   return (
@@ -365,18 +501,42 @@ export default function Ledger() {
         title={t('ledger.statementTitle')}
         subtitle={t('ledger.statementSubtitle')}
         action={(
-          <div className="flex flex-wrap gap-2">
-            <button className="btn-secondary" type="button" onClick={handlePrint}>
-              <Printer size={16} /> {t('ledger.printPdf')}
-            </button>
-            <button className="btn-primary" type="button" onClick={handleDownloadExcel}>
-              <Download size={16} /> {t('ledger.downloadExcel')}
-            </button>
+          <div className="flex flex-col gap-2 sm:items-end">
+            <div className="flex flex-wrap gap-2">
+              <button className="btn-secondary" type="button" onClick={handlePrint}>
+                <Printer size={16} /> {t('ledger.printPdf')}
+              </button>
+              <button
+                className="btn-ghost inline-flex items-center justify-center gap-2"
+                type="button"
+                onClick={handleRefresh}
+                disabled={loading || refreshing}
+                aria-busy={loading || refreshing}
+              >
+                <RefreshCw size={16} className={loading || refreshing ? 'animate-spin' : ''} />
+                {loading || refreshing ? t('common.loading') : t('topbar.refresh')}
+              </button>
+              <button
+                className="btn-primary inline-flex items-center justify-center gap-2"
+                type="button"
+                onClick={handleDownloadExcel}
+                disabled={loading}
+              >
+                <Download size={16} /> {t('ledger.downloadExcel')}
+              </button>
+            </div>
           </div>
         )}
       />
 
-      {status ? <Notice title={status} tone="error" /> : null}
+      {status ? (
+        <div className="space-y-3">
+          <Notice title={status} tone="error" />
+          <button className="btn-secondary" type="button" onClick={() => fetchLedger({ refresh: Boolean(statementRows.length), force: true })}>
+            {t('common.retry')}
+          </button>
+        </div>
+      ) : null}
 
       <div ref={printRef} className="space-y-6">
         <div className="hidden print:block">
@@ -418,19 +578,19 @@ export default function Ledger() {
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{balanceLabel}</p>
                   <p className={`mt-1.5 text-sm font-semibold ${balanceToneClass}`}>
-                    {t('currency.formatted', { symbol: t('currency.symbol'), amount: Math.abs(summary.currentBalance).toFixed(2) })}
+                    {formatMoney(summary.currentBalance, t)}
                   </p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('ledger.totalDebit')}</p>
                   <p className="mt-1.5 text-sm font-semibold text-slate-900">
-                    {t('currency.formatted', { symbol: t('currency.symbol'), amount: summary.totalDebit.toFixed(2) })}
+                    {formatMoney(summary.totalDebit, t)}
                   </p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('ledger.totalCredit')}</p>
                   <p className="mt-1.5 text-sm font-semibold text-slate-900">
-                    {t('currency.formatted', { symbol: t('currency.symbol'), amount: summary.totalCredit.toFixed(2) })}
+                    {formatMoney(summary.totalCredit, t)}
                   </p>
                 </div>
                 <div>
@@ -444,7 +604,7 @@ export default function Ledger() {
               <table className="w-full text-sm text-slate-700">
                 <thead className="text-xs text-slate-400">
                   <tr>
-                    <th colSpan={selectedPartyId ? 6 : 7} className="pb-3 normal-case text-slate-500">
+                    <th colSpan={9} className="pb-3 normal-case text-slate-500">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span className="font-medium text-slate-600">{selectedPartyLabel}</span>
                         <span>{timeSpanLabel}</span>
@@ -453,9 +613,11 @@ export default function Ledger() {
                   </tr>
                   <tr className="uppercase tracking-wider">
                     <th className="pb-3 text-left">{t('common.date')}</th>
-                    {selectedPartyId ? null : <th className="pb-3 text-left">{t('ledger.party')}</th>}
-                    <th className="pb-3 text-left">{t('ledger.transaction')}</th>
-                    <th className="pb-3 text-left">{t('common.payment')}</th>
+                    <th className="pb-3 text-left">{t('ledger.referenceNo')}</th>
+                    <th className="pb-3 text-left">{t('ledger.party')}</th>
+                    <th className="pb-3 text-left">{t('ledger.type')}</th>
+                    <th className="pb-3 text-left">{t('common.status')}</th>
+                    <th className="pb-3 text-left">{t('payments.paymentMethod')}</th>
                     <th className="pb-3 text-right">{t('ledger.debit')}</th>
                     <th className="pb-3 text-right">{t('ledger.credit')}</th>
                     <th className="pb-3 text-right">{t('ledger.runningBalance')}</th>
@@ -464,25 +626,30 @@ export default function Ledger() {
                 <tbody className="divide-y divide-slate-100">
                   {statementRows.length === 0 ? (
                     <tr>
-                      <td colSpan={selectedPartyId ? 6 : 7} className="py-4 text-slate-400">{t('ledger.noTransactions')}</td>
+                      <td colSpan={9} className="py-4 text-slate-400">{t('ledger.noTransactions')}</td>
                     </tr>
                   ) : (
                     statementRows.map((row) => (
                       <tr key={`print-${row.type}-${row.id}`}>
                         <td className="py-3">{formatStatementDate(row.date)}</td>
-                        {selectedPartyId ? null : <td className="py-3">{row.partyName || '—'}</td>}
-                        <td className="py-3">{row.label}</td>
+                        <td className="py-3">{row.referenceDisplay}</td>
+                        <td className="py-3">{row.partyDisplay}</td>
+                        <td className="py-3">{row.typeMeta.label}</td>
+                        <td className="py-3">{row.statusDisplay}</td>
                         <td className="py-3">
-                          <PaymentTypeSummary source={row} />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-slate-700">{row.paymentDisplay.label}</p>
+                            {row.paymentDisplay.balanceText ? <p className="truncate text-xs text-slate-500">{row.paymentDisplay.balanceText}</p> : null}
+                          </div>
                         </td>
-                        <td className="py-3 text-right">
-                          {row.debit > 0 ? t('currency.formatted', { symbol: t('currency.symbol'), amount: row.debit.toFixed(2) }) : '—'}
+                        <td className="py-3 text-right text-rose-700">
+                          {row.debit > 0 ? formatMoney(row.debit, t) : '-'}
                         </td>
-                        <td className="py-3 text-right">
-                          {row.credit > 0 ? t('currency.formatted', { symbol: t('currency.symbol'), amount: row.credit.toFixed(2) }) : '—'}
+                        <td className="py-3 text-right text-emerald-700">
+                          {row.credit > 0 ? formatMoney(row.credit, t) : '-'}
                         </td>
                         <td className={`py-3 text-right ${getBalanceToneClass(row.runningBalance)}`}>
-                          {t('currency.formatted', { symbol: t('currency.symbol'), amount: Math.abs(row.runningBalance).toFixed(2) })}
+                          {formatMoney(row.runningBalance, t)}
                         </td>
                       </tr>
                     ))
@@ -500,7 +667,7 @@ export default function Ledger() {
 
         <div className="space-y-6 print:hidden">
           <div className="overflow-hidden rounded-[28px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,_rgba(155,104,53,0.18),_transparent_38%),linear-gradient(135deg,_rgba(255,255,255,0.98),_rgba(248,244,237,0.98))] shadow-sm dark:border-primary-900/40 dark:bg-[radial-gradient(circle_at_top_left,_rgba(155,104,53,0.16),_transparent_34%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(30,41,59,0.96))]">
-            <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.95fr)] lg:p-6">
+            <div className="grid gap-6 p-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(360px,1fr)] lg:p-6">
               <div className="space-y-4">
                 <div className="inline-flex items-center gap-2 rounded-full bg-white/85 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-primary-700 shadow-sm ring-1 ring-primary-100 dark:bg-slate-900/85 dark:text-primary-300 dark:ring-primary-900/40">
                   <ScrollText size={14} />
@@ -523,7 +690,7 @@ export default function Ledger() {
                   </span>
                   <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900/70 dark:text-slate-200 dark:ring-slate-700/80">
                     <CalendarRange size={13} className="text-primary-600 dark:text-primary-400" />
-                    {currentPeriodLabel}
+                    {timeSpanLabel}
                   </span>
                   <span className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-900/70 dark:text-slate-200 dark:ring-slate-700/80">
                     <ScrollText size={13} className="text-primary-600 dark:text-primary-400" />
@@ -542,33 +709,51 @@ export default function Ledger() {
                     onChange={handlePartyFilterChange}
                     placeholder={t('ledger.allParties')}
                     searchPlaceholder={t('ledger.searchPlaceholder')}
+                    showPhone={false}
                   />
-                  {hasActivePartyFilter ? (
+                  <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                    {hasActivePartyFilter ? `${t('ledger.party')}: ${selectedPartyLabel}` : t('ledger.allParties')}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/45">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="label" htmlFor="ledger-from-date">{t('ledger.from')}</label>
+                      <input
+                        id="ledger-from-date"
+                        className="input mt-1"
+                        type="date"
+                        value={filters.from}
+                        onChange={(event) => handleDateChange('from', event.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="ledger-to-date">{t('ledger.to')}</label>
+                      <input
+                        id="ledger-to-date"
+                        className="input mt-1"
+                        type="date"
+                        value={filters.to}
+                        onChange={(event) => handleDateChange('to', event.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {hasAnyFilter ? (
                     <button
                       type="button"
                       className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-700 transition hover:text-primary-600 dark:text-primary-300 dark:hover:text-primary-200"
-                      onClick={() => handlePartyFilterChange(null)}
+                      onClick={handleResetFilters}
                     >
                       <FilterX size={13} />
                       {t('common.clear')}
                     </button>
                   ) : (
                     <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                      {t('ledger.allParties')}
+                      {timeSpanLabel}
                     </p>
                   )}
-                </div>
-
-                <div className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-sm backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/45">
-                  <label className="label">{t('analytics.period')}</label>
-                  <select className="input mt-1" value={period} onChange={(event) => setPeriod(event.target.value)}>
-                    <option value="month">{t('ledger.thisMonth')}</option>
-                    <option value="year">{t('ledger.thisYear')}</option>
-                    <option value="all">{t('ledger.allTime')}</option>
-                  </select>
-                  <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                    {timeSpanLabel}
-                  </p>
                 </div>
               </div>
             </div>
@@ -621,71 +806,93 @@ export default function Ledger() {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 md:hidden">
-              <span className="rounded-full bg-secondary-100 px-3 py-1 dark:bg-slate-800">{selectedPartyLabel}</span>
-              <span className="rounded-full bg-secondary-100 px-3 py-1 dark:bg-slate-800">{timeSpanLabel}</span>
-            </div>
+            <div
+              className="space-y-3 md:hidden"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+              onTouchCancel={handleTouchEnd}
+            >
+              <div
+                className="overflow-hidden transition-all duration-150"
+                style={{ maxHeight: pullDistance || refreshing ? 56 : 0, opacity: pullDistance || refreshing ? 1 : 0 }}
+              >
+                <div className="rounded-2xl border border-dashed border-primary-200 bg-primary-50/70 px-4 py-3 text-center text-xs font-medium text-primary-700 dark:border-primary-900/40 dark:bg-primary-950/20 dark:text-primary-300">
+                  {refreshing ? t('common.loading') : pullReady ? t('topbar.refresh') : t('ledger.pullToRefresh')}
+                </div>
+              </div>
 
-            <div className="space-y-3 md:hidden">
               {loading && statementRows.length === 0 ? (
                 <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
               ) : statementRows.length === 0 ? (
-                <p className="py-3 text-sm text-slate-500">{t('ledger.noTransactions')}</p>
+                <Notice title={t('ledger.noTransactions')} tone="info" />
               ) : (
-                statementRows.map((row) => {
-                  const typeMeta = getLedgerTypeMeta(row.type, t);
-                  return (
-                    <div key={`${row.type}-${row.id}`} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${typeMeta.className}`}>
-                              {typeMeta.label}
-                            </span>
-                            <p className="text-xs text-slate-500">{formatStatementDate(row.date)}</p>
-                          </div>
-                          <p className="mt-1 truncate font-semibold text-slate-800 dark:text-slate-100">{row.label}</p>
-                          {selectedPartyId ? null : <p className="truncate text-xs text-slate-500">{row.partyName || '—'}</p>}
-                          <PaymentTypeSummary source={row} className="mt-2" />
-                        </div>
-                        <div className="shrink-0 text-right">
-                          {row.debit > 0 ? (
-                            <p className="font-semibold text-rose-700 dark:text-rose-300">
-                              -{t('currency.formatted', { symbol: t('currency.symbol'), amount: row.debit.toFixed(2) })}
-                            </p>
-                          ) : (
-                            <p className="font-semibold text-emerald-700 dark:text-emerald-300">
-                              +{t('currency.formatted', { symbol: t('currency.symbol'), amount: row.credit.toFixed(2) })}
-                            </p>
-                          )}
-                          <p className={`mt-0.5 text-xs font-medium ${getBalanceToneClass(row.runningBalance)}`}>
-                            {getBalanceLabel(row.runningBalance, t)}:{' '}
-                            {t('currency.formatted', { symbol: t('currency.symbol'), amount: Math.abs(row.runningBalance).toFixed(2) })}
-                          </p>
+                statementRows.map((row) => (
+                  <div key={`${row.type}-${row.id}`} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${row.typeMeta.className}`}>
+                        {row.typeMeta.label}
+                      </span>
+                      <StatusPill status={row.status} />
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <p className="font-semibold uppercase tracking-wide text-slate-400">{t('common.date')}</p>
+                        <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{formatStatementDate(row.date)}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold uppercase tracking-wide text-slate-400">{t('ledger.referenceNo')}</p>
+                        <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{row.referenceDisplay}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold uppercase tracking-wide text-slate-400">{t('ledger.party')}</p>
+                        <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{row.partyDisplay}</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold uppercase tracking-wide text-slate-400">{t('common.status')}</p>
+                        <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{row.statusDisplay}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="font-semibold uppercase tracking-wide text-slate-400">{t('payments.paymentMethod')}</p>
+                        <div className="mt-1">
+                          <PaymentMethodCell paymentDisplay={row.paymentDisplay} />
                         </div>
                       </div>
+                      <div>
+                        <p className="font-semibold uppercase tracking-wide text-slate-400">{t('ledger.debit')}</p>
+                        <p className="mt-1 text-sm font-semibold text-rose-700 dark:text-rose-300">
+                          {row.debit > 0 ? formatMoney(row.debit, t) : '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="font-semibold uppercase tracking-wide text-slate-400">{t('ledger.credit')}</p>
+                        <p className="mt-1 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                          {row.credit > 0 ? formatMoney(row.credit, t) : '-'}
+                        </p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="font-semibold uppercase tracking-wide text-slate-400">{t('ledger.runningBalance')}</p>
+                        <p className={`mt-1 text-sm font-semibold ${getBalanceToneClass(row.runningBalance)}`}>
+                          {formatMoney(row.runningBalance, t)}
+                        </p>
+                      </div>
                     </div>
-                  );
-                })
+                  </div>
+                ))
               )}
             </div>
 
             <div className="hidden overflow-x-auto md:block">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[980px] text-sm">
                 <thead className="text-xs uppercase text-slate-400">
                   <tr>
-                    <th colSpan={selectedPartyId ? 6 : 7} className="pb-3 normal-case text-slate-500">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-medium text-slate-600">{selectedPartyLabel}</span>
-                        <span>{timeSpanLabel}</span>
-                      </div>
-                    </th>
-                  </tr>
-                  <tr>
                     <th className="py-2.5 pr-4 text-left">{t('common.date')}</th>
-                    {selectedPartyId ? null : <th className="py-2.5 pr-4 text-left">{t('ledger.party')}</th>}
-                    <th className="py-2.5 pr-4 text-left">{t('ledger.transaction')}</th>
-                    <th className="py-2.5 pr-4 text-left">{t('common.payment')}</th>
+                    <th className="py-2.5 pr-4 text-left">{t('ledger.referenceNo')}</th>
+                    <th className="py-2.5 pr-4 text-left">{t('ledger.party')}</th>
+                    <th className="py-2.5 pr-4 text-left">{t('ledger.type')}</th>
+                    <th className="py-2.5 pr-4 text-left">{t('common.status')}</th>
+                    <th className="py-2.5 pr-4 text-left">{t('payments.paymentMethod')}</th>
                     <th className="py-2.5 pr-4 text-right">{t('ledger.debit')}</th>
                     <th className="py-2.5 pr-4 text-right">{t('ledger.credit')}</th>
                     <th className="py-2.5 text-right">{t('ledger.runningBalance')}</th>
@@ -694,43 +901,40 @@ export default function Ledger() {
                 <tbody>
                   {loading && statementRows.length === 0 ? (
                     <tr>
-                      <td colSpan={selectedPartyId ? 6 : 7} className="py-3 text-slate-500">{t('common.loading')}</td>
+                      <td colSpan={9} className="py-3 text-slate-500">{t('common.loading')}</td>
                     </tr>
                   ) : statementRows.length === 0 ? (
                     <tr>
-                      <td colSpan={selectedPartyId ? 6 : 7} className="py-3 text-slate-500">{t('ledger.noTransactions')}</td>
+                      <td colSpan={9} className="py-3 text-slate-500">{t('ledger.noTransactions')}</td>
                     </tr>
                   ) : (
-                    statementRows.map((row) => {
-                      const typeMeta = getLedgerTypeMeta(row.type, t);
-
-                      return (
-                        <tr key={`${row.type}-${row.id}`} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                          <td className="py-2.5 pr-4 font-medium text-slate-800 dark:text-slate-200">{formatStatementDate(row.date)}</td>
-                          {selectedPartyId ? null : <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">{row.partyName || '—'}</td>}
-                          <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
-                            <div className="flex items-center gap-2">
-                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${typeMeta.className}`}>
-                                {typeMeta.label}
-                              </span>
-                              <span className="truncate">{row.label}</span>
-                            </div>
-                          </td>
-                          <td className="py-2.5 pr-4">
-                            <PaymentTypeSummary source={row} />
-                          </td>
-                          <td className="py-2.5 pr-4 text-right font-semibold text-rose-700 dark:text-rose-300">
-                            {row.debit > 0 ? t('currency.formatted', { symbol: t('currency.symbol'), amount: row.debit.toFixed(2) }) : '—'}
-                          </td>
-                          <td className="py-2.5 pr-4 text-right font-semibold text-emerald-700 dark:text-emerald-300">
-                            {row.credit > 0 ? t('currency.formatted', { symbol: t('currency.symbol'), amount: row.credit.toFixed(2) }) : '—'}
-                          </td>
-                          <td className={`py-2.5 text-right font-semibold ${getBalanceToneClass(row.runningBalance)}`}>
-                            {t('currency.formatted', { symbol: t('currency.symbol'), amount: Math.abs(row.runningBalance).toFixed(2) })}
-                          </td>
-                        </tr>
-                      );
-                    })
+                    statementRows.map((row) => (
+                      <tr key={`${row.type}-${row.id}`} className="border-t border-slate-200/70 align-top dark:border-slate-800/70">
+                        <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">{formatStatementDate(row.date)}</td>
+                        <td className="py-3 pr-4 text-slate-700 dark:text-slate-300">{row.referenceDisplay}</td>
+                        <td className="py-3 pr-4 text-slate-700 dark:text-slate-300">{row.partyDisplay}</td>
+                        <td className="py-3 pr-4">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${row.typeMeta.className}`}>
+                            {row.typeMeta.label}
+                          </span>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <StatusPill status={row.status} />
+                        </td>
+                        <td className="py-3 pr-4">
+                          <PaymentMethodCell paymentDisplay={row.paymentDisplay} />
+                        </td>
+                        <td className="py-3 pr-4 text-right font-semibold text-rose-700 dark:text-rose-300">
+                          {row.debit > 0 ? formatMoney(row.debit, t) : '-'}
+                        </td>
+                        <td className="py-3 pr-4 text-right font-semibold text-emerald-700 dark:text-emerald-300">
+                          {row.credit > 0 ? formatMoney(row.credit, t) : '-'}
+                        </td>
+                        <td className={`py-3 text-right font-semibold ${getBalanceToneClass(row.runningBalance)}`}>
+                          {formatMoney(row.runningBalance, t)}
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>

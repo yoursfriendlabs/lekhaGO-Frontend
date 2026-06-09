@@ -6,9 +6,26 @@
   color-scheme: light;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+html {
+  background-color: #f8f5f2;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   font-family: "Space Grotesk", system-ui, sans-serif;
   @apply bg-mist text-ink;
+  min-height: 100dvh;
+  overscroll-behavior-x: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .glass {
@@ -69,17 +86,6 @@ body {
 
 .btn-ghost {
   @apply btn border border-secondary-200 text-secondary-700 hover:bg-secondary-50;
-}
-
-.mobile-sticky-actions {
-  @apply sticky bottom-0 z-10 -mx-4 border-t border-slate-200/70 bg-white/95 px-4 pt-4 backdrop-blur;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
-}
-
-@media (min-width: 768px) {
-  .mobile-sticky-actions {
-    @apply static mx-0 border-0 bg-transparent p-0 backdrop-blur-0;
-  }
 }
 
 /* Custom Utilities */
@@ -167,8 +173,18 @@ body {
     position: static !important;
     box-sizing: border-box !important;
     width: 100% !important;
+    max-width: none !important;
     margin: 0 !important;
     padding: 0.8cm !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  .print-clone * {
+    visibility: visible !important;
   }
 
   .print-clone .card,
@@ -195,4 +211,20 @@ body {
     margin: 1.5cm;
     size: A4 portrait;
   }
+}
+
+/* Custom Scrollbar Utilities */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

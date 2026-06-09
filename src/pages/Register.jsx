@@ -177,7 +177,8 @@ export default function Register() {
           data.role || 'owner',
           data.subscription || null,
           data.business || null,
-          data.businessProfile || null
+          data.businessProfile || null,
+          data.accessControl || data.user?.accessControl || null
         );
         navigate('/app');
         return;
@@ -220,7 +221,7 @@ export default function Register() {
             <span className="inline-flex items-center rounded-full border border-[#9b6835]/20 bg-[#9b6835]/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#9b6835]">
               {t('auth.register')}
             </span>
-            <h1 className="mt-4 text-4xl font-bold tracking-tight text-gray-900">{t('auth.registerTitle')}</h1>
+            <h1  className="mt-4 text-4xl font-bold tracking-tight text-gray-900">{t('auth.registerTitle')}</h1>
             <p className="mt-3 text-lg text-gray-600">{t('auth.registerSubtitle')}</p>
           </div>
 
@@ -229,7 +230,7 @@ export default function Register() {
             className="space-y-6 rounded-[2rem] border border-[#9b6835]/10 bg-white/95 p-6 shadow-[0_24px_80px_-40px_rgba(155,104,53,0.45)] backdrop-blur sm:p-8"
           >
             {statusCopy ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+              <div  id="register-error" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
                 <p className="font-semibold">{statusCopy.title}</p>
                 {statusCopy.description ? (
                   <p className="mt-1 text-rose-600/90">{statusCopy.description}</p>
@@ -395,11 +396,11 @@ export default function Register() {
               </div>
             ) : null}
 
-            <button className={btnPrimary} type="submit" disabled={loading || !form.businessType}>
+            <button  id="submit" className={btnPrimary} type="submit" disabled={loading || !form.businessType}>
               {loading ? (
                 <span>{t('auth.creating')}</span>
               ) : (
-                <span className="flex items-center gap-2">
+                <span className=" id flex items-center gap-2">
                   {t('auth.createAccount')}
                   <ArrowRight className="h-5 w-5" aria-hidden />
                 </span>

@@ -36,6 +36,13 @@ export default function CategoriesSettingsPanel() {
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState('');
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);

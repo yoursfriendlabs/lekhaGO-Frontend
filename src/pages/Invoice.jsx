@@ -6,6 +6,7 @@ import InvoiceHeader from '../components/InvoiceHeader';
 import Notice from '../components/Notice';
 import { formatCurrency } from '../lib/currency';
 import { getCreatorDisplayName } from '../lib/records';
+import { printElement } from '../lib/print';
 import dayjs, { formatMaybeDate } from '../lib/datetime';
 
 function fmt(dateStr) {
@@ -30,18 +31,7 @@ export default function Invoice() {
   }, [type, id]);
 
   const handlePrint = () => {
-    const source = printRef.current;
-    if (!source) { window.print(); return; }
-    const clone = source.cloneNode(true);
-    clone.classList.add('print-clone');
-    clone.style.cssText = '';
-    document.body.appendChild(clone);
-    const cleanup = () => {
-      if (document.body.contains(clone)) document.body.removeChild(clone);
-      window.removeEventListener('afterprint', cleanup);
-    };
-    window.addEventListener('afterprint', cleanup);
-    window.print();
+    printElement(printRef.current);
   };
 
   const isSale = type === 'sales';

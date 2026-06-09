@@ -5,6 +5,7 @@ import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import NoteTextarea from '../components/NoteTextarea.jsx';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
@@ -81,6 +82,13 @@ export default function CafeOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formMode, setFormMode] = useState('create');
   const [editingId, setEditingId] = useState(null);
@@ -928,10 +936,9 @@ export default function CafeOrders() {
 
                 <div className="sm:col-span-2 xl:col-span-4">
                   <label className="label">Notes</label>
-                  <textarea
+                  <NoteTextarea
                     className="input mt-1 h-24 resize-none"
                     value={orderFields.notes}
-                    maxLength={10000}
                     onChange={(event) => setOrderFields((prev) => ({ ...prev, notes: event.target.value }))}
                     placeholder="Special instructions"
                   />

@@ -7,7 +7,7 @@ interface DialogProps {
     onClose: () => void;
     title?: string;
     children: React.ReactNode;
-    size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+    size?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'wide';
     showCloseButton?: boolean;
     closeOnOverlayClick?: boolean;
     headerContent?: React.ReactNode;
@@ -71,6 +71,7 @@ export const Dialog = ({
         lg: 'max-w-lg',
         xl: 'max-w-2xl',
         full: 'max-w-4xl',
+        wide: 'max-w-6xl',
     };
 
     const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {

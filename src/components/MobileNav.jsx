@@ -1,20 +1,19 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Boxes, Users, ShoppingCart, Briefcase, Settings2, ShieldCheck, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Boxes, Users, ShoppingCart, Briefcase, Settings2, ClipboardList } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { getNavigationForBusinessType } from '../lib/businessTypeConfig.js';
 
 const NAV_ROLE_MAP = {
-  dashboard: ['owner', 'staff'],
-  orders: ['owner', 'staff'],
-  inventory: ['owner', 'staff'],
-  sales: ['owner', 'staff'],
-  services: ['owner', 'staff'],
-  purchases: ['owner'],
-  parties: ['owner'],
-  settings: ['owner', 'staff'],
-  admin: ['owner'],
+  dashboard: ['owner', 'staff', 'admin', 'super_admin'],
+  orders: ['owner', 'staff', 'admin', 'super_admin'],
+  inventory: ['owner', 'staff', 'admin', 'super_admin'],
+  sales: ['owner', 'staff', 'admin', 'super_admin'],
+  services: ['owner', 'staff', 'admin', 'super_admin'],
+  purchases: ['owner', 'staff', 'admin', 'super_admin'],
+  parties: ['owner', 'staff', 'admin', 'super_admin'],
+  settings: ['owner', 'staff', 'admin', 'super_admin'],
 };
 
 const ICON_MAP = {
@@ -26,7 +25,6 @@ const ICON_MAP = {
   purchases: ShoppingCart,
   parties: Users,
   settings: Settings2,
-  admin: ShieldCheck,
 };
 
 export default function MobileNav() {
@@ -50,8 +48,7 @@ export default function MobileNav() {
     : item));
   const visibleNavItems = navigation
     .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
-    .filter((item) => hasFeatureAccess(item.key))
-    .concat(role === 'owner' && hasFeatureAccess('admin') ? [{ key: 'admin', label: t('nav.admin'), route: '/app/admin' }] : []);
+    .filter((item) => hasFeatureAccess(item.key));
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200/70 bg-white/95 px-2 py-2 shadow-lg backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/90 md:hidden">

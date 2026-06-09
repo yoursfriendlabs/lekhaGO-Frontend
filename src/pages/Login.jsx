@@ -72,7 +72,8 @@ export default function Login() {
         resolvedRole,
         data.subscription || null,
         data.business || null,
-        data.businessProfile || null
+        data.businessProfile || null,
+        data.accessControl || data.user?.accessControl || null
       );
       if (hasUnverifiedEmail(data.user)) {
         setPendingEmailVerification({
@@ -124,7 +125,7 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="login-animate-fade-up space-y-6">
             {status.message ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <div id="login-error" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 {status.message}
               </div>
             ) : null}

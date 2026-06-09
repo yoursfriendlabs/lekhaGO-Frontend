@@ -156,9 +156,9 @@ export function BusinessSettingsProvider({ children }) {
   }, [applySettings, authBusinessProfile, businessId, fetchSettings]);
 
   return (
-    <BusinessSettingsContext.Provider value={{ settings, businessProfile, loading, saveSettings, reloadSettings, mergeSettings, syncBusinessName }}>
+    <BusinessSettingsContext value={{ settings, businessProfile, loading, saveSettings, reloadSettings, mergeSettings, syncBusinessName }}>
       {children}
-    </BusinessSettingsContext.Provider>
+    </BusinessSettingsContext>
   );
 }
 

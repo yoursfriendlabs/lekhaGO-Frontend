@@ -4,11 +4,19 @@ import {
   getToken,
   setSessionNotice,
 } from "./storage";
+import { normalizePopularAnalyticsResponse } from "./analyticsPopular";
+import { normalizeLedgerReportResponse } from "./ledger";
 import { toQueryKey, toQueryString } from "./queryKey";
+import { normalizeStaffCollection, normalizeStaffMeta, normalizeStaffMember } from "./staff";
 
-// export const API_BASE =
-  // import.meta.env.VITE_API_BASE_URL || "https://api.yoursfriend.com";
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+const DEFAULT_API_BASE = "http://localhost:4000";
+
+function normalizeApiBase(value) {
+  const apiBase = String(value || "").trim() || DEFAULT_API_BASE;
+  return apiBase.replace(/\/+$/, "");
+}
+
+export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE_URL);
 
 const INACTIVE_USER_REGEX = /user is inactive/i;
 const SESSION_EXPIRED_MESSAGE = "Your session expired. Please log in again.";
@@ -498,20 +506,34 @@ export const api = {
       mutationConfig(["auth-me", "subscription", "subscription-payment-setup"]),
     ),
 
+  getStaffMeta: () =>
+    request("/api/staff/meta", {}, listCache(["staff"], CACHE_TTL.short)).then(
+      normalizeStaffMeta,
+    ),
   listStaff: () =>
-    request("/api/staff", {}, listCache(["staff"], CACHE_TTL.short)),
+    request("/api/staff", {}, listCache(["staff"], CACHE_TTL.short)).then(
+      normalizeStaffCollection,
+    ),
   createStaff: (data) =>
     request(
       "/api/staff",
       { method: "POST", body: JSON.stringify(data) },
       mutationConfig(["staff"]),
-    ),
+    ).then((payload) => ({
+      ...payload,
+      meta: normalizeStaffMeta(payload?.meta),
+      member: normalizeStaffMember(payload?.member, payload?.meta),
+    })),
   updateStaff: (membershipId, data) =>
     request(
       `/api/staff/${membershipId}`,
       { method: "PATCH", body: JSON.stringify(data) },
       mutationConfig(["staff"]),
-    ),
+    ).then((payload) => ({
+      ...payload,
+      meta: normalizeStaffMeta(payload?.meta),
+      member: normalizeStaffMember(payload?.member, payload?.meta),
+    })),
   deleteStaff: (membershipId) =>
     request(
       `/api/staff/${membershipId}`,
@@ -827,12 +849,12 @@ export const api = {
       params,
       listCache(["reports", "dashboard"], CACHE_TTL.report),
     ),
-  ledgerReport: (params = {}) =>
-    collectionRequest(
+  ledgerReport: (params = {}, options = {}) =>
+    listRequest(
       "/api/reports/ledger",
       params,
-      listCache(["reports", "party-statements"], CACHE_TTL.short),
-    ),
+      listCache(["reports", "party-statements"], CACHE_TTL.short, options),
+    ).then((payload) => normalizeLedgerReportResponse(payload)),
   partyReport: (params = {}) =>
     collectionRequest(
       "/api/reports/party-report",
@@ -1063,6 +1085,18 @@ export const api = {
       params,
       listCache(["analytics"], CACHE_TTL.short),
     ),
+  getPopularItemsAnalytics: (params = {}) =>
+    listRequest(
+      "/api/analytics/popular-items",
+      { limit: 10, ...params },
+      listCache(["analytics"], CACHE_TTL.short),
+    ).then(normalizePopularAnalyticsResponse),
+  getPopularCategoriesAnalytics: (params = {}) =>
+    listRequest(
+      "/api/analytics/popular-categories",
+      { limit: 10, ...params },
+      listCache(["analytics"], CACHE_TTL.short),
+    ).then(normalizePopularAnalyticsResponse),
 
   uploadAttachment: (file) => {
     const formData = new FormData();

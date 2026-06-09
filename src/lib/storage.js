@@ -5,6 +5,7 @@ const BUSINESS_DATA_KEY = 'mms_business';
 const BUSINESS_PROFILE_KEY = 'mms_business_profile';
 const ROLE_KEY = 'mms_role';
 const SUBSCRIPTION_KEY = 'mms_subscription';
+const ACCESS_CONTROL_KEY = 'mms_access_control';
 const SESSION_NOTICE_KEY = 'mms_session_notice';
 const PENDING_EMAIL_VERIFICATION_KEY = 'mms_pending_email_verification';
 const PASSWORD_RESET_FLOW_KEY = 'mms_password_reset_flow';
@@ -100,6 +101,20 @@ export function setSubscription(subscription) {
   else localStorage.removeItem(SUBSCRIPTION_KEY);
 }
 
+export function getAccessControl() {
+  try {
+    const raw = localStorage.getItem(ACCESS_CONTROL_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setAccessControl(accessControl) {
+  if (accessControl) localStorage.setItem(ACCESS_CONTROL_KEY, JSON.stringify(accessControl));
+  else localStorage.removeItem(ACCESS_CONTROL_KEY);
+}
+
 export function setSessionNotice(message) {
   if (message) localStorage.setItem(SESSION_NOTICE_KEY, message);
   else localStorage.removeItem(SESSION_NOTICE_KEY);
@@ -179,5 +194,6 @@ export function clearSession() {
   setBusinessProfile(null);
   setRole('');
   setSubscription(null);
+  setAccessControl(null);
   clearPendingEmailVerification();
 }

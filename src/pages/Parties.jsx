@@ -8,6 +8,7 @@ import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
+import { useAuth } from '../lib/auth.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import dayjs, { todayISODate } from '../lib/datetime';
 import {
@@ -46,6 +47,7 @@ const makeEmptyTx = () => ({
 
 const TX_PAGE_SIZE = 10;
 const PARTY_PAGE_SIZE = 20;
+const SUCCESS_NOTICE_TIMEOUT_MS = 3000;
 
 function formatDate(value) {
   if (!value) return '-';
@@ -123,7 +125,9 @@ function mergeUniqueParties(existing = [], incoming = []) {
 }
 
 export default function Parties() {
+  const { canManageFeature } = useAuth();
   const { t } = useI18n();
+  const canManageParties = canManageFeature('parties');
   const navigate = useNavigate();
   const { upsert: upsertParty, remove: removeParty, invalidate: invalidateParties } = usePartyStore();
 
@@ -140,6 +144,13 @@ export default function Parties() {
 
   const [form, setForm] = useState(emptyForm);
   const [status, setStatus] = useState({ type: 'info', message: '' });
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [filterType, setFilterType] = useState('all');
@@ -165,6 +176,20 @@ export default function Parties() {
   const partyListSessionRef = useRef(0);
   const submitPartyRequestRef = useRef(false);
   const supportsIntersectionObserver = typeof IntersectionObserver !== 'undefined';
+
+  useEffect(() => {
+    if (status.type !== 'success' || !status.message) return undefined;
+
+    const timerId = window.setTimeout(() => {
+      setStatus((current) =>
+        current.type === 'success' && current.message === status.message
+          ? { type: 'info', message: '' }
+          : current
+      );
+    }, SUCCESS_NOTICE_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timerId);
+  }, [status.message, status.type]);
 
   const loadPartyPage = useCallback(
     async ({ offset = 0, append = false, session = partyListSessionRef.current, force = false } = {}) => {
@@ -224,6 +249,8 @@ export default function Parties() {
   );
 
   const refreshParties = async () => {
+    if (refreshingParties) return;
+
     const session = partyListSessionRef.current + 1;
     partyListSessionRef.current = session;
 
@@ -429,6 +456,7 @@ export default function Parties() {
   };
 
   const openCreate = () => {
+    if (!canManageParties) return;
     setEditingId(null);
     setForm(emptyForm);
     setActiveTab('credit');
@@ -436,6 +464,7 @@ export default function Parties() {
   };
 
   const openEdit = (party) => {
+    if (!canManageParties) return;
     setEditingId(party.id);
     setForm({
       name: party.name || '',
@@ -458,6 +487,8 @@ export default function Parties() {
   };
 
   const openTxDialog = async () => {
+    if (!canManageParties) return;
+    if (pendingServicesLoading) return;
     if (!selectedParty) return;
 
     setTxForm({ ...makeEmptyTx(), partyId: selectedParty.id });
@@ -503,7 +534,9 @@ export default function Parties() {
   };
 
   const handleDelete = async () => {
+    if (!canManageParties) return;
     if (!deleteParty) return;
+    if (deleteSubmitting) return;
 
     setDeleteSubmitting(true);
     try {
@@ -524,6 +557,10 @@ export default function Parties() {
   };
 
   const submitParty = async (keepOpen = false) => {
+    if (!canManageParties) {
+      setStatus({ type: 'error', message: t('staffManagement.permissionError') });
+      return;
+    }
     if (submitPartyRequestRef.current) return;
 
     const phoneDigits = String(form.phone || '').replace(/\D/g, '');
@@ -568,6 +605,11 @@ export default function Parties() {
 
   const submitTransaction = async (event) => {
     event.preventDefault();
+    if (!canManageParties) {
+      setTxStatus({ type: 'error', message: t('staffManagement.permissionError') });
+      return;
+    }
+    if (txLoading) return;
     if (!txForm.partyId) return;
 
     setTxLoading(true);
@@ -630,9 +672,11 @@ export default function Parties() {
         title={t('parties.title')}
         subtitle={t('parties.subtitle')}
         action={(
-          <button className="btn-primary" type="button" onClick={openCreate}>
-            <Plus size={16} /> {t('parties.addParty')}
-          </button>
+          canManageParties ? (
+            <button className="btn-primary" type="button" onClick={openCreate}>
+              <Plus size={16} /> {t('parties.addParty')}
+            </button>
+          ) : null
         )}
       />
 
@@ -672,9 +716,11 @@ export default function Parties() {
             </h3>
             <div className="flex flex-wrap gap-2">
               <RefreshButton refreshing={refreshingParties} onClick={refreshParties} />
-              <button className="btn-ghost" type="button" onClick={openCreate}>
-                <ChevronDown size={16} /> {t('parties.addParty')}
-              </button>
+              {canManageParties ? (
+                <button className="btn-ghost" type="button" onClick={openCreate}>
+                  <ChevronDown size={16} /> {t('parties.addParty')}
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -884,19 +930,22 @@ export default function Parties() {
 
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex gap-2">
-                  <button className="btn-ghost" type="button" onClick={() => openEdit(selectedPartyView)}>
-                    {t('parties.manageParty')}
-                  </button>
+                  {canManageParties ? (
+                    <button className="btn-ghost" type="button" onClick={() => openEdit(selectedPartyView)}>
+                      {t('parties.manageParty')}
+                    </button>
+                  ) : null}
                   <button className="btn-ghost" type="button" onClick={goToStatement}>
                     {t('parties.statement')}
                   </button>
                 </div>
-                <div className="flex gap-2">
-
-                  <button className="btn-ghost text-rose-600" type="button" onClick={() => setDeleteParty(selectedPartyView)}>
-                    {t('common.delete')}
-                  </button>
-                </div>
+                {canManageParties ? (
+                  <div className="flex gap-2">
+                    <button className="btn-ghost text-rose-600" type="button" onClick={() => setDeleteParty(selectedPartyView)}>
+                      {t('common.delete')}
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -928,9 +977,11 @@ export default function Parties() {
                 <h4 className="text-lg font-semibold text-slate-900">
                   {t('parties.transactions', { count: statementData.summary.totalRows })}
                 </h4>
-                <button className="btn-primary" type="button" onClick={openTxDialog}>
-                  <Plus size={16} /> {t('parties.addTransaction')}
-                </button>
+                {canManageParties ? (
+                  <button className="btn-primary" type="button" onClick={openTxDialog} disabled={pendingServicesLoading}>
+                    <Plus size={16} /> {pendingServicesLoading ? t('common.loading') : t('parties.addTransaction')}
+                  </button>
+                ) : null}
               </div>
 
               {statementError ? <Notice title={statementError} tone="error" /> : null}

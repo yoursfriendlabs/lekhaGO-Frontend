@@ -11,12 +11,18 @@ export default function PartyFilterSelect({
   type = 'both',
   placeholder,
   searchPlaceholder,
+  showPhone = true,
 }) {
   const { t } = useI18n();
   const normalizedType = type && type !== 'both' ? type : undefined;
 
   const mapPartyOptions = (items = []) => items
-    .map((party) => toPartyLookupOption(party))
+    .map((party) => {
+      const option = toPartyLookupOption(party);
+      const name = option?.entity?.name || option?.label || '';
+
+      return showPhone ? option : { ...option, label: name };
+    })
     .filter((option) => option?.value)
     .sort((left, right) => left.label.localeCompare(right.label));
 
@@ -60,7 +66,7 @@ export default function PartyFilterSelect({
     return (
       <div className="min-w-0">
         <p className="truncate font-semibold text-slate-800 dark:text-slate-100">{name}</p>
-        {phone ? <p className="truncate text-xs text-slate-500">{phone}</p> : null}
+        {showPhone && phone ? <p className="truncate text-xs text-slate-500">{phone}</p> : null}
       </div>
     );
   };

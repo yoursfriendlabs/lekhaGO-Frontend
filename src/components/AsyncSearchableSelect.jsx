@@ -145,7 +145,7 @@ export default function AsyncSearchableSelect({
     if (!open || typeof loadOptionsRef.current !== 'function') return undefined;
 
     const search = debouncedQuery.trim();
-    
+
     // Load options when opened, even with empty query (for browsing all options)
     if (search.length < minQueryLength && minQueryLength > 0) {
       setOptions((previous) => {
@@ -231,11 +231,11 @@ export default function AsyncSearchableSelect({
           style={dropdownStyle}
         >
           <div className="border-b border-slate-100 p-2 dark:border-slate-800">
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-800">
-              <Search size={13} className="shrink-0 text-slate-400" />
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800 focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-400 transition-all">
+              <Search size={16} className="shrink-0 text-slate-400" />
               <input
                 ref={searchRef}
-                className="flex-1 border-0 bg-transparent text-sm text-ink outline-none ring-0 placeholder:text-slate-400 focus:border-0 focus:outline-0 focus:ring-0"
+                className="flex-1 border-0 bg-transparent text-base md:text-sm text-ink outline-none ring-0 placeholder:text-slate-400 focus:border-0 focus:outline-0 focus:ring-0"
                 placeholder={searchPlaceholder}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -265,7 +265,7 @@ export default function AsyncSearchableSelect({
               safeOptions.map((option) => (
                 <li
                   key={option.value}
-                  className={`min-w-0 cursor-pointer px-3 py-3 text-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                  className={`min-w-0 cursor-pointer px-4 py-3.5 text-base md:text-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 ${
                     String(option.value) === String(value)
                       ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-900/20 dark:text-primary-400'
                       : 'text-slate-700 dark:text-slate-300'

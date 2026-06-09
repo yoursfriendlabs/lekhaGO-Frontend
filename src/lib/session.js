@@ -1,4 +1,5 @@
 import { normalizeBusinessProfile } from './businessProfile';
+import { normalizeAccessControl } from './accessControl';
 import { normalizeSubscriptionPayload } from './subscription';
 
 function asObject(value) {
@@ -37,6 +38,10 @@ export function normalizeSessionPayload(payload = {}, fallback = {}) {
       business: business || normalizedProfileSource?.business || null,
     })
     : null;
+  const accessControl = normalizeAccessControl(
+    source.accessControl ?? userSource?.accessControl ?? null,
+    fallbackSource.accessControl ?? fallbackSource.user?.accessControl ?? null,
+  );
 
   return {
     token: pickString(source.token, fallbackSource.token),
@@ -45,6 +50,7 @@ export function normalizeSessionPayload(payload = {}, fallback = {}) {
     businessId,
     business: business || null,
     businessProfile,
+    accessControl,
     subscription: normalizeSubscriptionPayload(source.subscription ?? fallbackSource.subscription ?? null, {
       businessId,
       business,

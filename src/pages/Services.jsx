@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useSearchParams } from 'react-router-dom';
 import Notice from '../components/Notice';
 import Pagination from '../components/Pagination';
 import RefreshButton from '../components/RefreshButton.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import NoteTextarea from '../components/NoteTextarea.jsx';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
+import QuickPaymentButtons from '../components/QuickPaymentButtons.jsx';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import InvoiceHeader from '../components/InvoiceHeader';
 import MobileFormStepper from '../components/MobileFormStepper.jsx';
@@ -19,6 +22,7 @@ import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
 import { getServicesDisplayLabel } from '../lib/businessTypeConfig.js';
 import { useI18n } from '../lib/i18n.jsx';
+import { printElement } from '../lib/print.js';
 import FileUpload from '../components/FileUpload';
 import DynamicAttributes from '../components/DynamicAttributes';
 import {
@@ -37,6 +41,8 @@ import {
   Pencil,
   FileText,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Phone,
   ArrowRight,
   CalendarDays,
@@ -84,7 +90,7 @@ const TABLE_ROW_OPTIONS = [10, 20, 30, 40, 50];
 const makeEmptyHeader = () => ({
   partyId: '',
   orderNo: '',
-  status: 'open',
+  status: 'in_progress',
   notes: '',
   deliveryDate: todayISODate(),
   paymentMethod: 'cash',
@@ -171,14 +177,14 @@ function AttachmentStrip({ urls = [], onOpen, maxVisible = 3, size = 'sm' }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {visibleUrls.map((url) => (
-        <AttachmentPreview key={url} url={url} onOpen={onOpen} size={size} />
+      {visibleUrls.map((url, i) => (
+        <AttachmentPreview key={url} url={url} onOpen={() => onOpen(urls, i)} size={size} />
       ))}
       {hiddenCount > 0 ? (
         <button
           type="button"
           className="inline-flex h-9 min-w-9 items-center justify-center rounded-2xl bg-slate-100 px-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
-          onClick={() => onOpen(hiddenUrls[0])}
+          onClick={() => onOpen(urls, visibleUrls.length)}
           title="Open more attachments"
         >
           +{hiddenCount}
@@ -228,6 +234,16 @@ function DeliveryBadge({ date }) {
   return (
     <span className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`}>
       <Clock size={10} /> {label} · {days}d left
+    </span>
+  );
+}
+
+function ClosedDeliveryLabel() {
+  const { t } = useI18n();
+
+  return (
+    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+      {t('services.closed')}
     </span>
   );
 }
@@ -377,7 +393,7 @@ function FilterChip({ label, active, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center rounded-full border px-4 py-2 text-sm font-semibold transition ${
+      className={`inline-flex min-w-0 items-center justify-center rounded-full border px-2.5 py-1.5 text-xs font-semibold leading-tight transition sm:px-4 sm:py-2 sm:text-sm ${
         active
           ? 'border-primary-300 bg-primary-50 text-primary-700 shadow-sm dark:border-primary-700/70 dark:bg-primary-900/30 dark:text-primary-200'
           : 'border-slate-200/80 bg-white/80 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-700'
@@ -398,14 +414,16 @@ function isPlaceholderItem(item) {
 }
 
 function StatusBadge({ status }) {
+  const { t } = useI18n();
   const map = {
     open: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
     in_progress: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
     closed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
   };
   const label =
-    status === 'in_progress' ? 'In progress'
-    : status ? status.charAt(0).toUpperCase() + status.slice(1)
+    status === 'in_progress' ? t('services.inProgress')
+    // : status === 'open' ? t('services.open')
+    : status === 'closed' ? t('services.closed')
     : '—';
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[status] || 'bg-slate-100 text-slate-600'}`}>
@@ -415,14 +433,6 @@ function StatusBadge({ status }) {
 }
 
 const STATUS_STEPS = [
-  {
-    value: 'open',
-    label: 'Open',
-    desc: 'Awaiting work to begin',
-    selectedClass: 'border-blue-400 bg-blue-50 dark:bg-blue-900/20',
-    dotClass: 'bg-blue-500',
-    checkClass: 'text-blue-600',
-  },
   {
     value: 'in_progress',
     label: 'In Progress',
@@ -443,8 +453,11 @@ const STATUS_STEPS = [
 
 export default function Services() {
   const { t } = useI18n();
-  const { businessId, user } = useAuth();
+  const { businessId, user, canManageFeature } = useAuth();
+  const canManageServices = canManageFeature('services');
+  const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
+  const createIntentHandledRef = useRef(false);
   const partyPickerRef = useRef(null);
   const partyDropdownRef = useRef(null);
   const { settings: bizSettings, businessProfile } = useBusinessSettings();
@@ -475,6 +488,13 @@ export default function Services() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [listError, setListError] = useState('');
   const [listNotice, setListNotice] = useState({ type: '', message: '' });
+
+  useEffect(() => {
+    if (listNotice.type !== 'success' && listNotice.type !== 'error') return;
+    const timer = setTimeout(() => setListNotice({ type: '', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [listNotice]);
+
   const [page, setPage] = useState(1);
   const [refreshingServices, setRefreshingServices] = useState(false);
   const [pageSize, setPageSize] = useState(10);
@@ -482,6 +502,7 @@ export default function Services() {
   // ── New order dialog ──
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formNotice, setFormNotice] = useState({ type: '', message: '' });
+  const formNoticeTimerRef = useRef(null);
 
   // ── Payment dialog ──
   const [payDialog, setPayDialog] = useState(null);
@@ -508,7 +529,28 @@ export default function Services() {
   const [deleteService, setDeleteService] = useState(null);
 
   // ── Lightbox ──
-  const [lightboxUrl, setLightboxUrl] = useState(null);
+  const [lightboxState, setLightboxState] = useState(null);
+
+  const openLightbox = (urls = [], index = 0) => {
+    const normalized = Array.isArray(urls) ? urls : [urls];
+    const abs = normalized.map((u) => (u && String(u).startsWith('http') ? u : String(u || '')));
+    setLightboxState({ urls: abs, index: Math.max(0, Math.min(index || 0, abs.length - 1)) });
+  };
+
+  const closeLightbox = () => setLightboxState(null);
+  const showPrev = () => setLightboxState((s) => (s ? { ...s, index: Math.max(0, s.index - 1) } : s));
+  const showNext = () => setLightboxState((s) => (s ? { ...s, index: Math.min(s.urls.length - 1, s.index + 1) } : s));
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (!lightboxState) return;
+      if (e.key === 'ArrowLeft') showPrev();
+      if (e.key === 'ArrowRight') showNext();
+      if (e.key === 'Escape') closeLightbox();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightboxState]);
 
   // ── Invoice modal ──
   const [invoiceOrder, setInvoiceOrder] = useState(null);
@@ -534,6 +576,8 @@ export default function Services() {
   const [creatingParty, setCreatingParty] = useState(false);
   const [header, setHeader] = useState(() => makeEmptyHeader());
   const [items, setItems] = useState([]);
+  const quantityInputRef = useRef(null);
+  const descriptionInputRef = useRef(null);
   const [discount, setDiscount] = useState('0');
   const [amountReceived, setAmountReceived] = useState('0');
   const [isPaid, setIsPaid] = useState(false);
@@ -720,6 +764,12 @@ export default function Services() {
     if (isPaid) setAmountReceived(totals.grandTotal.toFixed(2));
   }, [isPaid, totals.grandTotal]);
 
+  const applyQuickReceivedAmount = useCallback((nextAmount, { markPaid = false } = {}) => {
+    const normalizedAmount = Math.min(Math.max(Number(nextAmount || 0), 0), totals.grandTotal);
+    setIsPaid(markPaid && totals.grandTotal > 0);
+    setAmountReceived(normalizedAmount.toFixed(2));
+  }, [totals.grandTotal]);
+
   useEffect(() => {
     if (!dialogOpen) return undefined;
     const node = formScrollRef.current;
@@ -865,6 +915,11 @@ export default function Services() {
 
     if (product) {
       syncItemDefaults(null, product, true);
+      // Auto-focus quantity input after product selection
+      setTimeout(() => {
+        quantityInputRef.current?.focus();
+        quantityInputRef.current?.select();
+      }, 100);
     }
   };
 
@@ -901,6 +956,7 @@ export default function Services() {
       if (field === 'itemType' && value === 'labor') {
         next.productId = '';
         next.unitType = 'primary';
+        next.quantity = '1';
       }
       next.lineTotal = (Number(next.quantity || 0) * Number(next.unitPrice || 0)).toFixed(2);
       return next;
@@ -1067,6 +1123,7 @@ export default function Services() {
   };
 
   const openDialog = async () => {
+    if (!canManageServices) return;
     resetForm();
     setDialogOpen(true);
 
@@ -1079,7 +1136,24 @@ export default function Services() {
       }
     }
   };
+
+  useEffect(() => {
+    if (searchParams.get('create') !== '1') {
+      createIntentHandledRef.current = false;
+      return;
+    }
+
+    if (createIntentHandledRef.current) return;
+    createIntentHandledRef.current = true;
+    openDialog();
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('create');
+    setSearchParams(nextParams, { replace: true });
+  }, [openDialog, searchParams, setSearchParams]);
+
   const openEditDialog = async (order) => {
+    if (!canManageServices) return;
     resetForm();
     setEditingId(order.id);
     setDialogOpen(true);
@@ -1140,7 +1214,10 @@ export default function Services() {
       setEditLoading(false);
     }
   };
-  const closeDialog = () => { setDialogOpen(false); resetForm(); };
+  const closeDialog = () => {
+    resetForm();
+    setDialogOpen(false);
+  };
 
   const goToNextMobileStep = () => {
     if (!canGoForwardStep) return;
@@ -1160,8 +1237,10 @@ export default function Services() {
   // ── Submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (!canManageServices) { setFormNotice({ type: 'error', message: t('staffManagement.permissionError') }); return; }
     if (!businessId) { setFormNotice({ type: 'error', message: t('errors.businessIdRequired') }); return; }
-    if (!header.partyId) { setFormNotice({ type: 'error', message: t('errors.customerRequired') }); return; }
+    // Customer is optional for services (walk-in support)
     const invalidPart = chargeableItems.find((i) => i.itemType === 'part' && !i.productId);
     if (invalidPart) { setFormNotice({ type: 'error', message: t('errors.selectProductPart') }); return; }
     const invalidConversion = chargeableItems.find((i) => {
@@ -1169,7 +1248,22 @@ export default function Services() {
       return Number(getProductById(i.productId)?.conversionRate || 0) <= 0;
     });
     if (invalidConversion) { setFormNotice({ type: 'error', message: t('errors.conversionRequired') }); return; }
-    if (!chargeableItems.length) { setFormNotice({ type: 'error', message: t('services.addFirstItem') }); return; }
+    if (!chargeableItems.length) {
+      setFormNotice({ type: 'error', message: t('services.addFirstItem') });
+      try {
+        clearTimeout(formNoticeTimerRef.current);
+        formNoticeTimerRef.current = setTimeout(() => {
+          try {
+            setFormNotice({ type: '', message: '' });
+          } catch (err) {
+            console.error('Error clearing notice:', err);
+          }
+        }, 2000);
+      } catch (err) {
+        console.error('Error setting timeout:', err);
+      }
+      return;
+    }
     if (Number(discount || 0) < 0) { setFormNotice({ type: 'error', message: t('services.discountInvalid') }); return; }
     const normalizedAttributes = showGoldJewelleryDetails
       ? normalizeJewelleryAttributes(header.attributes)
@@ -1181,8 +1275,26 @@ export default function Services() {
       setFormNotice({ type: 'error', message: 'Wastage percent must be between 5 and 15.' });
       return;
     }
-    if (requiresBankSelection(header, totals.received)) {
-      setFormNotice({ type: 'error', message: t('payments.bankRequired') });
+    const receivedAmount = isPaid
+      ? Number(totals.grandTotal || 0)
+      : Number(amountReceived || 0);
+
+    if (requiresBankSelection(header, receivedAmount)) {
+      setMobileStep('payment');
+      setFormNotice({
+        type: 'error',
+        message: t('payments.bankRequired'),
+      });
+
+      clearTimeout(formNoticeTimerRef.current);
+
+      formNoticeTimerRef.current = setTimeout(() => {
+        setFormNotice({
+          type: '',
+          message: '',
+        });
+      }, 2000);
+
       return;
     }
     try {
@@ -1242,6 +1354,7 @@ export default function Services() {
 
   const serviceOverview = useMemo(() => {
     const openCount = safeServiceList.filter((order) => order.status === 'open').length;
+    const closedCount = safeServiceList.filter((order) => order.status === 'closed').length;
     const inProgressCount = safeServiceList.filter((order) => order.status === 'in_progress').length;
     const pendingCollection = safeServiceList.reduce(
       (sum, order) => sum + Math.max(Number(order.grandTotal || 0) - Number(order.receivedTotal || 0), 0),
@@ -1251,6 +1364,7 @@ export default function Services() {
     return {
       totalOrders: safeServiceList.length,
       openCount,
+      closedCount,
       inProgressCount,
       pendingCollection,
     };
@@ -1265,6 +1379,7 @@ export default function Services() {
 
   // ── Status dialog ──
   const openStatusDialog = (order) => {
+    if (!canManageServices) return;
     setStatusDialog(order);
     setNewStatus(order.status || 'open');
     setStatusError('');
@@ -1285,6 +1400,7 @@ export default function Services() {
   };
 
   const handleUpdateStatus = async () => {
+    if (!canManageServices) return;
     if (!statusDialog) return;
     try {
       await api.updateService(statusDialog.id, { status: newStatus });
@@ -1297,6 +1413,7 @@ export default function Services() {
 
   // ── Record payment ──
   const openPayDialog = (order) => {
+    if (!canManageServices) return;
     setPayDialog(order);
     setPayAmount('');
     setPayNotes('');
@@ -1307,6 +1424,7 @@ export default function Services() {
 
   const handleRecordPayment = async (e) => {
     e.preventDefault();
+    if (!canManageServices) { setPayError(t('staffManagement.permissionError')); return; }
     const amount = Number(payAmount || 0);
     if (!amount || amount <= 0) { setPayError('Enter a valid amount.'); return; }
     if (requiresBankSelection({ paymentMethod: payPaymentMethod, bankId: payBankId }, amount)) {
@@ -1356,6 +1474,7 @@ export default function Services() {
   };
 
   const handleDeleteService = async () => {
+    if (!canManageServices) return;
     if (!deleteService) return;
 
     setDeletingServiceId(deleteService.id);
@@ -1385,19 +1504,7 @@ export default function Services() {
   const invoicePrintRef = useRef(null);
 
   const handlePrint = () => {
-    const source = invoicePrintRef.current;
-    if (!source) { window.print(); return; }
-    const clone = source.cloneNode(true);
-    clone.classList.add('print-clone');
-    // Ensure inline styles don't hide it on screen before print fires
-    clone.style.cssText = '';
-    document.body.appendChild(clone);
-    const cleanup = () => {
-      if (document.body.contains(clone)) document.body.removeChild(clone);
-      window.removeEventListener('afterprint', cleanup);
-    };
-    window.addEventListener('afterprint', cleanup);
-    window.print();
+    printElement(invoicePrintRef.current);
   };
 
   const showDetailsStep = mobileStep === 'details';
@@ -1436,15 +1543,17 @@ export default function Services() {
               </p>
             </div>
 
-            <button className="btn-primary w-full sm:w-auto" type="button" onClick={openDialog}>
-              <Plus size={16} className="mr-1.5 inline" />
-              {newOrderLabel}
-            </button>
+            {canManageServices ? (
+              <button className="btn-primary w-full sm:w-auto" type="button" onClick={openDialog}>
+                <Plus size={16} className="mr-1.5 inline" />
+                {newOrderLabel}
+              </button>
+            ) : null}
           </div>
 
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-hide sm:grid sm:grid-cols-2 xl:grid-cols-4">
             <OverviewMetric icon={LayoutList} label={t('services.totalOrders')} value={serviceOverview.totalOrders} />
-            <OverviewMetric icon={Wrench} label={t('services.open')} value={serviceOverview.openCount} tone="blue" />
+            <OverviewMetric icon={Check} label={t('services.closed')} value={serviceOverview.closedCount} tone="emerald" />
             <OverviewMetric icon={CalendarDays} label={t('services.activeJobs')} value={serviceOverview.inProgressCount} tone="amber" />
             <OverviewMetric icon={Wallet} label={t('services.pendingCollection')} value={money(serviceOverview.pendingCollection)} tone="rose" />
           </div>
@@ -1492,7 +1601,7 @@ export default function Services() {
             </div>
           </div>
 
-          <div className="mt-4 flex gap-2 overflow-x-auto no-scrollbar">
+          <div className="mt-4 flex flex-wrap gap-1.5 sm:gap-2">
             {statusFilterOptions.map((option) => (
               <FilterChip
                 key={option.value}
@@ -1528,11 +1637,21 @@ export default function Services() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <p className="truncate text-base font-semibold text-slate-900 dark:text-white">
                             {order.orderNo || order.id.slice(0, 8)}
                           </p>
-                          <StatusBadge status={order.status} />
+                          {canManageServices ? (
+                            <button
+                              type="button"
+                              className="transition hover:opacity-75"
+                              onClick={() => openStatusDialog(order)}
+                            >
+                              <StatusBadge status={order.status} />
+                            </button>
+                          ) : (
+                            <StatusBadge status={order.status} />
+                          )}
                         </div>
 
                         <div className="mt-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
@@ -1545,8 +1664,12 @@ export default function Services() {
                           </div>
                         </div>
 
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <DeliveryBadge date={order.deliveryDate} />
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                          {order.status !== 'closed' ? (
+                            <DeliveryBadge date={order.deliveryDate} />
+                          ) : (
+                            <ClosedDeliveryLabel />
+                          )}
                           <PaymentTypeSummary
                             source={order}
                             className="rounded-full bg-slate-100/80 px-2.5 py-1 dark:bg-slate-800/80"
@@ -1576,16 +1699,18 @@ export default function Services() {
                     <div className="mt-4 flex justify-end border-t border-slate-200/70 pt-3 dark:border-slate-800/70">
                       <ActionMenu
                         actions={[
-                          { label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) },
+                          ...(canManageServices ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) }] : []),
                           { label: 'View Bill', icon: FileText, onClick: () => openInvoiceModal(order) },
                           { label: 'Print Bill', icon: Printer, onClick: () => openInvoiceModal(order, { print: true }) },
-                          {
-                            label: t('common.delete'),
-                            icon: Trash2,
-                            tone: 'danger',
-                            disabled: deletingServiceId === order.id,
-                            onClick: () => setDeleteService(order),
-                          },
+                          ...(canManageServices
+                            ? [{
+                              label: t('common.delete'),
+                              icon: Trash2,
+                              tone: 'danger',
+                              disabled: deletingServiceId === order.id,
+                              onClick: () => setDeleteService(order),
+                            }]
+                            : []),
                         ]}
                       />
                     </div>
@@ -1595,7 +1720,7 @@ export default function Services() {
                         <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                           {t('services.attachment')}
                         </p>
-                        <AttachmentStrip urls={attachmentUrls} onOpen={setLightboxUrl} size="md" />
+                        <AttachmentStrip urls={attachmentUrls} onOpen={openLightbox} size="md" />
                       </div>
                     ) : null}
                   </div>
@@ -1652,7 +1777,7 @@ export default function Services() {
                           <div className="text-xs text-slate-400">Created by {getCreatorDisplayName(order)}</div>
                         </td>
                         <td className="py-3 pr-4">
-                          { order.status !== 'closed'  ? <DeliveryBadge date={order.deliveryDate} /> : 'Delivered'}
+                          {order.status !== 'closed' ? <DeliveryBadge date={order.deliveryDate} /> : <ClosedDeliveryLabel />}
                         </td>
                         <td className="py-3 pr-4">
                           <button type="button" className="transition hover:opacity-75" onClick={() => openStatusDialog(order)}>
@@ -1664,7 +1789,7 @@ export default function Services() {
                         </td>
                         <td className="py-3 pr-2">
                           {attachmentUrls.length > 0 ? (
-                            <AttachmentStrip urls={attachmentUrls} onOpen={setLightboxUrl} maxVisible={2} />
+                            <AttachmentStrip urls={attachmentUrls} onOpen={openLightbox} maxVisible={2} />
                           ) : (
                             <span className="text-slate-300">—</span>
                           )}
@@ -1687,16 +1812,18 @@ export default function Services() {
                         <td className="py-3 text-right">
                            <ActionMenu
                             actions={[
-                              { label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) },
+                              ...(canManageServices ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEditDialog(order) }] : []),
                               { label: 'View Bill', icon: FileText, onClick: () => openInvoiceModal(order) },
                               { label: 'Print Bill', icon: Printer, onClick: () => openInvoiceModal(order, { print: true }) },
-                              {
-                                label: t('common.delete'),
-                                icon: Trash2,
-                                tone: 'danger',
-                                disabled: deletingServiceId === order.id,
-                                onClick: () => setDeleteService(order),
-                              },
+                              ...(canManageServices
+                                ? [{
+                                  label: t('common.delete'),
+                                  icon: Trash2,
+                                  tone: 'danger',
+                                  disabled: deletingServiceId === order.id,
+                                  onClick: () => setDeleteService(order),
+                                }]
+                                : []),
                             ]}
                           />
                         </td>
@@ -1732,10 +1859,15 @@ export default function Services() {
             <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#fcfaf6] shadow-2xl dark:bg-slate-950 md:h-[calc(100dvh-2.5rem)] md:max-h-[calc(100dvh-2.5rem)] md:max-w-[1440px] md:rounded-[32px] md:border md:border-slate-200/70 md:dark:border-slate-800/70">
               <div className="flex items-center gap-3 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-8">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary-700 dark:text-primary-200">{t('services.workspaceLabel')}</p>
-                  <h2 className="mt-1 truncate font-serif text-2xl text-slate-900 dark:text-white">{dialogTitle}</h2>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary-700 dark:text-primary-200">{t('services.workspaceLabel')}</p>
+                  <h2 className="mt-1 truncate font-serif text-xl text-slate-900 dark:text-white md:text-2xl">{dialogTitle}</h2>
                 </div>
-                <div className="min-w-0 flex-1">
+                <button type="button" onClick={closeDialog} className="rounded-2xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
+                  <X size={20} />
+                </button>
+              </div>
+
+                <div className="md:hidden">
                   <MobileFormStepper
                     steps={formSteps}
                     currentStep={mobileStep}
@@ -1748,10 +1880,6 @@ export default function Services() {
                     showNavigation={false}
                   />
                 </div>
-                <button type="button" onClick={closeDialog} className="rounded-2xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200">
-                  <X size={20} />
-                </button>
-              </div>
 
               <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
                 <div ref={formScrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
@@ -1769,13 +1897,12 @@ export default function Services() {
                     {showDetailsStep ? (
                       <>
                         <FormSectionCard
-                          title={t('services.detailsSectionTitle')}
-                          hint={t('services.detailsSectionHint')}
                           className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                         >
-                          <label className="label">
-                            {t('services.customer')} <span className="ml-1 text-rose-500">*</span>
-                          </label>
+                          <div className="flex items-center justify-between">
+                            <label className="label">{t('services.customer')}</label>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('common.optional')}</span>
+                          </div>
                           <div ref={partyPickerRef} className="relative mt-2">
                             {selectedParty ? (
                               <div className="flex items-center gap-3 rounded-[24px] border border-emerald-200 bg-emerald-50/70 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-900/10">
@@ -1923,7 +2050,6 @@ export default function Services() {
                             <div>
                               <label className="label">{t('services.status')}</label>
                               <select className="input mt-1" name="status" value={header.status} onChange={handleHeaderChange}>
-                                <option value="open">{t('services.open')}</option>
                                 <option value="in_progress">{t('services.inProgress')}</option>
                                 <option value="closed">{t('services.closed')}</option>
                               </select>
@@ -1943,11 +2069,10 @@ export default function Services() {
                           <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                             <div>
                               <label className="label">{t('services.notes')}</label>
-                              <textarea
+                              <NoteTextarea
                                 className="input mt-1 h-32 resize-none"
                                 name="notes"
                                 value={header.notes}
-                                maxLength={10000}
                                 onChange={handleHeaderChange}
                                 placeholder={t('services.notesPlaceholder')}
                               />
@@ -2179,11 +2304,13 @@ export default function Services() {
                                             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{item.description}</p>
                                           ) : null}
                                           <div className="mt-2 flex flex-wrap gap-2">
+                                            {item.itemType === 'part' && (
+                                              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                                {t('services.qty')}: {item.quantity}{unitLabel ? ` ${unitLabel}` : ''}
+                                              </span>
+                                            )}
                                             <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
-                                              {t('services.qty')}: {item.quantity}{unitLabel ? ` ${unitLabel}` : ''}
-                                            </span>
-                                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
-                                              {t('services.unitPrice')}: {money(item.unitPrice)}
+                                              {item.itemType === 'labor' ? t('common.total') : t('services.unitPrice')}: {money(item.unitPrice)}
                                             </span>
                                             <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
                                               {t('services.tax')}: {Number(item.taxRate || 0).toFixed(2)}%
@@ -2253,21 +2380,39 @@ export default function Services() {
                             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{t('services.itemComposerHint')}</p>
                           </div>
 
-                          <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="flex flex-col gap-4">
                             <div>
                               <label className="label">{t('services.type')}</label>
-                              <select
-                                className="input mt-1"
-                                value={itemDraft.itemType}
-                                onChange={(e) => handleDraftChange('itemType', e.target.value)}
-                              >
-                                <option value="labor">{t('services.serviceLine')}</option>
-                                <option value="part">{t('services.productLine')}</option>
-                              </select>
+                              <div className="mt-1 flex gap-2">
+                                <button
+                                  type="button"
+                                  className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
+                                    itemDraft.itemType === 'labor'
+                                      ? 'bg-primary-600 text-white shadow-md ring-2 ring-primary-600 ring-offset-2 dark:ring-offset-slate-900'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
+                                  }`}
+                                  onClick={() => handleDraftChange('itemType', 'labor')}
+                                >
+                                  {t('services.serviceLine')}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
+                                    itemDraft.itemType === 'part'
+                                      ? 'bg-primary-600 text-white shadow-md ring-2 ring-primary-600 ring-offset-2 dark:ring-offset-slate-900'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
+                                  }`}
+                                  onClick={() => handleDraftChange('itemType', 'part')}
+                                >
+                                  {t('services.productLine')}
+                                </button>
+                              </div>
                             </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                               <label className="label">{t('services.description')}</label>
                               <input
+                                ref={descriptionInputRef}
                                 className="input mt-1"
                                 value={itemDraft.description}
                                 onChange={(e) => handleDraftChange('description', e.target.value)}
@@ -2319,22 +2464,26 @@ export default function Services() {
                               </div>
                             ) : null}
 
+                            {itemDraft.itemType === 'part' ? (
+                              <div>
+                                <label className="label">{t('services.qty')}</label>
+                                <input
+                                  ref={quantityInputRef}
+                                  className="input mt-1"
+                                  type="number"
+                                  inputMode="decimal"
+                                  min="0"
+                                  step="0.1"
+                                  value={itemDraft.quantity}
+                                  onChange={(e) => handleDraftChange('quantity', e.target.value)}
+                                />
+                                {itemDraft.itemType === 'part' ? (
+                                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{getUnitLabel(itemDraftProduct, itemDraft.unitType)}</p>
+                                ) : null}
+                              </div>
+                            ) : null}
                             <div>
-                              <label className="label">{t('services.qty')}</label>
-                              <input
-                                className="input mt-1"
-                                type="number"
-                                min="0"
-                                step="0.1"
-                                value={itemDraft.quantity}
-                                onChange={(e) => handleDraftChange('quantity', e.target.value)}
-                              />
-                              {itemDraft.itemType === 'part' ? (
-                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{getUnitLabel(itemDraftProduct, itemDraft.unitType)}</p>
-                              ) : null}
-                            </div>
-                            <div>
-                              <label className="label">{t('services.unitPrice')}</label>
+                              <label className="label">{itemDraft.itemType === 'labor' ? t('common.total') : t('services.unitPrice')}</label>
                               <input
                                 className="input mt-1"
                                 type="number"
@@ -2354,6 +2503,7 @@ export default function Services() {
                                 value={itemDraft.taxRate}
                                 onChange={(e) => handleDraftChange('taxRate', e.target.value)}
                               />
+                            </div>
                             </div>
                           </div>
                         </div>
@@ -2459,6 +2609,12 @@ export default function Services() {
                                   disabled={isPaid}
                                   onChange={(e) => setAmountReceived(e.target.value)}
                                 />
+                                <QuickPaymentButtons
+                                  disabled={totals.grandTotal <= 0}
+                                  onNoPayment={() => applyQuickReceivedAmount(0)}
+                                  onHalfPayment={() => applyQuickReceivedAmount(totals.grandTotal / 2)}
+                                  onFullPayment={() => applyQuickReceivedAmount(totals.grandTotal, { markPaid: true })}
+                                />
                               </div>
                               <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-slate-300 dark:hover:bg-slate-800/60">
                                 <input
@@ -2495,28 +2651,24 @@ export default function Services() {
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200/70 bg-white/90 px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-8">
+                <div className="border-t border-slate-200/70 bg-white/90 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-8">
                   <div className="mx-auto w-full max-w-[1320px]">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="grid gap-3 rounded-2xl bg-slate-100/90 px-4 py-3 text-sm dark:bg-slate-900/70 sm:grid-cols-3 lg:min-w-[520px]">
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Current</p>
-                        <p className="mt-1 truncate font-semibold text-slate-700 dark:text-slate-200">
+                    <div className="flex items-center gap-4 rounded-2xl bg-slate-100/90 px-4 py-2.5 text-sm dark:bg-slate-900/70 lg:min-w-[520px]">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-bold text-slate-800 dark:text-slate-200">
                           {formSteps[mobileStepIndex]?.label || t('services.detailStep')}
                         </p>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Order</p>
-                        <p className="mt-1 truncate font-semibold text-slate-700 dark:text-slate-200">
-                          {summaryOrderNo}
+                        <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                          Order: {summaryOrderNo}
                         </p>
                       </div>
-                      <div className="min-w-0 sm:text-right">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                          {t('services.summaryDue')}
-                        </p>
-                        <p className={`mt-1 font-semibold ${totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
+                      <div className="shrink-0 text-right">
+                        <p className={`font-bold ${totals.due > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
                           {money(totals.due)}
+                        </p>
+                        <p className="text-[10px] uppercase tracking-wider text-slate-500">
+                          {t('services.summaryDue')}
                         </p>
                       </div>
                     </div>
@@ -2555,17 +2707,26 @@ export default function Services() {
       )}
 
       {/* ── Attachment Lightbox ── */}
-      {lightboxUrl && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4" onClick={() => setLightboxUrl(null)}>
-          <button type="button" className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onClick={() => setLightboxUrl(null)}>
+      {lightboxState && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4" onClick={closeLightbox}>
+          <button type="button" className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); closeLightbox(); }}>
             <X size={20} />
           </button>
-          {isPdfAttachment(lightboxUrl) ? (
-            <a href={lightboxUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-white px-6 py-4 text-slate-800 font-semibold" onClick={(e) => e.stopPropagation()}>
+
+          <button type="button" className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); showPrev(); }} aria-label="Previous">
+            <ChevronLeft size={22} />
+          </button>
+
+          <button type="button" className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); showNext(); }} aria-label="Next">
+            <ChevronRight size={22} />
+          </button>
+
+          {isPdfAttachment(lightboxState.urls[lightboxState.index]) ? (
+            <a href={lightboxState.urls[lightboxState.index]} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-white px-6 py-4 text-slate-800 font-semibold" onClick={(e) => e.stopPropagation()}>
               Open PDF in new tab
             </a>
           ) : (
-            <img src={lightboxUrl} alt="Attachment" className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
+            <img src={lightboxState.urls[lightboxState.index]} alt="Attachment" className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
           )}
         </div>
       )}
@@ -2585,12 +2746,12 @@ export default function Services() {
             ) : (
               <div ref={invoicePrintRef} className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950">
                 {/* ── Header ── */}
-                <div className="px-8 pt-0">
+                <div className="px-4 pt-0 sm:px-8">
                     <InvoiceHeader
                       biz={bizSettings}
                       invoiceType="Service Invoice"
                       invoiceNo={invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)}
-                      date={invoiceOrder.deliveryDate ? formatMaybeDate(invoiceOrder.deliveryDate, 'MMMM D, YYYY') : null}
+                      date={invoiceOrder.status !== 'closed' && invoiceOrder.deliveryDate ? formatMaybeDate(invoiceOrder.deliveryDate, 'MMMM D, YYYY') : null}
                       // status={invoiceOrder.status}
                       statusColor={
                         invoiceOrder.status === 'closed'
@@ -2602,24 +2763,18 @@ export default function Services() {
                   />
                 </div>
 
-                {/* ── Customer + Notes + Attributes ── */}
-                <div className="border-b border-slate-200/70 bg-slate-50/60 px-8 py-5 dark:border-slate-800/70 dark:bg-slate-900/30">
+                {/* ── Customer + Attributes ── */}
+                <div className="border-b border-slate-200/70 bg-slate-50/60 px-4 py-5 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-black">Bill To</p>
-                      <p className="font-semibold text-slate-900">{invoiceOrder.Party?.name || invoiceOrder.partyName || '—'}</p>
-                      {invoiceOrder.Party?.phone && <p className="mt-0.5 text-sm text-black">{invoiceOrder.Party?.phone}</p>}
-                      <p className="mt-2 text-sm text-black">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">Bill To</p>
+                      <p className="font-semibold text-slate-900 dark:text-white">{invoiceOrder.Party?.name || invoiceOrder.partyName || '—'}</p>
+                      {invoiceOrder.Party?.phone && <p className="mt-0.5 text-sm text-slate-900 dark:text-white">{invoiceOrder.Party?.phone}</p>}
+                      <p className="mt-2 text-sm text-slate-900 dark:text-white">
                         Created By:{' '}
-                        <span className="font-medium text-black">{getCreatorDisplayName(invoiceOrder)}</span>
+                        <span className="font-medium text-slate-900 dark:text-white">{getCreatorDisplayName(invoiceOrder)}</span>
                       </p>
                     </div>
-                    {invoiceOrder.notes && (
-                      <div>
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-black" >Notes</p>
-                        <p className="whitespace-pre-wrap text-sm text-black">{invoiceOrder.notes}</p>
-                      </div>
-                    )}
                   </div>
                   {showGoldJewelleryDetails && (invoiceJewellery.metalType || invoiceJewellery.metalPurity || invoiceJewellery.actualWeight || invoiceJewellery.wastagePercent || invoiceJewellery.totalWeight || invoiceJewellery.diamondType || invoiceJewellery.diamondWeight || invoiceJewellery.diamondCarat || invoiceJewellery.diamondCharge) && (
                     <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5">
@@ -2684,40 +2839,40 @@ export default function Services() {
                 </div>
 
                 {/* ── Line Items ── */}
-                <div className="px-8 py-6">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto px-4 py-6 sm:px-8">
+                  <table className="w-full min-w-[540px] text-sm">
                     <thead>
                       <tr className="border-b-2 border-slate-200/70 dark:border-slate-700/70">
-                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider tblack w-8"></th>
-                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider tblack">Description</th>
-                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider tblack">Product Name</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider tblack">Qty</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider tblack">Unit Price</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider tblack">{t('services.tax')}</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider tblack">{t('services.taxTotal')}</th>
-                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider tblack">Amount</th>
+                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">Item</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">Qty</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">Rate</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">{t('services.tax')}</th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                       {invoiceItems.map((item, idx) => (
                         <tr key={`${item.productId || item.description || 'service'}-${idx}`}>
-                          <td className="py-3 pr-2">
-                            <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}>
-                              {item.itemType === 'labor' ? 'Service' : 'Product'}
-                            </span>
-                          </td>
-                          <td className="py-3 pr-4 font-medium text-black">
-                            {item.description || item.productName || '—'}
-                          </td>
-                          <td className="py-3 pr-4 font-medium text-black">
-                            { item.productName || '—'}
+                          <td className="py-3 pr-4">
+                            <div className="flex items-center gap-2">
+                              <span className={`inline-block shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${item.itemType === 'labor' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'}`}>
+                                {item.itemType === 'labor' ? 'Service' : 'Product'}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="truncate font-medium text-black">
+                                  {item.description || item.productName || '—'}
+                                </p>
+                                {item.productName && item.description && item.description !== item.productName && (
+                                  <p className="truncate text-xs text-slate-500">{item.productName}</p>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td className="py-3 text-right text-slate-900">
                             {Number(item.quantity || 0).toFixed(item.quantity % 1 ? 3 : 0)}
                           </td>
                           <td className="py-3 text-right text-black">{money(item.unitPrice)}</td>
                           <td className="py-3 text-right text-black">{Number(item.taxRate || 0).toFixed(2)}%</td>
-                          <td className="py-3 text-right text-black">{money(getVatAmount(item.lineTotal, item.taxRate))}</td>
                           <td className="py-3 text-right font-semibold text-black">{money(item.lineTotal)}</td>
                         </tr>
                       ))}
@@ -2726,7 +2881,7 @@ export default function Services() {
                 </div>
 
                 {/* ── Totals ── */}
-                <div className="border-t border-slate-200/70 dark:border-slate-800/70 px-8 py-6">
+                <div className="border-t border-slate-200/70 dark:border-slate-800/70 px-4 py-6 sm:px-8">
                   <div className="ml-auto max-w-xs space-y-2 text-sm">
                     <div className="flex justify-between text-black">
                       <span>{t('services.subTotal')}</span><span>{money(invoiceTotals.subTotal)}</span>
@@ -2774,14 +2929,14 @@ export default function Services() {
 
                 {/* ── Attachment ── */}
                 {invoiceAttachmentUrls.length > 0 && (
-                  <div className="border-t border-slate-200/70 px-8 py-5 dark:border-slate-800/70">
+                  <div className="border-t border-slate-200/70 px-4 py-5 dark:border-slate-800/70 sm:px-8">
                     <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-black">Attachment</p>
-                    <AttachmentStrip urls={invoiceAttachmentUrls} onOpen={setLightboxUrl} maxVisible={4} size="lg" />
+                    <AttachmentStrip urls={invoiceAttachmentUrls} onOpen={openLightbox} maxVisible={4} size="lg" />
                   </div>
                 )}
 
                 {/* ── Footer ── */}
-                <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-8 py-4 dark:border-slate-800/70 dark:bg-slate-900/30">
+                <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-4 py-4 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
                   <p className="text-xs text-black">Thank you for your business!</p>
                   <p className="text-xs text-black">
                     Printed {dayjs().format('D MMM YYYY')}
@@ -2845,7 +3000,18 @@ export default function Services() {
               <button type="button" onClick={() => setPayDialog(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"><X size={18} /></button>
             </div>
             <form onSubmit={handleRecordPayment} className="space-y-4 p-6">
-              {payError ? <Notice title={payError} tone="error" /> : null}
+              {payError ? (
+                <div className="space-y-3">
+                  <Notice title={payError} tone="error" />
+                  <button
+                    type="button"
+                    className="btn-secondary w-full sm:w-auto"
+                    onClick={() => setPayError('')}
+                  >
+                    {t('common.back')}
+                  </button>
+                </div>
+              ) : null}
               <div className="rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-900/60">
                 <p className="font-semibold text-slate-800 dark:text-slate-200">{payDialog.orderNo || payDialog.id.slice(0, 8)}</p>
                 {payDialog.partyName ? <p className="text-slate-500">{payDialog.partyName}</p> : null}
@@ -2861,6 +3027,7 @@ export default function Services() {
                 <input
                   className="input mt-1"
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min="0"
                   value={payAmount}

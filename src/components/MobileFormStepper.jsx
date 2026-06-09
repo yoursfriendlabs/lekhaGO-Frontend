@@ -14,36 +14,42 @@ export default function MobileFormStepper({
   const isLastStep = currentIndex === steps.length - 1;
 
   return (
-    <div className="bg-white px-1.5 py-1 dark:bg-slate-950">
-      <div className="mx-auto flex w-full max-w-[360px] items-start justify-center">
+    <div className="bg-white px-3 py-3 dark:bg-slate-950 border-b border-slate-200/60 dark:border-slate-800/60">
+      <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-1.5">
         {steps.map((step, index) => {
           const isActive = step.id === currentStep;
           const isPast = index < currentIndex;
 
           return (
-            <div key={step.id} className="flex min-w-0 flex-1 items-start last:flex-none">
+            <div key={step.id} className="flex flex-1 items-center gap-1.5 last:flex-none">
               <button
                 type="button"
                 onClick={() => onStepChange(step.id)}
+                className="flex flex-col items-center group"
                 aria-current={isActive ? 'step' : undefined}
-                className="group flex min-w-[52px] flex-col items-center text-center"
               >
-                <span
-                  className={`flex h-6 w-6 items-center justify-center rounded-full border text-xs font-semibold transition ${
+                <div
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-all duration-300 ${
                     isActive
-                      ? 'border-slate-950 bg-slate-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-slate-950'
+                      ? 'bg-primary text-white shadow-md shadow-primary/20 ring-2 ring-primary/10'
                       : isPast
-                        ? 'border-slate-950 bg-slate-950 text-white dark:border-white dark:bg-white dark:text-slate-950'
-                        : 'border-slate-400 bg-white text-slate-600 group-hover:border-slate-700 group-hover:text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-300 dark:group-hover:border-slate-300 dark:group-hover:text-white'
+                        ? 'bg-primary text-white'
+                        : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
                   }`}
                 >
-                  {index + 1}
-                </span>
+                  {isPast ? (
+                    <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    index + 1
+                  )}
+                </div>
                 <span
-                  className={`mt-1 max-w-[68px] text-[10px] font-medium leading-tight ${
+                  className={`mt-1 whitespace-nowrap text-[9px] font-bold uppercase tracking-wider transition-colors duration-300 ${
                     isActive
-                      ? 'text-slate-950 dark:text-white'
-                      : 'text-slate-500 dark:text-slate-400'
+                      ? 'text-primary dark:text-primary-400'
+                      : 'text-slate-400 dark:text-slate-600'
                   }`}
                 >
                   {step.label}
@@ -51,11 +57,10 @@ export default function MobileFormStepper({
               </button>
 
               {index < steps.length - 1 ? (
-                <div className="mt-3 h-px flex-1 bg-slate-300 dark:bg-slate-700">
+                <div className="mb-3.5 h-[1.5px] flex-1 rounded-full bg-slate-100 dark:bg-slate-800">
                   <div
-                    className={`h-px transition-colors ${
-                      isPast ? 'bg-slate-950 dark:bg-white' : 'bg-transparent'
-                    }`}
+                    className="h-full rounded-full bg-primary transition-all duration-500"
+                    style={{ width: isPast ? '100%' : '0%' }}
                   />
                 </div>
               ) : null}
