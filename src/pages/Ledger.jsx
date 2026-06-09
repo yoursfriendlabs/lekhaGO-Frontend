@@ -243,7 +243,7 @@ export default function Ledger() {
     setSearchParams(nextParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const fetchLedger = useCallback(async ({ refresh = false } = {}) => {
+  const fetchLedger = useCallback(async ({ refresh = false, force = false } = {}) => {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
 
@@ -258,7 +258,7 @@ export default function Ledger() {
         ...(selectedPartyId ? { partyId: selectedPartyId } : {}),
         ...(filters.from ? { from: filters.from } : {}),
         ...(filters.to ? { to: filters.to } : {}),
-      });
+      }, { force });
 
       if (requestId !== requestIdRef.current) return;
       setLedger(response);
@@ -461,7 +461,7 @@ export default function Ledger() {
   };
 
   const handleRefresh = () => {
-    fetchLedger({ refresh: true });
+    fetchLedger({ refresh: true, force: true });
   };
 
   const resetPullState = () => {
@@ -532,7 +532,7 @@ export default function Ledger() {
       {status ? (
         <div className="space-y-3">
           <Notice title={status} tone="error" />
-          <button className="btn-secondary" type="button" onClick={() => fetchLedger({ refresh: Boolean(statementRows.length) })}>
+          <button className="btn-secondary" type="button" onClick={() => fetchLedger({ refresh: Boolean(statementRows.length), force: true })}>
             {t('common.retry')}
           </button>
         </div>
