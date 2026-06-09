@@ -361,6 +361,7 @@ export default function Inventory() {
     const match = unitOptions.find((unit) => getUnitText(unit).toLowerCase() === current.toLowerCase());
     return match ? `id:${match.id}` : `legacy:${current}`;
   }, [form.secondaryUnit, unitOptions]);
+  const hasPrimaryUnitSelected = Boolean(String(form.primaryUnit || '').trim() || form.unitId);
 
   const filteredItems = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -421,6 +422,7 @@ export default function Inventory() {
         ...previous,
         unitId: '',
         primaryUnit: '',
+        secondaryUnit: '',
       }));
       return;
     }
@@ -1175,12 +1177,16 @@ export default function Inventory() {
                     className="input mt-1"
                     value={secondaryUnitSelectValue}
                     onChange={handleSecondaryUnitChange}
+                    disabled={!hasPrimaryUnitSelected}
                   >
                     <option value="">{t('unitsManagement.selectSecondary')}</option>
                     {secondaryUnitChoices.map((option) => (
                       <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                   </select>
+                  {!hasPrimaryUnitSelected ? (
+                    <p className="mt-2 text-xs text-slate-500">Add a primary unit first.</p>
+                  ) : null}
                 </div>
                 <div>
                   <label className="label">{t('products.conversionRate')}</label>
