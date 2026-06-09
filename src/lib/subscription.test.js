@@ -153,4 +153,24 @@ describe('subscription helpers', () => {
     expect(freeButNotTrialState.isTrialActive).toBe(false);
     expect(freeButNotTrialState.kind).toBe('expired');
   });
+
+  it('keeps feature access open when business context is recovered from a cached business id', () => {
+    const subscription = normalizeSubscriptionPayload(
+      {
+        access: {
+          canUseApplication: false,
+          guard: 'business_missing',
+          planKey: null,
+          subscriptionStatus: 'untracked',
+        },
+      },
+      {
+        businessId: 'biz-123',
+      }
+    );
+
+    expect(subscription?.businessId).toBe('biz-123');
+    expect(subscription?.access?.canUseApplication).toBe(true);
+    expect(canAccessFeature(subscription, 'inventory')).toBe(true);
+  });
 });

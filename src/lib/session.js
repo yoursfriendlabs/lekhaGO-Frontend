@@ -13,6 +13,22 @@ function pickString(...values) {
   return '';
 }
 
+function shouldReuseFallbackSubscription(nextSubscription, fallbackSubscription) {
+  return Boolean(
+    nextSubscription
+    && fallbackSubscription
+    && nextSubscription.access?.guard === 'business_missing'
+    && nextSubscription.businessId
+    && fallbackSubscription.businessId === nextSubscription.businessId
+    && fallbackSubscription.access?.canUseApplication !== false
+    && (
+      !nextSubscription.currentPlan?.key
+      || !nextSubscription.access?.planKey
+      || nextSubscription.access?.subscriptionStatus === 'untracked'
+    )
+  );
+}
+
 /**
  * Normalizes backend auth payloads so login/register bootstrap and /auth/me
  * responses can all hydrate the same auth store safely.
@@ -42,6 +58,20 @@ export function normalizeSessionPayload(payload = {}, fallback = {}) {
     source.accessControl ?? userSource?.accessControl ?? null,
     fallbackSource.accessControl ?? fallbackSource.user?.accessControl ?? null,
   );
+  const nextSubscription = normalizeSubscriptionPayload(source.subscription ?? fallbackSource.subscription ?? null, {
+    businessId,
+    business,
+  });
+  const fallbackSubscription = normalizeSubscriptionPayload(fallbackSource.subscription ?? null, {
+    businessId,
+    business,
+  });
+  const subscription = shouldReuseFallbackSubscription(nextSubscription, fallbackSubscription)
+    ? {
+      ...fallbackSubscription,
+      businessId: nextSubscription?.businessId || fallbackSubscription?.businessId || '',
+    }
+    : nextSubscription;
 
   return {
     token: pickString(source.token, fallbackSource.token),
@@ -51,9 +81,6 @@ export function normalizeSessionPayload(payload = {}, fallback = {}) {
     business: business || null,
     businessProfile,
     accessControl,
-    subscription: normalizeSubscriptionPayload(source.subscription ?? fallbackSource.subscription ?? null, {
-      businessId,
-      business,
-    }),
+    subscription,
   };
 }

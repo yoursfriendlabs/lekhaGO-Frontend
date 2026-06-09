@@ -282,9 +282,17 @@ export function normalizeSubscriptionPayload(payload, context = {}) {
       : [],
   };
 
+  const access = normalizeSubscriptionAccess(source.access, normalized);
+  const recoveredBusinessContext = access.guard === 'business_missing' && Boolean(normalized.businessId);
+
   return {
     ...normalized,
-    access: normalizeSubscriptionAccess(source.access, normalized),
+    access: recoveredBusinessContext
+      ? {
+        ...access,
+        canUseApplication: true,
+      }
+      : access,
   };
 }
 
