@@ -12,6 +12,7 @@ const PAID_PLAN_KEYS = new Set(['growth', 'custom']);
 
 export function shouldShowUpgradeCta(subscription, role) {
   if (role !== 'owner') return false;
+  if (subscription?.access?.guard === 'business_missing') return false;
 
   const currentPlanKey = String(subscription?.currentPlan?.key || subscription?.access?.planKey || '')
     .trim()

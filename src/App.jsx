@@ -188,7 +188,10 @@ function AppShell() {
   const posPageElement = businessProfile?.type === 'cafe' && cafeOrdersEnabled ? <CafeOrders /> : <QuickPos />;
   const subscriptionGuard = getSubscriptionGuard(subscription);
   const subscriptionStatusState = getSubscriptionStatusState(subscription);
+  const hasRecoverableBusinessMismatch = role === 'owner' && subscriptionAccess?.guard === 'business_missing';
   const subscriptionNotice = subscriptionStatusState.isExpired
+    ? null
+    : hasRecoverableBusinessMismatch
     ? null
     : subscriptionAccess?.canUseApplication === false
     ? {
