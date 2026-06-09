@@ -682,7 +682,7 @@ export default function Inventory() {
         </div>
       ) : null}
 
-      <PageHeader
+      <PageHeader id="inventory-page-header"
         title={inventoryTitle}
         subtitle={inventorySubtitle}
         action={(
@@ -691,8 +691,8 @@ export default function Inventory() {
             {/*  <Upload size={16} /> {t('inventory.importItems')}*/}
             {/*</button>*/}
             {canManageInventory ? (
-              <button className="btn-primary w-full sm:w-auto" type="button" onClick={openCreateDialog}>
-                <Plus size={16} /> {t('inventory.addNewItem')}
+              <button id="add-new-item" className="btn-primary w-full sm:w-auto" type="button" onClick={openCreateDialog}>
+                <Plus  size={16} /> {t ('  inventory.addNewItem')}
               </button>
             ) : null}
           </div>
