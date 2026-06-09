@@ -123,6 +123,31 @@ function formatSeriesLabel(rawLabel, fallbackLabel) {
   return label;
 }
 
+function getGroupByDateRange(groupBy) {
+  const today = dayjs();
+
+  if (groupBy === "day") {
+    const value = today.format("YYYY-MM-DD");
+    return { fromDate: value, toDate: value };
+  }
+
+  if (groupBy === "week") {
+    return {
+      fromDate: today.startOf("week").format("YYYY-MM-DD"),
+      toDate: today.endOf("week").format("YYYY-MM-DD"),
+    };
+  }
+
+  if (groupBy === "month") {
+    return {
+      fromDate: today.startOf("month").format("YYYY-MM-DD"),
+      toDate: today.endOf("month").format("YYYY-MM-DD"),
+    };
+  }
+
+  return null;
+}
+
 function normalizeMetricTotals(source, cashKey) {
   const base =
     source && typeof source === "object" && !Array.isArray(source)
@@ -859,6 +884,16 @@ export default function Analytics() {
 
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
+    if (name === "groupBy") {
+      const nextRange = getGroupByDateRange(value);
+      setFilters((prev) => ({
+        ...prev,
+        groupBy: value,
+        ...(nextRange || {}),
+      }));
+      return;
+    }
+
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
