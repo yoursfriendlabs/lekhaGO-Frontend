@@ -90,6 +90,15 @@ const EMPTY_POPULAR_ANALYTICS = Object.freeze({
 
 const EMPTY_EXPENSE_CATEGORY_ANALYTICS = Object.freeze({
   hasCategoryContract: false,
+  range: {
+    partyId: null,
+    supplierId: null,
+    categoryKey: null,
+  },
+  totals: {
+    ...EMPTY_METRIC_TOTALS,
+    cashPaid: 0,
+  },
   summary: {
     totalCategories: 0,
     categorizedCategories: 0,
@@ -98,6 +107,7 @@ const EMPTY_EXPENSE_CATEGORY_ANALYTICS = Object.freeze({
     uncategorizedAmount: 0,
     topCategory: null,
   },
+  timeline: [],
   breakdown: [],
 });
 
@@ -113,6 +123,23 @@ function firstNumber(source, keys = []) {
   }
 
   return null;
+}
+
+function normalizeStringList(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
 }
 
 function getProfitLossStatus(amount) {
@@ -701,6 +728,8 @@ function normalizeExpenseCategoryRow(item, index = 0) {
     categoryName: String(item?.categoryName || item?.name || "").trim(),
     expenseCount: asNumber(item?.expenseCount),
     lineCount: asNumber(item?.lineCount),
+    lineDescriptions: normalizeStringList(item?.lineDescriptions),
+    supplierNames: normalizeStringList(item?.supplierNames),
     total,
     cashPaid,
     pending: firstNumber(item, ["pending"]) ?? Math.max(total - cashPaid, 0),
@@ -728,6 +757,8 @@ function normalizeExpenseAnalyticsResponse(payload = {}) {
     categories.summary && typeof categories.summary === "object"
       ? categories.summary
       : {};
+  const rangeSource =
+    source?.range && typeof source.range === "object" ? source.range : {};
   const breakdown = (
     Array.isArray(categories.breakdown) ? categories.breakdown : []
   )
@@ -758,6 +789,11 @@ function normalizeExpenseAnalyticsResponse(payload = {}) {
 
   return {
     hasCategoryContract: true,
+    range: {
+      partyId: String(rangeSource.partyId || "") || null,
+      supplierId: String(rangeSource.supplierId || "") || null,
+      categoryKey: String(rangeSource.categoryKey || "") || null,
+    },
     totals: expensesTotals,
     summary: {
       totalCategories,
@@ -770,6 +806,12 @@ function normalizeExpenseAnalyticsResponse(payload = {}) {
           ? topCategory
           : null,
     },
+    timeline: normalizeBreakdownSeries(source?.series?.timeline, {
+      totalKeys: ["total", "expenseTotal", "expenses", "amount", "value"],
+      cashKeys: ["cashPaid", "expenseCashPaid", "paid"],
+      pendingKeys: ["pending", "expensePending"],
+      cashField: "cashPaid",
+    }),
     breakdown,
   };
 }
@@ -779,6 +821,60 @@ function resolveExpenseCategoryName(row, t) {
   if (label) return label;
 
   return t("analytics.uncategorizedCategory");
+}
+
+function normalizeCategoryFilterOption(item = {}) {
+  const value = String(
+    item?.categoryKey || item?.key || item?.category?.key || "",
+  ).trim();
+  const label = String(
+    item?.categoryName || item?.name || item?.label || value,
+  ).trim();
+
+  if (!value) return null;
+
+  return {
+    value,
+    label: label || value,
+  };
+}
+
+function mergeFilterOptions(...groups) {
+  const seen = new Set();
+  const merged = [];
+
+  groups.flat().forEach((item) => {
+    if (!item?.value || seen.has(item.value)) return;
+    seen.add(item.value);
+    merged.push(item);
+  });
+
+  return merged.sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function CompactValueList({ items = [], maxVisible = 4 }) {
+  if (!items.length) return null;
+
+  const visibleItems = items.slice(0, maxVisible);
+  const hiddenCount = Math.max(items.length - visibleItems.length, 0);
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {visibleItems.map((item) => (
+        <span
+          key={item}
+          className="inline-flex items-center rounded-full bg-white px-2 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-800"
+        >
+          {item}
+        </span>
+      ))}
+      {hiddenCount > 0 ? (
+        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+          +{hiddenCount}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function PopularRankingCard({
@@ -851,7 +947,15 @@ function PopularRankingCard({
                             {t("analytics.categoryName")}: {row.categoryName}
                           </span>
                         ) : null}
+                        {row.lineCount > 0 ? (
+                          <span>
+                            {t("analytics.lineCount")}: {formatQuantityValue(row.lineCount)}
+                          </span>
+                        ) : null}
                       </div>
+                      {row.productNames?.length ? (
+                        <CompactValueList items={row.productNames} />
+                      ) : null}
                     </div>
                   </td>
                   <td className="py-3 text-right font-medium text-slate-900 dark:text-white">
@@ -880,6 +984,8 @@ function ExpenseCategoryAnalyticsSection({
   onRetry,
   t,
   formatMoney,
+  formatCompactMoney,
+  caption,
 }) {
   const rows = analytics.breakdown;
   const hasRows = rows.length > 0;
@@ -937,7 +1043,36 @@ function ExpenseCategoryAnalyticsSection({
         </div>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="card">
+              <p className="text-xs uppercase text-slate-400">
+                {t("analytics.expenses")}
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                {formatMoney(analytics.totals.total)}
+              </p>
+              <div className="mt-3 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                <p className="flex items-center justify-between gap-3">
+                  <span>{t("analytics.expenseCount")}</span>
+                  <span className="font-medium text-slate-900 dark:text-white">
+                    {formatQuantityValue(analytics.totals.count)}
+                  </span>
+                </p>
+                <p className="flex items-center justify-between gap-3">
+                  <span>{t("analytics.paid")}</span>
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                    {formatMoney(analytics.totals.cashPaid)}
+                  </span>
+                </p>
+                <p className="flex items-center justify-between gap-3">
+                  <span>{t("analytics.pending")}</span>
+                  <span className="font-medium text-rose-600 dark:text-rose-400">
+                    {formatMoney(analytics.totals.pending)}
+                  </span>
+                </p>
+              </div>
+            </div>
+
             <div className="card">
               <p className="text-xs uppercase text-slate-400">
                 {t("analytics.totalCategories")}
@@ -1047,6 +1182,29 @@ function ExpenseCategoryAnalyticsSection({
               title={t("analytics.uncategorizedHintTitle")}
               description={t("analytics.uncategorizedHintDescription")}
               tone="warn"
+            />
+          ) : null}
+
+          {analytics.timeline.length > 0 ? (
+            <BarGraph
+              title={t("analytics.timelineSummary")}
+              caption={caption}
+              data={analytics.timeline}
+              nameKey="label"
+              bars={[
+                {
+                  dataKey: "cashPaid",
+                  label: t("analytics.paid"),
+                  color: "#d97706",
+                },
+                {
+                  dataKey: "pending",
+                  label: t("analytics.pending"),
+                  color: "#f97316",
+                },
+              ]}
+              valueFormatter={formatMoney}
+              axisFormatter={formatCompactMoney}
             />
           ) : null}
 
@@ -1180,6 +1338,27 @@ function ExpenseCategoryAnalyticsSection({
                         </p>
                       </div>
                     </div>
+
+                    {row.lineDescriptions.length || row.supplierNames.length ? (
+                      <div className="mt-4 grid gap-3 border-t border-slate-200/70 pt-4 text-xs text-slate-500 dark:border-slate-800/70 dark:text-slate-400">
+                        {row.lineDescriptions.length ? (
+                          <div>
+                            <p className="uppercase tracking-[0.14em]">
+                              {t("common.details")}
+                            </p>
+                            <CompactValueList items={row.lineDescriptions} />
+                          </div>
+                        ) : null}
+                        {row.supplierNames.length ? (
+                          <div>
+                            <p className="uppercase tracking-[0.14em]">
+                              {t("analytics.suppliers")}
+                            </p>
+                            <CompactValueList items={row.supplierNames} />
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -1216,11 +1395,36 @@ export default function Analytics() {
     toDate: todayISODate(),
     groupBy: "auto",
     partyId: "",
+    supplierId: "",
+    categoryKey: "",
     createdBy: "",
   });
   const [selectedPartyFilterOption, setSelectedPartyFilterOption] =
     useState(null);
+  const [selectedSupplierFilterOption, setSelectedSupplierFilterOption] =
+    useState(null);
+  const [expenseCategoryOptions, setExpenseCategoryOptions] = useState([]);
   const refreshModeRef = useRef(false);
+
+  useEffect(() => {
+    let isActive = true;
+
+    api.listCategories({ type: "expense", limit: 100, offset: 0 })
+      .then((response) => {
+        if (!isActive) return;
+        const options = (Array.isArray(response?.items) ? response.items : [])
+          .map((item) => normalizeCategoryFilterOption(item))
+          .filter(Boolean);
+        setExpenseCategoryOptions(options);
+      })
+      .catch(() => {
+        if (isActive) setExpenseCategoryOptions([]);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -1244,6 +1448,11 @@ export default function Analytics() {
       ...sharedParams,
       createdBy: filters.createdBy || undefined,
     };
+    const expenseAnalyticsParams = {
+      ...analyticsParams,
+      supplierId: filters.supplierId || undefined,
+      categoryKey: filters.categoryKey || undefined,
+    };
     const rankingParams = {
       from: filters.fromDate || undefined,
       to: filters.toDate || undefined,
@@ -1255,7 +1464,7 @@ export default function Analytics() {
     Promise.allSettled([
       api.getAnalyticsSummary(analyticsParams),
       api.getAnalyticsProfitLoss(analyticsParams),
-      api.getAnalyticsExpenses(analyticsParams),
+      api.getAnalyticsExpenses(expenseAnalyticsParams),
       api.getPopularItemsAnalytics(rankingParams),
       api.getPopularCategoriesAnalytics(rankingParams),
     ])
@@ -1351,10 +1560,12 @@ export default function Analytics() {
       isActive = false;
     };
   }, [
+    filters.categoryKey,
     filters.createdBy,
     filters.fromDate,
     filters.groupBy,
     filters.partyId,
+    filters.supplierId,
     filters.toDate,
     refreshTick,
     t,
@@ -1378,6 +1589,11 @@ export default function Analytics() {
   const handlePartyFilterChange = (option) => {
     setSelectedPartyFilterOption(option || null);
     setFilters((prev) => ({ ...prev, partyId: option?.value || "" }));
+  };
+
+  const handleSupplierFilterChange = (option) => {
+    setSelectedSupplierFilterOption(option || null);
+    setFilters((prev) => ({ ...prev, supplierId: option?.value || "" }));
   };
 
   const handleRefresh = () => {
@@ -1473,6 +1689,40 @@ export default function Analytics() {
     return `${labelMap[filters.groupBy] || labelMap.auto} | ${filters.fromDate || "-"} to ${filters.toDate || "-"}`;
   }, [filters.fromDate, filters.groupBy, filters.toDate, t]);
 
+  const availableExpenseCategoryOptions = useMemo(
+    () =>
+      mergeFilterOptions(
+        expenseCategoryOptions,
+        expenseCategoryAnalytics.breakdown.map((row) =>
+          normalizeCategoryFilterOption(row),
+        ),
+        expenseCategoryAnalytics.summary.topCategory
+          ? [
+              normalizeCategoryFilterOption(
+                expenseCategoryAnalytics.summary.topCategory,
+              ),
+            ]
+          : [],
+        filters.categoryKey
+          ? [
+              normalizeCategoryFilterOption({
+                categoryKey: filters.categoryKey,
+                categoryName:
+                  expenseCategoryAnalytics.breakdown.find(
+                    (row) => row.categoryKey === filters.categoryKey,
+                  )?.categoryName || filters.categoryKey,
+              }),
+            ]
+          : [],
+      ),
+    [
+      expenseCategoryAnalytics.breakdown,
+      expenseCategoryAnalytics.summary.topCategory,
+      expenseCategoryOptions,
+      filters.categoryKey,
+    ],
+  );
+
   const profitLossValueClass = metricToneClasses(
     "net",
     profitLoss.summary.profitLoss.amount,
@@ -1490,7 +1740,7 @@ export default function Analytics() {
 
       <div className="card space-y-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="grid flex-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid flex-1 gap-4 md:grid-cols-2 xl:grid-cols-7">
             <div>
               <label className="label">{t("common.from")}</label>
               <input
@@ -1536,6 +1786,35 @@ export default function Analytics() {
                 searchPlaceholder={t("parties.searchPlaceholder")}
                 showPhone={false}
               />
+            </div>
+            <div>
+              <label className="label">{t("purchases.supplier")}</label>
+              <PartyFilterSelect
+                className="mt-1"
+                type="supplier"
+                value={filters.supplierId}
+                selectedOption={selectedSupplierFilterOption}
+                onChange={handleSupplierFilterChange}
+                placeholder={t("purchases.selectSupplier")}
+                searchPlaceholder={t("parties.searchPlaceholder")}
+                showPhone={false}
+              />
+            </div>
+            <div>
+              <label className="label">{t("analytics.categoryName")}</label>
+              <select
+                className="input mt-1"
+                name="categoryKey"
+                value={filters.categoryKey}
+                onChange={handleFilterChange}
+              >
+                <option value="">{t("common.allCategories")}</option>
+                {availableExpenseCategoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="label">{t("filters.createdBy")}</label>
@@ -1728,6 +2007,8 @@ export default function Analytics() {
         onRetry={handleRefresh}
         t={t}
         formatMoney={formatMoney}
+        formatCompactMoney={formatCompactMoney}
+        caption={seriesCaption}
       />
 
       <div className="grid gap-4 xl:grid-cols-2">

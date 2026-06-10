@@ -961,6 +961,22 @@ export const api = {
         "banks",
       ]),
     ),
+  updatePartyTransaction: (id, data) =>
+    request(
+      `/api/party-transactions/${id}`,
+      { method: "PUT", body: JSON.stringify(data) },
+      mutationConfig([
+        "party-transactions",
+        "parties",
+        "party-statements",
+        "purchases",
+        "sales",
+        "services",
+        "reports",
+        "analytics",
+        "banks",
+      ]),
+    ),
 
   listBanks: (params = {}) =>
     collectionRequest(

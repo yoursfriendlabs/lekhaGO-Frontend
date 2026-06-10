@@ -502,6 +502,7 @@ export default function Services() {
   // ── New order dialog ──
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formNotice, setFormNotice] = useState({ type: '', message: '' });
+  const [orderNoError, setOrderNoError] = useState('');
   const formNoticeTimerRef = useRef(null);
 
   // ── Payment dialog ──
@@ -853,6 +854,9 @@ export default function Services() {
 
   const handleHeaderChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'orderNo') {
+      setOrderNoError('');
+    }
     setHeader((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -1113,6 +1117,7 @@ export default function Services() {
     setAmountReceived('0');
     setIsPaid(false);
     setFormNotice({ type: '', message: '' });
+    setOrderNoError('');
     setEditingId(null);
     setShowItemForm(false);
     setItemDraft({ ...emptyItem });
@@ -1238,6 +1243,8 @@ export default function Services() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
+    setOrderNoError('');
+    setFormNotice({ type: '', message: '' });
     if (!canManageServices) { setFormNotice({ type: 'error', message: t('staffManagement.permissionError') }); return; }
     if (!businessId) { setFormNotice({ type: 'error', message: t('errors.businessIdRequired') }); return; }
     // Customer is optional for services (walk-in support)
@@ -1344,6 +1351,11 @@ export default function Services() {
       closeDialog();
       loadServices();
     } catch (err) {
+      if (err?.status === 409 && err?.message) {
+        setMobileStep('details');
+        setOrderNoError(err.message);
+        return;
+      }
       setFormNotice({ type: 'error', message: err.message });
     }
   };
@@ -2040,12 +2052,17 @@ export default function Services() {
                             <div>
                               <label className="label">{t('services.orderNo')}</label>
                               <input
-                                className="input mt-1"
+                                className={`input mt-1 ${orderNoError ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-200' : ''}`}
                                 name="orderNo"
                                 value={header.orderNo}
                                 onChange={handleHeaderChange}
                                 placeholder={!editingId ? suggestedOrderNo : ''}
                               />
+                              {orderNoError ? (
+                                <p className="mt-1 text-xs font-medium text-rose-600 dark:text-rose-300">
+                                  {orderNoError}
+                                </p>
+                              ) : null}
                             </div>
                             <div>
                               <label className="label">{t('services.status')}</label>

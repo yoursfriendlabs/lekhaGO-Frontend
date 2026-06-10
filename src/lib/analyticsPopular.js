@@ -17,6 +17,23 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeStringList(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || '').trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
 export function normalizePopularAnalyticsResponse(payload) {
   const source = asObject(payload) || {};
   const range = asObject(source.range) || {};
@@ -36,6 +53,7 @@ export function normalizePopularAnalyticsResponse(payload) {
         sku: pickString(item?.sku) || null,
         categoryName: pickString(item?.categoryName) || null,
         lineCount: toNumber(item?.lineCount),
+        productNames: normalizeStringList(item?.productNames),
         orderCount: toNumber(item?.orderCount),
         saleQuantity: toNumber(item?.saleQuantity),
         serviceQuantity: toNumber(item?.serviceQuantity),

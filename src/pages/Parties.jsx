@@ -5,6 +5,8 @@ import Notice from '../components/Notice';
 import RefreshButton from '../components/RefreshButton.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import PaymentTypeSummary from '../components/PaymentTypeSummary.jsx';
+import ActionMenu from '../components/ActionMenu.jsx';
+import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
@@ -17,9 +19,10 @@ import {
   normalizePartyStatementResponse,
   toAmount,
 } from '../lib/partyBalances.js';
+import { toPartyLookupOption } from '../lib/lookups.js';
 import { usePartyStore } from '../stores/parties';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { Plus, Bell, Search, Filter, ChevronDown, MessageCircle } from 'lucide-react';
+import { Plus, Bell, Search, Filter, ChevronDown, MessageCircle, Pencil } from 'lucide-react';
 import { buildPaymentPayload, requiresBankSelection } from '../lib/payments';
 import { getDueWhatsAppMessage, getWhatsAppLink } from '../lib/whatsapp.js';
 
@@ -53,6 +56,16 @@ function formatDate(value) {
   if (!value) return '-';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+}
+
+function toDateInputValue(value) {
+  if (!value) return todayISODate();
+  const parsed = dayjs(value);
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD') : todayISODate();
+}
+
+function isEditableTransactionRow(row) {
+  return row?.type === 'payment_in' || row?.type === 'payment_out';
 }
 
 function getStatementBadgeClass(type) {
@@ -160,7 +173,9 @@ export default function Parties() {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('credit');
   const [txOpen, setTxOpen] = useState(false);
+  const [txEditingId, setTxEditingId] = useState(null);
   const [txForm, setTxForm] = useState(makeEmptyTx());
+  const [selectedTxPartyOption, setSelectedTxPartyOption] = useState(null);
   const [txStatus, setTxStatus] = useState({ type: 'info', message: '' });
   const [txLoading, setTxLoading] = useState(false);
   const [pendingServices, setPendingServices] = useState([]);
@@ -486,20 +501,18 @@ export default function Parties() {
     setForm(emptyForm);
   };
 
-  const openTxDialog = async () => {
-    if (!canManageParties) return;
-    if (pendingServicesLoading) return;
-    if (!selectedParty) return;
+  const loadPendingServiceTransactions = async (partyId) => {
+    if (!partyId) {
+      setPendingServices([]);
+      return;
+    }
 
-    setTxForm({ ...makeEmptyTx(), partyId: selectedParty.id });
-    setTxStatus({ type: 'info', message: '' });
     setPendingServices([]);
     setPendingServicesLoading(true);
-    setTxOpen(true);
 
     try {
       const data = await api.partyStatement({
-        partyId: selectedParty.id,
+        partyId,
         type: 'service',
         limit: 100,
         offset: 0,
@@ -515,8 +528,55 @@ export default function Parties() {
     }
   };
 
+  const openTxDialog = async () => {
+    if (!canManageParties) return;
+    if (pendingServicesLoading) return;
+    if (!selectedPartyView?.id) return;
+
+    const nextPartyOption = toPartyLookupOption(selectedPartyView);
+    setTxEditingId(null);
+    setSelectedTxPartyOption(nextPartyOption);
+    setTxForm({ ...makeEmptyTx(), partyId: selectedPartyView.id });
+    setTxStatus({ type: 'info', message: '' });
+    setTxOpen(true);
+
+    await loadPendingServiceTransactions(selectedPartyView.id);
+  };
+
+  const openEditTxDialog = async (row) => {
+    if (!canManageParties) return;
+    if (!row?.id || !isEditableTransactionRow(row)) return;
+
+    const nextParty = {
+      id: row.partyId || selectedPartyView?.id || '',
+      name: row.partyName || selectedPartyView?.name || '',
+      phone: row.partyPhone || selectedPartyView?.phone || '',
+      type: row.partyType || selectedPartyView?.type || 'both',
+      currentAmount: row.currentAmount ?? selectedPartyView?.currentAmount ?? null,
+    };
+
+    setTxEditingId(row.id);
+    setSelectedTxPartyOption(nextParty.id ? toPartyLookupOption(nextParty) : null);
+    setTxForm({
+      ...makeEmptyTx(),
+      partyId: nextParty.id,
+      direction: row.type === 'payment_in' ? 'receive' : 'give',
+      amount: String(toAmount(row.amount)),
+      txDate: toDateInputValue(row.txDate || row.date || row.createdAt),
+      note: row.note || '',
+      paymentMethod: row.paymentMethod || 'cash',
+      bankId: row.bankId ? String(row.bankId) : '',
+    });
+    setTxStatus({ type: 'info', message: '' });
+    setTxOpen(true);
+
+    await loadPendingServiceTransactions(nextParty.id);
+  };
+
   const closeTxDialog = () => {
     setTxOpen(false);
+    setTxEditingId(null);
+    setSelectedTxPartyOption(null);
     setTxStatus({ type: 'info', message: '' });
     setTxForm(makeEmptyTx());
     setPendingServices([]);
@@ -526,6 +586,14 @@ export default function Parties() {
   const handleTxChange = (event) => {
     const { name, value } = event.target;
     setTxForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleTxPartyChange = (option) => {
+    setSelectedTxPartyOption(option || null);
+    setTxForm((prev) => ({
+      ...prev,
+      partyId: option?.value || '',
+    }));
   };
 
   const closeDeleteDialog = () => {
@@ -636,7 +704,9 @@ export default function Parties() {
         ),
       };
 
-      await api.createPartyTransaction(payload);
+      const savedTransaction = txEditingId
+        ? await api.updatePartyTransaction(txEditingId, payload)
+        : await api.createPartyTransaction(payload);
 
       // if (txForm.serviceId) {
       //   const selectedService = pendingServices.find((service) => service.id === txForm.serviceId);
@@ -649,10 +719,22 @@ export default function Parties() {
       //   }
       // }
 
+      const nextPartyId = String(savedTransaction?.partyId || payload.partyId || '');
       invalidateParties();
       setPartyReloadKey((prev) => prev + 1);
       setStatementReloadKey((prev) => prev + 1);
-      setStatus({ type: 'success', message: t('parties.messages.transactionSaved') });
+
+      if (nextPartyId) {
+        setTxPage(1);
+        setSelectedId(nextPartyId);
+      }
+
+      setStatus({
+        type: 'success',
+        message: txEditingId
+          ? t('parties.messages.transactionUpdated')
+          : t('parties.messages.transactionSaved'),
+      });
       closeTxDialog();
     } catch (err) {
       setTxStatus({ type: 'error', message: err.message });
@@ -994,6 +1076,7 @@ export default function Parties() {
                 ) : (
                   statementData.rows.map((row) => {
                     const amountFields = getStatementAmountFields(row, t);
+                    const canEditTransaction = canManageParties && isEditableTransactionRow(row);
 
                     return (
                       <div key={`${row.type}-${row.id}`} className="rounded-2xl border border-slate-200 bg-white p-3">
@@ -1020,31 +1103,46 @@ export default function Parties() {
                             />
                           </div>
                           <div className="shrink-0 text-right text-sm">
-                            <p className="font-semibold text-slate-900">
-                              {amountFields.primaryLabel}:{' '}
-                              {t('currency.formatted', {
-                                symbol: t('currency.symbol'),
-                                amount: amountFields.primaryValue.toFixed(2),
-                              })}
-                            </p>
-                            {amountFields.secondaryLabel ? (
-                              <p className="text-slate-500">
-                                {amountFields.secondaryLabel}:{' '}
-                                {t('currency.formatted', {
-                                  symbol: t('currency.symbol'),
-                                  amount: amountFields.secondaryValue.toFixed(2),
-                                })}
-                              </p>
-                            ) : null}
-                            {amountFields.tertiaryLabel ? (
-                              <p className="text-rose-500">
-                                {amountFields.tertiaryLabel}:{' '}
-                                {t('currency.formatted', {
-                                  symbol: t('currency.symbol'),
-                                  amount: amountFields.tertiaryValue.toFixed(2),
-                                })}
-                              </p>
-                            ) : null}
+                            <div className="flex items-start justify-end gap-2">
+                              <div>
+                                <p className="font-semibold text-slate-900">
+                                  {amountFields.primaryLabel}:{' '}
+                                  {t('currency.formatted', {
+                                    symbol: t('currency.symbol'),
+                                    amount: amountFields.primaryValue.toFixed(2),
+                                  })}
+                                </p>
+                                {amountFields.secondaryLabel ? (
+                                  <p className="text-slate-500">
+                                    {amountFields.secondaryLabel}:{' '}
+                                    {t('currency.formatted', {
+                                      symbol: t('currency.symbol'),
+                                      amount: amountFields.secondaryValue.toFixed(2),
+                                    })}
+                                  </p>
+                                ) : null}
+                                {amountFields.tertiaryLabel ? (
+                                  <p className="text-rose-500">
+                                    {amountFields.tertiaryLabel}:{' '}
+                                    {t('currency.formatted', {
+                                      symbol: t('currency.symbol'),
+                                      amount: amountFields.tertiaryValue.toFixed(2),
+                                    })}
+                                  </p>
+                                ) : null}
+                              </div>
+                              {canEditTransaction ? (
+                                <ActionMenu
+                                  actions={[
+                                    {
+                                      label: t('common.edit'),
+                                      icon: Pencil,
+                                      onClick: () => openEditTxDialog(row),
+                                    },
+                                  ]}
+                                />
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1168,8 +1266,25 @@ export default function Parties() {
         </form>
       </Dialog>
 
-      <Dialog isOpen={txOpen} onClose={closeTxDialog} title={t('parties.addTransaction')} size="md">
+      <Dialog
+        isOpen={txOpen}
+        onClose={closeTxDialog}
+        title={txEditingId ? t('parties.editTransaction') : t('parties.addTransaction')}
+        size="md"
+      >
         <form className="space-y-4" onSubmit={submitTransaction}>
+          <div>
+            <label className="label">{t('ledger.party')}</label>
+            <PartyFilterSelect
+              className="mt-1"
+              value={txForm.partyId}
+              type="both"
+              selectedOption={selectedTxPartyOption}
+              onChange={handleTxPartyChange}
+              placeholder={t('parties.searchPlaceholder')}
+              searchPlaceholder={t('parties.searchPlaceholder')}
+            />
+          </div>
           <div>
             <label className="label">{t('parties.transactionType')}</label>
             <div className="mt-1 grid grid-cols-2 gap-2">
@@ -1235,7 +1350,7 @@ export default function Parties() {
           <div className="flex flex-wrap justify-end gap-2">
             <button className="btn-secondary" type="button" onClick={closeTxDialog}>{t('common.close')}</button>
             <button className="btn-primary" type="submit" disabled={txLoading}>
-              {txLoading ? t('common.loading') : t('common.save')}
+              {txLoading ? t('common.loading') : txEditingId ? t('common.update') : t('common.save')}
             </button>
           </div>
         </form>
