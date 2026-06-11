@@ -12,8 +12,17 @@ import {
   normalizeStaffMeta,
   normalizeStaffMember,
 } from "./staff";
+import {
+  normalizeTaskDetail,
+  normalizeTaskListItem,
+  normalizeTaskMeta,
+  normalizeTaskNotificationSummary,
+} from "./tasks";
+
+
 
 const DEFAULT_API_BASE = "http://localhost:4000";
+const INVALID_TOKEN_REGEX = /(invalid|expired|malformed|missing).*(token|jwt|session)|token.*(invalid|expired)|jwt.*(invalid|expired)|session expired|unauthenticated/i;
 
 function normalizeApiBase(value) {
   const apiBase = String(value || "").trim() || DEFAULT_API_BASE;
@@ -168,6 +177,33 @@ function shouldHandleUnauthorized(path, token) {
   return window.location.pathname.startsWith("/app");
 }
 
+function isInvalidTokenMessage(message = "", payload = null) {
+  if (INVALID_TOKEN_REGEX.test(String(message || ""))) {
+    return true;
+  }
+
+  const errorCode = String(
+    payload?.code ||
+      payload?.errorCode ||
+      payload?.error?.code ||
+      payload?.error ||
+      "",
+  )
+    .trim()
+    .toLowerCase();
+
+  return [
+    "invalid_token",
+    "token_invalid",
+    "token_expired",
+    "session_expired",
+    "invalid_jwt",
+    "jwt_expired",
+    "jwt_invalid",
+    "unauthenticated",
+  ].includes(errorCode);
+}
+
 function handleUnauthorizedSession(message) {
   clearApiCache();
   clearSession();
@@ -263,7 +299,11 @@ async function request(path, options = {}, config = {}) {
           handleInactiveUser(message);
         }
 
-        if (res.status === 401 && shouldHandleUnauthorized(path, token)) {
+        if (
+          res.status === 401 &&
+          shouldHandleUnauthorized(path, token) &&
+          isInvalidTokenMessage(message, payload)
+        ) {
           error.unauthorized = true;
           handleUnauthorizedSession(message);
         }
@@ -554,6 +594,61 @@ export const api = {
       `/api/staff/${membershipId}`,
       { method: "DELETE" },
       mutationConfig(["staff"]),
+    ),
+
+  getTaskMeta: (options = {}) =>
+    request(
+      "/api/tasks/meta",
+      {},
+      listCache(["tasks-meta"], CACHE_TTL.lookup, options),
+    ).then((payload) => normalizeTaskMeta(payload)),
+  listTasks: (params = {}, options = {}) =>
+    collectionRequest(
+      "/api/tasks",
+      params,
+      listCache(["tasks", "task-notifications", "dashboard"], options),
+      { itemKeys: ["items"] },
+    ).then((payload) => ({
+      ...payload,
+      items: payload.items.map((task) => normalizeTaskListItem(task)),
+    })),
+  getTask: (id, options = {}) =>
+    request(
+      `/api/tasks/${id}`,
+      {},
+      listCache(detailTags("task", id), CACHE_TTL.short, {
+        force: options.force !== false,
+      }),
+    ).then((payload) => normalizeTaskDetail(payload)),
+  createTask: (data) =>
+    request(
+      "/api/tasks",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["tasks", "task-notifications", "dashboard"]),
+    ).then((payload) => normalizeTaskDetail(payload)),
+  updateTask: (id, data) =>
+    request(
+      `/api/tasks/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([detailTags("task", id), "tasks", "task-notifications", "dashboard"]),
+    ).then((payload) => normalizeTaskDetail(payload)),
+  createTaskComment: (id, data) =>
+    request(
+      `/api/tasks/${id}/comments`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([detailTags("task", id), "tasks", "task-notifications", "dashboard"]),
+    ),
+  getTaskNotificationSummary: (options = {}) =>
+    request(
+      "/api/tasks/notifications/summary",
+      {},
+      listCache(["task-notifications", "tasks", "dashboard"], CACHE_TTL.short, options),
+    ).then((payload) => normalizeTaskNotificationSummary(payload)),
+  markTaskNotificationsRead: () =>
+    request(
+      "/api/tasks/notifications/read",
+      { method: "POST" },
+      mutationConfig(["task-notifications", "tasks", "dashboard"]),
     ),
 
   listProducts: (params = {}) =>
@@ -964,6 +1059,22 @@ export const api = {
     request(
       "/api/party-transactions",
       { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        "party-transactions",
+        "parties",
+        "party-statements",
+        "purchases",
+        "sales",
+        "services",
+        "reports",
+        "analytics",
+        "banks",
+      ]),
+    ),
+  updatePartyTransaction: (id, data) =>
+    request(
+      `/api/party-transactions/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
       mutationConfig([
         "party-transactions",
         "parties",

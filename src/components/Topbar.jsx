@@ -3,6 +3,7 @@ import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { getSubscriptionStatusState } from '../lib/subscription.js';
+import TaskNotificationsButton from './tasks/TaskNotificationsButton.jsx';
 import { formatSubscriptionDaysRemainingLabel, formatSubscriptionStatusDate } from './subscription/SubscriptionStatusBanner.jsx';
 import UpgradeSubscriptionCta, { shouldShowUpgradeCta } from './subscription/UpgradeSubscriptionCta.jsx';
 
@@ -45,6 +46,8 @@ export default function Topbar() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <TaskNotificationsButton t={t} />
+
           {isActiveTrial && trialStatusLabel ? (
             <span className={`inline-flex max-w-[8.75rem] items-center gap-1.5 rounded-full border px-2.5 py-2 text-[11px] font-semibold sm:max-w-none sm:px-3 ${trialBadgeClass}`}>
               {subscriptionStatus.kind === 'trial-expiring'

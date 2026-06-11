@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarClock, RefreshCw, ShieldAlert, ShieldCheck, WalletCards } from 'lucide-react';
 import Notice from '../Notice.jsx';
+import TeamSeatUsagePanel from '../subscription/TeamSeatUsagePanel.jsx';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { todayISODate } from '../../lib/datetime';
@@ -112,6 +113,7 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
   const [notice, setNotice] = useState({ type: 'info', message: '' });
   const [planSelections, setPlanSelections] = useState({});
   const [activePlanKey, setActivePlanKey] = useState('');
+  const [staffSummary, setStaffSummary] = useState({ maxUsers: 0, totalUsers: 0, availableSlots: 0 });
 
   const syncSubscription = useCallback((payload) => {
     const normalized = normalizeSubscriptionPayload(payload);
@@ -147,6 +149,21 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
   useEffect(() => {
     loadSubscriptionSettings();
   }, [loadSubscriptionSettings]);
+
+  useEffect(() => {
+    if (!businessId) {
+      setStaffSummary({ maxUsers: 0, totalUsers: 0, availableSlots: 0 });
+      return;
+    }
+
+    api.listStaff()
+      .then((payload) => {
+        setStaffSummary(payload?.summary || { maxUsers: 0, totalUsers: 0, availableSlots: 0 });
+      })
+      .catch(() => {
+        setStaffSummary({ maxUsers: 0, totalUsers: 0, availableSlots: 0 });
+      });
+  }, [businessId, notice.message]);
 
   useEffect(() => {
     const plans = subscriptionData?.availablePlans || [];
@@ -352,6 +369,15 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
           </div>
         ) : null}
       </div>
+
+      {isOwner ? (
+        <TeamSeatUsagePanel
+          summary={staffSummary}
+          staffing={subscriptionData?.staffing || subscription?.staffing}
+          loading={loading}
+          t={t}
+        />
+      ) : null}
 
       <div className="card space-y-5">
         <div>

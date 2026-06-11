@@ -29,6 +29,7 @@ const Parties = lazy(() => import('./pages/Parties'));
 const Banks = lazy(() => import('./pages/Banks'));
 const Ledger = lazy(() => import('./pages/Ledger'));
 const Analytics = lazy(() => import('./pages/Analytics'));
+const Tasks = lazy(() => import('./pages/Tasks'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
@@ -323,6 +324,18 @@ function AppShell() {
                     )}
                   />
                   <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="parties"><Parties /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route
+                    path="tasks"
+                    element={(
+                      <EmailActivationRequiredRoute>
+                        <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
+                          <SubscriptionFeatureRoute featureKey="tasks">
+                            <Tasks />
+                          </SubscriptionFeatureRoute>
+                        </RoleGuard>
+                      </EmailActivationRequiredRoute>
+                    )}
+                  />
                   <Route path="banks" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="banks"><Banks /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="ledger" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="ledger"><Ledger /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="analytics" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="analytics"><Analytics /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />

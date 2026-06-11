@@ -38,30 +38,35 @@ describe('Parties', () => {
     apiMocks.listParties.mockResolvedValue({ items: [], total: 0 });
     apiMocks.partyStatement.mockResolvedValue({});
     apiMocks.createParty.mockResolvedValue({
-      id: 'staff-party-1',
+      id: 'supplier-party-1',
       name: 'Riya',
-      type: 'staff',
+      type: 'supplier',
     });
   });
 
-  it('filters and creates staff parties', async () => {
-    renderWithProviders(<Parties />, { route: '/app/parties' });
+  it('filters and creates supplier parties', async () => {
+    window.localStorage.setItem('mms_token', 'token-123');
+    window.localStorage.setItem('mms_role', 'owner');
+    window.localStorage.setItem('mms_business_id', 'business-123');
+    window.localStorage.setItem('mms_user', JSON.stringify({ id: 'user-1', name: 'Owner', role: 'owner' }));
 
-    const staffFilterButton = await screen.findByRole('button', { name: 'Staff' });
-    fireEvent.click(staffFilterButton);
+    renderWithProviders(<Parties />, { route: '/app/parties', withAuth: true });
+
+    const supplierFilterButton = await screen.findByRole('button', { name: 'Supplier' });
+    fireEvent.click(supplierFilterButton);
 
     await waitFor(() => {
       expect(apiMocks.listParties).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'staff' }),
+        expect.objectContaining({ type: 'supplier' }),
         expect.any(Object)
       );
     });
 
     fireEvent.click(screen.getAllByRole('button', { name: /add party/i })[0]);
 
-    const staffButtons = screen.getAllByRole('button', { name: 'Staff' });
-    expect(staffButtons).toHaveLength(2);
-    fireEvent.click(staffButtons[1]);
+    const supplierButtons = screen.getAllByRole('button', { name: 'Supplier' });
+    expect(supplierButtons).toHaveLength(2);
+    fireEvent.click(supplierButtons[1]);
 
     fireEvent.change(document.querySelector('input[name="name"]'), {
       target: { value: 'Riya' },
@@ -69,12 +74,12 @@ describe('Parties', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(apiMocks.createParty).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Riya',
-          type: 'staff',
-        })
-      );
+        expect(apiMocks.createParty).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'Riya',
+            type: 'supplier',
+          })
+        );
     });
   });
 });

@@ -3,6 +3,7 @@ import { RefreshCw, Search, ShieldCheck, Users } from 'lucide-react';
 import Notice from './Notice';
 import ConfirmDialog from './ui/ConfirmDialog.jsx';
 import { Dialog } from './ui/Dialog.tsx';
+import TeamSeatUsagePanel from './subscription/TeamSeatUsagePanel.jsx';
 import { api, invalidateApiCache } from '../lib/api';
 import { getPermissionKeyForFeature, normalizePermissionMap } from '../lib/accessControl';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
@@ -50,10 +51,6 @@ function buildEmptyForm(meta, role = 'staff') {
 }
 
 function normalizeErrorMessage(error, fallback) {
-  if (error?.status === 403) {
-    return fallback;
-  }
-
   return error?.message || fallback;
 }
 
@@ -442,7 +439,7 @@ function StaffFormDialog({
 
 export default function StaffManagement({ businessId }) {
   const { t } = useI18n();
-  const { canManageFeature, canViewFeature } = useAuth();
+  const { canManageFeature, canViewFeature, subscription } = useAuth();
   const canManageStaff = canManageFeature('staff');
   const canViewStaff = canViewFeature('staff');
 
@@ -740,6 +737,13 @@ export default function StaffManagement({ businessId }) {
             icon={RefreshCw}
           />
         </div>
+
+        <TeamSeatUsagePanel
+          summary={summary}
+          staffing={subscription?.staffing}
+          loading={loading}
+          t={t}
+        />
 
         <div className="grid gap-4 xl:grid-cols-[1.35fr,0.85fr,0.8fr]">
           <div>

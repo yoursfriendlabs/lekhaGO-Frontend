@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, Boxes, Clock, Package, ShoppingCart, UserCheck } from 'lucide-react';
+import { BarChart3, BellRing, Boxes, Clock, ClipboardList, Package, ShoppingCart, UserCheck } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import { useTaskNotifications } from '../hooks/useTaskNotifications';
 import { api } from '../lib/api';
+import { useAuth } from '../lib/auth.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import dayjs, { formatMaybeDate } from '../lib/datetime';
@@ -172,6 +174,7 @@ function getRangeStart(range) {
 
 export default function Dashboard() {
   const { t } = useI18n();
+  const { canViewFeature, canManageFeature } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const [summary, setSummary] = useState(() => EMPTY_SUMMARY);
   const [loadError, setLoadError] = useState('');
@@ -236,6 +239,9 @@ export default function Dashboard() {
   const upcomingDeliveries = summary.upcomingServiceDeliveries.slice(0, 6);
   const lowStockItems = summary.lowStockItems.slice(0, 5);
   const servicesEnabled = businessProfile?.modules?.services === true;
+  const tasksEnabled = canViewFeature('tasks');
+  const canManageTasks = canManageFeature('tasks');
+  const { summary: taskSummary } = useTaskNotifications({ enabled: tasksEnabled });
   const profitLossToneClass = summary.profitOrLoss < 0
     ? 'text-rose-600 dark:text-rose-300'
     : summary.profitOrLoss > 0
@@ -362,9 +368,66 @@ export default function Dashboard() {
             <div id="quick-actions" className="mt-4 grid gap-2 sm:grid-cols-2">
               <Link id='quick-sale'  className="btn-primary w-full justify-center" to={businessProfile?.salesFlow?.route || '/app/pos'}>{t('dashboard.quickSale')}</Link>
               <Link id='new-purchase' className="btn-ghost w-full justify-center" to="/app/purchases?create=1&entry=expense">{t('dashboard.newPurchase')}</Link>
+              {tasksEnabled ? (
+                <Link className="btn-ghost w-full justify-center" to={canManageTasks ? '/app/tasks?create=1' : '/app/tasks'}>
+                  {canManageTasks ? t('tasks.actions.newTask') : t('tasks.notifications.viewAll')}
+                </Link>
+              ) : null}
               <Link id='manage-banks' className="btn-ghost w-full justify-center" to="/app/banks">{t('dashboard.manageBanks')}</Link>
             </div>
           </div>
+
+          {tasksEnabled ? (
+            <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{t('tasks.dashboard.title')}</p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('tasks.dashboard.subtitle')}</p>
+                </div>
+                <BellRing size={18} className="text-slate-400" />
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
+                  <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><ClipboardList size={14} /> {t('tasks.notifications.assignedOpen')}</div>
+                  <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{taskSummary?.counters?.assignedToMeOpen || 0}</p>
+                </div>
+                <div className="rounded-2xl border border-rose-200/70 bg-rose-50/60 p-3 dark:border-rose-700/40 dark:bg-rose-900/20">
+                  <div className="flex items-center gap-2 text-xs uppercase text-rose-500"><Clock size={14} /> {t('tasks.notifications.assignedOverdue')}</div>
+                  <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{taskSummary?.counters?.assignedToMeOverdue || 0}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
+                  <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><UserCheck size={14} /> {t('tasks.notifications.createdOpen')}</div>
+                  <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{taskSummary?.counters?.createdByMeOpen || 0}</p>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{t('tasks.notifications.recentActivity')}</p>
+                  <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/tasks">{t('dashboard.viewAll')}</Link>
+                </div>
+                {taskSummary?.recentActivities?.length ? (
+                  <div className="mt-3 space-y-2">
+                    {taskSummary.recentActivities.slice(0, 2).map((activity) => (
+                      <Link
+                        key={activity.id || `${activity.taskId}-${activity.createdAt}`}
+                        className="block rounded-2xl border border-slate-200/70 bg-slate-50/80 p-3 transition hover:border-primary-200 hover:bg-primary-50/60 dark:border-slate-700/60 dark:bg-slate-900/60 dark:hover:border-primary-500/30 dark:hover:bg-primary-500/10"
+                        to={activity.task?.id || activity.taskId ? `/app/tasks?task=${activity.task?.id || activity.taskId}` : '/app/tasks'}
+                      >
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{activity.task?.title || t('tasks.detail.title')}</p>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          {(activity.actor?.name || t('tasks.detail.unknownUser'))} · {formatMaybeDate(activity.createdAt, 'D MMM')}
+                        </p>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{t('tasks.notifications.empty')}</p>
+                )}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 

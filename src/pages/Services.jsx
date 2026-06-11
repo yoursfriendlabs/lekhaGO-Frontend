@@ -605,7 +605,8 @@ export default function Services() {
 
   // ── New order dialog ──
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [formNotice, setFormNotice] = useState({ type: '', message: '' });
+  const [formNotice, setFormNotice] = useState({ type: "", message: "" });
+  const [orderNoError, setOrderNoError] = useState('');
   const formNoticeTimerRef = useRef(null);
 
   // ── Payment dialog ──
@@ -1352,7 +1353,8 @@ export default function Services() {
     setNewPartyPhone("");
     setAmountReceived("0");
     setIsPaid(false);
-    setFormNotice({ type: '', message: '' });
+    setFormNotice({ type: "", message: "" });
+    setOrderNoError('');
     setEditingId(null);
     setShowItemForm(false);
     setItemDraft({ ...emptyItem });
@@ -1490,8 +1492,19 @@ export default function Services() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!canManageServices) { setFormNotice({ type: 'error', message: t('staffManagement.permissionError') }); return; }
-    if (!businessId) { setFormNotice({ type: 'error', message: t('errors.businessIdRequired') }); return; }
+    setOrderNoError('');
+    setFormNotice({ type: '', message: '' });
+    if (!canManageServices) {
+      setFormNotice({
+        type: "error",
+        message: t("staffManagement.permissionError"),
+      });
+      return;
+    }
+    if (!businessId) {
+      setFormNotice({ type: "error", message: t("errors.businessIdRequired") });
+      return;
+    }
     // Customer is optional for services (walk-in support)
     const invalidPart = chargeableItems.find(
       (i) => i.itemType === "part" && !i.productId,
@@ -1624,7 +1637,12 @@ export default function Services() {
       closeDialog();
       loadServices();
     } catch (err) {
-      setFormNotice({ type: 'error', message: err.message });
+      if (err?.status === 409 && err?.message) {
+        setMobileStep('details');
+        setOrderNoError(err.message);
+        return;
+      }
+      setFormNotice({ type: "error", message: err.message });
     }
   };
 
