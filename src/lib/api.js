@@ -19,6 +19,12 @@ import {
   normalizeStaffMeta,
   normalizeStaffMember,
 } from "./staff";
+import {
+  normalizeTaskDetail,
+  normalizeTaskListItem,
+  normalizeTaskMeta,
+  normalizeTaskNotificationSummary,
+} from "./tasks";
 
 const DEFAULT_API_BASE = "http://localhost:4000";
 const INVALID_TOKEN_REGEX = /(invalid|expired|malformed|missing).*(token|jwt|session)|token.*(invalid|expired)|jwt.*(invalid|expired)|session expired|unauthenticated/i;
