@@ -13,6 +13,8 @@ import Notice from "../components/Notice";
 import RefreshButton from "../components/RefreshButton.jsx";
 import PaymentMethodFields from "../components/PaymentMethodFields.jsx";
 import PaymentTypeSummary from "../components/PaymentTypeSummary.jsx";
+import ActionMenu from '../components/ActionMenu.jsx';
+import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
 import { Dialog } from "../components/ui/Dialog.tsx";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
 import { api } from "../lib/api";
@@ -25,6 +27,7 @@ import {
   normalizePartyStatementResponse,
   toAmount,
 } from "../lib/partyBalances.js";
+import { toPartyLookupOption } from '../lib/lookups.js';
 import { usePartyStore } from "../stores/parties";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import {
@@ -33,7 +36,7 @@ import {
   Search,
   Filter,
   ChevronDown,
-  MessageCircle,
+  MessageCircle, Pencil,
 } from "lucide-react";
 import { buildPaymentPayload, requiresBankSelection } from "../lib/payments";
 import { getDueWhatsAppMessage, getWhatsAppLink } from "../lib/whatsapp.js";
@@ -44,14 +47,7 @@ const emptyForm = {
   email: "",
   address: "",
   type: "customer",
-  name: "",
-  phone: "",
-  email: "",
-  address: "",
-  type: "customer",
   openingBalance: 0,
-  asOfDate: "",
-  balanceType: "receive",
   asOfDate: "",
   balanceType: "receive",
 };
@@ -60,14 +56,7 @@ const makeEmptyTx = () => ({
   partyId: "",
   direction: "give",
   amount: "",
-  partyId: "",
-  direction: "give",
-  amount: "",
   txDate: todayISODate(),
-  note: "",
-  paymentMethod: "cash",
-  bankId: "",
-  serviceId: "",
   note: "",
   paymentMethod: "cash",
   bankId: "",
@@ -131,7 +120,7 @@ function txReducer(state, action) {
           partyId: partyId ?? "",
           direction: directionMap[row?.type] ?? "give",
           amount: toAmount(resolvedAmount ?? 0),
-          txDate: row?.date || todayISODate(),
+          txDate: toDateInputValue(row?.date || row?.txDate || row?.createdAt),
           note: row?.note || "",
           paymentMethod: row?.paymentMethod || "cash",
           bankId: row?.bankId || "",
@@ -206,10 +195,24 @@ const EDITABLE_TX_TYPES = new Set([
   "payment_out",
 ]);
 
-function formatDate(value) {
+function formatTransactionDate(value) {
   if (!value) return "-";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+  const match = String(value).match(/^\d{4}-\d{2}-\d{2}/);
+  const dateStr = match ? match[0] : value;
+  const parsed = dayjs(dateStr);
+  return parsed.isValid() ? parsed.format("DD/MM/YYYY") : value;
+}
+
+function toDateInputValue(value) {
+  if (!value) return todayISODate();
+  const match = String(value).match(/^\d{4}-\d{2}-\d{2}/);
+  const dateStr = match ? match[0] : value;
+  const parsed = dayjs(dateStr);
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD') : todayISODate();
+}
+
+function isEditableTransactionRow(row) {
+  return row?.type === 'payment_in' || row?.type === 'payment_out';
 }
 
 function getStatementBadgeClass(type) {
@@ -220,20 +223,12 @@ function getStatementBadgeClass(type) {
     expense: "bg-rose-100 text-rose-700",
     payment_in: "bg-teal-100 text-teal-700",
     payment_out: "bg-red-500 text-white",
-    sale: "bg-emerald-100 text-emerald-700",
-    service: "bg-sky-100 text-sky-700",
-    purchase: "bg-amber-100 text-amber-700",
-    expense: "bg-rose-100 text-rose-700",
-    payment_in: "bg-teal-100 text-teal-700",
-    payment_out: "bg-red-500 text-white",
   };
 
-  return classes[type] || "bg-slate-100 text-slate-600";
   return classes[type] || "bg-slate-100 text-slate-600";
 }
 
 function getStatementRowTitle(row, t) {
-  const reference = row.referenceNo || row.id?.slice(0, 8) || "-";
   const reference = row.referenceNo || row.id?.slice(0, 8) || "-";
 
   switch (row.type) {
@@ -246,17 +241,7 @@ function getStatementRowTitle(row, t) {
     case "expense":
       return `${t("purchases.expense")} `;
     case "payment_in":
-    case "sale":
-      return `${t("parties.salesInvoice")} `;
-    case "service":
-      return `${t("parties.serviceOrder")} `;
-    case "purchase":
-      return `${t("parties.purchaseBill")} `;
-    case "expense":
-      return `${t("purchases.expense")} `;
-    case "payment_in":
       return `Received`;
-    case "payment_out":
     case "payment_out":
       return `Given `;
     default:
@@ -266,9 +251,7 @@ function getStatementRowTitle(row, t) {
 
 function getStatementAmountFields(row, t) {
   if (row.type === "payment_in" || row.type === "payment_out") {
-  if (row.type === "payment_in" || row.type === "payment_out") {
     return {
-      primaryLabel: t("ledger.amount"),
       primaryLabel: t("ledger.amount"),
       primaryValue: toAmount(row.amount),
       secondaryLabel: null,
@@ -280,12 +263,9 @@ function getStatementAmountFields(row, t) {
 
   return {
     primaryLabel: t("common.total"),
-    primaryLabel: t("common.total"),
     primaryValue: toAmount(row.totalAmount),
     secondaryLabel: t("common.paid"),
-    secondaryLabel: t("common.paid"),
     secondaryValue: toAmount(row.paidAmount),
-    tertiaryLabel: t("common.due"),
     tertiaryLabel: t("common.due"),
     tertiaryValue: toAmount(row.dueAmount),
   };
@@ -306,16 +286,9 @@ function mergeUniqueParties(existing = [], incoming = []) {
 
 export default function Parties() {
   // const { canManageFeature } = useAuth();
-  // const { canManageFeature } = useAuth();
   const { t } = useI18n();
   const canManageParties = true;
-  const canManageParties = true;
   const navigate = useNavigate();
-  const {
-    upsert: upsertParty,
-    remove: removeParty,
-    invalidate: invalidateParties,
-  } = usePartyStore();
   const {
     upsert: upsertParty,
     remove: removeParty,
@@ -325,31 +298,20 @@ export default function Parties() {
   const [parties, setParties] = useState([]);
   const [loadingParties, setLoadingParties] = useState(false);
   const [listError, setListError] = useState("");
-  const [listError, setListError] = useState("");
   const [partyReloadKey, setPartyReloadKey] = useState(0);
   const [refreshingParties, setRefreshingParties] = useState(false);
 
   const [statementData, setStatementData] = useState(() =>
     normalizePartyStatementResponse(),
   );
-  const [statementData, setStatementData] = useState(() =>
-    normalizePartyStatementResponse(),
-  );
   const [statementLoading, setStatementLoading] = useState(false);
-  const [statementError, setStatementError] = useState("");
   const [statementError, setStatementError] = useState("");
   const [statementReloadKey, setStatementReloadKey] = useState(0);
 
   const [form, setForm] = useState(emptyForm);
   const [status, setStatus] = useState({ type: "info", message: "" });
-  const [status, setStatus] = useState({ type: "info", message: "" });
 
   useEffect(() => {
-    if (status.type !== "success" && status.type !== "error") return;
-    const timer = setTimeout(
-      () => setStatus({ type: "info", message: "" }),
-      3000,
-    );
     if (status.type !== "success" && status.type !== "error") return;
     const timer = setTimeout(
       () => setStatus({ type: "info", message: "" }),
@@ -362,15 +324,12 @@ export default function Parties() {
   const [editingId, setEditingId] = useState(null);
   const [filterType, setFilterType] = useState("all");
   const [query, setQuery] = useState("");
-  const [filterType, setFilterType] = useState("all");
-  const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query, 300);
   const [selectedId, setSelectedId] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("credit");
-
+  const [activeTab, setActiveTab] = useState('credit');
   const [txState, dispatchTx] = useReducer(txReducer, txInitialState);
-
+  const [selectedTxPartyOption, setSelectedTxPartyOption] = useState(null);
   const [txPage, setTxPage] = useState(1);
   const [deleteParty, setDeleteParty] = useState(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
@@ -383,18 +342,12 @@ export default function Parties() {
   const submitPartyRequestRef = useRef(false);
   const supportsIntersectionObserver =
     typeof IntersectionObserver !== "undefined";
-  const supportsIntersectionObserver =
-    typeof IntersectionObserver !== "undefined";
 
   useEffect(() => {
-    if (status.type !== "success" || !status.message) return undefined;
     if (status.type !== "success" || !status.message) return undefined;
 
     const timerId = window.setTimeout(() => {
       setStatus((current) =>
-        current.type === "success" && current.message === status.message
-          ? { type: "info", message: "" }
-          : current,
         current.type === "success" && current.message === status.message
           ? { type: "info", message: "" }
           : current,
@@ -411,18 +364,11 @@ export default function Parties() {
       session = partyListSessionRef.current,
       force = false,
     } = {}) => {
-    async ({
-      offset = 0,
-      append = false,
-      session = partyListSessionRef.current,
-      force = false,
-    } = {}) => {
       const search = debouncedQuery.trim();
       const requestParams = {
         limit: PARTY_PAGE_SIZE,
         offset,
         ...(search ? { search } : {}),
-        ...(filterType !== "all" ? { type: filterType } : {}),
         ...(filterType !== "all" ? { type: filterType } : {}),
       };
 
@@ -430,7 +376,6 @@ export default function Parties() {
         setLoadingMoreParties(true);
       } else {
         setLoadingParties(true);
-        setListError("");
         setListError("");
       }
 
@@ -447,24 +392,13 @@ export default function Parties() {
         setParties((previous) =>
           append ? mergeUniqueParties(previous, nextItems) : nextItems,
         );
-        setListError("");
-        setParties((previous) =>
-          append ? mergeUniqueParties(previous, nextItems) : nextItems,
-        );
         setPartyTotal(total);
-        setPartyHasMore(
-          nextItems.length > 0 &&
-            (offset + nextItems.length < total || pageFilled),
-        );
         setPartyHasMore(
           nextItems.length > 0 &&
             (offset + nextItems.length < total || pageFilled),
         );
 
         if (!append && nextItems[0]?.id) {
-          setSelectedId(
-            (currentSelectedId) => currentSelectedId || nextItems[0].id,
-          );
           setSelectedId(
             (currentSelectedId) => currentSelectedId || nextItems[0].id,
           );
@@ -489,7 +423,6 @@ export default function Parties() {
         }
       }
     },
-    [debouncedQuery, filterType],
     [debouncedQuery, filterType],
   );
 
@@ -560,22 +493,12 @@ export default function Parties() {
       {
         root,
         rootMargin: "160px 0px",
-        rootMargin: "160px 0px",
         threshold: 0.1,
-      },
       },
     );
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [
-    loadPartyPage,
-    loadingMoreParties,
-    loadingParties,
-    partyHasMore,
-    parties.length,
-    supportsIntersectionObserver,
-  ]);
   }, [
     loadPartyPage,
     loadingMoreParties,
@@ -610,7 +533,6 @@ export default function Parties() {
     if (!selectedId) {
       setStatementData(normalizePartyStatementResponse());
       setStatementError("");
-      setStatementError("");
       return;
     }
 
@@ -619,7 +541,6 @@ export default function Parties() {
     async function loadStatement() {
       setStatementData(normalizePartyStatementResponse());
       setStatementLoading(true);
-      setStatementError("");
       setStatementError("");
 
       try {
@@ -637,11 +558,8 @@ export default function Parties() {
           upsertParty(normalized.party);
           setParties((prev) =>
             prev.map((party) =>
-            prev.map((party) =>
               party.id === normalized.party.id
                 ? { ...party, ...normalized.party }
-                : party,
-            ),
                 : party,
             ),
           );
@@ -670,22 +588,12 @@ export default function Parties() {
         return totals;
       },
       { totalReceive: 0, totalGive: 0 },
-      { totalReceive: 0, totalGive: 0 },
     );
   }, [parties]);
 
   const selectedParty = useMemo(
     () => parties.find((party) => party.id === selectedId) || null,
     [parties, selectedId],
-    [parties, selectedId],
-  );
-  const selectedPartyView =
-    selectedParty || statementData.party
-      ? { ...(selectedParty || {}), ...(statementData.party || {}) }
-      : null;
-  const selectedBalanceMeta = getPartyBalanceMeta(
-    selectedPartyView?.currentAmount,
-    t,
   );
   const selectedPartyView =
     selectedParty || statementData.party
@@ -701,20 +609,9 @@ export default function Parties() {
     selectedPartyHasDue
       ? t("currency.formatted", {
           symbol: t("currency.symbol"),
-      ? t("currency.formatted", {
-          symbol: t("currency.symbol"),
           amount: selectedBalanceMeta.absoluteAmount.toFixed(2),
         })
       : "",
-      : "",
-  );
-  const selectedPartyWhatsAppLink = getWhatsAppLink(
-    selectedPartyView?.phone,
-    selectedPartyWhatsAppMessage,
-  );
-  const totalTxPages = Math.max(
-    1,
-    Math.ceil(statementData.summary.totalRows / TX_PAGE_SIZE),
   );
   const selectedPartyWhatsAppLink = getWhatsAppLink(
     selectedPartyView?.phone,
@@ -730,23 +627,15 @@ export default function Parties() {
       label: t("dashboard.salesAndServices"),
       total:
         statementData.summary.totalSales + statementData.summary.totalServices,
-      key: "sales-and-services",
-      label: t("dashboard.salesAndServices"),
-      total:
-        statementData.summary.totalSales + statementData.summary.totalServices,
       due: statementData.summary.salesDue + statementData.summary.servicesDue,
     },
     {
-      key: "purchases",
-      label: t("ledger.purchase"),
       key: "purchases",
       label: t("ledger.purchase"),
       total: statementData.summary.totalPurchases,
       due: statementData.summary.purchasesDue,
     },
     {
-      key: "expenses",
-      label: t("purchases.expense"),
       key: "expenses",
       label: t("purchases.expense"),
       total: statementData.summary.totalExpenses,
@@ -764,7 +653,6 @@ export default function Parties() {
     setEditingId(null);
     setForm(emptyForm);
     setActiveTab("credit");
-    setActiveTab("credit");
     setIsOpen(true);
   };
 
@@ -777,18 +665,10 @@ export default function Parties() {
       email: party.email || "",
       address: party.address || "",
       type: party.type || "customer",
-      name: party.name || "",
-      phone: party.phone || "",
-      email: party.email || "",
-      address: party.address || "",
-      type: party.type || "customer",
       openingBalance: party.openingBalance || 0,
       asOfDate: party.asOfDate || "",
       balanceType: party.balanceType || "receive",
-      asOfDate: party.asOfDate || "",
-      balanceType: party.balanceType || "receive",
     });
-    setActiveTab("credit");
     setActiveTab("credit");
     setIsOpen(true);
   };
@@ -799,21 +679,20 @@ export default function Parties() {
     setForm(emptyForm);
   };
 
-  const openTxDialog = async () => {
-    if (!canManageParties) return;
-    if (txState.pendingServicesLoading) return;
-    if (!selectedParty) return;
-
-    dispatchTx({
-      type: "OPEN_CREATE",
-      payload: { partyId: selectedParty.id },
-    });
+  const loadPendingServiceTransactions = async (partyId) => {
+    if (!partyId) {
+      dispatchTx({
+        type: "LOAD_PENDING_SERVICES_SUCCESS",
+        payload: [],
+      });
+      return;
+    }
 
     dispatchTx({ type: "SET_PENDING_SERVICES_LOADING", payload: true });
 
     try {
       const data = await api.partyStatement({
-        partyId: selectedParty.id,
+        partyId,
         type: "service",
         limit: 100,
         offset: 0,
@@ -825,17 +704,7 @@ export default function Parties() {
           (row) => row.type === "service" && toAmount(row.dueAmount) > 0,
         ),
       });
-      dispatchTx({
-        type: "LOAD_PENDING_SERVICES_SUCCESS",
-        payload: normalized.rows.filter(
-          (row) => row.type === "service" && toAmount(row.dueAmount) > 0,
-        ),
-      });
     } catch (err) {
-      dispatchTx({
-        type: "SET_STATUS",
-        payload: { type: "error", message: err.message },
-      });
       dispatchTx({
         type: "SET_STATUS",
         payload: { type: "error", message: err.message },
@@ -848,18 +717,55 @@ export default function Parties() {
     }
   };
 
-  const openEditTransaction = (row) => {
+  const openTxDialog = async () => {
+    if (!canManageParties) return;
+    if (txState.pendingServicesLoading) return;
+    if (!selectedPartyView?.id) return;
+
+    const nextPartyOption = toPartyLookupOption(selectedPartyView);
+    setSelectedTxPartyOption(nextPartyOption);
+
+    dispatchTx({
+      type: "OPEN_CREATE",
+      payload: { partyId: selectedPartyView.id },
+    });
+
+    await loadPendingServiceTransactions(selectedPartyView.id);
+  };
+
+  const openEditTransaction = async (row) => {
     if (!EDITABLE_TX_TYPES.has(row?.type)) return;
+
+    const nextParty = {
+      id: row.partyId || selectedPartyView?.id || "",
+      name: row.partyName || selectedPartyView?.name || "",
+      phone: row.partyPhone || selectedPartyView?.phone || "",
+      type: row.partyType || selectedPartyView?.type || "both",
+      currentAmount: row.currentAmount ?? selectedPartyView?.currentAmount ?? null,
+    };
+
+    setSelectedTxPartyOption(nextParty.id ? toPartyLookupOption(nextParty) : null);
+
     dispatchTx({
       type: "OPEN_EDIT",
       payload: {
         row,
-        partyId: selectedParty?.id || "",
+        partyId: nextParty.id,
       },
     });
+
+    await loadPendingServiceTransactions(nextParty.id);
+  };
+
+  const openEditTxDialog = async (row) => {
+    if (!canManageParties) return;
+    if (!row?.id || !isEditableTransactionRow(row)) return;
+
+    await openEditTransaction(row);
   };
 
   const closeTxDialog = () => {
+    setSelectedTxPartyOption(null);
     dispatchTx({ type: "CLOSE" });
   };
 
@@ -868,6 +774,14 @@ export default function Parties() {
     dispatchTx({
       type: "SET_FORM_FIELD",
       payload: { name, value },
+    });
+  };
+
+  const handleTxPartyChange = (option) => {
+    setSelectedTxPartyOption(option || null);
+    dispatchTx({
+      type: "SET_FORM_FIELD",
+      payload: { name: "partyId", value: option?.value || "" },
     });
   };
 
@@ -887,13 +801,11 @@ export default function Parties() {
       removeParty(deleteParty.id);
       invalidateParties();
       setStatus({ type: "success", message: t("parties.messages.deleted") });
-      setStatus({ type: "success", message: t("parties.messages.deleted") });
       if (selectedId === deleteParty.id) {
         setSelectedId(null);
       }
       setPartyReloadKey((prev) => prev + 1);
     } catch (err) {
-      setStatus({ type: "error", message: err.message });
       setStatus({ type: "error", message: err.message });
     } finally {
       setDeleteSubmitting(false);
@@ -907,25 +819,18 @@ export default function Parties() {
         type: "error",
         message: t("staffManagement.permissionError"),
       });
-      setStatus({
-        type: "error",
-        message: t("staffManagement.permissionError"),
-      });
       return;
     }
     if (submitPartyRequestRef.current) return;
 
     const phoneDigits = String(form.phone || "").replace(/\D/g, "");
-    const phoneDigits = String(form.phone || "").replace(/\D/g, "");
     if (form.phone && phoneDigits.length < 10) {
-      setStatus({ type: "error", message: t("errors.phoneMinDigits") });
       setStatus({ type: "error", message: t("errors.phoneMinDigits") });
       return;
     }
 
     submitPartyRequestRef.current = true;
     setLoading(true);
-    setStatus({ type: "info", message: "" });
     setStatus({ type: "info", message: "" });
 
     try {
@@ -945,10 +850,6 @@ export default function Parties() {
         message: editingId
           ? t("parties.messages.updated")
           : t("parties.messages.created"),
-        type: "success",
-        message: editingId
-          ? t("parties.messages.updated")
-          : t("parties.messages.created"),
       });
 
       if (keepOpen) {
@@ -957,7 +858,6 @@ export default function Parties() {
         closeDialog();
       }
     } catch (err) {
-      setStatus({ type: "error", message: err.message });
       setStatus({ type: "error", message: err.message });
     } finally {
       submitPartyRequestRef.current = false;
@@ -968,15 +868,7 @@ export default function Parties() {
   const submitTransaction = async (event) => {
     event.preventDefault();
 
-
     if (!canManageParties) {
-      dispatchTx({
-        type: "SET_STATUS",
-        payload: {
-          type: "error",
-          message: t("staffManagement.permissionError"),
-        },
-      });
       dispatchTx({
         type: "SET_STATUS",
         payload: {
@@ -990,11 +882,6 @@ export default function Parties() {
     if (txState.loading) return;
     if (!txState.form.partyId) return;
 
-    if (txState.loading) return;
-    if (!txState.form.partyId) return;
-
-    dispatchTx({ type: "SET_LOADING", payload: true });
-    dispatchTx({ type: "SET_STATUS", payload: { type: "info", message: "" } });
     dispatchTx({ type: "SET_LOADING", payload: true });
     dispatchTx({ type: "SET_STATUS", payload: { type: "info", message: "" } });
 
@@ -1007,26 +894,8 @@ export default function Parties() {
           payload: { type: "error", message: "Amount must be greater than 0" },
         });
         dispatchTx({ type: "SET_LOADING", payload: false });
-      const amount = toAmount(txState.form.amount);
-
-      if (!amount || amount <= 0) {
-        dispatchTx({
-          type: "SET_STATUS",
-          payload: { type: "error", message: "Amount must be greater than 0" },
-        });
-        dispatchTx({ type: "SET_LOADING", payload: false });
         return;
       }
-
-      if (requiresBankSelection(txState.form, amount)) {
-        dispatchTx({
-          type: "SET_STATUS",
-          payload: { type: "error", message: t("payments.bankRequired") },
-        });
-        dispatchTx({ type: "SET_LOADING", payload: false });
-        return;
-      }
-
 
       if (requiresBankSelection(txState.form, amount)) {
         dispatchTx({
@@ -1040,49 +909,51 @@ export default function Parties() {
       const payload = {
         partyId: txState.form.partyId,
         direction: txState.form.direction,
-        partyId: txState.form.partyId,
-        direction: txState.form.direction,
         amount,
-        txDate: txState.form.txDate,
         txDate: txState.form.txDate,
         ...buildPaymentPayload(
           {
             paymentMethod: txState.form.paymentMethod,
             bankId: txState.form.bankId,
             paymentNote: txState.form.note,
-            paymentMethod: txState.form.paymentMethod,
-            bankId: txState.form.bankId,
-            paymentNote: txState.form.note,
           },
-          { noteKey: "note" },
           { noteKey: "note" },
         ),
       };
 
+      let savedTransaction;
       if (txState.editingTxId) {
         const rowType = txState.form._rowType;
         if (rowType === "sale") {
-          await api.updateSale(txState.editingTxId, payload);
+          savedTransaction = await api.updateSale(txState.editingTxId, payload);
         } else if (rowType === "service") {
-          await api.updateService(txState.editingTxId, payload);
+          savedTransaction = await api.updateService(txState.editingTxId, payload);
         } else if (rowType === "purchase") {
-          await api.updatePurchase(txState.editingTxId, payload);
+          savedTransaction = await api.updatePurchase(txState.editingTxId, payload);
         } else if (rowType === "payment_in" || rowType === "payment_out") {
-          await api.updatePartyTransaction(txState.editingTxId, payload);
+          savedTransaction = await api.updatePartyTransaction(txState.editingTxId, payload);
         } else {
           throw new Error(`Editing "${rowType}" transactions is not supported`);
         }
       } else {
-        await api.createPartyTransaction(payload);
+        savedTransaction = await api.createPartyTransaction(payload);
       }
 
+      const nextPartyId = String(savedTransaction?.partyId || payload.partyId || '');
       invalidateParties();
       setPartyReloadKey((prev) => prev + 1);
       setStatementReloadKey((prev) => prev + 1);
 
+      if (nextPartyId) {
+        setTxPage(1);
+        setSelectedId(nextPartyId);
+      }
+
       setStatus({
         type: "success",
-        message: t("parties.messages.transactionSaved"),
+        message: txState.editingTxId
+          ? t('parties.messages.transactionUpdated')
+          : t("parties.messages.transactionSaved"),
       });
 
       closeTxDialog();
@@ -1091,12 +962,7 @@ export default function Parties() {
         type: "SET_STATUS",
         payload: { type: "error", message: err.message },
       });
-      dispatchTx({
-        type: "SET_STATUS",
-        payload: { type: "error", message: err.message },
-      });
     } finally {
-      dispatchTx({ type: "SET_LOADING", payload: false });
       dispatchTx({ type: "SET_LOADING", payload: false });
     }
   };
@@ -1112,22 +978,14 @@ export default function Parties() {
         title={t("parties.title")}
         subtitle={t("parties.subtitle")}
         action={
-        title={t("parties.title")}
-        subtitle={t("parties.subtitle")}
-        action={
           canManageParties ? (
             <button className="btn-primary" type="button" onClick={openCreate}>
-              <Plus size={16} /> {t("parties.addParty")}
               <Plus size={16} /> {t("parties.addParty")}
             </button>
           ) : null
         }
-        }
       />
 
-      {status.message ? (
-        <Notice title={status.message} tone={status.type} />
-      ) : null}
       {status.message ? (
         <Notice title={status.message} tone={status.type} />
       ) : null}
@@ -1149,32 +1007,12 @@ export default function Parties() {
             >
               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
             </svg>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
           </div>
           <div>
             <p className="text-xs uppercase text-emerald-600 dark:text-emerald-400">
               {t("parties.totalToReceive")}
             </p>
-            <p className="text-xs uppercase text-emerald-600 dark:text-emerald-400">
-              {t("parties.totalToReceive")}
-            </p>
             <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
-              {t("currency.formatted", {
-                symbol: t("currency.symbol"),
-                amount: totalsummary.totalReceive.toFixed(2),
-              })}
               {t("currency.formatted", {
                 symbol: t("currency.symbol"),
                 amount: totalsummary.totalReceive.toFixed(2),
@@ -1197,32 +1035,12 @@ export default function Parties() {
             >
               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
             </svg>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
           </div>
           <div>
             <p className="text-xs uppercase text-rose-600 dark:text-rose-400">
               {t("parties.totalToGive")}
             </p>
-            <p className="text-xs uppercase text-rose-600 dark:text-rose-400">
-              {t("parties.totalToGive")}
-            </p>
             <p className="text-xl font-bold text-rose-700 dark:text-rose-300">
-              {t("currency.formatted", {
-                symbol: t("currency.symbol"),
-                amount: totalsummary.totalGive.toFixed(2),
-              })}
               {t("currency.formatted", {
                 symbol: t("currency.symbol"),
                 amount: totalsummary.totalGive.toFixed(2),
@@ -1237,24 +1055,13 @@ export default function Parties() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
               {t("parties.listTitle", { count: partyTotal || parties.length })}
-              {t("parties.listTitle", { count: partyTotal || parties.length })}
             </h3>
             <div className="flex flex-wrap gap-2">
               <RefreshButton
                 refreshing={refreshingParties}
                 onClick={refreshParties}
               />
-              <RefreshButton
-                refreshing={refreshingParties}
-                onClick={refreshParties}
-              />
               {canManageParties ? (
-                <button
-                  className="btn-ghost"
-                  type="button"
-                  onClick={openCreate}
-                >
-                  <ChevronDown size={16} /> {t("parties.addParty")}
                 <button
                   className="btn-ghost"
                   type="button"
@@ -1272,7 +1079,6 @@ export default function Parties() {
               <input
                 className="w-full bg-transparent outline-none"
                 placeholder={t("parties.searchPlaceholder")}
-                placeholder={t("parties.searchPlaceholder")}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
@@ -1284,15 +1090,12 @@ export default function Parties() {
 
           <div className="flex flex-wrap gap-2">
             {["customer", "supplier", "all"].map((type) => (
-            {["customer", "supplier", "all"].map((type) => (
               <button
                 key={type}
                 type="button"
                 onClick={() => setFilterType(type)}
                 className={
                   filterType === type
-                    ? "rounded-xl bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700"
-                    : "rounded-xl bg-slate-100 px-3 py-1 text-sm text-slate-600"
                     ? "rounded-xl bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700"
                     : "rounded-xl bg-slate-100 px-3 py-1 text-sm text-slate-600"
                 }
@@ -1308,12 +1111,8 @@ export default function Parties() {
           >
             {loadingParties && parties.length === 0 ? (
               <p className="text-sm text-slate-500">{t("common.loading")}</p>
-              <p className="text-sm text-slate-500">{t("common.loading")}</p>
             ) : parties.length === 0 ? (
               <div className="space-y-2">
-                <p className="text-sm text-slate-500">
-                  {t("parties.noParties")}
-                </p>
                 <p className="text-sm text-slate-500">
                   {t("parties.noParties")}
                 </p>
@@ -1347,17 +1146,9 @@ export default function Parties() {
                       isSelected
                         ? "border-emerald-300 bg-emerald-50 shadow-sm ring-1 ring-emerald-200 dark:border-emerald-700 dark:bg-emerald-900/20 dark:ring-emerald-800"
                         : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800"
-                        ? "border-emerald-300 bg-emerald-50 shadow-sm ring-1 ring-emerald-200 dark:border-emerald-700 dark:bg-emerald-900/20 dark:ring-emerald-800"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800"
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white transition-colors ${
-                          isSelected ? "bg-emerald-600" : "bg-slate-400"
-                        }`}
-                      >
-                        {party.name?.slice(0, 2).toUpperCase() || "P"}
                       <div
                         className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white transition-colors ${
                           isSelected ? "bg-emerald-600" : "bg-slate-400"
@@ -1372,16 +1163,9 @@ export default function Parties() {
                             <span
                               className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${balanceMeta.badgeClass}`}
                             >
-                          {balanceMeta.tone !== "settled" && (
-                            <span
-                              className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${balanceMeta.badgeClass}`}
-                            >
                               {balanceMeta.label}
                             </span>
                           )}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {party.phone || "-"}
                         </p>
                         <p className="text-xs text-slate-500">
                           {party.phone || "-"}
@@ -1391,13 +1175,8 @@ export default function Parties() {
                         <p className={`font-semibold ${balanceMeta.textClass}`}>
                           {t("currency.formatted", {
                             symbol: t("currency.symbol"),
-                          {t("currency.formatted", {
-                            symbol: t("currency.symbol"),
                             amount: balanceMeta.absoluteAmount.toFixed(2),
                           })}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {balanceMeta.label}
                         </p>
                         <p className="text-xs text-slate-500">
                           {balanceMeta.label}
@@ -1414,11 +1193,6 @@ export default function Parties() {
               className="h-4"
               aria-hidden="true"
             />
-            <div
-              ref={partyListSentinelRef}
-              className="h-4"
-              aria-hidden="true"
-            />
           </div>
 
           <div className="flex items-center justify-between gap-2 border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-slate-700/60">
@@ -1429,17 +1203,9 @@ export default function Parties() {
                 total: partyTotal || parties.length,
               })}
             </span>
-            <span>
-              {t("pagination.showing", {
-                start: parties.length ? 1 : 0,
-                end: parties.length,
-                total: partyTotal || parties.length,
-              })}
-            </span>
             {loadingMoreParties ? (
               <span className="inline-flex items-center gap-2">
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-500" />
-                {t("common.loading")}
                 {t("common.loading")}
               </span>
             ) : listError ? (
@@ -1487,19 +1253,12 @@ export default function Parties() {
                 <div className="flex items-center gap-3">
                   <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-semibold text-emerald-700">
                     {selectedPartyView.name?.slice(0, 1).toUpperCase() || "P"}
-                    {selectedPartyView.name?.slice(0, 1).toUpperCase() || "P"}
                   </div>
                   <div>
                     <p className="text-xl font-semibold text-slate-900">
                       {selectedPartyView.name}
                     </p>
-                    <p className="text-xl font-semibold text-slate-900">
-                      {selectedPartyView.name}
-                    </p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                      <p className="text-sm text-slate-500">
-                        {selectedPartyView.phone || "-"}
-                      </p>
                       <p className="text-sm text-slate-500">
                         {selectedPartyView.phone || "-"}
                       </p>
@@ -1519,14 +1278,6 @@ export default function Parties() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs uppercase text-slate-400">
-                    {selectedBalanceMeta.label}
-                  </p>
-                  <p
-                    className={`text-2xl font-semibold ${selectedBalanceMeta.textClass}`}
-                  >
-                    {t("currency.formatted", {
-                      symbol: t("currency.symbol"),
                   <p className="text-xs uppercase text-slate-400">
                     {selectedBalanceMeta.label}
                   </p>
@@ -1562,20 +1313,8 @@ export default function Parties() {
                       onClick={() => openEdit(selectedPartyView)}
                     >
                       {t("parties.manageParty")}
-                    <button
-                      className="btn-ghost"
-                      type="button"
-                      onClick={() => openEdit(selectedPartyView)}
-                    >
-                      {t("parties.manageParty")}
                     </button>
                   ) : null}
-                  <button
-                    className="btn-ghost"
-                    type="button"
-                    onClick={goToStatement}
-                  >
-                    {t("parties.statement")}
                   <button
                     className="btn-ghost"
                     type="button"
@@ -1586,12 +1325,6 @@ export default function Parties() {
                 </div>
                 {canManageParties ? (
                   <div className="flex gap-2">
-                    <button
-                      className="btn-ghost text-rose-600"
-                      type="button"
-                      onClick={() => setDeleteParty(selectedPartyView)}
-                    >
-                      {t("common.delete")}
                     <button
                       className="btn-ghost text-rose-600"
                       type="button"
@@ -1616,16 +1349,10 @@ export default function Parties() {
                       {t("common.total")}:{" "}
                       {t("currency.formatted", {
                         symbol: t("currency.symbol"),
-                      {t("common.total")}:{" "}
-                      {t("currency.formatted", {
-                        symbol: t("currency.symbol"),
                         amount: card.total.toFixed(2),
                       })}
                     </p>
                     <p className="mt-1 text-xs text-rose-500 dark:text-rose-300">
-                      {t("common.due")}:{" "}
-                      {t("currency.formatted", {
-                        symbol: t("currency.symbol"),
                       {t("common.due")}:{" "}
                       {t("currency.formatted", {
                         symbol: t("currency.symbol"),
@@ -1641,22 +1368,8 @@ export default function Parties() {
                   {t("parties.transactions", {
                     count: statementData.summary.totalRows,
                   })}
-                  {t("parties.transactions", {
-                    count: statementData.summary.totalRows,
-                  })}
                 </h4>
                 {canManageParties ? (
-                  <button
-                    className="btn-primary"
-                    type="button"
-                    onClick={openTxDialog}
-                    disabled={txState.pendingServicesLoading}
-                  >
-                    <Plus size={16} />{" "}
-                    {/* FIX: was referencing undefined `pendingServicesLoading`; use txState */}
-                    {txState.pendingServicesLoading
-                      ? t("common.loading")
-                      : t("parties.addTransaction")}
                   <button
                     className="btn-primary"
                     type="button"
@@ -1675,22 +1388,13 @@ export default function Parties() {
               {statementError ? (
                 <Notice title={statementError} tone="error" />
               ) : null}
-              {statementError ? (
-                <Notice title={statementError} tone="error" />
-              ) : null}
 
               <div className="space-y-2">
                 {statementLoading ? (
                   <p className="py-3 text-sm text-slate-500">
                     {t("common.loading")}
                   </p>
-                  <p className="py-3 text-sm text-slate-500">
-                    {t("common.loading")}
-                  </p>
                 ) : statementData.rows.length === 0 ? (
-                  <p className="py-3 text-sm text-slate-500">
-                    {t("parties.noTransactions")}
-                  </p>
                   <p className="py-3 text-sm text-slate-500">
                     {t("parties.noTransactions")}
                   </p>
@@ -1704,16 +1408,9 @@ export default function Parties() {
                         key={`${row.type}-${row.id}`}
                         className="rounded-2xl border border-slate-200 bg-white p-3"
                       >
-                      <div
-                        key={`${row.type}-${row.id}`}
-                        className="rounded-2xl border border-slate-200 bg-white p-3"
-                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span
-                                className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold capitalize ${getStatementBadgeClass(row.type)}`}
-                              >
                               <span
                                 className={`rounded-lg px-2 py-0.5 text-[11px] font-semibold capitalize ${getStatementBadgeClass(row.type)}`}
                               >
@@ -1725,14 +1422,9 @@ export default function Parties() {
                             </div>
                             <div className="mt-2 flex flex-wrap text-black font-medium items-center gap-x-3 gap-y-1 text-xs">
                               <span>
-                                {dayjs(row.date || row.createdAt).format(
-                                  "dddd MMM, YY",
-                                )}
+                                {formatTransactionDate(row.date || row.createdAt)}
                               </span>
                               {row.status ? <span>{row.status}</span> : null}
-                              {row.note ? (
-                                <span className="italic">Note: {row.note}</span>
-                              ) : null}
                               {row.note ? (
                                 <span className="italic">Note: {row.note}</span>
                               ) : null}
@@ -1755,44 +1447,48 @@ export default function Parties() {
                               Edit
                             </button>
                           ) : null}
-                          {/* Edit only for sale/service/purchase — the only types with update APIs */}
-                          {canManageParties &&
-                          EDITABLE_TX_TYPES.has(row.type) ? (
-                            <button
-                              type="button"
-                              onClick={() => openEditTransaction(row)}
-                              className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100 active:scale-95"
-                            >
-                              Edit
-                            </button>
-                          ) : null}
                           <div className="shrink-0 text-right text-sm">
-                            <p className="font-semibold text-slate-900">
-                              {amountFields.primaryLabel}:{" "}
-                              {t("currency.formatted", {
-                                symbol: t("currency.symbol"),
-                                amount: amountFields.primaryValue.toFixed(2),
-                              })}
-                            </p>
-                            {amountFields.secondaryLabel ? (
-                              <p className="text-slate-500">
-                                {amountFields.secondaryLabel}:{" "}
-                                {t("currency.formatted", {
-                                  symbol: t("currency.symbol"),
-                                  amount:
+                            <div className="flex items-start justify-end gap-2">
+                              <div>
+                                <p className="font-semibold text-slate-900">
+                                  {amountFields.primaryLabel}:{" "}
+                                  {t("currency.formatted", {
+                                    symbol: t("currency.symbol"),
+                                    amount: amountFields.primaryValue.toFixed(2),
+                                  })}
+                                </p>
+                                {amountFields.secondaryLabel ? (
+                                  <p className="text-slate-500">
+                                    {amountFields.secondaryLabel}:{" "}
+                                    {t("currency.formatted", {
+                                      symbol: t("currency.symbol"),
+                                      amount:
                                     amountFields.secondaryValue.toFixed(2),
-                                })}
-                              </p>
-                            ) : null}
-                            {amountFields.tertiaryLabel ? (
-                              <p className="text-rose-500">
-                                {amountFields.tertiaryLabel}:{" "}
-                                {t("currency.formatted", {
-                                  symbol: t("currency.symbol"),
-                                  amount: amountFields.tertiaryValue.toFixed(2),
-                                })}
-                              </p>
-                            ) : null}
+                                    })}
+                                  </p>
+                                ) : null}
+                                {amountFields.tertiaryLabel ? (
+                                  <p className="text-rose-500">
+                                    {amountFields.tertiaryLabel}:{" "}
+                                    {t("currency.formatted", {
+                                      symbol: t("currency.symbol"),
+                                      amount: amountFields.tertiaryValue.toFixed(2),
+                                    })}
+                                  </p>
+                                ) : null}
+                              </div>
+                              {canEditTransaction ? (
+                                <ActionMenu
+                                  actions={[
+                                    {
+                                      label: t('common.edit'),
+                                      icon: Pencil,
+                                      onClick: () => openEditTxDialog(row),
+                                    },
+                                  ]}
+                                />
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1804,8 +1500,6 @@ export default function Parties() {
               {totalTxPages > 1 && (
                 <div className="flex items-center justify-between pt-2 text-sm text-slate-500">
                   <span>
-                    {statementData.summary.totalRows} transactions · page{" "}
-                    {txPage} of {totalTxPages}
                     {statementData.summary.totalRows} transactions · page{" "}
                     {txPage} of {totalTxPages}
                   </span>
@@ -1832,27 +1526,10 @@ export default function Parties() {
             </>
           ) : (
             <p className="text-sm text-slate-500">{t("parties.noParties")}</p>
-            <p className="text-sm text-slate-500">{t("parties.noParties")}</p>
           )}
         </div>
       </div>
 
-      <Dialog
-        isOpen={isOpen}
-        onClose={closeDialog}
-        title={editingId ? t("parties.editParty") : t("parties.addParty")}
-        size="lg"
-      >
-        <form
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submitParty(false);
-          }}
-        >
-          {status.message ? (
-            <Notice title={status.message} tone={status.type} />
-          ) : null}
       <Dialog
         isOpen={isOpen}
         onClose={closeDialog}
@@ -1879,26 +1556,8 @@ export default function Parties() {
                 onChange={handleChange}
                 required
               />
-              <label className="label">{t("parties.partyName")}</label>
-              <input
-                className="input mt-1"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                required
-              />
             </div>
             <div>
-              <label className="label">{t("parties.phone")}</label>
-              <input
-                className="input mt-1"
-                type="tel"
-                inputMode="numeric"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                placeholder={t("parties.phonePlaceholder")}
-              />
               <label className="label">{t("parties.phone")}</label>
               <input
                 className="input mt-1"
@@ -1913,15 +1572,7 @@ export default function Parties() {
           </div>
           <div>
             <label className="label">{t("parties.partyType")}</label>
-            <label className="label">{t("parties.partyType")}</label>
             <div className="mt-1 flex gap-2">
-              {["customer", "supplier"].map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, type }))}
-                  className={form.type === type ? "btn-primary" : "btn-ghost"}
-                >
               {["customer", "supplier"].map((type) => (
                 <button
                   key={type}
@@ -1958,31 +1609,8 @@ export default function Parties() {
             >
               {t("parties.additionalInfo")}
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("credit")}
-              className={
-                activeTab === "credit"
-                  ? "border-b-2 border-emerald-500 pb-1 font-semibold text-emerald-600"
-                  : ""
-              }
-            >
-              {t("parties.creditInfo")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("additional")}
-              className={
-                activeTab === "additional"
-                  ? "border-b-2 border-emerald-500 pb-1 font-semibold text-emerald-600"
-                  : ""
-              }
-            >
-              {t("parties.additionalInfo")}
-            </button>
           </div>
 
-          {activeTab === "credit" ? (
           {activeTab === "credit" ? (
             <div className="grid gap-3 md:grid-cols-2">
               <div>
@@ -1997,30 +1625,10 @@ export default function Parties() {
                   value={form.openingBalance}
                   onChange={handleChange}
                 />
-                <label className="label">{t("parties.openingBalance")}</label>
-                <input
-                  className="input mt-1"
-                  name="openingBalance"
-                  type="number"
-                  step="1"
-                  defaultValue={0}
-                  min={0}
-                  value={form.openingBalance}
-                  onChange={handleChange}
-                />
               </div>
               <div>
                 <label className="label">{t("parties.asOfDate")}</label>
-                <label className="label">{t("parties.asOfDate")}</label>
                 <input
-                  className="input mt-1"
-                  name="asOfDate"
-                  type="date"
-                  value={
-                    form.asOfDate || new Date().toISOString().split("T")[0]
-                  }
-                  onChange={handleChange}
-                />
                   className="input mt-1"
                   name="asOfDate"
                   type="date"
@@ -2031,20 +1639,6 @@ export default function Parties() {
                 />
               </div>
               <div className="flex gap-2">
-                {["receive", "give"].map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() =>
-                      setForm((prev) => ({ ...prev, balanceType: type }))
-                    }
-                    className={
-                      form.balanceType === type ? "btn-primary" : "btn-ghost"
-                    }
-                  >
-                    {type === "receive"
-                      ? t("parties.toReceive")
-                      : t("parties.toGive")}
                 {["receive", "give"].map((type) => (
                   <button
                     key={type}
@@ -2073,22 +1667,8 @@ export default function Parties() {
                   value={form.email}
                   onChange={handleChange}
                 />
-                <label className="label">{t("parties.email")}</label>
-                <input
-                  className="input mt-1"
-                  name="email"
-                  value={form.email}
-                  onChange={handleChange}
-                />
               </div>
               <div>
-                <label className="label">{t("parties.address")}</label>
-                <input
-                  className="input mt-1"
-                  name="address"
-                  value={form.address}
-                  onChange={handleChange}
-                />
                 <label className="label">{t("parties.address")}</label>
                 <input
                   className="input mt-1"
@@ -2109,22 +1689,7 @@ export default function Parties() {
             >
               {t("common.close")}
             </button>
-            <button
-              className="btn-secondary"
-              type="button"
-              onClick={closeDialog}
-              disabled={loading}
-            >
-              {t("common.close")}
-            </button>
             {!editingId ? (
-              <button
-                className="btn-ghost"
-                type="button"
-                onClick={() => submitParty(true)}
-                disabled={loading}
-              >
-                {loading ? t("common.loading") : t("parties.saveAndNew")}
               <button
                 className="btn-ghost"
                 type="button"
@@ -2135,11 +1700,6 @@ export default function Parties() {
               </button>
             ) : null}
             <button className="btn-primary" type="submit" disabled={loading}>
-              {loading
-                ? t("common.loading")
-                : editingId
-                  ? t("common.update")
-                  : t("common.save")}
               {loading
                 ? t("common.loading")
                 : editingId
@@ -2160,23 +1720,23 @@ export default function Parties() {
         }
         size="md"
       >
-      <Dialog
-        isOpen={txState.isOpen}
-        onClose={closeTxDialog}
-        title={
-          txState.mode === "editing"
-            ? t("parties.editTransaction")
-            : t("parties.addTransaction")
-        }
-        size="md"
-      >
         <form className="space-y-4" onSubmit={submitTransaction}>
           <div>
-            <label className="label">{t("parties.transactionType")}</label>
+            <label className="label">{t('ledger.party')}</label>
+            <PartyFilterSelect
+              className="mt-1"
+              value={txState.form.partyId}
+              type="both"
+              selectedOption={selectedTxPartyOption}
+              onChange={handleTxPartyChange}
+              placeholder={t('parties.searchPlaceholder')}
+              searchPlaceholder={t('parties.searchPlaceholder')}
+            />
+          </div>
+          <div>
+            <label className="label">{t('parties.transactionType')}</label>
             <div className="mt-1 grid grid-cols-2 gap-2">
               {[
-                { value: "receive", label: t("parties.paymentIn") },
-                { value: "give", label: t("parties.paymentOut") },
                 { value: "receive", label: t("parties.paymentIn") },
                 { value: "give", label: t("parties.paymentOut") },
               ].map((opt) => (
@@ -2189,18 +1749,7 @@ export default function Parties() {
                       payload: { name: "direction", value: opt.value },
                     })
                   }
-                  onClick={() =>
-                    dispatchTx({
-                      type: "SET_FORM_FIELD",
-                      payload: { name: "direction", value: opt.value },
-                    })
-                  }
                   className={
-                    txState.form.direction === opt.value
-                      ? opt.value === "give"
-                        ? "rounded-xl border-2 border-emerald-400 bg-emerald-50 py-2.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
-                        : "rounded-xl border-2 border-rose-400 bg-rose-50 py-2.5 text-sm font-semibold text-rose-700 dark:bg-rose-900/20 dark:text-rose-300"
-                      : "rounded-xl border-2 border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
                     txState.form.direction === opt.value
                       ? opt.value === "give"
                         ? "rounded-xl border-2 border-emerald-400 bg-emerald-50 py-2.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
@@ -2214,18 +1763,7 @@ export default function Parties() {
             </div>
           </div>
 
-
           <div>
-            <label className="label">{t("parties.transactionAmount")}</label>
-            <input
-              className="input mt-1"
-              name="amount"
-              type="number"
-              step="0.01"
-              value={txState.form.amount}
-              onChange={handleTxChange}
-              required
-            />
             <label className="label">{t("parties.transactionAmount")}</label>
             <input
               className="input mt-1"
@@ -2238,7 +1776,6 @@ export default function Parties() {
             />
           </div>
 
-
           <div>
             <label className="label">{t("parties.transactionDate")}</label>
             <input
@@ -2248,22 +1785,10 @@ export default function Parties() {
               value={txState.form.txDate}
               onChange={handleTxChange}
             />
-            <label className="label">{t("parties.transactionDate")}</label>
-            <input
-              className="input mt-1"
-              name="txDate"
-              type="date"
-              value={txState.form.txDate}
-              onChange={handleTxChange}
-            />
           </div>
-
 
           <PaymentMethodFields
             value={{
-              paymentMethod: txState.form.paymentMethod,
-              bankId: txState.form.bankId,
-              paymentNote: txState.form.note,
               paymentMethod: txState.form.paymentMethod,
               bankId: txState.form.bankId,
               paymentNote: txState.form.note,
@@ -2279,23 +1804,7 @@ export default function Parties() {
               })
             }
             noteLabel={t("parties.transactionNote")}
-            onChange={(patch) =>
-              dispatchTx({
-                type: "PATCH_FORM",
-                payload: {
-                  paymentMethod: patch.paymentMethod,
-                  bankId: patch.bankId,
-                  note: patch.paymentNote,
-                },
-              })
-            }
-            noteLabel={t("parties.transactionNote")}
           />
-
-          {txState.status.message ? (
-            <Notice title={txState.status.message} tone={txState.status.type} />
-          ) : null}
-
 
           {txState.status.message ? (
             <Notice title={txState.status.message} tone={txState.status.type} />
@@ -2314,7 +1823,7 @@ export default function Parties() {
               type="submit"
               disabled={txState.loading}
             >
-              {txState.loading ? t("common.loading") : t("common.save")}
+              {txState.loading ? t("common.loading") : txState.mode === "editing" ? t('common.update') : t("common.save")}
             </button>
           </div>
         </form>
@@ -2324,7 +1833,6 @@ export default function Parties() {
         isOpen={Boolean(deleteParty)}
         onClose={closeDeleteDialog}
         onConfirm={handleDelete}
-        description={t("parties.confirmDelete")}
         description={t("parties.confirmDelete")}
         confirming={deleteSubmitting}
       />
