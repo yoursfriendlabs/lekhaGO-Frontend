@@ -587,6 +587,7 @@ export default function Services() {
 
   // ── List state ──
   const [statusFilter, setStatusFilter] = useState("all");
+  const [storeTypeFilter, setStoreTypeFilter] = useState("all");
   const [listError, setListError] = useState("");
   const [listNotice, setListNotice] = useState({ type: "", message: "" });
 
@@ -606,7 +607,6 @@ export default function Services() {
   // ── New order dialog ──
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formNotice, setFormNotice] = useState({ type: "", message: "" });
-  const [orderNoError, setOrderNoError] = useState('');
   const formNoticeTimerRef = useRef(null);
 
   // ── Payment dialog ──
@@ -729,8 +729,9 @@ export default function Services() {
       ...(statusFilter !== "all" ? { status: statusFilter } : {}),
       ...(partyFilterId ? { partyId: partyFilterId } : {}),
       ...(createdByFilterId ? { createdBy: createdByFilterId } : {}),
+      ...(storeTypeFilter !== "all" ? { storeType: storeTypeFilter } : {}),
     }),
-    [createdByFilterId, page, pageSize, partyFilterId, statusFilter],
+    [createdByFilterId, page, pageSize, partyFilterId, statusFilter, storeTypeFilter],
   );
 
   const updatePartyDropdownPosition = useCallback(() => {
@@ -794,7 +795,7 @@ export default function Services() {
 
   useEffect(() => {
     setPage(1);
-  }, [createdByFilterId, partyFilterId, statusFilter]);
+  }, [createdByFilterId, partyFilterId, statusFilter, storeTypeFilter]);
 
   useEffect(() => {
     const search = debouncedPartyQuery.trim();
@@ -1052,9 +1053,6 @@ export default function Services() {
 
   const handleHeaderChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'orderNo') {
-      setOrderNoError('');
-    }
     setHeader((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -1353,8 +1351,8 @@ export default function Services() {
     setNewPartyPhone("");
     setAmountReceived("0");
     setIsPaid(false);
+    setStoreType("physical");
     setFormNotice({ type: "", message: "" });
-    setOrderNoError('');
     setEditingId(null);
     setShowItemForm(false);
     setItemDraft({ ...emptyItem });
@@ -1441,6 +1439,7 @@ export default function Services() {
           0,
         ) <= 0;
       setIsPaid(computedIsPaid);
+      setStoreType(full.storeType || "physical");
       setItems(
         rawItems.length > 0
           ? rawItems.map((i) => ({
@@ -1492,8 +1491,6 @@ export default function Services() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setOrderNoError('');
-    setFormNotice({ type: '', message: '' });
     if (!canManageServices) {
       setFormNotice({
         type: "error",
@@ -1637,11 +1634,6 @@ export default function Services() {
       closeDialog();
       loadServices();
     } catch (err) {
-      if (err?.status === 409 && err?.message) {
-        setMobileStep('details');
-        setOrderNoError(err.message);
-        return;
-      }
       setFormNotice({ type: "error", message: err.message });
     }
   };
@@ -1971,7 +1963,7 @@ export default function Services() {
               </p>
             </div>
 
-            <div className="grid w-full gap-3 xl:max-w-3xl xl:grid-cols-[1fr_1fr_auto] xl:items-end">
+            <div className="grid w-full gap-3 xl:max-w-4xl xl:grid-cols-[1fr_1fr_1fr_auto] xl:items-end">
               <div>
                 <label className="label">{t("services.filterByParty")}</label>
                 <PartyFilterSelect
@@ -1991,6 +1983,18 @@ export default function Services() {
                   value={createdByFilterId}
                   onChange={setCreatedByFilterId}
                 />
+              </div>
+              <div>
+                <label className="label">Store Type</label>
+                <select
+                  className="input mt-1 min-h-[44px] w-full rounded-[24px] border border-slate-200/70 bg-white/80 px-3 py-2 text-sm text-slate-700 outline-none focus:border-primary-300 dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-300"
+                  value={storeTypeFilter}
+                  onChange={(e) => setStoreTypeFilter(e.target.value)}
+                >
+                  <option value="all">All stores</option>
+                  <option value="physical">Physical store</option>
+                  <option value="online">Online store</option>
+                </select>
               </div>
               <RefreshButton
                 className="min-h-[44px] xl:self-end"
@@ -2059,6 +2063,15 @@ export default function Services() {
                             </button>
                           ) : (
                             <StatusBadge status={order.status} />
+                          )}
+                          {order.storeType === "online" ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                              <Globe size={11} /> Online
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                              <Building2 size={11} /> Physical
+                            </span>
                           )}
                         </div>
 
@@ -2186,6 +2199,9 @@ export default function Services() {
                   <th className="py-2 pr-4 text-left">
                     {t("services.status")}
                   </th>
+                  <th className="py-2 pr-4 text-left">
+                    Store
+                  </th>
                   <th className="py-2 pr-4 text-left">{t("common.payment")}</th>
                   <th className="py-2 pr-2 text-left">
                     {t("services.attachment")}
@@ -2203,13 +2219,13 @@ export default function Services() {
               <tbody>
                 {listLoading && safeServiceList.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-4 text-slate-500">
+                    <td colSpan={11} className="py-4 text-slate-500">
                       {t("common.loading")}
                     </td>
                   </tr>
                 ) : pagedServices.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-4 text-slate-500">
+                    <td colSpan={11} className="py-4 text-slate-500">
                       {t("services.noOrders")}
                     </td>
                   </tr>
@@ -2265,6 +2281,17 @@ export default function Services() {
                           >
                             <StatusBadge status={order.status} />
                           </button>
+                        </td>
+                        <td className="py-3 pr-4">
+                          {order.storeType === "online" ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                              <Globe size={11} /> Online
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                              <Building2 size={11} /> Physical
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 pr-4">
                           <PaymentTypeSummary source={order} />
@@ -2708,17 +2735,12 @@ export default function Services() {
                                 {t("services.orderNo")}
                               </label>
                               <input
-                                className={`input mt-1 ${orderNoError ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-200' : ''}`}
+                                className="input mt-1"
                                 name="orderNo"
                                 value={header.orderNo}
                                 onChange={handleHeaderChange}
                                 placeholder={!editingId ? suggestedOrderNo : ""}
                               />
-                              {orderNoError ? (
-                                <p className="mt-1 text-xs font-medium text-rose-600 dark:text-rose-300">
-                                  {orderNoError}
-                                </p>
-                              ) : null}
                             </div>
                             <div>
                               <label className="label">

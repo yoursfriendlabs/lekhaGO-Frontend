@@ -1808,7 +1808,7 @@ export default function Analytics() {
                 value={filters.categoryKey}
                 onChange={handleFilterChange}
               >
-                <option value="">{t("common.allCategories")}</option>
+                <option value="">{t("Categories")}</option>
                 {availableExpenseCategoryOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
