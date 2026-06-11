@@ -120,7 +120,7 @@ function txReducer(state, action) {
           partyId: partyId ?? "",
           direction: directionMap[row?.type] ?? "give",
           amount: toAmount(resolvedAmount ?? 0),
-          txDate: row?.date || todayISODate(),
+          txDate: toDateInputValue(row?.date || row?.txDate || row?.createdAt),
           note: row?.note || "",
           paymentMethod: row?.paymentMethod || "cash",
           bankId: row?.bankId || "",
@@ -195,15 +195,19 @@ const EDITABLE_TX_TYPES = new Set([
   "payment_out",
 ]);
 
-function formatDate(value) {
+function formatTransactionDate(value) {
   if (!value) return "-";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+  const match = String(value).match(/^\d{4}-\d{2}-\d{2}/);
+  const dateStr = match ? match[0] : value;
+  const parsed = dayjs(dateStr);
+  return parsed.isValid() ? parsed.format("DD/MM/YYYY") : value;
 }
 
 function toDateInputValue(value) {
   if (!value) return todayISODate();
-  const parsed = dayjs(value);
+  const match = String(value).match(/^\d{4}-\d{2}-\d{2}/);
+  const dateStr = match ? match[0] : value;
+  const parsed = dayjs(dateStr);
   return parsed.isValid() ? parsed.format('YYYY-MM-DD') : todayISODate();
 }
 
@@ -324,14 +328,8 @@ export default function Parties() {
   const [selectedId, setSelectedId] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('credit');
-  const [txOpen, setTxOpen] = useState(false);
-  const [txEditingId, setTxEditingId] = useState(null);
-  const [txForm, setTxForm] = useState(makeEmptyTx());
+  const [txState, dispatchTx] = useReducer(txReducer, txInitialState);
   const [selectedTxPartyOption, setSelectedTxPartyOption] = useState(null);
-  const [txStatus, setTxStatus] = useState({ type: 'info', message: '' });
-  const [txLoading, setTxLoading] = useState(false);
-  const [pendingServices, setPendingServices] = useState([]);
-  const [pendingServicesLoading, setPendingServicesLoading] = useState(false);
   const [txPage, setTxPage] = useState(1);
   const [deleteParty, setDeleteParty] = useState(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
@@ -681,25 +679,16 @@ export default function Parties() {
     setForm(emptyForm);
   };
 
-  const openTxDialog = async () => {
-    if (!canManageParties) return;
-    if (txState.pendingServicesLoading) return;
-    if (!selectedParty) return;
-
-    dispatchTx({
-      type: "OPEN_CREATE",
-      payload: { partyId: selectedParty.id },
-    });
-
-    dispatchTx({ type: "SET_PENDING_SERVICES_LOADING", payload: true });
   const loadPendingServiceTransactions = async (partyId) => {
     if (!partyId) {
-      setPendingServices([]);
+      dispatchTx({
+        type: "LOAD_PENDING_SERVICES_SUCCESS",
+        payload: [],
+      });
       return;
     }
 
-    setPendingServices([]);
-    setPendingServicesLoading(true);
+    dispatchTx({ type: "SET_PENDING_SERVICES_LOADING", payload: true });
 
     try {
       const data = await api.partyStatement({
@@ -725,74 +714,58 @@ export default function Parties() {
         type: "SET_PENDING_SERVICES_LOADING",
         payload: false,
       });
-      setPendingServicesLoading(false);
     }
-  };
-
-  const openEditTransaction = (row) => {
-    if (!EDITABLE_TX_TYPES.has(row?.type)) return;
-    dispatchTx({
-      type: "OPEN_EDIT",
-      payload: {
-        row,
-        partyId: selectedParty?.id || "",
-      },
-    });
   };
 
   const openTxDialog = async () => {
     if (!canManageParties) return;
-    if (pendingServicesLoading) return;
+    if (txState.pendingServicesLoading) return;
     if (!selectedPartyView?.id) return;
 
     const nextPartyOption = toPartyLookupOption(selectedPartyView);
-    setTxEditingId(null);
     setSelectedTxPartyOption(nextPartyOption);
-    setTxForm({ ...makeEmptyTx(), partyId: selectedPartyView.id });
-    setTxStatus({ type: 'info', message: '' });
-    setTxOpen(true);
+
+    dispatchTx({
+      type: "OPEN_CREATE",
+      payload: { partyId: selectedPartyView.id },
+    });
 
     await loadPendingServiceTransactions(selectedPartyView.id);
+  };
+
+  const openEditTransaction = async (row) => {
+    if (!EDITABLE_TX_TYPES.has(row?.type)) return;
+
+    const nextParty = {
+      id: row.partyId || selectedPartyView?.id || "",
+      name: row.partyName || selectedPartyView?.name || "",
+      phone: row.partyPhone || selectedPartyView?.phone || "",
+      type: row.partyType || selectedPartyView?.type || "both",
+      currentAmount: row.currentAmount ?? selectedPartyView?.currentAmount ?? null,
+    };
+
+    setSelectedTxPartyOption(nextParty.id ? toPartyLookupOption(nextParty) : null);
+
+    dispatchTx({
+      type: "OPEN_EDIT",
+      payload: {
+        row,
+        partyId: nextParty.id,
+      },
+    });
+
+    await loadPendingServiceTransactions(nextParty.id);
   };
 
   const openEditTxDialog = async (row) => {
     if (!canManageParties) return;
     if (!row?.id || !isEditableTransactionRow(row)) return;
 
-    const nextParty = {
-      id: row.partyId || selectedPartyView?.id || '',
-      name: row.partyName || selectedPartyView?.name || '',
-      phone: row.partyPhone || selectedPartyView?.phone || '',
-      type: row.partyType || selectedPartyView?.type || 'both',
-      currentAmount: row.currentAmount ?? selectedPartyView?.currentAmount ?? null,
-    };
-
-    setTxEditingId(row.id);
-    setSelectedTxPartyOption(nextParty.id ? toPartyLookupOption(nextParty) : null);
-    setTxForm({
-      ...makeEmptyTx(),
-      partyId: nextParty.id,
-      direction: row.type === 'payment_in' ? 'receive' : 'give',
-      amount: String(toAmount(row.amount)),
-      txDate: toDateInputValue(row.txDate || row.date || row.createdAt),
-      note: row.note || '',
-      paymentMethod: row.paymentMethod || 'cash',
-      bankId: row.bankId ? String(row.bankId) : '',
-    });
-    setTxStatus({ type: 'info', message: '' });
-    setTxOpen(true);
-
-    await loadPendingServiceTransactions(nextParty.id);
+    await openEditTransaction(row);
   };
 
   const closeTxDialog = () => {
-    setTxOpen(false);
-    setTxEditingId(null);
     setSelectedTxPartyOption(null);
-    setTxStatus({ type: 'info', message: '' });
-    setTxForm(makeEmptyTx());
-    setPendingServices([]);
-    setPendingServicesLoading(false);
     dispatchTx({ type: "CLOSE" });
   };
 
@@ -804,14 +777,12 @@ export default function Parties() {
     });
   };
 
-
-
   const handleTxPartyChange = (option) => {
     setSelectedTxPartyOption(option || null);
-    setTxForm((prev) => ({
-      ...prev,
-      partyId: option?.value || '',
-    }));
+    dispatchTx({
+      type: "SET_FORM_FIELD",
+      payload: { name: "partyId", value: option?.value || "" },
+    });
   };
 
   const closeDeleteDialog = () => {
@@ -950,23 +921,22 @@ export default function Parties() {
         ),
       };
 
+      let savedTransaction;
       if (txState.editingTxId) {
         const rowType = txState.form._rowType;
         if (rowType === "sale") {
-          await api.updateSale(txState.editingTxId, payload);
+          savedTransaction = await api.updateSale(txState.editingTxId, payload);
         } else if (rowType === "service") {
-          await api.updateService(txState.editingTxId, payload);
+          savedTransaction = await api.updateService(txState.editingTxId, payload);
         } else if (rowType === "purchase") {
-          await api.updatePurchase(txState.editingTxId, payload);
+          savedTransaction = await api.updatePurchase(txState.editingTxId, payload);
         } else if (rowType === "payment_in" || rowType === "payment_out") {
-          await api.updatePartyTransaction(txState.editingTxId, payload);
+          savedTransaction = await api.updatePartyTransaction(txState.editingTxId, payload);
         } else {
           throw new Error(`Editing "${rowType}" transactions is not supported`);
         }
       } else {
-        const savedTransaction = txEditingId
-        ? await api.updatePartyTransaction(txEditingId, payload)
-        : await api.createPartyTransaction(payload);
+        savedTransaction = await api.createPartyTransaction(payload);
       }
 
       const nextPartyId = String(savedTransaction?.partyId || payload.partyId || '');
@@ -979,15 +949,11 @@ export default function Parties() {
         setSelectedId(nextPartyId);
       }
 
-
       setStatus({
-       
         type: "success",
-       
-        message: txEditingId
+        message: txState.editingTxId
           ? t('parties.messages.transactionUpdated')
           : t("parties.messages.transactionSaved"),
-     ,
       });
 
       closeTxDialog();
@@ -1456,9 +1422,7 @@ export default function Parties() {
                             </div>
                             <div className="mt-2 flex flex-wrap text-black font-medium items-center gap-x-3 gap-y-1 text-xs">
                               <span>
-                                {dayjs(row.date || row.createdAt).format(
-                                  "dddd MMM, YY",
-                                )}
+                                {formatTransactionDate(row.date || row.createdAt)}
                               </span>
                               {row.status ? <span>{row.status}</span> : null}
                               {row.note ? (
@@ -1747,26 +1711,21 @@ export default function Parties() {
       </Dialog>
 
       <Dialog
-       
         isOpen={txState.isOpen}
-       
         onClose={closeTxDialog}
-       
-        title={txEditingId ? t('parties.editTransaction') : 
+        title={
           txState.mode === "editing"
             ? t("parties.editTransaction")
             : t("parties.addTransaction")
         }
-       
         size="md"
-      
       >
         <form className="space-y-4" onSubmit={submitTransaction}>
           <div>
             <label className="label">{t('ledger.party')}</label>
             <PartyFilterSelect
               className="mt-1"
-              value={txForm.partyId}
+              value={txState.form.partyId}
               type="both"
               selectedOption={selectedTxPartyOption}
               onChange={handleTxPartyChange}
@@ -1864,7 +1823,7 @@ export default function Parties() {
               type="submit"
               disabled={txState.loading}
             >
-              {txState.loading ? t("common.loading") : txEditingId ? t('common.update') : t("common.save")}
+              {txState.loading ? t("common.loading") : txState.mode === "editing" ? t('common.update') : t("common.save")}
             </button>
           </div>
         </form>

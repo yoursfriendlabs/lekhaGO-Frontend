@@ -26,12 +26,18 @@ import { printElement } from '../lib/print';
 
 function formatStatementDate(value) {
   if (!value) return '-';
-  return formatMaybeDate(value, 'D MMM YYYY');
+  const match = String(value).match(/^\d{4}-\d{2}-\d{2}/);
+  const dateStr = match ? match[0] : value;
+  const parsed = dayjs(dateStr);
+  return parsed.isValid() ? parsed.format('DD/MM/YYYY') : value;
 }
 
 function formatRangeDate(value) {
   if (!value) return '-';
-  return formatMaybeDate(value, 'D MMM YYYY');
+  const match = String(value).match(/^\d{4}-\d{2}-\d{2}/);
+  const dateStr = match ? match[0] : value;
+  const parsed = dayjs(dateStr);
+  return parsed.isValid() ? parsed.format('DD/MM/YYYY') : value;
 }
 
 function formatLedgerText(value) {
