@@ -26,12 +26,41 @@ import { useI18n } from "../lib/i18n.jsx";
 import { printElement } from "../lib/print.js";
 import FileUpload from "../components/FileUpload";
 import DynamicAttributes from "../components/DynamicAttributes";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Building2, Globe } from "lucide-react";
+import { createPortal } from "react-dom";
+import { useSearchParams } from "react-router-dom";
+import Notice from "../components/Notice";
+import Pagination from "../components/Pagination";
+import RefreshButton from "../components/RefreshButton.jsx";
+import PaymentMethodFields from "../components/PaymentMethodFields.jsx";
+import NoteTextarea from "../components/NoteTextarea.jsx";
+import FormSectionCard from "../components/FormSectionCard.jsx";
+import PaymentTypeSummary from "../components/PaymentTypeSummary.jsx";
+import QuickPaymentButtons from "../components/QuickPaymentButtons.jsx";
+import AsyncSearchableSelect from "../components/AsyncSearchableSelect.jsx";
+import InvoiceHeader from "../components/InvoiceHeader";
+import MobileFormStepper from "../components/MobileFormStepper.jsx";
+import PartyFilterSelect from "../components/PartyFilterSelect.jsx";
+import CreatorFilterSelect from "../components/CreatorFilterSelect.jsx";
+import { Dialog } from "../components/ui/Dialog.tsx";
+import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
+import ActionMenu from "../components/ActionMenu.jsx";
+import { api } from "../lib/api";
+import { useAuth } from "../lib/auth";
+import { useBusinessSettings } from "../lib/businessSettings";
+import { getServicesDisplayLabel } from "../lib/businessTypeConfig.js";
+import { useI18n } from "../lib/i18n.jsx";
+import { printElement } from "../lib/print.js";
+import FileUpload from "../components/FileUpload";
+import DynamicAttributes from "../components/DynamicAttributes";
 import {
   getJewelleryBreakdown,
   getPurityOptionsForMetal,
   JEWELLERY_ATTRIBUTE_KEYS,
   METAL_TYPE_OPTIONS,
   normalizeJewelleryAttributes,
+} from "../lib/jewellery.js";
 } from "../lib/jewellery.js";
 import {
   X,
@@ -68,11 +97,25 @@ import {
   requiresBankSelection,
 } from "../lib/payments";
 import { getDueWhatsAppMessage, getWhatsAppLink } from "../lib/whatsapp.js";
+} from "lucide-react";
+import { usePartyStore } from "../stores/parties";
+import { useServiceStore } from "../stores/services";
+import { useProductStore } from "../stores/products";
+import { getCreatorDisplayName, getCurrentCreatorValue } from "../lib/records";
+import { useDebouncedValue } from "../hooks/useDebouncedValue";
+import { useIsMobile } from "../hooks/useIsMobile.js";
+import {
+  buildPaymentPayload,
+  normalizePaymentFields,
+  requiresBankSelection,
+} from "../lib/payments";
+import { getDueWhatsAppMessage, getWhatsAppLink } from "../lib/whatsapp.js";
 import {
   mergeLookupEntities,
   normalizeLookupParty,
   normalizeLookupProduct,
   toProductLookupOption,
+} from "../lib/lookups.js";
 } from "../lib/lookups.js";
 
 import dayjs, {
@@ -81,8 +124,22 @@ import dayjs, {
   toDateInputValue,
 } from "../lib/datetime";
 import { getPartyBalanceMeta } from "../lib/partyBalances.js";
+import dayjs, {
+  formatMaybeDate,
+  todayISODate,
+  toDateInputValue,
+} from "../lib/datetime";
+import { getPartyBalanceMeta } from "../lib/partyBalances.js";
 
 const emptyItem = {
+  itemType: "labor",
+  description: "",
+  productId: "",
+  quantity: "1",
+  unitType: "primary",
+  unitPrice: "0",
+  taxRate: "0",
+  lineTotal: "0",
   itemType: "labor",
   description: "",
   productId: "",
@@ -100,7 +157,15 @@ const makeEmptyHeader = () => ({
   orderNo: "",
   status: "in_progress",
   notes: "",
+  partyId: "",
+  orderNo: "",
+  status: "in_progress",
+  notes: "",
   deliveryDate: todayISODate(),
+  paymentMethod: "cash",
+  bankId: "",
+  paymentNote: "",
+  attachment: "",
   paymentMethod: "cash",
   bankId: "",
   paymentNote: "",
@@ -138,8 +203,12 @@ function getServiceAttachmentUrls(record) {
 
 function isPdfAttachment(url) {
   return /\.pdf(?:$|[?#])/i.test(String(url || ""));
+  return /\.pdf(?:$|[?#])/i.test(String(url || ""));
 }
 
+function AttachmentPreview({ url, onOpen, size = "sm" }) {
+  const sizeClass =
+    size === "lg" ? "h-24 w-24" : size === "md" ? "h-14 w-14" : "h-9 w-9";
 function AttachmentPreview({ url, onOpen, size = "sm" }) {
   const sizeClass =
     size === "lg" ? "h-24 w-24" : size === "md" ? "h-14 w-14" : "h-9 w-9";
@@ -176,11 +245,17 @@ function AttachmentPreview({ url, onOpen, size = "sm" }) {
           alt="Attachment"
           className="h-full w-full object-cover"
         />
+        <img
+          src={url}
+          alt="Attachment"
+          className="h-full w-full object-cover"
+        />
       )}
     </button>
   );
 }
 
+function AttachmentStrip({ urls = [], onOpen, maxVisible = 3, size = "sm" }) {
 function AttachmentStrip({ urls = [], onOpen, maxVisible = 3, size = "sm" }) {
   if (!urls.length) return null;
 
@@ -191,6 +266,12 @@ function AttachmentStrip({ urls = [], onOpen, maxVisible = 3, size = "sm" }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {visibleUrls.map((url, i) => (
+        <AttachmentPreview
+          key={url}
+          url={url}
+          onOpen={() => onOpen(urls, i)}
+          size={size}
+        />
         <AttachmentPreview
           key={url}
           url={url}
@@ -216,7 +297,10 @@ function getDeliveryDaysLeft(deliveryDate) {
   if (!deliveryDate) return null;
   const today = dayjs().startOf("day");
   const d = dayjs(deliveryDate).startOf("day");
+  const today = dayjs().startOf("day");
+  const d = dayjs(deliveryDate).startOf("day");
   if (!d.isValid()) return null;
+  return d.diff(today, "day");
   return d.diff(today, "day");
 }
 
@@ -226,7 +310,15 @@ function DeliveryBadge({ date }) {
   const label = formatMaybeDate(date, "D MMM");
   const base =
     "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold";
+  const label = formatMaybeDate(date, "D MMM");
+  const base =
+    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold";
   if (days === null) {
+    return (
+      <span className="text-xs text-slate-600 dark:text-slate-400">
+        {label}
+      </span>
+    );
     return (
       <span className="text-xs text-slate-600 dark:text-slate-400">
         {label}
@@ -235,6 +327,9 @@ function DeliveryBadge({ date }) {
   }
   if (days < 0) {
     return (
+      <span
+        className={`${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`}
+      >
       <span
         className={`${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`}
       >
@@ -247,6 +342,9 @@ function DeliveryBadge({ date }) {
       <span
         className={`${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`}
       >
+      <span
+        className={`${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`}
+      >
         <Clock size={10} /> {label} · {days}d left
       </span>
     );
@@ -256,11 +354,17 @@ function DeliveryBadge({ date }) {
       <span
         className={`${base} bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300`}
       >
+      <span
+        className={`${base} bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300`}
+      >
         <Clock size={10} /> {label} · {days}d left
       </span>
     );
   }
   return (
+    <span
+      className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`}
+    >
     <span
       className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`}
     >
@@ -274,6 +378,7 @@ function ClosedDeliveryLabel() {
 
   return (
     <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+      {t("services.closed")}
       {t("services.closed")}
     </span>
   );
@@ -298,7 +403,11 @@ function normalizeServiceItem(item) {
     itemType: item?.itemType || "labor",
     description: item?.description || "",
     productId: item?.productId || "",
+    itemType: item?.itemType || "labor",
+    description: item?.description || "",
+    productId: item?.productId || "",
     quantity,
+    unitType: item?.unitType || "primary",
     unitType: item?.unitType || "primary",
     unitPrice,
     taxRate: toFiniteNumber(item?.taxRate, 0),
@@ -308,6 +417,11 @@ function normalizeServiceItem(item) {
 
 function getServiceItems(record) {
   if (Array.isArray(record)) return record.map(normalizeServiceItem);
+  if (!record || typeof record !== "object") return [];
+  if (Array.isArray(record.items))
+    return record.items.map(normalizeServiceItem);
+  if (Array.isArray(record.ServiceItems))
+    return record.ServiceItems.map(normalizeServiceItem);
   if (!record || typeof record !== "object") return [];
   if (Array.isArray(record.items))
     return record.items.map(normalizeServiceItem);
@@ -323,7 +437,13 @@ function getComputedServiceTotals(items, attributes = {}) {
       .filter((item) => item.itemType === "labor")
       .reduce((sum, item) => sum + toFiniteNumber(item.lineTotal, 0), 0) +
     jewellery.diamondChargeNumber;
+  const laborTotal =
+    items
+      .filter((item) => item.itemType === "labor")
+      .reduce((sum, item) => sum + toFiniteNumber(item.lineTotal, 0), 0) +
+    jewellery.diamondChargeNumber;
   const partsTotal = items
+    .filter((item) => item.itemType === "part")
     .filter((item) => item.itemType === "part")
     .reduce((sum, item) => sum + toFiniteNumber(item.lineTotal, 0), 0);
   const subTotal = laborTotal + partsTotal;
@@ -332,7 +452,17 @@ function getComputedServiceTotals(items, attributes = {}) {
       (sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate),
       0,
     ) + jewellery.additionalTaxNumber;
+  const taxTotal =
+    items.reduce(
+      (sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate),
+      0,
+    ) + jewellery.additionalTaxNumber;
   const discountTotal = Math.min(
+    Math.max(
+      toFiniteNumber(attributes?.discountTotal ?? attributes?.discount, 0),
+      0,
+    ),
+    subTotal + taxTotal,
     Math.max(
       toFiniteNumber(attributes?.discountTotal ?? attributes?.discount, 0),
       0,
@@ -367,6 +497,18 @@ function getServiceOrderTotals(record) {
       0,
     ),
     subTotal + taxTotal,
+    Math.max(
+      toFiniteNumber(
+        record?.discountTotal ?? record?.discount,
+        computed.discountTotal,
+      ),
+      0,
+    ),
+    subTotal + taxTotal,
+  );
+  const grandTotal = toFiniteNumber(
+    record?.grandTotal,
+    Math.max(subTotal + taxTotal - discountTotal, 0),
   );
   const grandTotal = toFiniteNumber(
     record?.grandTotal,
@@ -386,8 +528,18 @@ function getServiceOrderTotals(record) {
 function normalizeServiceOrder(record) {
   if (!record || typeof record !== "object" || Array.isArray(record))
     return record;
+  if (!record || typeof record !== "object" || Array.isArray(record))
+    return record;
 
   const items = getServiceItems(record);
+  const normalizedAttributes = normalizeJewelleryAttributes(
+    record.attributes || {},
+  );
+  const totals = getServiceOrderTotals({
+    ...record,
+    items,
+    attributes: normalizedAttributes,
+  });
   const normalizedAttributes = normalizeJewelleryAttributes(
     record.attributes || {},
   );
@@ -404,14 +556,21 @@ function normalizeServiceOrder(record) {
     ServiceItems: Array.isArray(record.ServiceItems)
       ? record.ServiceItems
       : items,
+    ServiceItems: Array.isArray(record.ServiceItems)
+      ? record.ServiceItems
+      : items,
     ...totals,
     receivedTotal: toFiniteNumber(record.receivedTotal, 0),
   };
 }
 
 function OverviewMetric({ icon: Icon, label, value, tone = "slate" }) {
+function OverviewMetric({ icon: Icon, label, value, tone = "slate" }) {
   const styles = {
     slate: {
+      wrapper:
+        "border-slate-200/70 bg-white/80 dark:border-slate-800/60 dark:bg-slate-950/40",
+      icon: "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900",
       wrapper:
         "border-slate-200/70 bg-white/80 dark:border-slate-800/60 dark:bg-slate-950/40",
       icon: "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900",
@@ -420,13 +579,22 @@ function OverviewMetric({ icon: Icon, label, value, tone = "slate" }) {
       wrapper:
         "border-blue-200/70 bg-blue-50/70 dark:border-blue-900/40 dark:bg-blue-900/20",
       icon: "bg-blue-600 text-white",
+      wrapper:
+        "border-blue-200/70 bg-blue-50/70 dark:border-blue-900/40 dark:bg-blue-900/20",
+      icon: "bg-blue-600 text-white",
     },
     amber: {
       wrapper:
         "border-amber-200/70 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-900/20",
       icon: "bg-amber-500 text-white",
+      wrapper:
+        "border-amber-200/70 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-900/20",
+      icon: "bg-amber-500 text-white",
     },
     rose: {
+      wrapper:
+        "border-rose-200/70 bg-rose-50/80 dark:border-rose-900/40 dark:bg-rose-900/20",
+      icon: "bg-rose-500 text-white",
       wrapper:
         "border-rose-200/70 bg-rose-50/80 dark:border-rose-900/40 dark:bg-rose-900/20",
       icon: "bg-rose-500 text-white",
@@ -439,6 +607,9 @@ function OverviewMetric({ icon: Icon, label, value, tone = "slate" }) {
     <div
       className={`rounded-2xl border px-3 py-2.5 shadow-sm shadow-slate-200/20 ${palette.wrapper}`}
     >
+    <div
+      className={`rounded-2xl border px-3 py-2.5 shadow-sm shadow-slate-200/20 ${palette.wrapper}`}
+    >
       <div className="flex items-center justify-between gap-2.5">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
@@ -447,7 +618,16 @@ function OverviewMetric({ icon: Icon, label, value, tone = "slate" }) {
           <p className="mt-1 whitespace-nowrap text-base font-semibold leading-tight text-slate-900 dark:text-white">
             {value}
           </p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+            {label}
+          </p>
+          <p className="mt-1 whitespace-nowrap text-base font-semibold leading-tight text-slate-900 dark:text-white">
+            {value}
+          </p>
         </div>
+        <div
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${palette.icon}`}
+        >
         <div
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${palette.icon}`}
         >
@@ -467,6 +647,8 @@ function FilterChip({ label, active, onClick }) {
         active
           ? "border-primary-300 bg-primary-50 text-primary-700 shadow-sm dark:border-primary-700/70 dark:bg-primary-900/30 dark:text-primary-200"
           : "border-slate-200/80 bg-white/80 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-700"
+          ? "border-primary-300 bg-primary-50 text-primary-700 shadow-sm dark:border-primary-700/70 dark:bg-primary-900/30 dark:text-primary-200"
+          : "border-slate-200/80 bg-white/80 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-700"
       }`}
     >
       {label}
@@ -476,6 +658,13 @@ function FilterChip({ label, active, onClick }) {
 
 function isPlaceholderItem(item) {
   if (!item) return true;
+  return (
+    !String(item.description || "").trim() &&
+    !String(item.productId || "").trim() &&
+    Number(item.unitPrice || 0) === 0 &&
+    Number(item.lineTotal || 0) === 0 &&
+    Number(item.quantity || 1) === 1
+  );
   return (
     !String(item.description || "").trim() &&
     !String(item.productId || "").trim() &&
@@ -493,6 +682,11 @@ function StatusBadge({ status }) {
       "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
     closed:
       "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    open: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+    in_progress:
+      "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+    closed:
+      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
   };
   const label =
     status === "in_progress"
@@ -501,7 +695,16 @@ function StatusBadge({ status }) {
         status === "closed"
         ? t("services.closed")
         : "—";
+    status === "in_progress"
+      ? t("services.inProgress")
+      : // : status === 'open' ? t('services.open')
+        status === "closed"
+        ? t("services.closed")
+        : "—";
   return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[status] || "bg-slate-100 text-slate-600"}`}
+    >
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[status] || "bg-slate-100 text-slate-600"}`}
     >
@@ -518,8 +721,20 @@ const STATUS_STEPS = [
     selectedClass: "border-amber-400 bg-amber-50 dark:bg-amber-900/20",
     dotClass: "bg-amber-500",
     checkClass: "text-amber-600",
+    value: "in_progress",
+    label: "In Progress",
+    desc: "Currently being worked on",
+    selectedClass: "border-amber-400 bg-amber-50 dark:bg-amber-900/20",
+    dotClass: "bg-amber-500",
+    checkClass: "text-amber-600",
   },
   {
+    value: "closed",
+    label: "Closed",
+    desc: "Work completed",
+    selectedClass: "border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20",
+    dotClass: "bg-emerald-500",
+    checkClass: "text-emerald-600",
     value: "closed",
     label: "Closed",
     desc: "Work completed",
@@ -533,6 +748,7 @@ export default function Services() {
   const { t } = useI18n();
   const { businessId, user, canManageFeature } = useAuth();
   const canManageServices = canManageFeature("services");
+  const canManageServices = canManageFeature("services");
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const createIntentHandledRef = useRef(false);
@@ -541,8 +757,20 @@ export default function Services() {
   const { settings: bizSettings, businessProfile } = useBusinessSettings();
   const businessType = String(businessProfile?.type || "").toLowerCase();
   const showGoldJewelleryDetails = businessType === "gold";
+  const businessType = String(businessProfile?.type || "").toLowerCase();
+  const showGoldJewelleryDetails = businessType === "gold";
   const servicesFlow = businessProfile?.servicesFlow || {};
   const servicesEnabled = servicesFlow.enabled !== false;
+  const servicesTitle = getServicesDisplayLabel(
+    businessProfile,
+    servicesFlow.title || t("services.title"),
+  );
+  const servicesSubtitle =
+    servicesFlow.attributeSectionHint || t("services.subtitle");
+  const newOrderLabel =
+    businessType === "jewellery" || businessType === "gold"
+      ? "New Repair Order"
+      : t("services.newOrder");
   const servicesTitle = getServicesDisplayLabel(
     businessProfile,
     servicesFlow.title || t("services.title"),
@@ -565,7 +793,26 @@ export default function Services() {
     patch: patchService,
   } = useServiceStore();
   const [suggestedOrderNo, setSuggestedOrderNo] = useState("");
+  const [suggestedOrderNo, setSuggestedOrderNo] = useState("");
   const [productDirectory, setProductDirectory] = useState({});
+  const [storeType, setStoreType] = useState("physical");
+  const [storeDropdownOpen, setStoreDropdownOpen] = useState(false);
+
+  const storeOptions = [
+    {
+      value: "physical",
+      label: "Physical store",
+      icon: Building2,
+      sub: "Walk-in customers",
+    },
+    {
+      value: "online",
+      label: "Online store",
+      icon: Globe,
+      sub: "E-commerce orders",
+    },
+  ];
+  const selectedStore = storeOptions.find((o) => o.value === storeType);
   const [storeType, setStoreType] = useState("physical");
   const [storeDropdownOpen, setStoreDropdownOpen] = useState(false);
 
@@ -589,8 +836,16 @@ export default function Services() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [listError, setListError] = useState("");
   const [listNotice, setListNotice] = useState({ type: "", message: "" });
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [listError, setListError] = useState("");
+  const [listNotice, setListNotice] = useState({ type: "", message: "" });
 
   useEffect(() => {
+    if (listNotice.type !== "success" && listNotice.type !== "error") return;
+    const timer = setTimeout(
+      () => setListNotice({ type: "", message: "" }),
+      3000,
+    );
     if (listNotice.type !== "success" && listNotice.type !== "error") return;
     const timer = setTimeout(
       () => setListNotice({ type: "", message: "" }),
@@ -606,11 +861,15 @@ export default function Services() {
   // ── New order dialog ──
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formNotice, setFormNotice] = useState({ type: "", message: "" });
-  const [orderNoError, setOrderNoError] = useState('');
   const formNoticeTimerRef = useRef(null);
 
   // ── Payment dialog ──
   const [payDialog, setPayDialog] = useState(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payNotes, setPayNotes] = useState("");
+  const [payPaymentMethod, setPayPaymentMethod] = useState("cash");
+  const [payBankId, setPayBankId] = useState("");
+  const [payError, setPayError] = useState("");
   const [payAmount, setPayAmount] = useState("");
   const [payNotes, setPayNotes] = useState("");
   const [payPaymentMethod, setPayPaymentMethod] = useState("cash");
@@ -621,8 +880,14 @@ export default function Services() {
   const [statusDialog, setStatusDialog] = useState(null);
   const [newStatus, setNewStatus] = useState("");
   const [statusError, setStatusError] = useState("");
+  const [newStatus, setNewStatus] = useState("");
+  const [statusError, setStatusError] = useState("");
 
   // ── Party filter ──
+  const [partyFilterId, setPartyFilterId] = useState("");
+  const [selectedPartyFilterOption, setSelectedPartyFilterOption] =
+    useState(null);
+  const [createdByFilterId, setCreatedByFilterId] = useState("");
   const [partyFilterId, setPartyFilterId] = useState("");
   const [selectedPartyFilterOption, setSelectedPartyFilterOption] =
     useState(null);
@@ -632,6 +897,7 @@ export default function Services() {
   const [editingId, setEditingId] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
   const [deletingServiceId, setDeletingServiceId] = useState("");
+  const [deletingServiceId, setDeletingServiceId] = useState("");
   const [deleteService, setDeleteService] = useState(null);
 
   // ── Lightbox ──
@@ -639,6 +905,13 @@ export default function Services() {
 
   const openLightbox = (urls = [], index = 0) => {
     const normalized = Array.isArray(urls) ? urls : [urls];
+    const abs = normalized.map((u) =>
+      u && String(u).startsWith("http") ? u : String(u || ""),
+    );
+    setLightboxState({
+      urls: abs,
+      index: Math.max(0, Math.min(index || 0, abs.length - 1)),
+    });
     const abs = normalized.map((u) =>
       u && String(u).startsWith("http") ? u : String(u || ""),
     );
@@ -657,6 +930,14 @@ export default function Services() {
     setLightboxState((s) =>
       s ? { ...s, index: Math.min(s.urls.length - 1, s.index + 1) } : s,
     );
+  const showPrev = () =>
+    setLightboxState((s) =>
+      s ? { ...s, index: Math.max(0, s.index - 1) } : s,
+    );
+  const showNext = () =>
+    setLightboxState((s) =>
+      s ? { ...s, index: Math.min(s.urls.length - 1, s.index + 1) } : s,
+    );
 
   useEffect(() => {
     const handler = (e) => {
@@ -664,7 +945,12 @@ export default function Services() {
       if (e.key === "ArrowLeft") showPrev();
       if (e.key === "ArrowRight") showNext();
       if (e.key === "Escape") closeLightbox();
+      if (e.key === "ArrowLeft") showPrev();
+      if (e.key === "ArrowRight") showNext();
+      if (e.key === "Escape") closeLightbox();
     };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [lightboxState]);
@@ -679,10 +965,14 @@ export default function Services() {
     () =>
       Array.isArray(serviceList) ? serviceList.map(normalizeServiceOrder) : [],
     [serviceList],
+    () =>
+      Array.isArray(serviceList) ? serviceList.map(normalizeServiceOrder) : [],
+    [serviceList],
   );
   const safeAttributeDefs = Array.isArray(attributeDefs) ? attributeDefs : [];
 
   // ── Form data ──
+  const [partyQuery, setPartyQuery] = useState("");
   const [partyQuery, setPartyQuery] = useState("");
   const debouncedPartyQuery = useDebouncedValue(partyQuery, 250);
   const [partySearchResults, setPartySearchResults] = useState([]);
@@ -691,11 +981,14 @@ export default function Services() {
   const [partyDropdownStyle, setPartyDropdownStyle] = useState(null);
   const [showAddNew, setShowAddNew] = useState(false);
   const [newPartyPhone, setNewPartyPhone] = useState("");
+  const [newPartyPhone, setNewPartyPhone] = useState("");
   const [creatingParty, setCreatingParty] = useState(false);
   const [header, setHeader] = useState(() => makeEmptyHeader());
   const [items, setItems] = useState([]);
   const quantityInputRef = useRef(null);
   const descriptionInputRef = useRef(null);
+  const [discount, setDiscount] = useState("0");
+  const [amountReceived, setAmountReceived] = useState("0");
   const [discount, setDiscount] = useState("0");
   const [amountReceived, setAmountReceived] = useState("0");
   const [isPaid, setIsPaid] = useState(false);
@@ -713,7 +1006,19 @@ export default function Services() {
     () => getJewelleryBreakdown(jewelleryAttributes),
     [jewelleryAttributes],
   );
+  const [mobileStep, setMobileStep] = useState("details");
+  const jewelleryAttributes = useMemo(
+    () => normalizeJewelleryAttributes(header.attributes),
+    [header.attributes],
+  );
+  const jewelleryDetails = useMemo(
+    () => getJewelleryBreakdown(jewelleryAttributes),
+    [jewelleryAttributes],
+  );
   const activeJewelleryDetails = useMemo(
+    () =>
+      showGoldJewelleryDetails ? jewelleryDetails : getJewelleryBreakdown({}),
+    [jewelleryDetails, showGoldJewelleryDetails],
     () =>
       showGoldJewelleryDetails ? jewelleryDetails : getJewelleryBreakdown({}),
     [jewelleryDetails, showGoldJewelleryDetails],
@@ -721,6 +1026,17 @@ export default function Services() {
   const jewelleryPurityOptions = useMemo(
     () => getPurityOptionsForMetal(jewelleryAttributes.metalType),
     [jewelleryAttributes.metalType],
+    [jewelleryAttributes.metalType],
+  );
+  const listParams = useMemo(
+    () => ({
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+      ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+      ...(partyFilterId ? { partyId: partyFilterId } : {}),
+      ...(createdByFilterId ? { createdBy: createdByFilterId } : {}),
+    }),
+    [createdByFilterId, page, pageSize, partyFilterId, statusFilter],
   );
   const listParams = useMemo(
     () => ({
@@ -742,7 +1058,19 @@ export default function Services() {
       window.innerWidth || document.documentElement.clientWidth;
     const viewportHeight =
       window.innerHeight || document.documentElement.clientHeight;
+    const viewportWidth =
+      window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight =
+      window.innerHeight || document.documentElement.clientHeight;
     const margin = 8;
+    const width = Math.min(
+      viewportWidth - margin * 2,
+      Math.max(rect.width, 360),
+    );
+    const left = Math.min(
+      Math.max(rect.left, margin),
+      Math.max(margin, viewportWidth - width - margin),
+    );
     const width = Math.min(
       viewportWidth - margin * 2,
       Math.max(rect.width, 360),
@@ -764,6 +1092,13 @@ export default function Services() {
     const top = opensAbove
       ? Math.max(margin, rect.top - maxHeight - 8)
       : rect.bottom + 8;
+    const maxHeight = Math.max(
+      minHeight,
+      Math.min(dropdownMaxHeight, availableHeight),
+    );
+    const top = opensAbove
+      ? Math.max(margin, rect.top - maxHeight - 8)
+      : rect.bottom + 8;
 
     setPartyDropdownStyle({ left, top, width, maxHeight });
   }, []);
@@ -771,7 +1106,11 @@ export default function Services() {
   // ── Load services list ──
   const loadServices = () => {
     setListError("");
+    setListError("");
     invalidateServices(listParams);
+    return fetchServices(listParams, true).catch((err) =>
+      setListError(err.message),
+    );
     return fetchServices(listParams, true).catch((err) =>
       setListError(err.message),
     );
@@ -788,6 +1127,7 @@ export default function Services() {
 
   useEffect(() => {
     if (!businessId) return;
+    setListError("");
     setListError("");
     fetchServices(listParams).catch((err) => setListError(err.message));
   }, [businessId, fetchServices, listParams]);
@@ -806,6 +1146,8 @@ export default function Services() {
 
     let isActive = true;
 
+    api
+      .lookupParties({ search, type: "customer", limit: 10 })
     api
       .lookupParties({ search, type: "customer", limit: 10 })
       .then((results) => {
@@ -835,20 +1177,34 @@ export default function Services() {
 
     document.addEventListener("mousedown", handleMouseDown);
     return () => document.removeEventListener("mousedown", handleMouseDown);
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
   }, []);
 
   useEffect(() => {
+    if (!partyDropdownOpen || !partyQuery.trim() || selectedParty)
+      return undefined;
     if (!partyDropdownOpen || !partyQuery.trim() || selectedParty)
       return undefined;
 
     updatePartyDropdownPosition();
     window.addEventListener("resize", updatePartyDropdownPosition);
     window.addEventListener("scroll", updatePartyDropdownPosition, true);
+    window.addEventListener("resize", updatePartyDropdownPosition);
+    window.addEventListener("scroll", updatePartyDropdownPosition, true);
 
     return () => {
       window.removeEventListener("resize", updatePartyDropdownPosition);
       window.removeEventListener("scroll", updatePartyDropdownPosition, true);
+      window.removeEventListener("resize", updatePartyDropdownPosition);
+      window.removeEventListener("scroll", updatePartyDropdownPosition, true);
     };
+  }, [
+    partyDropdownOpen,
+    partyQuery,
+    selectedParty,
+    updatePartyDropdownPosition,
+  ]);
   }, [
     partyDropdownOpen,
     partyQuery,
@@ -859,7 +1215,14 @@ export default function Services() {
   useEffect(() => {
     api
       .listOrderAttributes({ entityType: "service" })
+    api
+      .listOrderAttributes({ entityType: "service" })
       .then((response) => {
+        const items = Array.isArray(response)
+          ? response
+          : Array.isArray(response?.items)
+            ? response.items
+            : [];
         const items = Array.isArray(response)
           ? response
           : Array.isArray(response?.items)
@@ -874,6 +1237,10 @@ export default function Services() {
     () => items.filter((item) => !isPlaceholderItem(item)),
     [items],
   );
+  const chargeableItems = useMemo(
+    () => items.filter((item) => !isPlaceholderItem(item)),
+    [items],
+  );
 
   // ── Totals ──
   const totals = useMemo(() => {
@@ -882,10 +1249,21 @@ export default function Services() {
         .filter((i) => i.itemType === "labor")
         .reduce((s, i) => s + Number(i.lineTotal || 0), 0) +
       activeJewelleryDetails.diamondChargeNumber;
+    const laborTotal =
+      chargeableItems
+        .filter((i) => i.itemType === "labor")
+        .reduce((s, i) => s + Number(i.lineTotal || 0), 0) +
+      activeJewelleryDetails.diamondChargeNumber;
     const partsTotal = chargeableItems
+      .filter((i) => i.itemType === "part")
       .filter((i) => i.itemType === "part")
       .reduce((s, i) => s + Number(i.lineTotal || 0), 0);
     const subTotal = laborTotal + partsTotal;
+    const taxTotal =
+      chargeableItems.reduce(
+        (sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate),
+        0,
+      ) + activeJewelleryDetails.additionalTaxNumber;
     const taxTotal =
       chargeableItems.reduce(
         (sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate),
@@ -896,7 +1274,14 @@ export default function Services() {
       Math.max(Number(discount || 0), 0),
       preDiscountTotal,
     );
+    const discountTotal = Math.min(
+      Math.max(Number(discount || 0), 0),
+      preDiscountTotal,
+    );
     const grandTotal = Math.max(preDiscountTotal - discountTotal, 0);
+    const received = isPaid
+      ? grandTotal
+      : Math.min(Number(amountReceived || 0), grandTotal);
     const received = isPaid
       ? grandTotal
       : Math.min(Number(amountReceived || 0), grandTotal);
@@ -921,7 +1306,19 @@ export default function Services() {
     discount,
     isPaid,
   ]);
+  }, [
+    activeJewelleryDetails.additionalTaxNumber,
+    activeJewelleryDetails.diamondChargeNumber,
+    amountReceived,
+    chargeableItems,
+    discount,
+    isPaid,
+  ]);
 
+  const visibleItems = useMemo(
+    () => items.filter((item) => !isPlaceholderItem(item)),
+    [items],
+  );
   const visibleItems = useMemo(
     () => items.filter((item) => !isPlaceholderItem(item)),
     [items],
@@ -935,9 +1332,19 @@ export default function Services() {
     ],
     [t],
   );
+  const formSteps = useMemo(
+    () => [
+      { id: "details", label: t("services.detailStep") },
+      { id: "items", label: t("services.itemsStep") },
+      { id: "payment", label: t("services.paymentStep") },
+    ],
+    [t],
+  );
 
   const mobileStepIndex = formSteps.findIndex((step) => step.id === mobileStep);
   const canGoBackStep = mobileStepIndex > 0;
+  const canGoForwardStep =
+    mobileStepIndex >= 0 && mobileStepIndex <= formSteps.length;
   const canGoForwardStep =
     mobileStepIndex >= 0 && mobileStepIndex <= formSteps.length;
 
@@ -956,6 +1363,17 @@ export default function Services() {
     },
     [totals.grandTotal],
   );
+  const applyQuickReceivedAmount = useCallback(
+    (nextAmount, { markPaid = false } = {}) => {
+      const normalizedAmount = Math.min(
+        Math.max(Number(nextAmount || 0), 0),
+        totals.grandTotal,
+      );
+      setIsPaid(markPaid && totals.grandTotal > 0);
+      setAmountReceived(normalizedAmount.toFixed(2));
+    },
+    [totals.grandTotal],
+  );
 
   useEffect(() => {
     if (!dialogOpen) return undefined;
@@ -963,12 +1381,14 @@ export default function Services() {
     if (!node) return undefined;
     const frame = window.requestAnimationFrame(() => {
       node.scrollTo({ top: 0, behavior: "smooth" });
+      node.scrollTo({ top: 0, behavior: "smooth" });
     });
     return () => window.cancelAnimationFrame(frame);
   }, [dialogOpen, mobileStep]);
 
   // ── Product helpers ──
   const getProductById = (id) => {
+    if (id === null || id === undefined || id === "") return null;
     if (id === null || id === undefined || id === "") return null;
     return productDirectory[String(id)] || null;
   };
@@ -989,6 +1409,10 @@ export default function Services() {
     return unitType === "secondary"
       ? product.secondaryUnit || product.primaryUnit || ""
       : product.primaryUnit || product.secondaryUnit || "";
+    if (!product) return "";
+    return unitType === "secondary"
+      ? product.secondaryUnit || product.primaryUnit || ""
+      : product.primaryUnit || product.secondaryUnit || "";
   };
 
   const syncItemDefaults = (index, product, draft = false) => {
@@ -996,6 +1420,8 @@ export default function Services() {
     if (draft) {
       setItemDraft((prev) => {
         const next = { ...prev };
+        if (!next.unitType) next.unitType = "primary";
+        if (next.unitType === "secondary") {
         if (!next.unitType) next.unitType = "primary";
         if (next.unitType === "secondary") {
           const explicit = Number(product.secondarySalePrice || 0);
@@ -1006,13 +1432,22 @@ export default function Services() {
             const primary = Number(product.salePrice || 0);
             if (rate > 0 && primary > 0)
               next.unitPrice = String((primary / rate).toFixed(4));
+            if (rate > 0 && primary > 0)
+              next.unitPrice = String((primary / rate).toFixed(4));
           }
+        } else if (
+          next.unitType === "primary" &&
+          Number(product.salePrice || 0) > 0
+        ) {
         } else if (
           next.unitType === "primary" &&
           Number(product.salePrice || 0) > 0
         ) {
           next.unitPrice = String(product.salePrice);
         }
+        next.lineTotal = (
+          Number(next.quantity || 0) * Number(next.unitPrice || 0)
+        ).toFixed(2);
         next.lineTotal = (
           Number(next.quantity || 0) * Number(next.unitPrice || 0)
         ).toFixed(2);
@@ -1027,6 +1462,8 @@ export default function Services() {
 
         if (!next.unitType) next.unitType = "primary";
         if (next.unitType === "secondary") {
+        if (!next.unitType) next.unitType = "primary";
+        if (next.unitType === "secondary") {
           const explicit = Number(product.secondarySalePrice || 0);
           if (explicit > 0) {
             next.unitPrice = String(explicit);
@@ -1035,7 +1472,13 @@ export default function Services() {
             const primary = Number(product.salePrice || 0);
             if (rate > 0 && primary > 0)
               next.unitPrice = String((primary / rate).toFixed(4));
+            if (rate > 0 && primary > 0)
+              next.unitPrice = String((primary / rate).toFixed(4));
           }
+        } else if (
+          next.unitType === "primary" &&
+          Number(product.salePrice || 0) > 0
+        ) {
         } else if (
           next.unitType === "primary" &&
           Number(product.salePrice || 0) > 0
@@ -1045,7 +1488,11 @@ export default function Services() {
         next.lineTotal = (
           Number(next.quantity || 0) * Number(next.unitPrice || 0)
         ).toFixed(2);
+        next.lineTotal = (
+          Number(next.quantity || 0) * Number(next.unitPrice || 0)
+        ).toFixed(2);
         return next;
+      }),
       }),
     );
   };
@@ -1066,7 +1513,13 @@ export default function Services() {
       };
 
       if (key === "metalType") {
+      if (key === "metalType") {
         const nextPurityOptions = getPurityOptionsForMetal(value);
+        if (
+          nextPurityOptions.length > 0 &&
+          !nextPurityOptions.includes(nextAttributes.metalPurity)
+        ) {
+          nextAttributes.metalPurity = "";
         if (
           nextPurityOptions.length > 0 &&
           !nextPurityOptions.includes(nextAttributes.metalPurity)
@@ -1090,13 +1543,22 @@ export default function Services() {
         if (field === "itemType" && value === "labor") {
           next.productId = "";
           next.unitType = "primary";
+        if (field === "itemType" && value === "labor") {
+          next.productId = "";
+          next.unitType = "primary";
         }
+        next.lineTotal = (
+          Number(next.quantity || 0) * Number(next.unitPrice || 0)
+        ).toFixed(2);
         next.lineTotal = (
           Number(next.quantity || 0) * Number(next.unitPrice || 0)
         ).toFixed(2);
         return next;
       }),
+      }),
     );
+    if (field === "productId" || field === "unitType") {
+      const productId = field === "productId" ? value : items[index]?.productId;
     if (field === "productId" || field === "unitType") {
       const productId = field === "productId" ? value : items[index]?.productId;
       const product = getProductById(productId);
@@ -1106,8 +1568,13 @@ export default function Services() {
 
   const removeItem = (index) =>
     setItems((prev) => prev.filter((_, i) => i !== index));
+  const removeItem = (index) =>
+    setItems((prev) => prev.filter((_, i) => i !== index));
 
   const handleDraftProductSelection = (option) => {
+    const product = option?.entity
+      ? normalizeLookupProduct(option.entity)
+      : null;
     const product = option?.entity
       ? normalizeLookupProduct(option.entity)
       : null;
@@ -1119,7 +1586,9 @@ export default function Services() {
     setItemDraft((previous) => ({
       ...previous,
       productId: option?.value || "",
+      productId: option?.value || "",
       taxRate: String(product?.taxRate || 0),
+      actualUnit: "",
       actualUnit: "",
     }));
 
@@ -1137,10 +1606,12 @@ export default function Services() {
   const handleDraftChange = (field, value, actualUnit) => {
     // unitType change needs to re-price from product immediately
     if (field === "unitType") {
+    if (field === "unitType") {
       const product = getProductById(itemDraft.productId);
       setItemDraft((prev) => {
         const next = { ...prev, unitType: value };
         if (product) {
+          if (value === "secondary") {
           if (value === "secondary") {
             const explicit = Number(product.secondarySalePrice || 0);
             if (explicit > 0) {
@@ -1150,7 +1621,13 @@ export default function Services() {
               const primary = Number(product.salePrice || 0);
               if (rate > 0 && primary > 0)
                 next.unitPrice = String((primary / rate).toFixed(4));
+              if (rate > 0 && primary > 0)
+                next.unitPrice = String((primary / rate).toFixed(4));
             }
+          } else if (
+            value === "primary" &&
+            Number(product.salePrice || 0) > 0
+          ) {
           } else if (
             value === "primary" &&
             Number(product.salePrice || 0) > 0
@@ -1159,6 +1636,9 @@ export default function Services() {
           }
         }
         next.actualUnit = actualUnit;
+        next.lineTotal = (
+          Number(next.quantity || 0) * Number(next.unitPrice || 0)
+        ).toFixed(2);
         next.lineTotal = (
           Number(next.quantity || 0) * Number(next.unitPrice || 0)
         ).toFixed(2);
@@ -1173,12 +1653,20 @@ export default function Services() {
         next.productId = "";
         next.unitType = "primary";
         next.quantity = "1";
+      if (field === "itemType" && value === "labor") {
+        next.productId = "";
+        next.unitType = "primary";
+        next.quantity = "1";
       }
+      next.lineTotal = (
+        Number(next.quantity || 0) * Number(next.unitPrice || 0)
+      ).toFixed(2);
       next.lineTotal = (
         Number(next.quantity || 0) * Number(next.unitPrice || 0)
       ).toFixed(2);
       return next;
     });
+    if (field === "productId") {
     if (field === "productId") {
       const product = getProductById(value);
       if (product) setTimeout(() => syncItemDefaults(null, product, true), 0);
@@ -1187,17 +1675,21 @@ export default function Services() {
 
   const startAddItem = () => {
     setFormNotice({ type: "", message: "" });
+    setFormNotice({ type: "", message: "" });
     setItemDraft({ ...emptyItem });
     setEditingItemIdx(null);
     setShowItemForm(true);
+    setMobileStep("items");
     setMobileStep("items");
   };
 
   const startEditItem = (idx) => {
     setFormNotice({ type: "", message: "" });
+    setFormNotice({ type: "", message: "" });
     setItemDraft({ ...items[idx] });
     setEditingItemIdx(idx);
     setShowItemForm(true);
+    setMobileStep("items");
     setMobileStep("items");
   };
 
@@ -1210,6 +1702,8 @@ export default function Services() {
   const confirmItem = () => {
     if (itemDraft.itemType === "part" && !itemDraft.productId) {
       setFormNotice({ type: "error", message: t("errors.selectProductPart") });
+    if (itemDraft.itemType === "part" && !itemDraft.productId) {
+      setFormNotice({ type: "error", message: t("errors.selectProductPart") });
       return;
     }
 
@@ -1217,7 +1711,11 @@ export default function Services() {
       itemDraft.itemType === "part" &&
       itemDraft.unitType === "secondary" &&
       Number(getProductById(itemDraft.productId)?.conversionRate || 0) <= 0
+      itemDraft.itemType === "part" &&
+      itemDraft.unitType === "secondary" &&
+      Number(getProductById(itemDraft.productId)?.conversionRate || 0) <= 0
     ) {
+      setFormNotice({ type: "error", message: t("errors.conversionRequired") });
       setFormNotice({ type: "error", message: t("errors.conversionRequired") });
       return;
     }
@@ -1227,14 +1725,21 @@ export default function Services() {
       lineTotal: (
         Number(itemDraft.quantity || 0) * Number(itemDraft.unitPrice || 0)
       ).toFixed(2),
+      lineTotal: (
+        Number(itemDraft.quantity || 0) * Number(itemDraft.unitPrice || 0)
+      ).toFixed(2),
     };
     if (editingItemIdx !== null) {
+      setItems((prev) =>
+        prev.map((item, idx) => (idx === editingItemIdx ? draft : item)),
+      );
       setItems((prev) =>
         prev.map((item, idx) => (idx === editingItemIdx ? draft : item)),
       );
     } else {
       setItems((prev) => [...prev, draft]);
     }
+    setFormNotice({ type: "", message: "" });
     setFormNotice({ type: "", message: "" });
     setShowItemForm(false);
     setEditingItemIdx(null);
@@ -1254,14 +1759,30 @@ export default function Services() {
     selectedParty?.currentAmount !== null;
   const selectedPartyHasDue =
     selectedPartyHasBalance && selectedPartyBalanceMeta.absoluteAmount > 0;
+  const selectedPartyBalanceMeta = getPartyBalanceMeta(
+    selectedParty?.currentAmount,
+    t,
+  );
+  const selectedPartyHasBalance =
+    selectedParty?.currentAmount !== undefined &&
+    selectedParty?.currentAmount !== null;
+  const selectedPartyHasDue =
+    selectedPartyHasBalance && selectedPartyBalanceMeta.absoluteAmount > 0;
   const selectedPartyWhatsAppMessage = getDueWhatsAppMessage(
     selectedParty?.name,
     selectedPartyHasDue
       ? t("currency.formatted", {
           symbol: t("currency.symbol"),
+      ? t("currency.formatted", {
+          symbol: t("currency.symbol"),
           amount: selectedPartyBalanceMeta.absoluteAmount.toFixed(2),
         })
       : "",
+      : "",
+  );
+  const selectedPartyWhatsAppLink = getWhatsAppLink(
+    selectedParty?.phone,
+    selectedPartyWhatsAppMessage,
   );
   const selectedPartyWhatsAppLink = getWhatsAppLink(
     selectedParty?.phone,
@@ -1273,8 +1794,10 @@ export default function Services() {
     setSelectedParty(party);
     setHeader((prev) => ({ ...prev, partyId: party.id }));
     setPartyQuery(`${party.name}${party.phone ? ` (${party.phone})` : ""}`);
+    setPartyQuery(`${party.name}${party.phone ? ` (${party.phone})` : ""}`);
     setPartyDropdownOpen(false);
     setShowAddNew(false);
+    setNewPartyPhone("");
     setNewPartyPhone("");
     setPartySearchResults([]);
   };
@@ -1283,8 +1806,11 @@ export default function Services() {
     setSelectedParty(null);
     setHeader((prev) => ({ ...prev, partyId: "" }));
     setPartyQuery("");
+    setHeader((prev) => ({ ...prev, partyId: "" }));
+    setPartyQuery("");
     setPartyDropdownOpen(false);
     setShowAddNew(false);
+    setNewPartyPhone("");
     setNewPartyPhone("");
     setPartySearchResults([]);
   };
@@ -1296,6 +1822,7 @@ export default function Services() {
     if (selectedParty) {
       setSelectedParty(null);
       setHeader((prev) => ({ ...prev, partyId: "" }));
+      setHeader((prev) => ({ ...prev, partyId: "" }));
     }
   };
 
@@ -1306,12 +1833,19 @@ export default function Services() {
       .trim()
       .replace(/\s*\(.*\)\s*$/, "")
       .trim();
+    const name = partyQuery
+      .trim()
+      .replace(/\s*\(.*\)\s*$/, "")
+      .trim();
     if (!name) {
+      setFormNotice({ type: "error", message: t("errors.customerRequired") });
       setFormNotice({ type: "error", message: t("errors.customerRequired") });
       return;
     }
     const phoneDigits = newPartyPhone.trim().replace(/\D/g, "");
+    const phoneDigits = newPartyPhone.trim().replace(/\D/g, "");
     if (phoneDigits && phoneDigits.length < 10) {
+      setFormNotice({ type: "error", message: t("errors.phoneMinDigits") });
       setFormNotice({ type: "error", message: t("errors.phoneMinDigits") });
       return;
     }
@@ -1319,8 +1853,14 @@ export default function Services() {
     createPartyRequestRef.current = true;
     setCreatingParty(true);
     setFormNotice({ type: "", message: "" });
+    setFormNotice({ type: "", message: "" });
 
     try {
+      const createdParty = await api.createParty({
+        name,
+        phone: newPartyPhone.trim(),
+        type: "customer",
+      });
       const createdParty = await api.createParty({
         name,
         phone: newPartyPhone.trim(),
@@ -1333,7 +1873,12 @@ export default function Services() {
         type: "success",
         message: t("parties.messages.created"),
       });
+      setFormNotice({
+        type: "success",
+        message: t("parties.messages.created"),
+      });
     } catch (err) {
+      setFormNotice({ type: "error", message: err.message });
       setFormNotice({ type: "error", message: err.message });
     } finally {
       createPartyRequestRef.current = false;
@@ -1344,7 +1889,10 @@ export default function Services() {
   // ── Reset & open/close dialog ──
   const resetForm = () => {
     setHeader({ ...makeEmptyHeader(), orderNo: "" });
+    setHeader({ ...makeEmptyHeader(), orderNo: "" });
     setItems([]);
+    setDiscount("0");
+    setPartyQuery("");
     setDiscount("0");
     setPartyQuery("");
     setSelectedParty(null);
@@ -1352,15 +1900,18 @@ export default function Services() {
     setShowAddNew(false);
     setNewPartyPhone("");
     setAmountReceived("0");
+    setNewPartyPhone("");
+    setAmountReceived("0");
     setIsPaid(false);
     setFormNotice({ type: "", message: "" });
-    setOrderNoError('');
     setEditingId(null);
     setShowItemForm(false);
     setItemDraft({ ...emptyItem });
     setEditingItemIdx(null);
     setSuggestedOrderNo("");
+    setSuggestedOrderNo("");
     setProductDirectory({});
+    setMobileStep("details");
     setMobileStep("details");
   };
 
@@ -1373,13 +1924,16 @@ export default function Services() {
       try {
         const data = await api.getNextSequences();
         setSuggestedOrderNo(data?.nextServiceOrderNo || "");
+        setSuggestedOrderNo(data?.nextServiceOrderNo || "");
       } catch {
+        setSuggestedOrderNo("");
         setSuggestedOrderNo("");
       }
     }
   };
 
   useEffect(() => {
+    if (searchParams.get("create") !== "1") {
     if (searchParams.get("create") !== "1") {
       createIntentHandledRef.current = false;
       return;
@@ -1390,6 +1944,7 @@ export default function Services() {
     openDialog();
 
     const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("create");
     nextParams.delete("create");
     setSearchParams(nextParams, { replace: true });
   }, [openDialog, searchParams, setSearchParams]);
@@ -1417,9 +1972,21 @@ export default function Services() {
         currentAmount:
           full.Party?.currentAmount ?? full.Customer?.currentAmount ?? null,
         type: "customer",
+        partyId: full.partyId || full.Party?.id || full.Customer?.id || "",
+        partyName:
+          full.partyName || full.Party?.name || full.Customer?.name || "",
+        partyPhone:
+          full.partyPhone || full.Party?.phone || full.Customer?.phone || "",
+        currentAmount:
+          full.Party?.currentAmount ?? full.Customer?.currentAmount ?? null,
+        type: "customer",
       };
 
       setHeader({
+        partyId: full.partyId || "",
+        orderNo: full.orderNo || "",
+        status: full.status || "open",
+        notes: full.notes || "",
         partyId: full.partyId || "",
         orderNo: full.orderNo || "",
         status: full.status || "open",
@@ -1428,13 +1995,21 @@ export default function Services() {
         ...normalizePaymentFields(full),
         attachment:
           normalizeAttachmentUrls(full.attachments, full.attachment)[0] || "",
+        attachment:
+          normalizeAttachmentUrls(full.attachments, full.attachment)[0] || "",
         attachments: normalizeAttachmentUrls(full.attachments, full.attachment),
         attributes: normalizeJewelleryAttributes(full.attributes || {}),
       });
       cacheProducts(hydratedProducts);
       setSuggestedOrderNo(full.orderNo || "");
+      setSuggestedOrderNo(full.orderNo || "");
       setAmountReceived(String(full.receivedTotal ?? 0));
       setDiscount(String(full.discountTotal ?? full.discount ?? 0));
+      const computedIsPaid =
+        Math.max(
+          Number(full.grandTotal || 0) - Number(full.receivedTotal || 0),
+          0,
+        ) <= 0;
       const computedIsPaid =
         Math.max(
           Number(full.grandTotal || 0) - Number(full.receivedTotal || 0),
@@ -1455,14 +2030,30 @@ export default function Services() {
             }))
           : [],
       );
+      setItems(
+        rawItems.length > 0
+          ? rawItems.map((i) => ({
+              itemType: i.itemType || "labor",
+              description: i.description || "",
+              productId: i.productId || "",
+              quantity: String(i.quantity ?? "1"),
+              unitType: i.unitType || "primary",
+              unitPrice: String(i.unitPrice ?? "0"),
+              taxRate: String(i.taxRate ?? "0"),
+              lineTotal: String(i.lineTotal ?? "0"),
+            }))
+          : [],
+      );
 
       // Set selected party if we have party data
       if (partyData.partyId && partyData.partyName) {
         const party = normalizeLookupParty(partyData);
         setSelectedParty(party);
         setPartyQuery(`${party.name}${party.phone ? ` (${party.phone})` : ""}`);
+        setPartyQuery(`${party.name}${party.phone ? ` (${party.phone})` : ""}`);
       }
     } catch (err) {
+      setFormNotice({ type: "error", message: err.message });
       setFormNotice({ type: "error", message: err.message });
     } finally {
       setEditLoading(false);
@@ -1485,6 +2076,7 @@ export default function Services() {
 
   const handlePartyFilterChange = (option) => {
     setPartyFilterId(option?.value || "");
+    setPartyFilterId(option?.value || "");
     setSelectedPartyFilterOption(option || null);
   };
 
@@ -1492,8 +2084,6 @@ export default function Services() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setOrderNoError('');
-    setFormNotice({ type: '', message: '' });
     if (!canManageServices) {
       setFormNotice({
         type: "error",
@@ -1513,7 +2103,15 @@ export default function Services() {
       setFormNotice({ type: "error", message: t("errors.selectProductPart") });
       return;
     }
+    const invalidPart = chargeableItems.find(
+      (i) => i.itemType === "part" && !i.productId,
+    );
+    if (invalidPart) {
+      setFormNotice({ type: "error", message: t("errors.selectProductPart") });
+      return;
+    }
     const invalidConversion = chargeableItems.find((i) => {
+      if (i.itemType !== "part" || i.unitType !== "secondary") return false;
       if (i.itemType !== "part" || i.unitType !== "secondary") return false;
       return Number(getProductById(i.productId)?.conversionRate || 0) <= 0;
     });
@@ -1521,20 +2119,32 @@ export default function Services() {
       setFormNotice({ type: "error", message: t("errors.conversionRequired") });
       return;
     }
+    if (invalidConversion) {
+      setFormNotice({ type: "error", message: t("errors.conversionRequired") });
+      return;
+    }
     if (!chargeableItems.length) {
+      setFormNotice({ type: "error", message: t("services.addFirstItem") });
       setFormNotice({ type: "error", message: t("services.addFirstItem") });
       try {
         clearTimeout(formNoticeTimerRef.current);
         formNoticeTimerRef.current = setTimeout(() => {
           try {
             setFormNotice({ type: "", message: "" });
+            setFormNotice({ type: "", message: "" });
           } catch (err) {
+            console.error("Error clearing notice:", err);
             console.error("Error clearing notice:", err);
           }
         }, 2000);
       } catch (err) {
         console.error("Error setting timeout:", err);
+        console.error("Error setting timeout:", err);
       }
+      return;
+    }
+    if (Number(discount || 0) < 0) {
+      setFormNotice({ type: "error", message: t("services.discountInvalid") });
       return;
     }
     if (Number(discount || 0) < 0) {
@@ -1547,8 +2157,20 @@ export default function Services() {
           Object.entries(header.attributes || {}).filter(
             ([key]) => !JEWELLERY_ATTRIBUTE_KEYS.includes(key),
           ),
+          Object.entries(header.attributes || {}).filter(
+            ([key]) => !JEWELLERY_ATTRIBUTE_KEYS.includes(key),
+          ),
         );
     const wastagePercent = Number(normalizedAttributes.wastagePercent || 0);
+    if (
+      showGoldJewelleryDetails &&
+      normalizedAttributes.wastagePercent &&
+      (wastagePercent < 5 || wastagePercent > 15)
+    ) {
+      setFormNotice({
+        type: "error",
+        message: "Wastage percent must be between 5 and 15.",
+      });
     if (
       showGoldJewelleryDetails &&
       normalizedAttributes.wastagePercent &&
@@ -1566,7 +2188,10 @@ export default function Services() {
 
     if (requiresBankSelection(header, receivedAmount)) {
       setMobileStep("payment");
+      setMobileStep("payment");
       setFormNotice({
+        type: "error",
+        message: t("payments.bankRequired"),
         type: "error",
         message: t("payments.bankRequired"),
       });
@@ -1577,6 +2202,8 @@ export default function Services() {
         setFormNotice({
           type: "",
           message: "",
+          type: "",
+          message: "",
         });
       }, 2000);
 
@@ -1584,13 +2211,19 @@ export default function Services() {
     }
     try {
       const manualOrderNo = String(header.orderNo || "").trim();
+      const manualOrderNo = String(header.orderNo || "").trim();
       const { paymentMethod, bankId, paymentNote, ...headerFields } = header;
+      const attachmentUrls = normalizeAttachmentUrls(
+        header.attachments,
+        header.attachment,
+      );
       const attachmentUrls = normalizeAttachmentUrls(
         header.attachments,
         header.attachment,
       );
       const payload = {
         ...headerFields,
+        storeType,
         storeType,
         attributes: normalizedAttributes,
         attachments: attachmentUrls,
@@ -1606,9 +2239,16 @@ export default function Services() {
         ...(Number(totals.received || 0) > 0
           ? buildPaymentPayload({ paymentMethod, bankId, paymentNote })
           : { paymentMethod: "cash" }),
+        ...(Number(totals.received || 0) > 0
+          ? buildPaymentPayload({ paymentMethod, bankId, paymentNote })
+          : { paymentMethod: "cash" }),
         items: chargeableItems.map((item) => ({
           ...item,
           quantity: Number(item.quantity),
+          unitType: item.unitType || "primary",
+          conversionRate: Number(
+            getProductById(item.productId)?.conversionRate || 0,
+          ),
           unitType: item.unitType || "primary",
           conversionRate: Number(
             getProductById(item.productId)?.conversionRate || 0,
@@ -1632,16 +2272,12 @@ export default function Services() {
           ...(creatorValue ? { createdBy: creatorValue } : {}),
         });
         setSuggestedOrderNo(created?.orderNo || "");
+        setSuggestedOrderNo(created?.orderNo || "");
       }
       useProductStore.getState().invalidate();
       closeDialog();
       loadServices();
     } catch (err) {
-      if (err?.status === 409 && err?.message) {
-        setMobileStep('details');
-        setOrderNoError(err.message);
-        return;
-      }
       setFormNotice({ type: "error", message: err.message });
     }
   };
@@ -1660,7 +2296,23 @@ export default function Services() {
     const inProgressCount = safeServiceList.filter(
       (order) => order.status === "in_progress",
     ).length;
+    const openCount = safeServiceList.filter(
+      (order) => order.status === "open",
+    ).length;
+    const closedCount = safeServiceList.filter(
+      (order) => order.status === "closed",
+    ).length;
+    const inProgressCount = safeServiceList.filter(
+      (order) => order.status === "in_progress",
+    ).length;
     const pendingCollection = safeServiceList.reduce(
+      (sum, order) =>
+        sum +
+        Math.max(
+          Number(order.grandTotal || 0) - Number(order.receivedTotal || 0),
+          0,
+        ),
+      0,
       (sum, order) =>
         sum +
         Math.max(
@@ -1688,11 +2340,22 @@ export default function Services() {
     ],
     [t],
   );
+  const statusFilterOptions = useMemo(
+    () => [
+      { value: "all", label: t("services.allStatuses") },
+      { value: "open", label: t("services.open") },
+      { value: "in_progress", label: t("services.inProgress") },
+      { value: "closed", label: t("services.closed") },
+    ],
+    [t],
+  );
 
   // ── Status dialog ──
   const openStatusDialog = (order) => {
     if (!canManageServices) return;
     setStatusDialog(order);
+    setNewStatus(order.status || "open");
+    setStatusError("");
     setNewStatus(order.status || "open");
     setStatusError("");
   };
@@ -1732,6 +2395,11 @@ export default function Services() {
     setPayPaymentMethod("cash");
     setPayBankId("");
     setPayError("");
+    setPayAmount("");
+    setPayNotes("");
+    setPayPaymentMethod("cash");
+    setPayBankId("");
+    setPayError("");
   };
 
   const handleRecordPayment = async (e) => {
@@ -1740,9 +2408,32 @@ export default function Services() {
       setPayError(t("staffManagement.permissionError"));
       return;
     }
+    if (!canManageServices) {
+      setPayError(t("staffManagement.permissionError"));
+      return;
+    }
     const amount = Number(payAmount || 0);
     if (!amount || amount <= 0) {
       setPayError("Enter a valid amount.");
+    if (!amount || amount <= 0) {
+      setPayError("Enter a valid amount.");
+      return;
+    }
+    if (
+      requiresBankSelection(
+        { paymentMethod: payPaymentMethod, bankId: payBankId },
+        amount,
+      )
+    ) {
+      setPayError(t("payments.bankRequired"));
+      return;
+    }
+    const currentDue = Math.max(
+      Number(payDialog.grandTotal || 0) - Number(payDialog.receivedTotal || 0),
+      0,
+    );
+    if (amount > currentDue) {
+      setPayError(`Amount cannot exceed due of ${currentDue.toFixed(2)}.`);
       return;
     }
     if (
@@ -1775,11 +2466,34 @@ export default function Services() {
       const refreshedOrder = normalizeServiceOrder(
         await api.getService(payDialog.id),
       );
+      const refreshedOrder = normalizeServiceOrder(
+        await api.getService(payDialog.id),
+      );
       patchService(payDialog.id, refreshedOrder);
       if (invoiceOrder?.id === refreshedOrder.id) {
         setInvoiceOrder(refreshedOrder);
       }
       const refreshedParty = normalizeLookupParty({
+        partyId:
+          refreshedOrder.partyId ||
+          refreshedOrder.Party?.id ||
+          refreshedOrder.Customer?.id ||
+          "",
+        partyName:
+          refreshedOrder.partyName ||
+          refreshedOrder.Party?.name ||
+          refreshedOrder.Customer?.name ||
+          "",
+        partyPhone:
+          refreshedOrder.partyPhone ||
+          refreshedOrder.Party?.phone ||
+          refreshedOrder.Customer?.phone ||
+          "",
+        currentAmount:
+          refreshedOrder.Party?.currentAmount ??
+          refreshedOrder.Customer?.currentAmount ??
+          null,
+        type: "customer",
         partyId:
           refreshedOrder.partyId ||
           refreshedOrder.Party?.id ||
@@ -1825,10 +2539,16 @@ export default function Services() {
 
     setDeletingServiceId(deleteService.id);
     setListNotice({ type: "", message: "" });
+    setListNotice({ type: "", message: "" });
 
     try {
       await api.deleteService(deleteService.id);
       useProductStore.getState().invalidate();
+      setListError("");
+      setListNotice({
+        type: "success",
+        message: t("services.messages.deleted"),
+      });
       setListError("");
       setListNotice({
         type: "success",
@@ -1843,13 +2563,22 @@ export default function Services() {
         type: "error",
         message: err.message || t("services.messages.deleteFailed"),
       });
+      setListNotice({
+        type: "error",
+        message: err.message || t("services.messages.deleteFailed"),
+      });
     } finally {
+      setDeletingServiceId("");
       setDeletingServiceId("");
       setDeleteService(null);
     }
   };
 
   const money = (val) =>
+    t("currency.formatted", {
+      symbol: t("currency.symbol"),
+      amount: Number(val || 0).toFixed(2),
+    }).replace(" ", "\u00a0");
     t("currency.formatted", {
       symbol: t("currency.symbol"),
       amount: Number(val || 0).toFixed(2),
@@ -1862,6 +2591,9 @@ export default function Services() {
     printElement(invoicePrintRef.current);
   };
 
+  const showDetailsStep = mobileStep === "details";
+  const showItemsStep = mobileStep === "items";
+  const showPaymentStep = mobileStep === "payment";
   const showDetailsStep = mobileStep === "details";
   const showItemsStep = mobileStep === "items";
   const showPaymentStep = mobileStep === "payment";
@@ -1880,11 +2612,31 @@ export default function Services() {
   const invoiceAttachmentUrls = invoiceOrder
     ? getServiceAttachmentUrls(invoiceOrder)
     : [];
+  const itemDraftVatAmount = getVatAmount(
+    itemDraft.lineTotal,
+    itemDraft.taxRate,
+  );
+  const canSaveDraftItem =
+    itemDraft.itemType === "part"
+      ? Boolean(itemDraft.productId) && Number(itemDraft.lineTotal || 0) > 0
+      : Number(itemDraft.lineTotal || 0) > 0 ||
+        Boolean(String(itemDraft.description || "").trim());
+  const dialogTitle = editingId ? t("services.editOrder") : newOrderLabel;
+  const summaryOrderNo = header.orderNo || suggestedOrderNo || "—";
+  const invoiceAttachmentUrls = invoiceOrder
+    ? getServiceAttachmentUrls(invoiceOrder)
+    : [];
   const invoiceItems = invoiceOrder ? getServiceItems(invoiceOrder) : [];
   const invoiceJewellery = invoiceOrder
     ? getJewelleryBreakdown(invoiceOrder.attributes || {})
     : getJewelleryBreakdown({});
+  const invoiceJewellery = invoiceOrder
+    ? getJewelleryBreakdown(invoiceOrder.attributes || {})
+    : getJewelleryBreakdown({});
   const invoiceExtraAttributes = invoiceOrder?.attributes
+    ? Object.entries(invoiceOrder.attributes).filter(
+        ([key]) => !JEWELLERY_ATTRIBUTE_KEYS.includes(key),
+      )
     ? Object.entries(invoiceOrder.attributes).filter(
         ([key]) => !JEWELLERY_ATTRIBUTE_KEYS.includes(key),
       )
@@ -1893,6 +2645,10 @@ export default function Services() {
     ? getServiceOrderTotals(invoiceOrder)
     : { laborTotal: 0, partsTotal: 0, subTotal: 0, taxTotal: 0, grandTotal: 0 };
   const mobilePrimaryActionLabel = canGoForwardStep
+    ? t("common.continue")
+    : editingId
+      ? t("common.update")
+      : t("services.saveOrder");
     ? t("common.continue")
     : editingId
       ? t("common.update")
@@ -1908,12 +2664,20 @@ export default function Services() {
               <h1 className="mt-0 font-serif text-3xl text-slate-900 dark:text-white md:text-3xl">
                 {servicesTitle}
               </h1>
+              <h1 className="mt-0 font-serif text-3xl text-slate-900 dark:text-white md:text-3xl">
+                {servicesTitle}
+              </h1>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 md:text-base">
                 {servicesSubtitle}
               </p>
             </div>
 
             {canManageServices ? (
+              <button
+                className="btn-primary w-full sm:w-auto"
+                type="button"
+                onClick={openDialog}
+              >
               <button
                 className="btn-primary w-full sm:w-auto"
                 type="button"
@@ -1949,10 +2713,36 @@ export default function Services() {
               value={money(serviceOverview.pendingCollection)}
               tone="rose"
             />
+            <OverviewMetric
+              icon={LayoutList}
+              label={t("services.totalOrders")}
+              value={serviceOverview.totalOrders}
+            />
+            <OverviewMetric
+              icon={Check}
+              label={t("services.closed")}
+              value={serviceOverview.closedCount}
+              tone="emerald"
+            />
+            <OverviewMetric
+              icon={CalendarDays}
+              label={t("services.activeJobs")}
+              value={serviceOverview.inProgressCount}
+              tone="amber"
+            />
+            <OverviewMetric
+              icon={Wallet}
+              label={t("services.pendingCollection")}
+              value={money(serviceOverview.pendingCollection)}
+              tone="rose"
+            />
           </div>
         </div>
       </section>
 
+      {listNotice.message ? (
+        <Notice title={listNotice.message} tone={listNotice.type} />
+      ) : null}
       {listNotice.message ? (
         <Notice title={listNotice.message} tone={listNotice.type} />
       ) : null}
@@ -1969,10 +2759,17 @@ export default function Services() {
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 {t("services.browseOrdersHint")}
               </p>
+              <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
+                {t("services.recentOrders")}
+              </h3>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                {t("services.browseOrdersHint")}
+              </p>
             </div>
 
             <div className="grid w-full gap-3 xl:max-w-3xl xl:grid-cols-[1fr_1fr_auto] xl:items-end">
               <div>
+                <label className="label">{t("services.filterByParty")}</label>
                 <label className="label">{t("services.filterByParty")}</label>
                 <PartyFilterSelect
                   className="mt-1"
@@ -1982,9 +2779,12 @@ export default function Services() {
                   onChange={handlePartyFilterChange}
                   placeholder={t("services.allParties")}
                   searchPlaceholder={t("parties.searchPlaceholder")}
+                  placeholder={t("services.allParties")}
+                  searchPlaceholder={t("parties.searchPlaceholder")}
                 />
               </div>
               <div>
+                <label className="label">{t("filters.createdBy")}</label>
                 <label className="label">{t("filters.createdBy")}</label>
                 <CreatorFilterSelect
                   className="mt-1"
@@ -2018,7 +2818,13 @@ export default function Services() {
               <p className="py-4 text-sm text-slate-500">
                 {t("common.loading")}
               </p>
+              <p className="py-4 text-sm text-slate-500">
+                {t("common.loading")}
+              </p>
             ) : pagedServices.length === 0 ? (
+              <p className="py-4 text-sm text-slate-500">
+                {t("services.noOrders")}
+              </p>
               <p className="py-4 text-sm text-slate-500">
                 {t("services.noOrders")}
               </p>
@@ -2029,7 +2835,14 @@ export default function Services() {
                     Number(order.receivedTotal || 0),
                   0,
                 );
+                const due = Math.max(
+                  Number(order.grandTotal || 0) -
+                    Number(order.receivedTotal || 0),
+                  0,
+                );
                 const days = getDeliveryDaysLeft(order.deliveryDate);
+                const isUrgent =
+                  order.status !== "closed" && days !== null && days < 3;
                 const isUrgent =
                   order.status !== "closed" && days !== null && days < 3;
                 const attachmentUrls = getServiceAttachmentUrls(order);
@@ -2039,6 +2852,8 @@ export default function Services() {
                     key={order.id}
                     className={`rounded-[26px] border p-4 text-sm shadow-sm ${
                       isUrgent
+                        ? "border-red-200/70 bg-red-50/60 dark:border-red-900/30 dark:bg-red-950/10"
+                        : "border-slate-200/70 bg-white/90 dark:border-slate-800/60 dark:bg-slate-900/70"
                         ? "border-red-200/70 bg-red-50/60 dark:border-red-900/30 dark:bg-red-950/10"
                         : "border-slate-200/70 bg-white/90 dark:border-slate-800/60 dark:bg-slate-900/70"
                     }`}
@@ -2073,10 +2888,17 @@ export default function Services() {
                             <p className="text-xs text-slate-500 dark:text-slate-400">
                               Created by {getCreatorDisplayName(order)}
                             </p>
+                            <p className="truncate font-medium text-slate-800 dark:text-slate-100">
+                              {order.Party?.name || order.partyName || "—"}
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              Created by {getCreatorDisplayName(order)}
+                            </p>
                           </div>
                         </div>
 
                         <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                          {order.status !== "closed" ? (
                           {order.status !== "closed" ? (
                             <DeliveryBadge date={order.deliveryDate} />
                           ) : (
@@ -2098,6 +2920,12 @@ export default function Services() {
                         <p className="mt-2 text-base font-semibold text-slate-900 dark:text-white">
                           {money(order.grandTotal)}
                         </p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                          {t("services.summaryTotal")}
+                        </p>
+                        <p className="mt-2 text-base font-semibold text-slate-900 dark:text-white">
+                          {money(order.grandTotal)}
+                        </p>
                         {due > 0 ? (
                           <button
                             type="button"
@@ -2107,6 +2935,9 @@ export default function Services() {
                             {money(due)}
                           </button>
                         ) : (
+                          <p className="mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                            {t("common.paid")}
+                          </p>
                           <p className="mt-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                             {t("common.paid")}
                           </p>
@@ -2147,6 +2978,35 @@ export default function Services() {
                                   onClick: () => setDeleteService(order),
                                 },
                               ]
+                            ? [
+                                {
+                                  label: t("common.edit"),
+                                  icon: Pencil,
+                                  onClick: () => openEditDialog(order),
+                                },
+                              ]
+                            : []),
+                          {
+                            label: "View Bill",
+                            icon: FileText,
+                            onClick: () => openInvoiceModal(order),
+                          },
+                          {
+                            label: "Print Bill",
+                            icon: Printer,
+                            onClick: () =>
+                              openInvoiceModal(order, { print: true }),
+                          },
+                          ...(canManageServices
+                            ? [
+                                {
+                                  label: t("common.delete"),
+                                  icon: Trash2,
+                                  tone: "danger",
+                                  disabled: deletingServiceId === order.id,
+                                  onClick: () => setDeleteService(order),
+                                },
+                              ]
                             : []),
                         ]}
                       />
@@ -2156,7 +3016,13 @@ export default function Services() {
                       <div className="mt-3">
                         <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                           {t("services.attachment")}
+                          {t("services.attachment")}
                         </p>
+                        <AttachmentStrip
+                          urls={attachmentUrls}
+                          onOpen={openLightbox}
+                          size="md"
+                        />
                         <AttachmentStrip
                           urls={attachmentUrls}
                           onOpen={openLightbox}
@@ -2198,6 +3064,30 @@ export default function Services() {
                   </th>
                   <th className="py-2 pr-4 text-right">{t("services.due")}</th>
                   <th className="py-2 text-right">{t("common.actions")}</th>
+                  <th className="py-2 pr-4 text-left">
+                    {t("services.orderNo")}
+                  </th>
+                  <th className="py-2 pr-4 text-left">
+                    {t("services.customer")}
+                  </th>
+                  <th className="py-2 pr-4 text-left">
+                    {t("services.deliveryDate")}
+                  </th>
+                  <th className="py-2 pr-4 text-left">
+                    {t("services.status")}
+                  </th>
+                  <th className="py-2 pr-4 text-left">{t("common.payment")}</th>
+                  <th className="py-2 pr-2 text-left">
+                    {t("services.attachment")}
+                  </th>
+                  <th className="py-2 pr-4 text-right">
+                    {t("services.grandTotal")}
+                  </th>
+                  <th className="py-2 pr-4 text-right">
+                    {t("services.amountReceived")}
+                  </th>
+                  <th className="py-2 pr-4 text-right">{t("services.due")}</th>
+                  <th className="py-2 text-right">{t("common.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2206,9 +3096,15 @@ export default function Services() {
                     <td colSpan={10} className="py-4 text-slate-500">
                       {t("common.loading")}
                     </td>
+                    <td colSpan={10} className="py-4 text-slate-500">
+                      {t("common.loading")}
+                    </td>
                   </tr>
                 ) : pagedServices.length === 0 ? (
                   <tr>
+                    <td colSpan={10} className="py-4 text-slate-500">
+                      {t("services.noOrders")}
+                    </td>
                     <td colSpan={10} className="py-4 text-slate-500">
                       {t("services.noOrders")}
                     </td>
@@ -2223,9 +3119,24 @@ export default function Services() {
                       days !== null &&
                       days >= 3 &&
                       days < 8;
+                    const isUrgent =
+                      order.status !== "closed" && days !== null && days < 3;
+                    const isWarning =
+                      order.status !== "closed" &&
+                      days !== null &&
+                      days >= 3 &&
+                      days < 8;
                     const rowClass = isUrgent
                       ? "border-t border-red-200/60 bg-red-50/40 dark:border-red-900/30 dark:bg-red-950/10"
+                      ? "border-t border-red-200/60 bg-red-50/40 dark:border-red-900/30 dark:bg-red-950/10"
                       : isWarning
+                        ? "border-t border-amber-200/60 bg-amber-50/40 dark:border-amber-900/30 dark:bg-amber-950/10"
+                        : "border-t border-slate-200/70 dark:border-slate-800/70";
+                    const due = Math.max(
+                      Number(order.grandTotal || 0) -
+                        Number(order.receivedTotal || 0),
+                      0,
+                    );
                         ? "border-t border-amber-200/60 bg-amber-50/40 dark:border-amber-900/30 dark:bg-amber-950/10"
                         : "border-t border-slate-200/70 dark:border-slate-800/70";
                     const due = Math.max(
@@ -2249,6 +3160,14 @@ export default function Services() {
                           <div className="text-xs text-slate-400">
                             Created by {getCreatorDisplayName(order)}
                           </div>
+                          <div>
+                            {order.Party?.name || order.partyName || (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            Created by {getCreatorDisplayName(order)}
+                          </div>
                         </td>
                         <td className="py-3 pr-4">
                           {order.status !== "closed" ? (
@@ -2256,8 +3175,18 @@ export default function Services() {
                           ) : (
                             <ClosedDeliveryLabel />
                           )}
+                          {order.status !== "closed" ? (
+                            <DeliveryBadge date={order.deliveryDate} />
+                          ) : (
+                            <ClosedDeliveryLabel />
+                          )}
                         </td>
                         <td className="py-3 pr-4">
+                          <button
+                            type="button"
+                            className="transition hover:opacity-75"
+                            onClick={() => openStatusDialog(order)}
+                          >
                           <button
                             type="button"
                             className="transition hover:opacity-75"
@@ -2276,9 +3205,20 @@ export default function Services() {
                               onOpen={openLightbox}
                               maxVisible={2}
                             />
+                            <AttachmentStrip
+                              urls={attachmentUrls}
+                              onOpen={openLightbox}
+                              maxVisible={2}
+                            />
                           ) : (
                             <span className="text-slate-300">—</span>
                           )}
+                        </td>
+                        <td className="py-3 pr-4 text-right font-semibold text-slate-800 dark:text-slate-200">
+                          {money(order.grandTotal)}
+                        </td>
+                        <td className="py-3 pr-4 text-right text-emerald-700 dark:text-emerald-400">
+                          {money(order.receivedTotal)}
                         </td>
                         <td className="py-3 pr-4 text-right font-semibold text-slate-800 dark:text-slate-200">
                           {money(order.grandTotal)}
@@ -2299,12 +3239,45 @@ export default function Services() {
                             <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
                               {t("common.paid")}
                             </span>
+                            <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                              {t("common.paid")}
+                            </span>
                           )}
                         </td>
                         <td className="py-3 text-right">
                           <ActionMenu
+                          <ActionMenu
                             actions={[
                               ...(canManageServices
+                                ? [
+                                    {
+                                      label: t("common.edit"),
+                                      icon: Pencil,
+                                      onClick: () => openEditDialog(order),
+                                    },
+                                  ]
+                                : []),
+                              {
+                                label: "View Bill",
+                                icon: FileText,
+                                onClick: () => openInvoiceModal(order),
+                              },
+                              {
+                                label: "Print Bill",
+                                icon: Printer,
+                                onClick: () =>
+                                  openInvoiceModal(order, { print: true }),
+                              },
+                              ...(canManageServices
+                                ? [
+                                    {
+                                      label: t("common.delete"),
+                                      icon: Trash2,
+                                      tone: "danger",
+                                      disabled: deletingServiceId === order.id,
+                                      onClick: () => setDeleteService(order),
+                                    },
+                                  ]
                                 ? [
                                     {
                                       label: t("common.edit"),
@@ -2357,6 +3330,10 @@ export default function Services() {
                 setPageSize(size);
                 setPage(1);
               }}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
               pageSizeOptions={TABLE_ROW_OPTIONS}
             />
           </div>
@@ -2367,6 +3344,9 @@ export default function Services() {
       {dialogOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeDialog();
+          }}
           onClick={(e) => {
             if (e.target === e.currentTarget) closeDialog();
           }}
@@ -2381,7 +3361,18 @@ export default function Services() {
                   <h2 className="mt-1 truncate font-serif text-xl text-slate-900 dark:text-white md:text-2xl">
                     {dialogTitle}
                   </h2>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary-700 dark:text-primary-200">
+                    {t("services.workspaceLabel")}
+                  </p>
+                  <h2 className="mt-1 truncate font-serif text-xl text-slate-900 dark:text-white md:text-2xl">
+                    {dialogTitle}
+                  </h2>
                 </div>
+                <button
+                  type="button"
+                  onClick={closeDialog}
+                  className="rounded-2xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                >
                 <button
                   type="button"
                   onClick={closeDialog}
@@ -2408,7 +3399,32 @@ export default function Services() {
                   showNavigation={false}
                 />
               </div>
+              <div className="md:hidden">
+                <MobileFormStepper
+                  steps={formSteps}
+                  currentStep={mobileStep}
+                  onStepChange={setMobileStep}
+                  onNext={goToNextMobileStep}
+                  onBack={goToPreviousMobileStep}
+                  canProceed={!editLoading}
+                  backLabel={t("common.back")}
+                  nextLabel={
+                    mobileStep === "items"
+                      ? t("services.paymentStep")
+                      : t("common.continue")
+                  }
+                  showNavigation={false}
+                />
+              </div>
 
+              <form
+                onSubmit={handleSubmit}
+                className="flex min-h-0 flex-1 flex-col"
+              >
+                <div
+                  ref={formScrollRef}
+                  className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6"
+                >
               <form
                 onSubmit={handleSubmit}
                 className="flex min-h-0 flex-1 flex-col"
@@ -2419,6 +3435,10 @@ export default function Services() {
                 >
                   <div className="mx-auto w-full max-w-[1320px] space-y-4">
                     {formNotice.message ? (
+                      <Notice
+                        title={formNotice.message}
+                        tone={formNotice.type}
+                      />
                       <Notice
                         title={formNotice.message}
                         tone={formNotice.type}
@@ -2434,7 +3454,14 @@ export default function Services() {
                     {showDetailsStep ? (
                       <>
                         <FormSectionCard className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40">
+                        <FormSectionCard className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40">
                           <div className="flex items-center justify-between">
+                            <label className="label">
+                              {t("services.customer")}
+                            </label>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                              {t("common.optional")}
+                            </span>
                             <label className="label">
                               {t("services.customer")}
                             </label>
@@ -2452,8 +3479,16 @@ export default function Services() {
                                   <p className="truncate font-semibold text-slate-800 dark:text-slate-100">
                                     {selectedParty.name}
                                   </p>
+                                  <p className="truncate font-semibold text-slate-800 dark:text-slate-100">
+                                    {selectedParty.name}
+                                  </p>
                                   {selectedParty.phone ? (
                                     <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                                      <p className="text-xs text-slate-500">
+                                        {selectedParty.phone}
+                                      </p>
+                                      {!selectedPartyHasDue &&
+                                      selectedPartyWhatsAppLink ? (
                                       <p className="text-xs text-slate-500">
                                         {selectedParty.phone}
                                       </p>
@@ -2484,8 +3519,20 @@ export default function Services() {
                                             selectedPartyBalanceMeta.absoluteAmount.toFixed(
                                               2,
                                             ),
+                                      <p
+                                        className={`text-xs ${selectedPartyBalanceMeta.textClass}`}
+                                      >
+                                        {selectedPartyBalanceMeta.label}:{" "}
+                                        {t("currency.formatted", {
+                                          symbol: t("currency.symbol"),
+                                          amount:
+                                            selectedPartyBalanceMeta.absoluteAmount.toFixed(
+                                              2,
+                                            ),
                                         })}
                                       </p>
+                                      {selectedPartyHasDue &&
+                                      selectedPartyWhatsAppLink ? (
                                       {selectedPartyHasDue &&
                                       selectedPartyWhatsAppLink ? (
                                         <a
@@ -2502,6 +3549,11 @@ export default function Services() {
                                     </div>
                                   ) : null}
                                 </div>
+                                <button
+                                  type="button"
+                                  onClick={clearParty}
+                                  className="rounded-xl p-2 text-slate-400 transition hover:bg-white hover:text-slate-700 dark:hover:bg-slate-800"
+                                >
                                 <button
                                   type="button"
                                   onClick={clearParty}
@@ -2536,7 +3588,124 @@ export default function Services() {
                                       </button>
                                     ) : null}
                                   </div>
+                                <div className="flex items-center gap-2">
+                                  {/* existing search input */}
+                                  <div className="flex items-center gap-2 rounded-[24px] border border-slate-200/70 bg-white px-3 py-3 shadow-sm shadow-slate-200/10 dark:border-slate-700/60 dark:bg-slate-900/60 focus-within:border-primary-300 flex-1">
+                                    <Search
+                                      size={16}
+                                      className="shrink-0 text-slate-400"
+                                    />
+                                    <input
+                                      className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400 dark:text-slate-200"
+                                      placeholder={t("services.customerSearch")}
+                                      value={partyQuery}
+                                      onChange={handlePartySearch}
+                                      onFocus={() => setPartyDropdownOpen(true)}
+                                    />
+                                    {partyQuery ? (
+                                      <button
+                                        type="button"
+                                        onClick={clearParty}
+                                        className="text-slate-400 transition hover:text-slate-600"
+                                      >
+                                        <X size={14} />
+                                      </button>
+                                    ) : null}
+                                  </div>
 
+                                  {/* store type dropdown */}
+                                  <div className="relative">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setStoreDropdownOpen((o) => !o)
+                                      }
+                                      className="flex items-center gap-1.5 rounded-[24px] border border-slate-200/70 bg-white px-3 py-3 text-sm font-medium text-slate-700 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-200 whitespace-nowrap"
+                                    >
+                                      <selectedStore.icon size={15} />
+                                      {selectedStore.value === "physical"
+                                        ? "Physical"
+                                        : "Online"}
+                                      <ChevronDown
+                                        size={13}
+                                        className={`text-slate-400 transition-transform ${storeDropdownOpen ? "rotate-180" : ""}`}
+                                      />
+                                    </button>
+
+                                    {storeDropdownOpen && (
+                                      <div className="absolute right-0 top-full mt-1.5 z-50 w-44 rounded-2xl border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-900 overflow-hidden">
+                                        {storeOptions.map((opt) => (
+                                          <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => {
+                                              setStoreType(opt.value);
+                                              setStoreDropdownOpen(false);
+                                            }}
+                                            className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+                                          >
+                                            <opt.icon
+                                              size={15}
+                                              className="shrink-0 text-slate-400"
+                                            />
+                                            <div className="flex-1">
+                                              <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                                                {opt.label}
+                                              </p>
+                                              <p className="text-[11px] text-slate-400">
+                                                {opt.sub}
+                                              </p>
+                                            </div>
+                                            {storeType === opt.value && (
+                                              <Check
+                                                size={13}
+                                                className="text-emerald-500 shrink-0"
+                                              />
+                                            )}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {partyDropdownOpen &&
+                                partyQuery.trim() &&
+                                partyDropdownStyle
+                                  ? createPortal(
+                                      <div
+                                        ref={partyDropdownRef}
+                                        className="fixed z-[1000] overflow-y-auto rounded-[24px] border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+                                        style={partyDropdownStyle}
+                                      >
+                                        {filteredParties.length > 0
+                                          ? filteredParties.map((party) => (
+                                              <button
+                                                key={party.id}
+                                                type="button"
+                                                className="flex w-full items-center gap-3 border-b border-slate-100/80 px-4 py-3 text-left text-sm transition hover:bg-slate-50 dark:border-slate-800/50 dark:hover:bg-slate-800/60 last:border-b-0"
+                                                onClick={() =>
+                                                  selectParty(party)
+                                                }
+                                              >
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                  {party.name
+                                                    .slice(0, 2)
+                                                    .toUpperCase()}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                  <p className="truncate font-semibold text-slate-800 dark:text-slate-200">
+                                                    {party.name}
+                                                  </p>
+                                                  {party.phone ? (
+                                                    <p className="truncate text-xs text-slate-500">
+                                                      {party.phone}
+                                                    </p>
+                                                  ) : null}
+                                                </div>
+                                              </button>
+                                            ))
+                                          : null}
                                   {/* store type dropdown */}
                                   <div className="relative">
                                     <button
@@ -2698,6 +3867,73 @@ export default function Services() {
                                       document.body,
                                     )
                                   : null}
+                                        {!showAddNew ? (
+                                          <button
+                                            type="button"
+                                            className="flex w-full items-center gap-2 px-4 py-3 text-sm text-primary-700 transition hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-900/20"
+                                            onClick={() => setShowAddNew(true)}
+                                          >
+                                            <Plus size={14} />
+                                            Add &ldquo;{partyQuery.trim()}
+                                            &rdquo; as customer
+                                          </button>
+                                        ) : (
+                                          <div className="border-t border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                                            <p className="mb-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                              New:{" "}
+                                              <span className="text-primary-700">
+                                                {partyQuery.trim()}
+                                              </span>
+                                            </p>
+                                            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                                              <Phone
+                                                size={13}
+                                                className="shrink-0 text-slate-400"
+                                              />
+                                              <input
+                                                className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                                                type="tel"
+                                                inputMode="numeric"
+                                                placeholder={t(
+                                                  "parties.phonePlaceholder",
+                                                )}
+                                                value={newPartyPhone}
+                                                disabled={creatingParty}
+                                                onChange={(e) =>
+                                                  setNewPartyPhone(
+                                                    e.target.value,
+                                                  )
+                                                }
+                                              />
+                                            </div>
+                                            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                                              <button
+                                                type="button"
+                                                className="btn-ghost text-xs"
+                                                onClick={() =>
+                                                  setShowAddNew(false)
+                                                }
+                                                disabled={creatingParty}
+                                              >
+                                                {t("common.cancel")}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                className="btn-primary text-xs"
+                                                onClick={createAndSelectParty}
+                                                disabled={creatingParty}
+                                              >
+                                                {creatingParty
+                                                  ? t("common.loading")
+                                                  : t("services.addSelect")}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>,
+                                      document.body,
+                                    )
+                                  : null}
                               </div>
                             )}
                           </div>
@@ -2707,11 +3943,15 @@ export default function Services() {
                               <label className="label">
                                 {t("services.orderNo")}
                               </label>
+                              <label className="label">
+                                {t("services.orderNo")}
+                              </label>
                               <input
                                 className={`input mt-1 ${orderNoError ? 'border-rose-300 focus:border-rose-400 focus:ring-rose-200' : ''}`}
                                 name="orderNo"
                                 value={header.orderNo}
                                 onChange={handleHeaderChange}
+                                placeholder={!editingId ? suggestedOrderNo : ""}
                                 placeholder={!editingId ? suggestedOrderNo : ""}
                               />
                               {orderNoError ? (
@@ -2721,6 +3961,21 @@ export default function Services() {
                               ) : null}
                             </div>
                             <div>
+                              <label className="label">
+                                {t("services.status")}
+                              </label>
+                              <select
+                                className="input mt-1"
+                                name="status"
+                                value={header.status}
+                                onChange={handleHeaderChange}
+                              >
+                                <option value="in_progress">
+                                  {t("services.inProgress")}
+                                </option>
+                                <option value="closed">
+                                  {t("services.closed")}
+                                </option>
                               <label className="label">
                                 {t("services.status")}
                               </label>
@@ -2749,11 +4004,23 @@ export default function Services() {
                                 value={header.deliveryDate}
                                 onChange={handleHeaderChange}
                               />
+                              <label className="label">
+                                {t("services.deliveryDate")}
+                              </label>
+                              <input
+                                type="date"
+                                className="input mt-1"
+                                name="deliveryDate"
+                                value={header.deliveryDate}
+                                onChange={handleHeaderChange}
+                              />
                             </div>
                           </div>
                         </FormSectionCard>
 
                         <FormSectionCard
+                          title={t("services.notesSectionTitle")}
+                          hint={t("services.notesSectionHint")}
                           title={t("services.notesSectionTitle")}
                           hint={t("services.notesSectionHint")}
                           className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
@@ -2763,19 +4030,35 @@ export default function Services() {
                               <label className="label">
                                 {t("services.notes")}
                               </label>
+                              <label className="label">
+                                {t("services.notes")}
+                              </label>
                               <NoteTextarea
                                 className="input mt-1 h-32 resize-none"
                                 name="notes"
                                 value={header.notes}
                                 onChange={handleHeaderChange}
                                 placeholder={t("services.notesPlaceholder")}
+                                placeholder={t("services.notesPlaceholder")}
                               />
                             </div>
                             <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
                               <FileUpload
                                 label={t("services.attachment")}
+                                label={t("services.attachment")}
                                 multiple
                                 initialUrls={header.attachments}
+                                onUpload={(urls) =>
+                                  setHeader((prev) => ({
+                                    ...prev,
+                                    attachments: Array.isArray(urls)
+                                      ? urls
+                                      : normalizeAttachmentUrls(urls),
+                                    attachment: Array.isArray(urls)
+                                      ? urls[0] || ""
+                                      : String(urls || ""),
+                                  }))
+                                }
                                 onUpload={(urls) =>
                                   setHeader((prev) => ({
                                     ...prev,
@@ -2947,12 +4230,19 @@ export default function Services() {
 
                         <FormSectionCard
                           title={t("services.orderInformation")}
+                          title={t("services.orderInformation")}
                           className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                         >
                           <DynamicAttributes
                             entityType="service"
                             attributes={header.attributes}
                             hiddenKeys={JEWELLERY_ATTRIBUTE_KEYS}
+                            onChange={(attr) =>
+                              setHeader((prev) => ({
+                                ...prev,
+                                attributes: attr,
+                              }))
+                            }
                             onChange={(attr) =>
                               setHeader((prev) => ({
                                 ...prev,
@@ -2969,7 +4259,19 @@ export default function Services() {
                         title={t("services.items")}
                         hint={t("services.itemsSectionHint")}
                         action={
+                        title={t("services.items")}
+                        hint={t("services.itemsSectionHint")}
+                        action={
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <span className="text-sm font-semibold text-slate-500">
+                              {visibleItems.length} {t("services.items")}
+                            </span>
+                            <button
+                              className="btn-ghost w-full sm:w-auto"
+                              type="button"
+                              onClick={startAddItem}
+                            >
+                              {t("services.addLine")}
                             <span className="text-sm font-semibold text-slate-500">
                               {visibleItems.length} {t("services.items")}
                             </span>
@@ -2982,12 +4284,24 @@ export default function Services() {
                             </button>
                           </div>
                         }
+                        }
                         className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                       >
                         {visibleItems.length > 0 ? (
                           <div className="mb-4 space-y-3">
                             {visibleItems.map((item, idx) => {
                               const product = getProductById(item.productId);
+                              const displayName =
+                                item.itemType === "part"
+                                  ? product?.name ||
+                                    item.description ||
+                                    t("services.productLine")
+                                  : item.description ||
+                                    t("services.serviceLine");
+                              const unitLabel =
+                                item.itemType === "part"
+                                  ? getUnitLabel(product, item.unitType)
+                                  : "";
                               const displayName =
                                 item.itemType === "part"
                                   ? product?.name ||
@@ -3016,6 +4330,14 @@ export default function Services() {
                                           ) : (
                                             <Package size={18} />
                                           )}
+                                        <div
+                                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${item.itemType === "labor" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"}`}
+                                        >
+                                          {item.itemType === "labor" ? (
+                                            <Wrench size={18} />
+                                          ) : (
+                                            <Package size={18} />
+                                          )}
                                         </div>
                                         <div className="min-w-0 flex-1">
                                           <div className="flex flex-wrap items-center gap-2">
@@ -3025,7 +4347,16 @@ export default function Services() {
                                               {item.itemType === "labor"
                                                 ? t("services.serviceLine")
                                                 : t("services.productLine")}
+                                            <span
+                                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.itemType === "labor" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"}`}
+                                            >
+                                              {item.itemType === "labor"
+                                                ? t("services.serviceLine")
+                                                : t("services.productLine")}
                                             </span>
+                                            <p className="truncate font-semibold text-slate-900 dark:text-white">
+                                              {displayName}
+                                            </p>
                                             <p className="truncate font-semibold text-slate-900 dark:text-white">
                                               {displayName}
                                             </p>
@@ -3037,10 +4368,23 @@ export default function Services() {
                                             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                                               {item.description}
                                             </p>
+                                          {item.itemType === "part" &&
+                                          item.description &&
+                                          product?.name &&
+                                          item.description !== product.name ? (
+                                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                              {item.description}
+                                            </p>
                                           ) : null}
                                           <div className="mt-2 flex flex-wrap gap-2">
                                             {item.itemType === "part" && (
+                                            {item.itemType === "part" && (
                                               <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                                {t("services.qty")}:{" "}
+                                                {item.quantity}
+                                                {unitLabel
+                                                  ? ` ${unitLabel}`
+                                                  : ""}
                                                 {t("services.qty")}:{" "}
                                                 {item.quantity}
                                                 {unitLabel
@@ -3053,6 +4397,10 @@ export default function Services() {
                                                 ? t("common.total")
                                                 : t("services.unitPrice")}
                                               : {money(item.unitPrice)}
+                                              {item.itemType === "labor"
+                                                ? t("common.total")
+                                                : t("services.unitPrice")}
+                                              : {money(item.unitPrice)}
                                             </span>
                                             <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
                                               {t("services.tax")}:{" "}
@@ -3060,8 +4408,15 @@ export default function Services() {
                                                 item.taxRate || 0,
                                               ).toFixed(2)}
                                               %
+                                              {t("services.tax")}:{" "}
+                                              {Number(
+                                                item.taxRate || 0,
+                                              ).toFixed(2)}
+                                              %
                                             </span>
                                             <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white dark:bg-primary-900/70">
+                                              {t("common.total")}:{" "}
+                                              {money(item.lineTotal)}
                                               {t("common.total")}:{" "}
                                               {money(item.lineTotal)}
                                             </span>
@@ -3080,12 +4435,22 @@ export default function Services() {
                                           className="mr-1.5 inline"
                                         />
                                         {t("common.edit")}
+                                        <Pencil
+                                          size={14}
+                                          className="mr-1.5 inline"
+                                        />
+                                        {t("common.edit")}
                                       </button>
                                       <button
                                         type="button"
                                         className="btn-ghost flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 xl:flex-none dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/20"
                                         onClick={() => removeItem(idx)}
                                       >
+                                        <X
+                                          size={14}
+                                          className="mr-1.5 inline"
+                                        />
+                                        {t("common.remove")}
                                         <X
                                           size={14}
                                           className="mr-1.5 inline"
@@ -3108,7 +4473,16 @@ export default function Services() {
                               className="btn-primary mt-4 w-full sm:w-auto"
                               onClick={startAddItem}
                             >
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                              {t("services.addFirstItem")}
+                            </p>
+                            <button
+                              type="button"
+                              className="btn-primary mt-4 w-full sm:w-auto"
+                              onClick={startAddItem}
+                            >
                               <Plus size={15} className="mr-1.5 inline" />
+                              {t("services.addLine")}
                               {t("services.addLine")}
                             </button>
                           </div>
@@ -3124,9 +4498,21 @@ export default function Services() {
                           ? t("services.editLine")
                           : t("services.addLine")
                       }
+                      title={
+                        editingItemIdx !== null
+                          ? t("services.editLine")
+                          : t("services.addLine")
+                      }
                       size="xl"
                       footer={
+                      footer={
                         <>
+                          <button
+                            type="button"
+                            className="btn-secondary w-full sm:w-auto"
+                            onClick={cancelItemForm}
+                          >
+                            {t("common.cancel")}
                           <button
                             type="button"
                             className="btn-secondary w-full sm:w-auto"
@@ -3143,13 +4529,29 @@ export default function Services() {
                             {editingItemIdx !== null
                               ? t("common.update")
                               : t("common.add")}
+                          <button
+                            type="button"
+                            className="btn-primary w-full sm:w-auto"
+                            onClick={confirmItem}
+                            disabled={!canSaveDraftItem}
+                          >
+                            {editingItemIdx !== null
+                              ? t("common.update")
+                              : t("common.add")}
                           </button>
                         </>
+                      }
                       }
                     >
                       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
                         <div className="space-y-4">
                           <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-200">
+                              {t("services.itemComposerTitle")}
+                            </p>
+                            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                              {t("services.itemComposerHint")}
+                            </p>
                             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-200">
                               {t("services.itemComposerTitle")}
                             </p>
@@ -3163,6 +4565,9 @@ export default function Services() {
                               <label className="label">
                                 {t("services.type")}
                               </label>
+                              <label className="label">
+                                {t("services.type")}
+                              </label>
                               <div className="mt-1 flex gap-2">
                                 <button
                                   type="button"
@@ -3170,11 +4575,18 @@ export default function Services() {
                                     itemDraft.itemType === "labor"
                                       ? "bg-primary-600 text-white shadow-md ring-2 ring-primary-600 ring-offset-2 dark:ring-offset-slate-900"
                                       : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                                    itemDraft.itemType === "labor"
+                                      ? "bg-primary-600 text-white shadow-md ring-2 ring-primary-600 ring-offset-2 dark:ring-offset-slate-900"
+                                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
                                   }`}
                                   onClick={() =>
                                     handleDraftChange("itemType", "labor")
                                   }
+                                  onClick={() =>
+                                    handleDraftChange("itemType", "labor")
+                                  }
                                 >
+                                  {t("services.serviceLine")}
                                   {t("services.serviceLine")}
                                 </button>
                                 <button
@@ -3183,16 +4595,40 @@ export default function Services() {
                                     itemDraft.itemType === "part"
                                       ? "bg-primary-600 text-white shadow-md ring-2 ring-primary-600 ring-offset-2 dark:ring-offset-slate-900"
                                       : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                                    itemDraft.itemType === "part"
+                                      ? "bg-primary-600 text-white shadow-md ring-2 ring-primary-600 ring-offset-2 dark:ring-offset-slate-900"
+                                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
                                   }`}
+                                  onClick={() =>
+                                    handleDraftChange("itemType", "part")
+                                  }
                                   onClick={() =>
                                     handleDraftChange("itemType", "part")
                                   }
                                 >
                                   {t("services.productLine")}
+                                  {t("services.productLine")}
                                 </button>
                               </div>
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2">
+                              <div>
+                                <label className="label">
+                                  {t("services.description")}
+                                </label>
+                                <input
+                                  ref={descriptionInputRef}
+                                  className="input mt-1"
+                                  value={itemDraft.description}
+                                  onChange={(e) =>
+                                    handleDraftChange(
+                                      "description",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder={t("services.placeholderService")}
+                                />
+                              </div>
                               <div>
                                 <label className="label">
                                   {t("services.description")}
@@ -3237,7 +4673,88 @@ export default function Services() {
                                   />
                                 </div>
                               ) : null}
+                              {itemDraft.itemType === "part" ? (
+                                <div className="sm:col-span-2">
+                                  <label className="label">
+                                    {t("services.productParts")}
+                                  </label>
+                                  <AsyncSearchableSelect
+                                    className="mt-1"
+                                    value={itemDraft.productId}
+                                    selectedOption={
+                                      itemDraftProduct
+                                        ? toProductLookupOption(
+                                            itemDraftProduct,
+                                          )
+                                        : null
+                                    }
+                                    onChange={handleDraftProductSelection}
+                                    loadOptions={loadProductOptions}
+                                    placeholder={t("purchases.selectProduct")}
+                                    searchPlaceholder={t(
+                                      "purchases.selectProduct",
+                                    )}
+                                    noResultsLabel={t("common.noData")}
+                                    loadingLabel={t("common.loading")}
+                                  />
+                                </div>
+                              ) : null}
 
+                              {itemDraft.itemType === "part" &&
+                              itemDraftProduct?.secondaryUnit ? (
+                                <div className="sm:col-span-2">
+                                  <label className="label">
+                                    {t("products.unitType")}
+                                  </label>
+                                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleDraftChange(
+                                          "unitType",
+                                          "primary",
+                                          itemDraftProduct.primaryUnit,
+                                        )
+                                      }
+                                      className={
+                                        itemDraft.unitType === "primary"
+                                          ? "btn-primary w-full text-sm"
+                                          : "btn-ghost w-full text-sm"
+                                      }
+                                    >
+                                      {itemDraftProduct.primaryUnit ||
+                                        t("products.primaryUnit")}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        handleDraftChange(
+                                          "unitType",
+                                          "secondary",
+                                          itemDraftProduct.secondaryUnit,
+                                        )
+                                      }
+                                      className={
+                                        itemDraft.unitType === "secondary"
+                                          ? "btn-primary w-full text-sm"
+                                          : "btn-ghost w-full text-sm"
+                                      }
+                                    >
+                                      {itemDraftProduct.secondaryUnit}{" "}
+                                      <span className="ml-1 text-xs opacity-70">
+                                        ({t("products.secondaryUnit")})
+                                      </span>
+                                    </button>
+                                  </div>
+                                  {itemDraftProduct.conversionRate > 0 ? (
+                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                      1 {itemDraftProduct.primaryUnit} ={" "}
+                                      {itemDraftProduct.conversionRate}{" "}
+                                      {itemDraftProduct.secondaryUnit}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ) : null}
                               {itemDraft.itemType === "part" &&
                               itemDraftProduct?.secondaryUnit ? (
                                 <div className="sm:col-span-2">
@@ -3359,6 +4876,71 @@ export default function Services() {
                                   }
                                 />
                               </div>
+                              {itemDraft.itemType === "part" ? (
+                                <div>
+                                  <label className="label">
+                                    {t("services.qty")}
+                                  </label>
+                                  <input
+                                    ref={quantityInputRef}
+                                    className="input mt-1"
+                                    type="number"
+                                    inputMode="decimal"
+                                    min="0"
+                                    step="0.1"
+                                    value={itemDraft.quantity}
+                                    onChange={(e) =>
+                                      handleDraftChange(
+                                        "quantity",
+                                        e.target.value,
+                                      )
+                                    }
+                                  />
+                                  {itemDraft.itemType === "part" ? (
+                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                      {getUnitLabel(
+                                        itemDraftProduct,
+                                        itemDraft.unitType,
+                                      )}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              <div>
+                                <label className="label">
+                                  {itemDraft.itemType === "labor"
+                                    ? t("common.total")
+                                    : t("services.unitPrice")}
+                                </label>
+                                <input
+                                  className="input mt-1"
+                                  type="number"
+                                  min="0"
+                                  step="0.1"
+                                  value={itemDraft.unitPrice}
+                                  onChange={(e) =>
+                                    handleDraftChange(
+                                      "unitPrice",
+                                      e.target.value,
+                                    )
+                                  }
+                                />
+                              </div>
+                              <div>
+                                <label className="label">
+                                  {t("services.tax")}
+                                </label>
+                                <input
+                                  className="input mt-1"
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={itemDraft.taxRate}
+                                  onChange={(e) =>
+                                    handleDraftChange("taxRate", e.target.value)
+                                  }
+                                />
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -3370,8 +4952,20 @@ export default function Services() {
                           <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
                             {money(itemDraft.lineTotal)}
                           </p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-200">
+                            {t("common.total")}
+                          </p>
+                          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                            {money(itemDraft.lineTotal)}
+                          </p>
                           <div className="mt-4 space-y-3">
                             <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                {t("services.taxTotal")}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                {money(itemDraftVatAmount)}
+                              </p>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                                 {t("services.taxTotal")}
                               </p>
@@ -3388,8 +4982,19 @@ export default function Services() {
                                   ? t("services.serviceLine")
                                   : t("services.productLine")}
                               </p>
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                {t("services.type")}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                {itemDraft.itemType === "labor"
+                                  ? t("services.serviceLine")
+                                  : t("services.productLine")}
+                              </p>
                             </div>
                             <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                {t("services.description")}
+                              </p>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                                 {t("services.description")}
                               </p>
@@ -3399,9 +5004,23 @@ export default function Services() {
                                     itemDraft.description ||
                                     "—"
                                   : itemDraft.description || "—"}
+                                {itemDraft.itemType === "part"
+                                  ? itemDraftProduct?.name ||
+                                    itemDraft.description ||
+                                    "—"
+                                  : itemDraft.description || "—"}
                               </p>
                             </div>
                             <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                {t("products.unitType")}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                {getUnitLabel(
+                                  itemDraftProduct,
+                                  itemDraft.unitType,
+                                ) || t("products.primaryUnit")}
+                              </p>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                                 {t("products.unitType")}
                               </p>
@@ -3421,12 +5040,21 @@ export default function Services() {
                       <FormSectionCard
                         title={t("services.paymentSectionTitle")}
                         hint={t("services.paymentSectionHint")}
+                        title={t("services.paymentSectionTitle")}
+                        hint={t("services.paymentSectionHint")}
                         className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                       >
                         <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
                           <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
+                          <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
                             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  {t("services.subTotal")}
+                                </p>
+                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                  {money(totals.subTotal)}
+                                </p>
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                                   {t("services.subTotal")}
                                 </p>
@@ -3441,8 +5069,20 @@ export default function Services() {
                                 <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
                                   {money(totals.laborTotal)}
                                 </p>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  Service Total
+                                </p>
+                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                  {money(totals.laborTotal)}
+                                </p>
                               </div>
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  Product Total
+                                </p>
+                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                  {money(totals.partsTotal)}
+                                </p>
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                                   Product Total
                                 </p>
@@ -3458,9 +5098,21 @@ export default function Services() {
                                   <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
                                     {money(totals.diamondCharge)}
                                   </p>
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                    Diamond Charge
+                                  </p>
+                                  <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                    {money(totals.diamondCharge)}
+                                  </p>
                                 </div>
                               ) : null}
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  {t("services.taxTotal")}
+                                </p>
+                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                  {money(totals.taxTotal)}
+                                </p>
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                                   {t("services.taxTotal")}
                                 </p>
@@ -3476,6 +5128,12 @@ export default function Services() {
                                   <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
                                     {money(totals.additionalTax)}
                                   </p>
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                    Additional Tax
+                                  </p>
+                                  <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                    {money(totals.additionalTax)}
+                                  </p>
                                 </div>
                               ) : null}
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
@@ -3485,8 +5143,20 @@ export default function Services() {
                                 <p className="mt-1 text-lg font-semibold text-rose-700 dark:text-rose-300">
                                   -{money(totals.discountTotal)}
                                 </p>
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  {t("services.discount")}
+                                </p>
+                                <p className="mt-1 text-lg font-semibold text-rose-700 dark:text-rose-300">
+                                  -{money(totals.discountTotal)}
+                                </p>
                               </div>
                               <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white dark:bg-primary-900/70">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                                  {t("services.grandTotal")}
+                                </p>
+                                <p className="mt-1 text-xl font-semibold">
+                                  {money(totals.grandTotal)}
+                                </p>
                                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
                                   {t("services.grandTotal")}
                                 </p>
@@ -3502,11 +5172,17 @@ export default function Services() {
                               <label className="label">
                                 {t("services.discount")}
                               </label>
+                              <label className="label">
+                                {t("services.discount")}
+                              </label>
                               <input
                                 className="input mt-1"
                                 type="number"
                                 step="0.01"
                                 min="0"
+                                max={(
+                                  totals.subTotal + totals.taxTotal
+                                ).toFixed(2)}
                                 max={(
                                   totals.subTotal + totals.taxTotal
                                 ).toFixed(2)}
@@ -3520,6 +5196,9 @@ export default function Services() {
                                 <label className="label">
                                   {t("services.amountReceived")}
                                 </label>
+                                <label className="label">
+                                  {t("services.amountReceived")}
+                                </label>
                                 <input
                                   className="input mt-1"
                                   type="number"
@@ -3530,13 +5209,35 @@ export default function Services() {
                                       ? totals.grandTotal.toFixed(2)
                                       : amountReceived
                                   }
+                                  value={
+                                    isPaid
+                                      ? totals.grandTotal.toFixed(2)
+                                      : amountReceived
+                                  }
                                   disabled={isPaid}
+                                  onChange={(e) =>
+                                    setAmountReceived(e.target.value)
+                                  }
                                   onChange={(e) =>
                                     setAmountReceived(e.target.value)
                                   }
                                 />
                                 <QuickPaymentButtons
                                   disabled={totals.grandTotal <= 0}
+                                  onNoPayment={() =>
+                                    applyQuickReceivedAmount(0)
+                                  }
+                                  onHalfPayment={() =>
+                                    applyQuickReceivedAmount(
+                                      totals.grandTotal / 2,
+                                    )
+                                  }
+                                  onFullPayment={() =>
+                                    applyQuickReceivedAmount(
+                                      totals.grandTotal,
+                                      { markPaid: true },
+                                    )
+                                  }
                                   onNoPayment={() =>
                                     applyQuickReceivedAmount(0)
                                   }
@@ -3561,11 +5262,18 @@ export default function Services() {
                                   onChange={(e) => setIsPaid(e.target.checked)}
                                 />
                                 {t("services.fullyPaid")}
+                                {t("services.fullyPaid")}
                               </label>
                             </div>
 
                             {totals.due > 0 ? (
                               <div className="rounded-[24px] border border-rose-200/70 bg-rose-50/70 px-4 py-3 dark:border-rose-900/40 dark:bg-rose-900/20">
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500 dark:text-rose-300">
+                                  {t("services.dueAmount")}
+                                </p>
+                                <p className="mt-1 text-lg font-semibold text-rose-700 dark:text-rose-200">
+                                  {money(totals.due)}
+                                </p>
                                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-500 dark:text-rose-300">
                                   {t("services.dueAmount")}
                                 </p>
@@ -3578,12 +5286,18 @@ export default function Services() {
                                 <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-200">
                                   {t("services.fullyPaid")}
                                 </p>
+                                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-200">
+                                  {t("services.fullyPaid")}
+                                </p>
                               </div>
                             )}
 
                             <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
                               <PaymentMethodFields
                                 value={header}
+                                onChange={(patch) =>
+                                  setHeader((prev) => ({ ...prev, ...patch }))
+                                }
                                 onChange={(patch) =>
                                   setHeader((prev) => ({ ...prev, ...patch }))
                                 }
@@ -3598,6 +5312,28 @@ export default function Services() {
 
                 <div className="border-t border-slate-200/70 bg-white/90 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-8">
                   <div className="mx-auto w-full max-w-[1320px]">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex items-center gap-4 rounded-2xl bg-slate-100/90 px-4 py-2.5 text-sm dark:bg-slate-900/70 lg:min-w-[520px]">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-bold text-slate-800 dark:text-slate-200">
+                            {formSteps[mobileStepIndex]?.label ||
+                              t("services.detailStep")}
+                          </p>
+                          <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                            Order: {summaryOrderNo}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p
+                            className={`font-bold ${totals.due > 0 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"}`}
+                          >
+                            {money(totals.due)}
+                          </p>
+                          <p className="text-[10px] uppercase tracking-wider text-slate-500">
+                            {t("services.summaryDue")}
+                          </p>
+                        </div>
+                      </div>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div className="flex items-center gap-4 rounded-2xl bg-slate-100/90 px-4 py-2.5 text-sm dark:bg-slate-900/70 lg:min-w-[520px]">
                         <div className="min-w-0 flex-1">
@@ -3641,7 +5377,49 @@ export default function Services() {
                             {t("common.cancel")}
                           </button>
                         )}
+                      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        {canGoBackStep ? (
+                          <button
+                            type="button"
+                            className="btn-ghost w-full sm:w-auto"
+                            onClick={goToPreviousMobileStep}
+                            disabled={editLoading}
+                          >
+                            {t("common.back")}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-ghost w-full sm:w-auto"
+                            onClick={closeDialog}
+                            disabled={editLoading}
+                          >
+                            {t("common.cancel")}
+                          </button>
+                        )}
 
+                        {canGoForwardStep ? (
+                          <button
+                            type="button"
+                            className="btn-primary w-full sm:w-auto"
+                            onClick={goToNextMobileStep}
+                            disabled={editLoading}
+                          >
+                            {mobilePrimaryActionLabel}
+                            <ArrowRight size={14} className="ml-1.5 inline" />
+                          </button>
+                        ) : (
+                          <button
+                            type="submit"
+                            className="btn-primary w-full sm:w-auto"
+                            disabled={editLoading}
+                          >
+                            {mobilePrimaryActionLabel}
+                            <Check size={14} className="ml-1.5 inline" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                         {canGoForwardStep ? (
                           <button
                             type="button"
@@ -3686,9 +5464,30 @@ export default function Services() {
               closeLightbox();
             }}
           >
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4"
+          onClick={closeLightbox}
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            onClick={(e) => {
+              e.stopPropagation();
+              closeLightbox();
+            }}
+          >
             <X size={20} />
           </button>
 
+          <button
+            type="button"
+            className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            onClick={(e) => {
+              e.stopPropagation();
+              showPrev();
+            }}
+            aria-label="Previous"
+          >
           <button
             type="button"
             className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
@@ -3710,6 +5509,15 @@ export default function Services() {
             }}
             aria-label="Next"
           >
+          <button
+            type="button"
+            className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            onClick={(e) => {
+              e.stopPropagation();
+              showNext();
+            }}
+            aria-label="Next"
+          >
             <ChevronRight size={22} />
           </button>
 
@@ -3721,9 +5529,22 @@ export default function Services() {
               className="rounded-xl bg-white px-6 py-4 text-slate-800 font-semibold"
               onClick={(e) => e.stopPropagation()}
             >
+            <a
+              href={lightboxState.urls[lightboxState.index]}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-xl bg-white px-6 py-4 text-slate-800 font-semibold"
+              onClick={(e) => e.stopPropagation()}
+            >
               Open PDF in new tab
             </a>
           ) : (
+            <img
+              src={lightboxState.urls[lightboxState.index]}
+              alt="Attachment"
+              className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
             <img
               src={lightboxState.urls[lightboxState.index]}
               alt="Attachment"
@@ -3753,6 +5574,20 @@ export default function Services() {
               >
                 Download PDF
               </button>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setInvoiceOrder(null)}
+              >
+                ← Close
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handlePrint}
+              >
+                Download PDF
+              </button>
             </div>
             {invoiceLoading ? (
               <div className="card flex items-center justify-center py-16">
@@ -3763,8 +5598,34 @@ export default function Services() {
                 ref={invoicePrintRef}
                 className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950"
               >
+              <div
+                ref={invoicePrintRef}
+                className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950"
+              >
                 {/* ── Header ── */}
                 <div className="px-4 pt-0 sm:px-8">
+                  <InvoiceHeader
+                    biz={bizSettings}
+                    invoiceType="Service Invoice"
+                    invoiceNo={
+                      invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)
+                    }
+                    date={
+                      invoiceOrder.status !== "closed" &&
+                      invoiceOrder.deliveryDate
+                        ? formatMaybeDate(
+                            invoiceOrder.deliveryDate,
+                            "MMMM D, YYYY",
+                          )
+                        : null
+                    }
+                    // status={invoiceOrder.status}
+                    statusColor={
+                      invoiceOrder.status === "closed"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                        : invoiceOrder.status === "in_progress"
+                          ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                          : "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
                   <InvoiceHeader
                     biz={bizSettings}
                     invoiceType="Service Invoice"
@@ -3808,7 +5669,24 @@ export default function Services() {
                           {invoiceOrder.Party?.phone}
                         </p>
                       )}
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">
+                        Bill To
+                      </p>
+                      <p className="font-semibold text-slate-900 dark:text-white">
+                        {invoiceOrder.Party?.name ||
+                          invoiceOrder.partyName ||
+                          "—"}
+                      </p>
+                      {invoiceOrder.Party?.phone && (
+                        <p className="mt-0.5 text-sm text-slate-900 dark:text-white">
+                          {invoiceOrder.Party?.phone}
+                        </p>
+                      )}
                       <p className="mt-2 text-sm text-slate-900 dark:text-white">
+                        Created By:{" "}
+                        <span className="font-medium text-slate-900 dark:text-white">
+                          {getCreatorDisplayName(invoiceOrder)}
+                        </span>
                         Created By:{" "}
                         <span className="font-medium text-slate-900 dark:text-white">
                           {getCreatorDisplayName(invoiceOrder)}
@@ -3816,6 +5694,79 @@ export default function Services() {
                       </p>
                     </div>
                   </div>
+                  {showGoldJewelleryDetails &&
+                    (invoiceJewellery.metalType ||
+                      invoiceJewellery.metalPurity ||
+                      invoiceJewellery.actualWeight ||
+                      invoiceJewellery.wastagePercent ||
+                      invoiceJewellery.totalWeight ||
+                      invoiceJewellery.diamondType ||
+                      invoiceJewellery.diamondWeight ||
+                      invoiceJewellery.diamondCarat ||
+                      invoiceJewellery.diamondCharge) && (
+                      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5">
+                        {invoiceJewellery.metalType ? (
+                          <div className="text-sm">
+                            <span className="text-black">Metal: </span>
+                            <span className="font-medium text-black">
+                              {invoiceJewellery.metalType}
+                            </span>
+                          </div>
+                        ) : null}
+                        {invoiceJewellery.metalPurity ? (
+                          <div className="text-sm">
+                            <span className="text-black">Purity: </span>
+                            <span className="font-medium text-black">
+                              {invoiceJewellery.metalPurity}
+                            </span>
+                          </div>
+                        ) : null}
+                        {invoiceJewellery.actualWeight ? (
+                          <div className="text-sm">
+                            <span className="text-black">Actual weight: </span>
+                            <span className="font-medium text-black">
+                              {invoiceJewellery.actualWeight}
+                            </span>
+                          </div>
+                        ) : null}
+                        {invoiceJewellery.wastagePercent ? (
+                          <div className="text-sm">
+                            <span className="text-slate-900">Wastage: </span>
+                            <span className="font-medium text-black">
+                              {invoiceJewellery.wastagePercent}% (
+                              {invoiceJewellery.wastageWeight || "0"})
+                            </span>
+                          </div>
+                        ) : null}
+                        {invoiceJewellery.totalWeight ? (
+                          <div className="text-sm">
+                            <span className="text-slate-900">
+                              Total weight:{" "}
+                            </span>
+                            <span className="font-medium text-black">
+                              {invoiceJewellery.totalWeight}
+                            </span>
+                          </div>
+                        ) : null}
+                        {invoiceJewellery.diamondType ? (
+                          <div className="text-sm">
+                            <span className="text-slate-900">Diamond: </span>
+                            <span className="font-medium text-black">
+                              {[
+                                invoiceJewellery.diamondType,
+                                invoiceJewellery.diamondWeight &&
+                                  `${invoiceJewellery.diamondWeight} wt`,
+                                invoiceJewellery.diamondCarat &&
+                                  `${invoiceJewellery.diamondCarat} ct`,
+                                invoiceJewellery.diamondPurity,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   {showGoldJewelleryDetails &&
                     (invoiceJewellery.metalType ||
                       invoiceJewellery.metalPurity ||
@@ -3900,8 +5851,22 @@ export default function Services() {
                           key
                             .replace(/_/g, " ")
                             .replace(/\b\w/g, (c) => c.toUpperCase());
+                        const def = safeAttributeDefs.find(
+                          (d) => d.key === key,
+                        );
+                        const attrLabel =
+                          def?.name ||
+                          key
+                            .replace(/_/g, " ")
+                            .replace(/\b\w/g, (c) => c.toUpperCase());
                         return (
                           <div key={key} className="text-sm">
+                            <span className="text-slate-900">
+                              {attrLabel}:{" "}
+                            </span>
+                            <span className="font-mediblack">
+                              {String(val || "—")}
+                            </span>
                             <span className="text-slate-900">
                               {attrLabel}:{" "}
                             </span>
@@ -3935,10 +5900,28 @@ export default function Services() {
                         <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">
                           Amount
                         </th>
+                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">
+                          Item
+                        </th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">
+                          Qty
+                        </th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">
+                          Rate
+                        </th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">
+                          {t("services.tax")}
+                        </th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">
+                          Amount
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                       {invoiceItems.map((item, idx) => (
+                        <tr
+                          key={`${item.productId || item.description || "service"}-${idx}`}
+                        >
                         <tr
                           key={`${item.productId || item.description || "service"}-${idx}`}
                         >
@@ -3950,11 +5933,25 @@ export default function Services() {
                                 {item.itemType === "labor"
                                   ? "Service"
                                   : "Product"}
+                              <span
+                                className={`inline-block shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${item.itemType === "labor" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"}`}
+                              >
+                                {item.itemType === "labor"
+                                  ? "Service"
+                                  : "Product"}
                               </span>
                               <div className="min-w-0">
                                 <p className="truncate font-medium text-black">
                                   {item.description || item.productName || "—"}
+                                  {item.description || item.productName || "—"}
                                 </p>
+                                {item.productName &&
+                                  item.description &&
+                                  item.description !== item.productName && (
+                                    <p className="truncate text-xs text-slate-500">
+                                      {item.productName}
+                                    </p>
+                                  )}
                                 {item.productName &&
                                   item.description &&
                                   item.description !== item.productName && (
@@ -3969,6 +5966,18 @@ export default function Services() {
                             {Number(item.quantity || 0).toFixed(
                               item.quantity % 1 ? 3 : 0,
                             )}
+                            {Number(item.quantity || 0).toFixed(
+                              item.quantity % 1 ? 3 : 0,
+                            )}
+                          </td>
+                          <td className="py-3 text-right text-black">
+                            {money(item.unitPrice)}
+                          </td>
+                          <td className="py-3 text-right text-black">
+                            {Number(item.taxRate || 0).toFixed(2)}%
+                          </td>
+                          <td className="py-3 text-right font-semibold text-black">
+                            {money(item.lineTotal)}
                           </td>
                           <td className="py-3 text-right text-black">
                             {money(item.unitPrice)}
@@ -3991,18 +6000,30 @@ export default function Services() {
                     <div className="flex justify-between text-black">
                       <span>{t("services.subTotal")}</span>
                       <span>{money(invoiceTotals.subTotal)}</span>
+                      <span>{t("services.subTotal")}</span>
+                      <span>{money(invoiceTotals.subTotal)}</span>
                     </div>
                     <div className="flex justify-between text-black">
+                      <span>Service Total</span>
+                      <span>{money(invoiceTotals.laborTotal)}</span>
                       <span>Service Total</span>
                       <span>{money(invoiceTotals.laborTotal)}</span>
                     </div>
                     <div className="flex justify-between text-black">
                       <span>Product Total</span>
                       <span>{money(invoiceTotals.partsTotal)}</span>
+                      <span>Product Total</span>
+                      <span>{money(invoiceTotals.partsTotal)}</span>
                     </div>
                     {showGoldJewelleryDetails &&
                     invoiceJewellery.diamondChargeNumber > 0 ? (
+                    {showGoldJewelleryDetails &&
+                    invoiceJewellery.diamondChargeNumber > 0 ? (
                       <div className="flex justify-between text-black">
+                        <span>Diamond Charge</span>
+                        <span>
+                          {money(invoiceJewellery.diamondChargeNumber)}
+                        </span>
                         <span>Diamond Charge</span>
                         <span>
                           {money(invoiceJewellery.diamondChargeNumber)}
@@ -4012,10 +6033,18 @@ export default function Services() {
                     <div className="flex justify-between text-black">
                       <span>{t("services.taxTotal")}</span>
                       <span>{money(invoiceTotals.taxTotal)}</span>
+                      <span>{t("services.taxTotal")}</span>
+                      <span>{money(invoiceTotals.taxTotal)}</span>
                     </div>
                     {showGoldJewelleryDetails &&
                     invoiceJewellery.additionalTaxNumber > 0 ? (
+                    {showGoldJewelleryDetails &&
+                    invoiceJewellery.additionalTaxNumber > 0 ? (
                       <div className="flex justify-between text-black">
+                        <span>Additional Tax</span>
+                        <span>
+                          {money(invoiceJewellery.additionalTaxNumber)}
+                        </span>
                         <span>Additional Tax</span>
                         <span>
                           {money(invoiceJewellery.additionalTaxNumber)}
@@ -4026,9 +6055,17 @@ export default function Services() {
                       <div className="flex justify-between text-rose-600 dark:text-rose-300">
                         <span>{t("services.discount")}</span>
                         <span>-{money(invoiceTotals.discountTotal)}</span>
+                        <span>{t("services.discount")}</span>
+                        <span>-{money(invoiceTotals.discountTotal)}</span>
                       </div>
                     ) : null}
                     <div className="flex justify-between border-t border-slate-200/70 pt-3 font-bold text-black dark:border-slate-700 dark:text-white">
+                      <span className="text-base">
+                        {t("services.grandTotal")}
+                      </span>
+                      <span className="text-lg">
+                        {money(invoiceTotals.grandTotal)}
+                      </span>
                       <span className="text-base">
                         {t("services.grandTotal")}
                       </span>
@@ -4041,13 +6078,34 @@ export default function Services() {
                       <span className="font-semibold">
                         {money(invoiceOrder.receivedTotal)}
                       </span>
+                      <span>{t("services.amountReceived")}</span>
+                      <span className="font-semibold">
+                        {money(invoiceOrder.receivedTotal)}
+                      </span>
                     </div>
                     {Math.max(
                       Number(invoiceTotals.grandTotal || 0) -
                         Number(invoiceOrder.receivedTotal || 0),
                       0,
                     ) > 0 && (
+                    {Math.max(
+                      Number(invoiceTotals.grandTotal || 0) -
+                        Number(invoiceOrder.receivedTotal || 0),
+                      0,
+                    ) > 0 && (
                       <div className="flex justify-between rounded-xl bg-rose-50 px-4 py-2.5 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">
+                        <span className="font-semibold">
+                          {t("services.dueAmount")}
+                        </span>
+                        <span className="font-bold">
+                          {money(
+                            Math.max(
+                              Number(invoiceTotals.grandTotal || 0) -
+                                Number(invoiceOrder.receivedTotal || 0),
+                              0,
+                            ),
+                          )}
+                        </span>
                         <span className="font-semibold">
                           {t("services.dueAmount")}
                         </span>
@@ -4077,12 +6135,25 @@ export default function Services() {
                       maxVisible={4}
                       size="lg"
                     />
+                    <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-black">
+                      Attachment
+                    </p>
+                    <AttachmentStrip
+                      urls={invoiceAttachmentUrls}
+                      onOpen={openLightbox}
+                      maxVisible={4}
+                      size="lg"
+                    />
                   </div>
                 )}
 
                 {/* ── Footer ── */}
                 <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-4 py-4 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
                   <p className="text-xs text-black">
+                    Thank you for your business!
+                  </p>
+                  <p className="text-xs text-black">
+                    Printed {dayjs().format("D MMM YYYY")}
                     Thank you for your business!
                   </p>
                   <p className="text-xs text-black">
@@ -4103,6 +6174,12 @@ export default function Services() {
             if (e.target === e.currentTarget) closeStatusDialog();
           }}
         >
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeStatusDialog();
+          }}
+        >
           <div className="w-full max-w-sm rounded-t-3xl bg-white shadow-2xl dark:bg-slate-950 sm:rounded-3xl">
             <div className="flex items-center justify-between border-b border-slate-200/70 px-6 py-4 dark:border-slate-800/70">
               <h2 className="font-serif text-xl text-slate-900 dark:text-white">
@@ -4115,10 +6192,27 @@ export default function Services() {
               >
                 <X size={18} />
               </button>
+              <h2 className="font-serif text-xl text-slate-900 dark:text-white">
+                {t("services.updateStatus")}
+              </h2>
+              <button
+                type="button"
+                onClick={closeStatusDialog}
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X size={18} />
+              </button>
             </div>
+            <div className="space-y-4 p-6">
             <div className="space-y-4 p-6">
               {statusError ? <Notice title={statusError} tone="error" /> : null}
               <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-900/60">
+                <p className="font-semibold text-slate-800 dark:text-slate-200">
+                  {statusDialog.orderNo || statusDialog.id.slice(0, 8)}
+                </p>
+                {statusDialog.Party?.name ? (
+                  <p className="text-slate-500">{statusDialog.partyName}</p>
+                ) : null}
                 <p className="font-semibold text-slate-800 dark:text-slate-200">
                   {statusDialog.orderNo || statusDialog.id.slice(0, 8)}
                 </p>
@@ -4135,11 +6229,18 @@ export default function Services() {
                       type="button"
                       onClick={() => setNewStatus(step.value)}
                       className={`flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition ${isSelected ? step.selectedClass : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"}`}
+                      className={`flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition ${isSelected ? step.selectedClass : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"}`}
                     >
                       <span
                         className={`h-3 w-3 shrink-0 rounded-full ${step.dotClass}`}
                       />
+                      <span
+                        className={`h-3 w-3 shrink-0 rounded-full ${step.dotClass}`}
+                      />
                       <div className="flex-1">
+                        <p className="font-semibold text-slate-800 dark:text-slate-200">
+                          {step.label}
+                        </p>
                         <p className="font-semibold text-slate-800 dark:text-slate-200">
                           {step.label}
                         </p>
@@ -4148,11 +6249,29 @@ export default function Services() {
                       {isSelected && (
                         <Check size={16} className={step.checkClass} />
                       )}
+                      {isSelected && (
+                        <Check size={16} className={step.checkClass} />
+                      )}
                     </button>
                   );
                 })}
               </div>
               <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row">
+                <button
+                  type="button"
+                  className="btn-ghost flex-1"
+                  onClick={closeStatusDialog}
+                >
+                  {t("common.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary flex-1"
+                  onClick={handleUpdateStatus}
+                  disabled={newStatus === statusDialog.status}
+                >
+                  {t("services.updateStatus")}
+                </button>
                 <button
                   type="button"
                   className="btn-ghost flex-1"
@@ -4182,8 +6301,24 @@ export default function Services() {
             if (e.target === e.currentTarget) setPayDialog(null);
           }}
         >
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPayDialog(null);
+          }}
+        >
           <div className="w-full max-w-sm rounded-t-3xl bg-white shadow-2xl dark:bg-slate-950 sm:rounded-3xl">
             <div className="flex items-center justify-between border-b border-slate-200/70 px-6 py-4 dark:border-slate-800/70">
+              <h2 className="font-serif text-xl text-slate-900 dark:text-white">
+                {t("services.recordPayment")}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setPayDialog(null)}
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X size={18} />
+              </button>
               <h2 className="font-serif text-xl text-slate-900 dark:text-white">
                 {t("services.recordPayment")}
               </h2>
@@ -4203,7 +6338,9 @@ export default function Services() {
                     type="button"
                     className="btn-secondary w-full sm:w-auto"
                     onClick={() => setPayError("")}
+                    onClick={() => setPayError("")}
                   >
+                    {t("common.back")}
                     {t("common.back")}
                   </button>
                 </div>
@@ -4215,7 +6352,16 @@ export default function Services() {
                 {payDialog.partyName ? (
                   <p className="text-slate-500">{payDialog.partyName}</p>
                 ) : null}
+                <p className="font-semibold text-slate-800 dark:text-slate-200">
+                  {payDialog.orderNo || payDialog.id.slice(0, 8)}
+                </p>
+                {payDialog.partyName ? (
+                  <p className="text-slate-500">{payDialog.partyName}</p>
+                ) : null}
                 <div className="mt-2 flex items-center justify-between text-xs">
+                  <span className="text-slate-500">
+                    Total: {money(payDialog.grandTotal)}
+                  </span>
                   <span className="text-slate-500">
                     Total: {money(payDialog.grandTotal)}
                   </span>
@@ -4228,10 +6374,19 @@ export default function Services() {
                         0,
                       ),
                     )}
+                    {t("services.dueAmount")}:{" "}
+                    {money(
+                      Math.max(
+                        Number(payDialog.grandTotal || 0) -
+                          Number(payDialog.receivedTotal || 0),
+                        0,
+                      ),
+                    )}
                   </span>
                 </div>
               </div>
               <div>
+                <label className="label">{t("services.amountReceived")}</label>
                 <label className="label">{t("services.amountReceived")}</label>
                 <input
                   className="input mt-1"
@@ -4258,9 +6413,20 @@ export default function Services() {
                     setPayNotes(patch.paymentNote);
                   }}
                   noteLabel={t("payments.paymentNote")}
+                  noteLabel={t("payments.paymentNote")}
                 />
               </div>
               <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row">
+                <button
+                  type="button"
+                  className="btn-ghost flex-1"
+                  onClick={() => setPayDialog(null)}
+                >
+                  {t("common.cancel")}
+                </button>
+                <button type="submit" className="btn-primary flex-1">
+                  Record Payment
+                </button>
                 <button
                   type="button"
                   className="btn-ghost flex-1"
@@ -4281,6 +6447,16 @@ export default function Services() {
         isOpen={Boolean(deleteService)}
         onClose={closeDeleteDialog}
         onConfirm={handleDeleteService}
+        description={
+          deleteService
+            ? t("services.deleteConfirm", {
+                name: deleteService.orderNo || deleteService.id.slice(0, 8),
+              })
+            : t("common.confirmDelete")
+        }
+        confirming={
+          Boolean(deleteService) && deletingServiceId === deleteService.id
+        }
         description={
           deleteService
             ? t("services.deleteConfirm", {

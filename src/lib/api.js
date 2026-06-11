@@ -7,7 +7,11 @@ import {
 import { normalizePopularAnalyticsResponse } from "./analyticsPopular";
 import { normalizeLedgerReportResponse } from "./ledger";
 import { toQueryKey, toQueryString } from "./queryKey";
-import { normalizeStaffCollection, normalizeStaffMeta, normalizeStaffMember } from "./staff";
+import {
+  normalizeStaffCollection,
+  normalizeStaffMeta,
+  normalizeStaffMember,
+} from "./staff";
 import {
   normalizeTaskDetail,
   normalizeTaskListItem,
@@ -1070,7 +1074,7 @@ export const api = {
   updatePartyTransaction: (id, data) =>
     request(
       `/api/party-transactions/${id}`,
-      { method: "PUT", body: JSON.stringify(data) },
+      { method: "PATCH", body: JSON.stringify(data) },
       mutationConfig([
         "party-transactions",
         "parties",
