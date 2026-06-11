@@ -41,4 +41,27 @@ describe('UpgradeSubscriptionCta', () => {
     expect(screen.getByRole('button', { name: /upgrade your plan/i })).toBeInTheDocument();
     expect(screen.queryByText(/unlock more tools/i)).not.toBeInTheDocument();
   });
+
+  it('hides the upgrade prompt when subscription data is temporarily degraded to business_missing', () => {
+    window.localStorage.setItem(
+      'mms_subscription',
+      JSON.stringify({
+        currentPlan: {
+          key: null,
+          label: null,
+          subscriptionStatus: 'untracked',
+        },
+        access: {
+          planKey: null,
+          subscriptionStatus: 'untracked',
+          canUseApplication: false,
+          guard: 'business_missing',
+        },
+      })
+    );
+
+    renderWithProviders(<UpgradeSubscriptionCta variant="sidebar" />, { withAuth: true });
+
+    expect(screen.queryByRole('button', { name: /upgrade your plan/i })).not.toBeInTheDocument();
+  });
 });

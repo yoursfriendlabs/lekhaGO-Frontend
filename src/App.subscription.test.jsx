@@ -58,6 +58,7 @@ describe('SubscriptionFeatureRoute', () => {
         },
       })
     );
+    window.localStorage.removeItem('mms_access_control');
   });
 
   it('redirects expired trial access to the subscription settings screen', async () => {
@@ -83,5 +84,96 @@ describe('SubscriptionFeatureRoute', () => {
     expect(screen.getByText('search:?tab=subscription')).toBeInTheDocument();
     expect(screen.getByText(/upgrade your plan to keep using this area/i)).toBeInTheDocument();
     expect(screen.getByText(/workspace trial has ended/i)).toBeInTheDocument();
+  });
+
+  it('allows owners through when accessControl exists but has no explicit permissions', async () => {
+    window.localStorage.setItem(
+      'mms_subscription',
+      JSON.stringify({
+        currentPlan: {
+          key: 'pro',
+          label: 'Pro',
+          subscriptionStatus: 'active',
+        },
+        access: {
+          canUseApplication: true,
+          planKey: 'pro',
+          subscriptionStatus: 'active',
+        },
+      })
+    );
+    window.localStorage.setItem(
+      'mms_access_control',
+      JSON.stringify({
+        role: 'owner',
+        permissions: {},
+      })
+    );
+
+    renderWithProviders(
+      <Routes>
+        <Route
+          path="/app"
+          element={(
+            <SubscriptionFeatureRoute featureKey="dashboard">
+              <div>Dashboard</div>
+            </SubscriptionFeatureRoute>
+          )}
+        />
+      </Routes>,
+      {
+        route: '/app',
+        withAuth: true,
+      }
+    );
+
+    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
+  });
+
+  it('keeps owner routes accessible when the backend reports business_missing', async () => {
+    window.localStorage.removeItem('mms_business_id');
+    window.localStorage.setItem(
+      'mms_subscription',
+      JSON.stringify({
+        businessId: null,
+        currentPlan: {
+          key: null,
+          label: null,
+          subscriptionStatus: 'untracked',
+        },
+        access: {
+          planKey: null,
+          subscriptionStatus: 'untracked',
+          canUseApplication: false,
+          guard: 'business_missing',
+        },
+      })
+    );
+    window.localStorage.setItem(
+      'mms_access_control',
+      JSON.stringify({
+        role: 'owner',
+        permissions: null,
+      })
+    );
+
+    renderWithProviders(
+      <Routes>
+        <Route
+          path="/app"
+          element={(
+            <SubscriptionFeatureRoute featureKey="dashboard">
+              <div>Dashboard</div>
+            </SubscriptionFeatureRoute>
+          )}
+        />
+      </Routes>,
+      {
+        route: '/app',
+        withAuth: true,
+      }
+    );
+
+    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
   });
 });

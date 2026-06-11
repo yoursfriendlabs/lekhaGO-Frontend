@@ -51,7 +51,7 @@ function pickString(...values) {
 }
 
 export function isElevatedAccessRole(role = '') {
-  return role === 'admin' || role === 'super_admin';
+  return role === 'owner' || role === 'admin' || role === 'super_admin';
 }
 
 export function normalizeAccessLevel(value) {

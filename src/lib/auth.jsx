@@ -208,9 +208,11 @@ export function AuthProvider({ children }) {
     setSubscription(normalized);
   }, [businessId, business]);
 
+  const shouldBypassBusinessMissingGuard = role === 'owner' && subscription?.access?.guard === 'business_missing';
+
   const hasSubscriptionFeatureAccess = useCallback(
-    (featureKey) => canAccessFeature(subscription, featureKey),
-    [subscription]
+    (featureKey) => shouldBypassBusinessMissingGuard || canAccessFeature(subscription, featureKey),
+    [shouldBypassBusinessMissingGuard, subscription]
   );
 
   const getFeatureAccessLevel = useCallback((featureKey) => {
