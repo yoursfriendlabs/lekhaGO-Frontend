@@ -13,6 +13,7 @@ const NAV_ROLE_MAP = {
   services: ['owner', 'staff', 'admin', 'super_admin'],
   purchases: ['owner', 'staff', 'admin', 'super_admin'],
   parties: ['owner', 'staff', 'admin', 'super_admin'],
+  tasks: ['owner', 'staff', 'admin', 'super_admin'],
   settings: ['owner', 'staff', 'admin', 'super_admin'],
 };
 
@@ -24,6 +25,7 @@ const ICON_MAP = {
   services: Briefcase,
   purchases: ShoppingCart,
   parties: Users,
+  tasks: ClipboardList,
   settings: Settings2,
 };
 
@@ -39,6 +41,7 @@ export default function MobileNav() {
         { key: 'inventory', label: t('nav.items'), route: '/app/inventory' },
         { key: 'sales', label: t('nav.sales'), route: '/app/sales' },
         { key: 'purchases', label: t('nav.expenses'), route: '/app/purchases' },
+        { key: 'tasks', label: t('nav.tasks'), route: '/app/tasks' },
         { key: 'parties', label: t('nav.parties'), route: '/app/parties' },
         { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
       ],

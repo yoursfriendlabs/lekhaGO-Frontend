@@ -9,6 +9,7 @@ const DEFAULT_BUSINESS_TYPES = [
       { key: 'sales', label: 'Quick POS', route: '/app/pos' },
       { key: 'services', label: 'Services', route: '/app/services' },
       { key: 'purchases', label: 'Expenses', route: '/app/purchases' },
+      { key: 'tasks', label: 'Tasks', route: '/app/tasks' },
       { key: 'parties', label: 'Parties', route: '/app/parties' },
       { key: 'ledger', label: 'Ledger', route: '/app/ledger' },
       { key: 'analytics', label: 'Analytics', route: '/app/analytics' },
@@ -20,6 +21,7 @@ const DEFAULT_BUSINESS_TYPES = [
       orders: false,
       purchases: true,
       parties: true,
+      tasks: true,
       ledger: true,
       analytics: true,
       services: true,
@@ -56,7 +58,7 @@ const DEFAULT_BUSINESS_TYPES = [
       servicesLabel: 'Services',
     },
     settings: {
-      enabledModules: ['dashboard', 'inventory', 'sales', 'services', 'purchases', 'parties', 'ledger', 'analytics', 'settings'],
+      enabledModules: ['dashboard', 'inventory', 'sales', 'services', 'purchases', 'tasks', 'parties', 'ledger', 'analytics', 'settings'],
       defaultOrderFlow: 'direct_sale',
       defaultOrderChannel: 'counter',
       serviceChargeRate: '0',
@@ -83,6 +85,7 @@ const DEFAULT_BUSINESS_TYPES = [
       { key: 'sales', label: 'Sales', route: '/app/sales' },
       { key: 'services', label: 'Repair Orders', route: '/app/services' },
       { key: 'purchases', label: 'Expenses', route: '/app/purchases' },
+      { key: 'tasks', label: 'Tasks', route: '/app/tasks' },
       { key: 'parties', label: 'Parties', route: '/app/parties' },
       { key: 'ledger', label: 'Ledger', route: '/app/ledger' },
       { key: 'analytics', label: 'Analytics', route: '/app/analytics' },
@@ -94,6 +97,7 @@ const DEFAULT_BUSINESS_TYPES = [
       orders: false,
       purchases: true,
       parties: true,
+      tasks: true,
       ledger: true,
       analytics: true,
       services: true,
@@ -131,7 +135,7 @@ const DEFAULT_BUSINESS_TYPES = [
       servicesLabel: 'Repair Revenue',
     },
     settings: {
-      enabledModules: ['dashboard', 'inventory', 'sales', 'services', 'purchases', 'parties', 'ledger', 'analytics', 'settings'],
+      enabledModules: ['dashboard', 'inventory', 'sales', 'services', 'purchases', 'tasks', 'parties', 'ledger', 'analytics', 'settings'],
       defaultOrderFlow: 'jewellery_sales_and_repair',
       defaultOrderChannel: 'showroom',
       serviceChargeRate: '0',
@@ -163,6 +167,7 @@ const DEFAULT_BUSINESS_TYPES = [
       { key: 'inventory', label: 'Menu & Stock', route: '/app/inventory' },
       { key: 'sales', label: 'POS', route: '/app/pos' },
       { key: 'purchases', label: 'Expenses', route: '/app/purchases' },
+      { key: 'tasks', label: 'Tasks', route: '/app/tasks' },
       { key: 'parties', label: 'Suppliers', route: '/app/parties' },
       { key: 'ledger', label: 'Ledger', route: '/app/ledger' },
       { key: 'analytics', label: 'Analytics', route: '/app/analytics' },
@@ -174,6 +179,7 @@ const DEFAULT_BUSINESS_TYPES = [
       orders: true,
       purchases: true,
       parties: true,
+      tasks: true,
       ledger: true,
       analytics: true,
       services: false,
@@ -212,7 +218,7 @@ const DEFAULT_BUSINESS_TYPES = [
       servicesLabel: 'Service Revenue',
     },
     settings: {
-      enabledModules: ['dashboard', 'orders', 'inventory', 'sales', 'purchases', 'parties', 'ledger', 'analytics', 'settings'],
+      enabledModules: ['dashboard', 'orders', 'inventory', 'sales', 'purchases', 'tasks', 'parties', 'ledger', 'analytics', 'settings'],
       defaultOrderFlow: 'cafe_pos',
       defaultOrderChannel: 'takeaway',
       serviceChargeRate: '0',
@@ -239,6 +245,35 @@ const DEFAULT_BUSINESS_TYPES = [
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeModuleKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, '-');
+}
+
+function readEnabledModules(profile) {
+  const fromArrays = [
+    profile?.enabledModules,
+    profile?.settings?.enabledModules,
+  ].find((value) => Array.isArray(value) && value.length);
+
+  if (Array.isArray(fromArrays)) {
+    return new Set(fromArrays.map((entry) => normalizeModuleKey(entry)).filter(Boolean));
+  }
+
+  if (profile?.enabledModules && typeof profile.enabledModules === 'object' && !Array.isArray(profile.enabledModules)) {
+    return new Set(
+      Object.entries(profile.enabledModules)
+        .filter(([, enabled]) => enabled === true)
+        .map(([key]) => normalizeModuleKey(key))
+        .filter(Boolean)
+    );
+  }
+
+  return null;
 }
 
 export function getFallbackBusinessTypes() {
@@ -307,5 +342,12 @@ export function getBusinessTypeOption(value) {
 }
 
 export function isModuleEnabled(profile, moduleKey) {
-  return Boolean(normalizeBusinessProfile(profile).modules?.[moduleKey]);
+  const normalizedKey = normalizeModuleKey(moduleKey);
+  const explicitModules = readEnabledModules(profile);
+
+  if (explicitModules) {
+    return explicitModules.has(normalizedKey);
+  }
+
+  return Boolean(normalizeBusinessProfile(profile).modules?.[normalizedKey]);
 }
