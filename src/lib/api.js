@@ -14,6 +14,11 @@ import {
   normalizeTaskMeta,
   normalizeTaskNotificationSummary,
 } from "./tasks";
+import {
+  normalizeStaffCollection,
+  normalizeStaffMeta,
+  normalizeStaffMember,
+} from "./staff";
 
 const DEFAULT_API_BASE = "http://localhost:4000";
 const INVALID_TOKEN_REGEX = /(invalid|expired|malformed|missing).*(token|jwt|session)|token.*(invalid|expired)|jwt.*(invalid|expired)|session expired|unauthenticated/i;
@@ -486,13 +491,21 @@ export const api = {
     request(
       "/api/auth/me",
       {},
-      listCache(["auth-me", "subscription", "business-profile"], CACHE_TTL.short),
+      listCache(
+        ["auth-me", "subscription", "business-profile"],
+        CACHE_TTL.short,
+      ),
     ),
   updateCurrentUser: (data) =>
     request(
       "/api/auth/me",
       { method: "PATCH", body: JSON.stringify(data) },
-      mutationConfig(["auth-me", "subscription", "business-profile", "business-settings"]),
+      mutationConfig([
+        "auth-me",
+        "subscription",
+        "business-profile",
+        "business-settings",
+      ]),
     ),
   requestEmailOtp: (data) =>
     request("/api/auth/request-email-otp", {
@@ -535,7 +548,10 @@ export const api = {
     request(
       "/api/subscription/payment-setup",
       {},
-      listCache(["subscription", "subscription-payment-setup"], CACHE_TTL.short),
+      listCache(
+        ["subscription", "subscription-payment-setup"],
+        CACHE_TTL.short,
+      ),
     ),
   updateSubscription: (data) =>
     request(
