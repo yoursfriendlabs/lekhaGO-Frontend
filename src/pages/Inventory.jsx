@@ -694,7 +694,7 @@ export default function Inventory() {
             {/*</button>*/}
             {canManageInventory ? (
               <button id="add-new-item" className="btn-primary w-full sm:w-auto" type="button" onClick={openCreateDialog}>
-                <Plus  size={16} /> {t ('  inventory.addNewItem')}
+                <Plus  size={16} /> {t ('inventory.addNewItem')}
               </button>
             ) : null}
           </div>

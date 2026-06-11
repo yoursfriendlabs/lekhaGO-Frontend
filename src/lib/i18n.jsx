@@ -1752,7 +1752,7 @@ const dictionaries = {
       buy: 'किन्नुहोस्',
       sell: 'बेच्नुहोस्',
       service: 'सेवा',
-      expenses: 'खर्च',
+      // expenses: 'खर्च',
       stats: 'तथ्याङ्क',
     },
     settingsPage: {
