@@ -816,6 +816,59 @@ function normalizeExpenseAnalyticsResponse(payload = {}) {
   };
 }
 
+function applyExpenseCategorySelection(analytics, categoryKey) {
+  if (!categoryKey) return analytics;
+
+  const selectedKey = String(categoryKey);
+  const selectedRow = analytics.breakdown.find(
+    (row) => String(row.categoryKey) === selectedKey,
+  );
+  const backendRangeKey = String(analytics?.range?.categoryKey || "");
+  const emptyTotals = {
+    ...EMPTY_METRIC_TOTALS,
+    cashPaid: 0,
+  };
+
+  if (!selectedRow) {
+    return {
+      ...analytics,
+      totals: emptyTotals,
+      summary: {
+        ...analytics.summary,
+        totalCategories: 0,
+        categorizedCategories: 0,
+        uncategorizedCategories: 0,
+        categorizedAmount: 0,
+        uncategorizedAmount: 0,
+        topCategory: null,
+      },
+      timeline: backendRangeKey === selectedKey ? analytics.timeline : [],
+      breakdown: [],
+    };
+  }
+
+  return {
+    ...analytics,
+    totals: {
+      count: selectedRow.expenseCount,
+      total: selectedRow.total,
+      cashPaid: selectedRow.cashPaid,
+      pending: selectedRow.pending,
+    },
+    summary: {
+      ...analytics.summary,
+      totalCategories: 1,
+      categorizedCategories: 1,
+      uncategorizedCategories: 0,
+      categorizedAmount: selectedRow.total,
+      uncategorizedAmount: 0,
+      topCategory: selectedRow,
+    },
+    timeline: backendRangeKey === selectedKey ? analytics.timeline : [],
+    breakdown: [selectedRow],
+  };
+}
+
 function resolveExpenseCategoryName(row, t) {
   const label = String(row?.categoryName || "").trim();
   if (label) return label;
@@ -986,6 +1039,9 @@ function ExpenseCategoryAnalyticsSection({
   formatMoney,
   formatCompactMoney,
   caption,
+  filters,
+  onFilterChange,
+  categoryOptions,
 }) {
   const rows = analytics.breakdown;
   const hasRows = rows.length > 0;
@@ -1020,6 +1076,47 @@ function ExpenseCategoryAnalyticsSection({
           {t("analytics.totalCategories")}:{" "}
           {formatQuantityValue(analytics.summary.totalCategories)}
         </span>
+      </div>
+
+      <div className="card">
+        <div className="grid gap-4 md:grid-cols-3">
+          <div>
+            <label className="label">{t("common.from")}</label>
+            <input
+              type="date"
+              className="input mt-1"
+              name="fromDate"
+              value={filters.fromDate}
+              onChange={onFilterChange}
+            />
+          </div>
+          <div>
+            <label className="label">{t("common.to")}</label>
+            <input
+              type="date"
+              className="input mt-1"
+              name="toDate"
+              value={filters.toDate}
+              onChange={onFilterChange}
+            />
+          </div>
+          <div>
+            <label className="label">{t("analytics.categoryName")}</label>
+            <select
+              className="input mt-1"
+              name="categoryKey"
+              value={filters.categoryKey}
+              onChange={onFilterChange}
+            >
+              <option value="">{`${t("common.all")} ${t("analytics.categoryName")}`}</option>
+              {categoryOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       {loading ? (
@@ -1396,8 +1493,12 @@ export default function Analytics() {
     groupBy: "auto",
     partyId: "",
     supplierId: "",
-    categoryKey: "",
     createdBy: "",
+  });
+  const [expenseFilters, setExpenseFilters] = useState({
+    fromDate: dayjs().startOf("month").format("YYYY-MM-DD"),
+    toDate: todayISODate(),
+    categoryKey: "",
   });
   const [selectedPartyFilterOption, setSelectedPartyFilterOption] =
     useState(null);
@@ -1450,8 +1551,10 @@ export default function Analytics() {
     };
     const expenseAnalyticsParams = {
       ...analyticsParams,
+      from: expenseFilters.fromDate || undefined,
+      to: expenseFilters.toDate || undefined,
       supplierId: filters.supplierId || undefined,
-      categoryKey: filters.categoryKey || undefined,
+      categoryKey: expenseFilters.categoryKey || undefined,
     };
     const rankingParams = {
       from: filters.fromDate || undefined,
@@ -1560,13 +1663,15 @@ export default function Analytics() {
       isActive = false;
     };
   }, [
-    filters.categoryKey,
     filters.createdBy,
     filters.fromDate,
     filters.groupBy,
     filters.partyId,
     filters.supplierId,
     filters.toDate,
+    expenseFilters.categoryKey,
+    expenseFilters.fromDate,
+    expenseFilters.toDate,
     refreshTick,
     t,
   ]);
@@ -1584,6 +1689,11 @@ export default function Analytics() {
     }
 
     setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleExpenseFilterChange = (event) => {
+    const { name, value } = event.target;
+    setExpenseFilters((prev) => ({ ...prev, [name]: value }));
   };
 
   const handlePartyFilterChange = (option) => {
@@ -1678,6 +1788,15 @@ export default function Analytics() {
     ],
   );
 
+  const visibleExpenseCategoryAnalytics = useMemo(
+    () =>
+      applyExpenseCategorySelection(
+        expenseCategoryAnalytics,
+        expenseFilters.categoryKey,
+      ),
+    [expenseCategoryAnalytics, expenseFilters.categoryKey],
+  );
+
   const seriesCaption = useMemo(() => {
     const labelMap = {
       auto: t("analytics.filters.auto"),
@@ -1688,6 +1807,22 @@ export default function Analytics() {
 
     return `${labelMap[filters.groupBy] || labelMap.auto} | ${filters.fromDate || "-"} to ${filters.toDate || "-"}`;
   }, [filters.fromDate, filters.groupBy, filters.toDate, t]);
+
+  const expenseSeriesCaption = useMemo(() => {
+    const labelMap = {
+      auto: t("analytics.filters.auto"),
+      day: t("analytics.filters.day"),
+      week: t("analytics.filters.week"),
+      month: t("analytics.filters.month"),
+    };
+
+    return `${labelMap[filters.groupBy] || labelMap.auto} | ${expenseFilters.fromDate || "-"} to ${expenseFilters.toDate || "-"}`;
+  }, [
+    expenseFilters.fromDate,
+    expenseFilters.toDate,
+    filters.groupBy,
+    t,
+  ]);
 
   const availableExpenseCategoryOptions = useMemo(
     () =>
@@ -1703,14 +1838,14 @@ export default function Analytics() {
               ),
             ]
           : [],
-        filters.categoryKey
+        expenseFilters.categoryKey
           ? [
               normalizeCategoryFilterOption({
-                categoryKey: filters.categoryKey,
+                categoryKey: expenseFilters.categoryKey,
                 categoryName:
                   expenseCategoryAnalytics.breakdown.find(
-                    (row) => row.categoryKey === filters.categoryKey,
-                  )?.categoryName || filters.categoryKey,
+                    (row) => row.categoryKey === expenseFilters.categoryKey,
+                  )?.categoryName || expenseFilters.categoryKey,
               }),
             ]
           : [],
@@ -1719,7 +1854,7 @@ export default function Analytics() {
       expenseCategoryAnalytics.breakdown,
       expenseCategoryAnalytics.summary.topCategory,
       expenseCategoryOptions,
-      filters.categoryKey,
+      expenseFilters.categoryKey,
     ],
   );
 
@@ -1740,7 +1875,7 @@ export default function Analytics() {
 
       <div className="card space-y-4">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="grid flex-1 gap-4 md:grid-cols-2 xl:grid-cols-7">
+          <div className="grid flex-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
             <div>
               <label className="label">{t("common.from")}</label>
               <input
@@ -1799,22 +1934,6 @@ export default function Analytics() {
                 searchPlaceholder={t("parties.searchPlaceholder")}
                 showPhone={false}
               />
-            </div>
-            <div>
-              <label className="label">{t("analytics.categoryName")}</label>
-              <select
-                className="input mt-1"
-                name="categoryKey"
-                value={filters.categoryKey}
-                onChange={handleFilterChange}
-              >
-                <option value="">{t("Categories")}</option>
-                {availableExpenseCategoryOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
             </div>
             <div>
               <label className="label">{t("filters.createdBy")}</label>
@@ -2001,14 +2120,17 @@ export default function Analytics() {
       </div>
 
       <ExpenseCategoryAnalyticsSection
-        analytics={expenseCategoryAnalytics}
+        analytics={visibleExpenseCategoryAnalytics}
         loading={isBusy}
         error={expenseCategoryError}
         onRetry={handleRefresh}
         t={t}
         formatMoney={formatMoney}
         formatCompactMoney={formatCompactMoney}
-        caption={seriesCaption}
+        caption={expenseSeriesCaption}
+        filters={expenseFilters}
+        onFilterChange={handleExpenseFilterChange}
+        categoryOptions={availableExpenseCategoryOptions}
       />
 
       <div className="grid gap-4 xl:grid-cols-2">

@@ -56,6 +56,9 @@ function normalizeExpenseCategory(category, index = 0) {
     value: `expense-category-${category.id}`,
     label: category.name,
     rawId: category.id,
+    backendKey: String(
+      category.categoryKey || category.key || category.slug || category.id,
+    ),
     icon: Wallet,
     ...getStyleAt(index),
   };
@@ -91,6 +94,51 @@ export function resolveExpenseCategoryLabel(categories, categoryId, customCatego
   }
 
   return categories.find((category) => category.id === categoryId)?.label || '';
+}
+
+function toSlug(value = '') {
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+export function resolveExpenseCategoryPayload(categories, categoryId, customCategory, t) {
+  const selectedCategory = categories.find((category) => category.id === categoryId) || null;
+  const customName = String(customCategory || '').trim();
+  const categoryName = resolveExpenseCategoryLabel(
+    categories,
+    categoryId,
+    customCategory,
+    t,
+  );
+
+  if (!categoryName) {
+    return {
+      categoryKey: '',
+      categoryName: '',
+      categoryType: '',
+      categoryId: null,
+    };
+  }
+
+  if (categoryId === CUSTOM_EXPENSE_CATEGORY) {
+    const slug = toSlug(customName);
+    return {
+      categoryKey: slug ? `custom-${slug}` : CUSTOM_EXPENSE_CATEGORY,
+      categoryName,
+      categoryType: 'custom',
+      categoryId: null,
+    };
+  }
+
+  return {
+    categoryKey: String(selectedCategory?.backendKey || categoryId || ''),
+    categoryName,
+    categoryType: selectedCategory?.rawId ? 'managed' : 'preset',
+    categoryId: selectedCategory?.rawId || null,
+  };
 }
 
 export function useExpenseCategories({ businessId, includeCustom = true } = {}) {

@@ -11,6 +11,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import {
   CUSTOM_EXPENSE_CATEGORY,
   resolveExpenseCategoryLabel,
+  resolveExpenseCategoryPayload,
   useExpenseCategories,
 } from '../hooks/useExpenseCategories.js';
 import { buildPaymentPayload, requiresBankSelection } from '../lib/payments';
@@ -132,11 +133,24 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
     try {
       setQuickSaving(true);
       setQuickStatus({ type: 'info', message: '' });
+      const preparedLines = validLines.map((line) => ({
+        line,
+        categoryMeta: resolveExpenseCategoryPayload(
+          categories,
+          line.categoryId,
+          line.customCategory,
+          t,
+        ),
+      }));
+      const primaryCategory = preparedLines[0]?.categoryMeta || null;
 
       const payload = {
         entryType: 'expense',
         partyId: selectedParty?.id || null,
         partyName: selectedParty?.name || resolveLineLabel(validLines[0]),
+        expenseCategoryKey: primaryCategory?.categoryKey || null,
+        expenseCategoryName: primaryCategory?.categoryName || null,
+        expenseCategoryType: primaryCategory?.categoryType || null,
         purchaseDate: quickHeader.expenseDate,
         status: 'received',
         notes: '',
@@ -145,15 +159,24 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
         subTotal: quickGrandTotal,
         taxTotal: 0,
         ...buildPaymentPayload(quickHeader),
-        items: validLines.map((line) => {
+        items: preparedLines.map(({ line, categoryMeta }) => {
           const amount = Number(line.amount || 0);
-          const categoryLabel = resolveLineLabel(line);
+          const categoryLabel =
+            categoryMeta.categoryName || resolveLineLabel(line);
           const description = line.notes
             ? `${categoryLabel} - ${line.notes}`
             : categoryLabel;
 
           return {
             itemType: 'expense',
+            categoryKey: categoryMeta.categoryKey || null,
+            categoryName: categoryMeta.categoryName || null,
+            categoryType: categoryMeta.categoryType || null,
+            categoryId: categoryMeta.categoryId ?? null,
+            expenseCategoryKey: categoryMeta.categoryKey || null,
+            expenseCategoryName: categoryMeta.categoryName || null,
+            expenseCategoryType: categoryMeta.categoryType || null,
+            expenseCategoryId: categoryMeta.categoryId ?? null,
             description,
             quantity: 1,
             unitType: 'primary',

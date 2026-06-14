@@ -16,6 +16,7 @@ import { todayISODate } from '../lib/datetime';
 import {
   CUSTOM_EXPENSE_CATEGORY,
   resolveExpenseCategoryLabel,
+  resolveExpenseCategoryPayload,
   useExpenseCategories,
 } from '../hooks/useExpenseCategories.js';
 
@@ -150,12 +151,24 @@ export default function QuickEntry() {
       setStatus({ type: 'info', message: '' });
 
       if (activeTab === 'expense') {
-        const categoryName = selectedCategoryLabel || t('purchases.expense');
+        const categoryPayload = resolveExpenseCategoryPayload(
+          expenseCategories,
+          form.category,
+          form.customCategory,
+          t,
+        );
+        const categoryName =
+          categoryPayload.categoryName ||
+          selectedCategoryLabel ||
+          t('purchases.expense');
         const notes = form.notes.trim();
         await api.createPurchase({
           entryType: 'expense',
           partyId: selectedParty?.id || null,
           partyName: selectedParty?.name || categoryName,
+          expenseCategoryKey: categoryPayload.categoryKey || null,
+          expenseCategoryName: categoryPayload.categoryName || null,
+          expenseCategoryType: categoryPayload.categoryType || null,
           purchaseDate: form.txDate,
           status: 'received',
           notes,
@@ -167,6 +180,14 @@ export default function QuickEntry() {
           items: [
             {
               description: notes ? `${categoryName} - ${notes}` : categoryName,
+              categoryKey: categoryPayload.categoryKey || null,
+              categoryName: categoryPayload.categoryName || null,
+              categoryType: categoryPayload.categoryType || null,
+              categoryId: categoryPayload.categoryId ?? null,
+              expenseCategoryKey: categoryPayload.categoryKey || null,
+              expenseCategoryName: categoryPayload.categoryName || null,
+              expenseCategoryType: categoryPayload.categoryType || null,
+              expenseCategoryId: categoryPayload.categoryId ?? null,
               quantity: 1,
               unitType: 'primary',
               unitPrice: amount,
