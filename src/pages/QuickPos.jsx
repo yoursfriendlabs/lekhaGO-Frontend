@@ -81,19 +81,43 @@ function getLineTaxAmount(item) {
 }
 
 function formatStockLabel(product, unitType = "primary") {
-  const stockOnHand = Number(product.stockOnHand || 0);
-  const conversionRate = Number(product.conversionRate || 0);
-  const isSecondary =
-    unitType === "secondary" && product.secondaryUnit && conversionRate > 0;
-  const quantity = (
-    isSecondary ? stockOnHand * conversionRate : stockOnHand
-  ).toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
+  const quantity = getAvailableStockQuantity(product, unitType).toLocaleString(
+    undefined,
+    {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    },
+  );
   const unitLabel = getProductUnitLabel(product, unitType);
 
   return `${quantity} ${unitLabel}`.trim();
+}
+
+function getStockQuantity(product = {}) {
+  return Number(
+    product?.stockOnHand ??
+      product?.openingStock ??
+      product?.quantityOnHand ??
+      0,
+  );
+}
+
+function getConversionRate(product = {}) {
+  return Number(product?.conversionRate || 0);
+}
+
+function getAvailableStockQuantity(product, unitType = "primary", fallback = {}) {
+  const stockOnHand = getStockQuantity(product) || getStockQuantity(fallback);
+  const conversionRate =
+    getConversionRate(product) || getConversionRate(fallback);
+  const secondaryUnit =
+    product?.secondaryUnit || fallback?.secondaryUnit || "";
+
+  if (unitType === "secondary" && secondaryUnit && conversionRate > 0) {
+    return stockOnHand * conversionRate;
+  }
+
+  return stockOnHand;
 }
 
 function getProductUnitLabel(product, unitType) {
@@ -420,18 +444,22 @@ export default function QuickPos() {
         (item) => item.productId === product.id,
       );
 
-      const stockOnHand = Number(product.stockOnHand || 0);
-
       if (existingIndex >= 0) {
         const currentItem = previous[existingIndex];
+        const selectedUnitType = currentItem.unitType || unitType || "primary";
+        const availableStock = getAvailableStockQuantity(
+          product,
+          selectedUnitType,
+          currentItem,
+        );
         const currentQty = Number(currentItem.quantity || 0);
         const newQty = currentQty + 1;
 
         // Check stock availability
-        if (newQty > stockOnHand) {
+        if (newQty > availableStock) {
           showError(
             t("sales.insufficientStock") ||
-            `Insufficient stock for ${product.name}. Available: ${stockOnHand}`
+            `Insufficient stock for ${product.name}. Available: ${availableStock}`
           );
           return previous;
         }
@@ -449,10 +477,11 @@ export default function QuickPos() {
       }
 
       // Check stock availability for new item
-      if (1 > stockOnHand) {
+      const availableStock = getAvailableStockQuantity(product, unitType, product);
+      if (1 > availableStock) {
         showError(
           t("sales.insufficientStock") ||
-          `Insufficient stock for ${product.name}. Available: ${stockOnHand}`
+          `Insufficient stock for ${product.name}. Available: ${availableStock}`
         );
         return previous;
       }
@@ -465,14 +494,20 @@ export default function QuickPos() {
     if (!productId) return;
 
     const product = getProductById(productId);
-    const stockOnHand = Number(product?.stockOnHand || 0);
+    const currentItem = cart.find((item) => item.productId === productId);
+    const unitType = currentItem?.unitType || "primary";
+    const availableStock = getAvailableStockQuantity(
+      product,
+      unitType,
+      currentItem,
+    );
     const requestedQty = Math.max(Number(nextQuantity || 0), 0);
 
     // Validate stock availability
-    if (requestedQty > 0 && requestedQty > stockOnHand) {
+    if (requestedQty > 0 && requestedQty > availableStock) {
       showError(
         t("sales.insufficientStock") ||
-        `Insufficient stock for ${product?.name}. Available: ${stockOnHand}`
+        `Insufficient stock for ${product?.name}. Available: ${availableStock}`
       );
       return;
     }
@@ -574,7 +609,11 @@ export default function QuickPos() {
     // Validate stock availability before submission
     const insufficientStockItems = cart.filter((item) => {
       const product = getProductById(item.productId);
-      const stock = Number(product?.stockOnHand || 0);
+      const stock = getAvailableStockQuantity(
+        product,
+        item.unitType || "primary",
+        item,
+      );
       return Number(item.quantity || 0) > stock;
     });
 
