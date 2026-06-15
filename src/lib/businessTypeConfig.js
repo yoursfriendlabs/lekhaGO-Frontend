@@ -61,5 +61,16 @@ export function getNavigationForBusinessType(navigation = [], businessProfile) {
     ];
   }
 
+  if (!normalized.some((item) => item?.key === 'staff')) {
+    const attendanceIndex = normalized.findIndex((item) => item?.key === 'attendance');
+    const insertIndex = attendanceIndex >= 0 ? attendanceIndex + 1 : Math.max(normalized.length - 2, 1);
+
+    normalized = [
+      ...normalized.slice(0, insertIndex),
+      { key: 'staff', label: 'Staff', route: '/app/staff' },
+      ...normalized.slice(insertIndex),
+    ];
+  }
+
   return normalized;
 }

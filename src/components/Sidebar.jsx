@@ -16,6 +16,7 @@ const NAV_ROLE_MAP = {
   parties: ['owner', 'staff', 'admin', 'super_admin'],
   tasks: ['owner', 'staff', 'admin', 'super_admin'],
   attendance: ['owner', 'staff', 'admin', 'super_admin'],
+  staff: ['owner', 'staff', 'admin', 'super_admin'],
   ledger: ['owner', 'staff', 'admin', 'super_admin'],
   analytics: ['owner', 'staff', 'admin', 'super_admin'],
   settings: ['owner', 'staff', 'admin', 'super_admin'],
@@ -36,6 +37,7 @@ export default function Sidebar() {
         { key: 'tasks', label: t('nav.tasks'), route: '/app/tasks' },
         { key: 'parties', label: t('nav.parties'), route: '/app/parties' },
         { key: 'attendance', label: t('nav.attendance'), route: '/app/attendance' },
+        { key: 'staff', label: t('nav.staff'), route: '/app/staff' },
         { key: 'ledger', label: t('nav.ledger'), route: '/app/ledger' },
         { key: 'analytics', label: t('nav.analytics'), route: '/app/analytics' },
         { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
@@ -44,6 +46,7 @@ export default function Sidebar() {
   ).map((item) => {
     if (item?.key === 'purchases') return { ...item, label: t('nav.expenses') };
     if (item?.key === 'attendance') return { ...item, label: t('nav.attendance') };
+    if (item?.key === 'staff') return { ...item, label: t('nav.staff') };
     return item;
   });
 

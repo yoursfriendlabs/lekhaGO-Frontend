@@ -15,6 +15,7 @@ const NAV_ROLE_MAP = {
   parties: ['owner', 'staff', 'admin', 'super_admin'],
   tasks: ['owner', 'staff', 'admin', 'super_admin'],
   attendance: ['owner', 'staff', 'admin', 'super_admin'],
+  staff: ['owner', 'staff', 'admin', 'super_admin'],
   settings: ['owner', 'staff', 'admin', 'super_admin'],
 };
 
@@ -28,6 +29,7 @@ const ICON_MAP = {
   parties: Users,
   tasks: ClipboardList,
   attendance: Clock,
+  staff: Users,
   settings: Settings2,
 };
 
@@ -46,12 +48,14 @@ export default function MobileNav() {
         { key: 'tasks', label: t('nav.tasks'), route: '/app/tasks' },
         { key: 'parties', label: t('nav.parties'), route: '/app/parties' },
         { key: 'attendance', label: t('nav.attendance'), route: '/app/attendance' },
+        { key: 'staff', label: t('nav.staff'), route: '/app/staff' },
         { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
       ],
     businessProfile,
   ).map((item) => {
     if (item?.key === 'purchases') return { ...item, label: t('nav.expenses') };
     if (item?.key === 'attendance') return { ...item, label: t('nav.attendance') };
+    if (item?.key === 'staff') return { ...item, label: t('nav.staff') };
     return item;
   });
   const visibleNavItems = navigation
