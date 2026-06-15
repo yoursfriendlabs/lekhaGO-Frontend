@@ -48,10 +48,7 @@ export default function TaskDetailDialog({
   onCommentChange,
   onCommentSubmit,
   commentSaving,
-  statusValue,
-  onStatusValueChange,
-  onStatusSubmit,
-  statusSaving,
+  onOpenStatusDialog,
   onEdit,
   onRefresh,
   onClose,
@@ -85,7 +82,13 @@ export default function TaskDetailDialog({
       <div className="space-y-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap gap-2">
-            <TaskStatusBadge task={task} meta={meta} />
+            <TaskStatusBadge
+              task={task}
+              meta={meta}
+              onClick={canManageTasks ? onOpenStatusDialog : undefined}
+              title={canManageTasks ? t('tasks.detail.updateStatus') : undefined}
+              ariaLabel={canManageTasks ? t('tasks.detail.updateStatus') : undefined}
+            />
             <TaskPriorityBadge task={task} meta={meta} />
             <TaskDueBadge task={task} t={t} />
           </div>
@@ -161,25 +164,23 @@ export default function TaskDetailDialog({
                 {canManageTasks ? (
                   <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 dark:border-slate-800/70 dark:bg-slate-950/60">
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{t('tasks.detail.statusAction')}</p>
-                    <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-                      <select
-                        className="input"
-                        value={statusValue}
-                        onChange={(event) => onStatusValueChange(event.target.value)}
+                    <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                          {getTaskStatusLabel(task?.status, meta)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          {t('tasks.detail.statusActionHint', { status: getTaskStatusLabel(task?.status, meta) })}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-primary justify-center"
+                        onClick={onOpenStatusDialog}
                       >
-                        {meta.statuses.map((status) => (
-                          <option key={status.key} value={status.key}>{status.label}</option>
-                        ))}
-                      </select>
-                      <button type="button" className="btn-primary justify-center" onClick={onStatusSubmit} disabled={statusSaving || statusValue === task.status}>
-                        {statusSaving ? t('common.saving') : t('tasks.detail.updateStatus')}
+                        {t('tasks.detail.updateStatus')}
                       </button>
                     </div>
-                    {!canEditContent ? (
-                      <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                        {t('tasks.detail.statusActionHint', { status: getTaskStatusLabel(task.status, meta) })}
-                      </p>
-                    ) : null}
                   </div>
                 ) : null}
               </div>

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import {
   BellRing,
   Columns3,
+  Check,
   Clock,
   List,
   Plus,
@@ -16,6 +17,7 @@ import PageHeader from '../components/PageHeader.jsx';
 import Pagination from '../components/Pagination.jsx';
 import TaskDetailDialog from '../components/tasks/TaskDetailDialog.jsx';
 import TaskFormDialog from '../components/tasks/TaskFormDialog.jsx';
+import { Dialog } from '../components/ui/Dialog.tsx';
 import {
   TaskDueBadge,
   TaskPriorityBadge,
@@ -35,10 +37,12 @@ import {
   emitTasksSync,
   getTaskAssigneeNames,
   getTaskDueState,
+  getTaskStatusLabel,
   hasUnreadTaskActivity,
   humanizeTaskKey,
   isTaskCompleted,
   normalizeTaskDetail,
+  normalizeTaskKey,
   subscribeToTasksSync,
 } from '../lib/tasks';
 
@@ -121,7 +125,16 @@ function buildTaskPath(searchParams, taskId) {
   return query ? `/app/tasks?${query}` : '/app/tasks';
 }
 
-function TaskCard({ task, meta, currentUserId, taskHref, onEdit, canEdit, t }) {
+function TaskCard({
+  task,
+  meta,
+  currentUserId,
+  taskHref,
+  onEdit,
+  onStatusClick,
+  canEdit,
+  t,
+}) {
   const dueState = getTaskDueState(task);
   const assigneeNames = getTaskAssigneeNames(task);
   const showUnread = hasUnreadTaskActivity(task, currentUserId);
@@ -153,7 +166,13 @@ function TaskCard({ task, meta, currentUserId, taskHref, onEdit, canEdit, t }) {
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <TaskStatusBadge task={task} meta={meta} />
+        <TaskStatusBadge
+          task={task}
+          meta={meta}
+          onClick={onStatusClick}
+          title={onStatusClick ? t('tasks.detail.updateStatus') : undefined}
+          ariaLabel={onStatusClick ? t('tasks.detail.updateStatus') : undefined}
+        />
         <TaskPriorityBadge task={task} meta={meta} />
         <TaskDueBadge task={task} t={t} />
       </div>
@@ -188,7 +207,16 @@ function TaskCard({ task, meta, currentUserId, taskHref, onEdit, canEdit, t }) {
   );
 }
 
-function TaskBoard({ tasks, meta, currentUserId, taskHrefFor, onEditTask, canEditTask, t }) {
+function TaskBoard({
+  tasks,
+  meta,
+  currentUserId,
+  taskHrefFor,
+  onEditTask,
+  onStatusClick,
+  canEditTask,
+  t,
+}) {
   const columns = meta.statuses.length ? meta.statuses : EMPTY_TASKS_META.statuses;
   const grouped = new Map(columns.map((status) => [status.key, []]));
 
@@ -218,6 +246,7 @@ function TaskBoard({ tasks, meta, currentUserId, taskHrefFor, onEditTask, canEdi
                   currentUserId={currentUserId}
                   taskHref={taskHrefFor(task.id)}
                   onEdit={() => onEditTask(task)}
+                  onStatusClick={() => onStatusClick?.(task)}
                   canEdit={canEditTask(task)}
                   t={t}
                 />
@@ -232,6 +261,40 @@ function TaskBoard({ tasks, meta, currentUserId, taskHrefFor, onEditTask, canEdi
       ))}
     </div>
   );
+}
+
+function getTaskStatusPalette(statusKey) {
+  const key = normalizeTaskKey(statusKey);
+
+  if (['todo', 'open', 'pending'].includes(key)) {
+    return {
+      selectedClass: 'border-sky-400 bg-sky-50 dark:bg-sky-900/20',
+      dotClass: 'bg-sky-500',
+      checkClass: 'text-sky-600',
+    };
+  }
+
+  if (['in_progress', 'progress', 'active', 'working'].includes(key)) {
+    return {
+      selectedClass: 'border-amber-400 bg-amber-50 dark:bg-amber-900/20',
+      dotClass: 'bg-amber-500',
+      checkClass: 'text-amber-600',
+    };
+  }
+
+  if (['completed', 'done', 'closed', 'resolved'].includes(key)) {
+    return {
+      selectedClass: 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20',
+      dotClass: 'bg-emerald-500',
+      checkClass: 'text-emerald-600',
+    };
+  }
+
+  return {
+    selectedClass: 'border-primary-400 bg-primary-50 dark:bg-primary-900/20',
+    dotClass: 'bg-primary-500',
+    checkClass: 'text-primary-600',
+  };
 }
 
 export default function Tasks() {
@@ -255,7 +318,9 @@ export default function Tasks() {
   const [formSaving, setFormSaving] = useState(false);
   const [commentValue, setCommentValue] = useState('');
   const [commentSaving, setCommentSaving] = useState(false);
-  const [statusValue, setStatusValue] = useState('');
+  const [statusDialog, setStatusDialog] = useState(null);
+  const [newStatus, setNewStatus] = useState('');
+  const [statusError, setStatusError] = useState('');
   const [statusSaving, setStatusSaving] = useState(false);
   const [queryInput, setQueryInput] = useState(() => searchParams.get('q') || '');
   const debouncedQuery = useDebouncedValue(queryInput, 300);
@@ -279,6 +344,15 @@ export default function Tasks() {
   const activeTaskFromList = currentTaskIds.includes(formTaskId)
     ? tasksData.items.find((task) => task.id === formTaskId)
     : null;
+  const statusOptions = useMemo(() => {
+    const statuses = meta.statuses.length ? meta.statuses : EMPTY_TASKS_META.statuses;
+    return statuses.map((status) => ({
+      value: status.key,
+      label: status.label || humanizeTaskKey(status.key),
+      description: status.description || '',
+      ...getTaskStatusPalette(status.key),
+    }));
+  }, [meta.statuses]);
 
   const updateParams = (updates = {}, { resetPage = false } = {}) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -366,7 +440,6 @@ export default function Tasks() {
       const payload = await api.getTask(taskId);
       const normalized = normalizeTaskDetail(payload);
       setDetailTask(normalized);
-      setStatusValue(normalized.status || meta.statuses[0]?.key || '');
       emitTasksSync({ type: 'task-opened', taskId });
       return normalized;
     } catch (error) {
@@ -502,22 +575,38 @@ export default function Tasks() {
     }
   };
 
+  const openStatusDialog = (task) => {
+    const source = task || detailTask;
+    if (!source || !canManageTasks) return;
+
+    setStatusDialog(source);
+    setNewStatus(
+      source.status || meta.statuses[0]?.key || EMPTY_TASKS_META.statuses[0]?.key || '',
+    );
+    setStatusError('');
+  };
+
+  const closeStatusDialog = () => {
+    setStatusDialog(null);
+    setStatusError('');
+  };
+
   const handleStatusSubmit = async () => {
-    if (!detailTask?.id || statusValue === detailTask.status) return;
+    if (!statusDialog?.id || newStatus === statusDialog.status) return;
 
     setStatusSaving(true);
-    setDetailError('');
+    setStatusError('');
 
     try {
-      const response = await api.updateTask(detailTask.id, { status: statusValue });
+      const response = await api.updateTask(statusDialog.id, { status: newStatus });
       const nextTask = normalizeTaskDetail(response);
-      setDetailTask(nextTask);
-      setStatusValue(nextTask.status);
+      setDetailTask((current) => (current?.id === nextTask.id ? nextTask : current));
       emitTasksSync({ type: 'task-status-updated', taskId: nextTask.id });
       showSuccess(t('tasks.feedback.statusUpdated'));
+      closeStatusDialog();
       await loadTasks({ silent: true });
     } catch (error) {
-      setDetailError(error.message || t('auth.errors.generic'));
+      setStatusError(error.message || t('auth.errors.generic'));
       showError(error.message || t('auth.errors.generic'));
     } finally {
       setStatusSaving(false);
@@ -743,6 +832,7 @@ export default function Tasks() {
           currentUserId={currentUserId}
           taskHrefFor={taskHrefFor}
           onEditTask={openEditForm}
+          onStatusClick={openStatusDialog}
           canEditTask={canEditSpecificTask}
           t={t}
         />
@@ -756,6 +846,7 @@ export default function Tasks() {
               currentUserId={currentUserId}
               taskHref={taskHrefFor(task.id)}
               onEdit={() => openEditForm(task)}
+              onStatusClick={() => openStatusDialog(task)}
               canEdit={canEditSpecificTask(task)}
               t={t}
             />
@@ -783,10 +874,7 @@ export default function Tasks() {
         onCommentChange={setCommentValue}
         onCommentSubmit={handleCommentSubmit}
         commentSaving={commentSaving}
-        statusValue={statusValue}
-        onStatusValueChange={setStatusValue}
-        onStatusSubmit={handleStatusSubmit}
-        statusSaving={statusSaving}
+        onOpenStatusDialog={() => openStatusDialog(detailTask)}
         onEdit={() => openEditForm(detailTask)}
         onRefresh={() => loadDetail(selectedTaskId)}
         onClose={closeDetail}
@@ -808,6 +896,76 @@ export default function Tasks() {
         onFieldChange={handleFormFieldChange}
         t={t}
       />
+
+      <Dialog
+        isOpen={Boolean(statusDialog)}
+        onClose={closeStatusDialog}
+        title={t('tasks.detail.updateStatus')}
+        size="sm"
+        footer={(
+          <div className="flex w-full flex-col gap-3 sm:flex-row">
+            <button
+              type="button"
+              className="btn-ghost w-full sm:w-auto sm:flex-1"
+              onClick={closeStatusDialog}
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              className="btn-primary w-full justify-center sm:w-auto sm:flex-1"
+              onClick={handleStatusSubmit}
+              disabled={statusSaving || !statusDialog || newStatus === statusDialog.status}
+            >
+              {statusSaving ? t('common.saving') : t('tasks.detail.updateStatus')}
+            </button>
+          </div>
+        )}
+      >
+        <div className="space-y-4">
+          {statusError ? <Notice title={statusError} tone="error" /> : null}
+
+          {statusDialog ? (
+            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-900/60">
+              <p className="font-semibold text-slate-800 dark:text-slate-200">
+                {statusDialog.title || t('tasks.detail.title')}
+              </p>
+              <p className="mt-1 text-slate-500 dark:text-slate-400">
+                {getTaskStatusLabel(statusDialog.status, meta)}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="space-y-2">
+            {statusOptions.map((option) => {
+              const isSelected = newStatus === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setNewStatus(option.value)}
+                  className={`flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition ${
+                    isSelected
+                      ? option.selectedClass
+                      : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600'
+                  }`}
+                >
+                  <span className={`h-3 w-3 shrink-0 rounded-full ${option.dotClass}`} />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-slate-800 dark:text-slate-200">
+                      {option.label}
+                    </p>
+                    {option.description ? (
+                      <p className="text-xs text-slate-500">{option.description}</p>
+                    ) : null}
+                  </div>
+                  {isSelected ? <Check size={16} className={option.checkClass} /> : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </Dialog>
 
       {canViewTasks ? (
         <div className="rounded-3xl border border-slate-200/70 bg-white/80 px-4 py-3 text-sm text-slate-500 dark:border-slate-800/70 dark:bg-slate-950/50 dark:text-slate-400">

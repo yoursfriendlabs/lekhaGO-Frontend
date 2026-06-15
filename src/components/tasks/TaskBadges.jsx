@@ -24,10 +24,35 @@ function badgeClass(tone = 'slate') {
   }
 }
 
-export function TaskStatusBadge({ task, meta, className = '' }) {
+export function TaskStatusBadge({
+  task,
+  meta,
+  className = '',
+  onClick,
+  title,
+  ariaLabel,
+}) {
+  const toneClass = badgeClass(getTaskStatusTone(task));
+  const content = getTaskStatusLabel(task?.status, meta);
+  const sharedClassName = `inline-flex rounded-full px-2.5 py-1 text-xs font-semibold transition ${toneClass} ${className}`.trim();
+
+  if (typeof onClick === 'function') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        title={title || content}
+        aria-label={ariaLabel || title || content}
+        className={`${sharedClassName} cursor-pointer hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-primary-300`}
+      >
+        {content}
+      </button>
+    );
+  }
+
   return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClass(getTaskStatusTone(task))} ${className}`.trim()}>
-      {getTaskStatusLabel(task?.status, meta)}
+    <span className={sharedClassName}>
+      {content}
     </span>
   );
 }
