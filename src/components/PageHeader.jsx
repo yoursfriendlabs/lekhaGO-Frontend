@@ -1,6 +1,6 @@
-export default function PageHeader({ title, subtitle, action }) {
+export default function PageHeader({ id, title, subtitle, action }) {
   return (
-    <div className="mb-5 flex flex-wrap items-center justify-between gap-4 md:mb-6">
+    <div id={id || undefined} className="mb-5 flex flex-wrap items-center justify-between gap-4 md:mb-6">
       <div className="min-w-0">
         <h2 className="font-serif text-xl text-slate-900 dark:text-white sm:text-2xl">{title}</h2>
         {subtitle ? <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 sm:text-base">{subtitle}</p> : null}

@@ -128,6 +128,10 @@ function formatQuantity(value) {
   });
 }
 
+const getInventoryItemRowId = (itemId) => `inventory-item-row-${itemId}`;
+const getInventoryItemCardId = (itemId) => `inventory-item-card-${itemId}`;
+const getInventoryItemActionId = (action, itemId) => `inventory-item-${action}-${itemId}`;
+
 function getItemTypeLabel(itemType, itemTypeOptions, t) {
   const match = itemTypeOptions.find((option) => option.value === itemType);
   if (match?.label) return match.label;
@@ -677,7 +681,7 @@ export default function Inventory() {
   }, [status]);
 
   return (
-    <div className="space-y-8">
+    <div id="inventory-page" className="space-y-8">
       {toast.message ? (
         <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+92px)] left-4 right-4 z-[80] md:left-auto md:right-6 md:w-full md:max-w-sm">
           <Notice title={toast.message} tone={toast.type || 'success'} />
@@ -693,8 +697,8 @@ export default function Inventory() {
             {/*  <Upload size={16} /> {t('inventory.importItems')}*/}
             {/*</button>*/}
             {canManageInventory ? (
-              <button id="add-new-item" className="btn-primary w-full sm:w-auto" type="button" onClick={openCreateDialog}>
-                <Plus  size={16} /> {t ('inventory.addNewItem')}
+              <button id="inventory-add-new-item" className="btn-primary w-full sm:w-auto" type="button" onClick={openCreateDialog}>
+                <Plus size={16} /> {t('inventory.addNewItem')}
               </button>
             ) : null}
           </div>
@@ -703,7 +707,7 @@ export default function Inventory() {
 
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
 
-      <div className="card">
+      <div id="inventory-items-card" className="card">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-serif text-2xl text-slate-900 dark:text-white ">
             {t('inventory.itemsList', { count: totalItems })}
@@ -715,6 +719,7 @@ export default function Inventory() {
           <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white  text-sm text-slate-600 shadow-sm focus-within:border-emerald-300 dark:border-slate-800 dark:bg-slate-950 sm:col-span-2 xl:col-span-1">
             <span className="text-slate-400">🔍</span>
             <input
+              id="inventory-search-input"
               className="w-full bg-transparent focus:border-none focus:ring-0 border-none"
               placeholder={t('inventory.searchItems')}
               value={query}
@@ -722,6 +727,7 @@ export default function Inventory() {
             />
           </div>
           <select
+            id="inventory-category-filter"
             className="input border-none min-w-[150px]"
             value={categoryFilter}
             onChange={(event) => setCategoryFilter(event.target.value)}
@@ -732,6 +738,7 @@ export default function Inventory() {
             ))}
           </select>
           <select
+            id="inventory-stock-filter"
             className="input min-w-[140px]"
             value={stockFilter}
             onChange={(event) => setStockFilter(event.target.value)}
@@ -742,6 +749,7 @@ export default function Inventory() {
             <option value="out">{t('inventory.outStock')}</option>
           </select>
           <select
+            id="inventory-type-filter"
             className="input min-w-[140px]"
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value)}
@@ -752,6 +760,7 @@ export default function Inventory() {
             ))}
           </select>
           <button
+            id="inventory-sort-button"
             className="btn-ghost w-full justify-center xl:w-auto"
             type="button"
             onClick={() => setSortKey((prev) => (prev === 'name' ? 'quantity' : 'name'))}
@@ -761,14 +770,18 @@ export default function Inventory() {
         </div>
 
         {/* Mobile card view */}
-        <div className="mt-4 md:hidden space-y-3">
+        <div id="inventory-mobile-list" className="mt-4 md:hidden space-y-3">
           {productsLoading && products.length === 0 ? (
             <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
           ) : pagedItems.length === 0 ? (
             <p className="py-3 text-sm text-slate-500">{t('inventory.noItems')}</p>
           ) : (
             pagedItems.map((item) => (
-              <div key={item.id} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+              <div
+                key={item.id}
+                id={getInventoryItemCardId(item.id)}
+                className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60"
+              >
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
                     {item.name?.slice(0, 1) || 'I'}
@@ -795,6 +808,7 @@ export default function Inventory() {
                   <div className="mt-3 flex gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
                     {isRestockableProduct(item) ? (
                       <button
+                        id={getInventoryItemActionId('restock', item.id)}
                         className="btn-secondary flex-1 justify-center sm:w-auto"
                         type="button"
                         onClick={() => openRestockDialog(item.id)}
@@ -803,6 +817,7 @@ export default function Inventory() {
                       </button>
                     ) : null}
                     <button
+                      id={getInventoryItemActionId('edit', item.id)}
                       className={`${isRestockableProduct(item) ? 'btn-ghost flex-1' : 'btn-ghost w-full'} justify-center sm:w-auto`}
                       type="button"
                       onClick={() => openEditDialog(item.id)}
@@ -816,7 +831,7 @@ export default function Inventory() {
           )}
         </div>
         {/* Desktop table */}
-        <div className="mt-4 overflow-x-auto hidden md:block">
+        <div id="inventory-desktop-table" className="mt-4 overflow-x-auto hidden md:block">
           <table className="w-full text-sm text-slate-600 dark:text-slate-300">
             <thead className="text-xs uppercase text-slate-400">
               <tr>
@@ -841,7 +856,7 @@ export default function Inventory() {
                 </tr>
               ) : (
                 pagedItems.map((item) => (
-                  <tr key={item.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
+                  <tr key={item.id} id={getInventoryItemRowId(item.id)} className="border-t border-slate-200/70 dark:border-slate-800/70">
                     <td className="py-3">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700">
@@ -876,6 +891,7 @@ export default function Inventory() {
                         <div className="flex justify-end gap-2">
                           {isRestockableProduct(item) ? (
                             <button
+                              id={getInventoryItemActionId('restock', item.id)}
                               className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
                               type="button"
                               onClick={() => openRestockDialog(item.id)}
@@ -884,6 +900,7 @@ export default function Inventory() {
                             </button>
                           ) : null}
                           <button
+                            id={getInventoryItemActionId('edit', item.id)}
                             className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                             type="button"
                             onClick={() => openEditDialog(item.id)}
@@ -902,16 +919,18 @@ export default function Inventory() {
           </table>
         </div>
 
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={totalItems}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
-        />
+        <div id="inventory-pagination">
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={totalItems}
+            onPageChange={setPage}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
+        </div>
       </div>
 
       <Dialog
@@ -920,25 +939,26 @@ export default function Inventory() {
         title={t('inventory.restockItem')}
         size="md"
       >
-        <form className="space-y-5" onSubmit={handleRestockSubmit}>
+        <form id="inventory-restock-form" className="space-y-5" onSubmit={handleRestockSubmit}>
           <FormSectionCard hint={t('inventory.restockHelp')}>
             <div className="space-y-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{t('inventory.itemName')}</p>
-                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{restockProduct?.name || '-'}</p>
-                <p className="text-sm text-slate-500">{restockProduct?.primaryUnit || t('inventory.noUnit')}</p>
+                <p id="inventory-restock-item-name" className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{restockProduct?.name || '-'}</p>
+                <p id="inventory-restock-item-unit" className="text-sm text-slate-500">{restockProduct?.primaryUnit || t('inventory.noUnit')}</p>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="label">{t('inventory.quantityOnHand')}</label>
-                  <div className="mt-1 rounded-2xl border border-slate-200/70 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 dark:border-slate-800/70 dark:bg-slate-900/50 dark:text-slate-200">
+                  <div id="inventory-restock-current-stock" className="mt-1 rounded-2xl border border-slate-200/70 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 dark:border-slate-800/70 dark:bg-slate-900/50 dark:text-slate-200">
                     {formatQuantity(currentRestockStock)}{restockUnitSuffix}
                   </div>
                 </div>
                 <div>
                   <label className="label">{t('inventory.restockQuantity')}</label>
                   <input
+                    id="inventory-restock-quantity"
                     className="input mt-1"
                     type="number"
                     min="0"
@@ -954,7 +974,7 @@ export default function Inventory() {
 
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
                 <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">{t('inventory.newStockLevel')}</p>
-                <p className="mt-1 text-lg font-semibold text-emerald-900 dark:text-emerald-200">
+                <p id="inventory-restock-new-stock" className="mt-1 text-lg font-semibold text-emerald-900 dark:text-emerald-200">
                   {formatQuantity(nextRestockStock)}{restockUnitSuffix}
                 </p>
                 <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">{t('inventory.restockEditHint')}</p>
@@ -963,10 +983,10 @@ export default function Inventory() {
           </FormSectionCard>
 
           <div className="mobile-sticky-actions flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button className="btn-secondary w-full sm:w-auto" type="button" onClick={closeRestockDialog}>
+            <button id="inventory-restock-close" className="btn-secondary w-full sm:w-auto" type="button" onClick={closeRestockDialog}>
               {t('common.close')}
             </button>
-            <button className="btn-primary w-full sm:w-auto" type="submit" disabled={restockSaving}>
+            <button id="inventory-restock-submit" className="btn-primary w-full sm:w-auto" type="submit" disabled={restockSaving}>
               {restockSaving ? t('common.loading') : t('inventory.restock')}
             </button>
           </div>
@@ -979,12 +999,13 @@ export default function Inventory() {
         title={editingId ? `${t('common.edit')} ${t('inventory.itemName').toLowerCase()}` : t('inventory.addNewItem')}
         size="xl"
       >
-        <form className="space-y-5" onSubmit={handleSubmit}>
+        <form id="inventory-item-form" className="space-y-5" onSubmit={handleSubmit}>
           <FormSectionCard hint={t('inventory.help')}>
             <div className="space-y-4">
               <div>
                 <label className="label">{t('inventory.itemName')}</label>
                 <input
+                  id="inventory-item-name"
                   className="input mt-1"
                   name="name"
                   value={form.name}
@@ -998,6 +1019,11 @@ export default function Inventory() {
                   <label className="label">{t('inventory.itemCategory')}</label>
                   <div className="mt-1">
                     <CategorySearchCreateField
+                      id="inventory-item-category"
+                      inputId="inventory-item-category-search"
+                      clearButtonId="inventory-item-category-clear"
+                      searchClearButtonId="inventory-item-category-search-clear"
+                      createButtonId="inventory-item-category-create"
                       selectedCategory={selectedCategory}
                       options={categoryOptions}
                       onSelect={handleCategorySelect}
@@ -1020,6 +1046,7 @@ export default function Inventory() {
                     <span className="ml-1 text-[10px] text-slate-400 font-normal">(barcode ready)</span>
                   </label>
                   <input
+                    id="inventory-item-code"
                     className="input mt-1"
                     name="itemCode"
                     value={form.itemCode}
@@ -1032,6 +1059,7 @@ export default function Inventory() {
                   <div className="mt-1 grid grid-cols-2 gap-2">
                     {itemTypeOptions.map((type) => (
                       <button
+                        id={`inventory-item-type-${type.value}`}
                         key={type.value}
                         type="button"
                         onClick={() => setForm((prev) => ({ ...prev, itemType: type.value }))}
@@ -1051,6 +1079,7 @@ export default function Inventory() {
                   <div>
                     <label className="label">Metal type</label>
                     <select
+                      id="inventory-metal-type"
                       className="input mt-1"
                       name="metalType"
                       value={form.metalType}
@@ -1069,6 +1098,7 @@ export default function Inventory() {
 
           <div className="grid grid-cols-2 gap-2">
             <button
+              id="inventory-stock-tab"
               type="button"
               onClick={() => setActiveTab('stock')}
               className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
@@ -1080,6 +1110,7 @@ export default function Inventory() {
               {t('inventory.stockDetails')}
             </button>
             <button
+              id="inventory-other-tab"
               type="button"
               onClick={() => setActiveTab('other')}
               className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
@@ -1100,6 +1131,7 @@ export default function Inventory() {
                     <label className="label">Purity</label>
                     {purityOptions.length > 0 ? (
                       <select
+                        id="inventory-purity"
                         className="input mt-1"
                         name="purity"
                         value={form.purity}
@@ -1112,6 +1144,7 @@ export default function Inventory() {
                       </select>
                     ) : (
                       <input
+                        id="inventory-purity"
                         className="input mt-1"
                         name="purity"
                         value={form.purity}
@@ -1123,11 +1156,12 @@ export default function Inventory() {
                 ) : null}
                 <div>
                   <label className="label">{t('inventory.openingStock')}</label>
-                  <input className="input mt-1" name="openingStock" type="number" min="0" step="0.1" value={form.openingStock} onChange={handleFormChange} />
+                  <input id="inventory-opening-stock" className="input mt-1" name="openingStock" type="number" min="0" step="0.1" value={form.openingStock} onChange={handleFormChange} />
                 </div>
                 <div>
                   <label className="label">{t('inventory.measuringUnit')}</label>
                   <select
+                    id="inventory-measuring-unit"
                     className="input mt-1"
                     value={primaryUnitSelectValue}
                     onChange={handlePrimaryUnitChange}
@@ -1150,15 +1184,15 @@ export default function Inventory() {
                 </div>
                 <div>
                   <label className="label">{t('products.salePrice')}</label>
-                  <input className="input mt-1" name="salePrice" type="number" step="0.1" value={form.salePrice} onChange={handleFormChange} />
+                  <input id="inventory-sale-price" className="input mt-1" name="salePrice" type="number" step="0.1" value={form.salePrice} onChange={handleFormChange} />
                 </div>
                 <div>
                   <label className="label">{t('products.purchasePrice')}</label>
-                  <input className="input mt-1" name="purchasePrice" type="number" step="0.1" value={form.purchasePrice} onChange={handleFormChange} />
+                  <input id="inventory-purchase-price" className="input mt-1" name="purchasePrice" type="number" step="0.1" value={form.purchasePrice} onChange={handleFormChange} />
                 </div>
                 <div>
                   <label className="label">{t('inventory.mrpPrice')}</label>
-                  <input className="input mt-1" name="mrpPrice" type="number" step="0.1" value={form.mrpPrice} onChange={handleFormChange} />
+                  <input id="inventory-mrp-price" className="input mt-1" name="mrpPrice" type="number" step="0.1" value={form.mrpPrice} onChange={handleFormChange} />
                 </div>
                 {/* <div>
                   <label className="label">{t('inventory.wholesalePrice')}</label>
@@ -1174,6 +1208,7 @@ export default function Inventory() {
                 <div>
                   <label className="label">{t('products.secondaryUnit')}</label>
                   <select
+                    id="inventory-secondary-unit"
                     className="input mt-1"
                     value={secondaryUnitSelectValue}
                     onChange={handleSecondaryUnitChange}
@@ -1190,22 +1225,22 @@ export default function Inventory() {
                 </div>
                 <div>
                   <label className="label">{t('products.conversionRate')}</label>
-                  <input className="input mt-1" name="conversionRate" type="number" step="1" value={form.conversionRate} onChange={handleFormChange} />
+                  <input id="inventory-conversion-rate" className="input mt-1" name="conversionRate" type="number" step="1" value={form.conversionRate} onChange={handleFormChange} />
                 </div>
                 <div>
                   <label className="label">{t('products.secondaryPrice')}</label>
-                  <input className="input mt-1" name="secondarySalePrice" type="number" step="0.01" value={form.secondarySalePrice} onChange={handleFormChange} />
+                  <input id="inventory-secondary-sale-price" className="input mt-1" name="secondarySalePrice" type="number" step="0.01" value={form.secondarySalePrice} onChange={handleFormChange} />
                 </div>
                 <div className="flex items-center gap-3 rounded-2xl border border-slate-200/70 px-4 py-3">
                   <input
-                    id="lowStockAlert"
+                    id="inventory-low-stock-alert"
                     className="h-4 w-4 rounded border-slate-300"
                     type="checkbox"
                     name="lowStockAlert"
                     checked={form.lowStockAlert}
                     onChange={handleFormChange}
                   />
-                  <label htmlFor="lowStockAlert" className="text-sm text-slate-600">
+                  <label htmlFor="inventory-low-stock-alert" className="text-sm text-slate-600">
                     {t('inventory.lowStockAlert')}
                   </label>
                 </div>
@@ -1214,10 +1249,10 @@ export default function Inventory() {
           </FormSectionCard>
 
           <div className="mobile-sticky-actions flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button className="btn-secondary w-full sm:w-auto" type="button" onClick={closeDialog}>
+            <button id="inventory-item-close" className="btn-secondary w-full sm:w-auto" type="button" onClick={closeDialog}>
               {t('common.close')}
             </button>
-            <button className="btn-primary w-full sm:w-auto" type="submit" disabled={saving}>
+            <button id="inventory-item-save" className="btn-primary w-full sm:w-auto" type="submit" disabled={saving}>
               {saving ? t('common.loading') : editingId ? t('common.update') : t('inventory.addItem')}
             </button>
           </div>

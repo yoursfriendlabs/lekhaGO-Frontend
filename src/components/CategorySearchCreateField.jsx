@@ -33,6 +33,11 @@ function dedupeCategories(categories = []) {
 }
 
 export default function CategorySearchCreateField({
+  id = '',
+  inputId = '',
+  clearButtonId = '',
+  searchClearButtonId = '',
+  createButtonId = '',
   selectedCategory = null,
   options = [],
   onSelect,
@@ -151,7 +156,7 @@ export default function CategorySearchCreateField({
   };
 
   return (
-    <div ref={containerRef} className={`relative ${className}`}>
+    <div ref={containerRef} id={id || undefined} className={`relative ${className}`}>
       {selected ? (
         <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 dark:border-emerald-800/40 dark:bg-emerald-900/10">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white">
@@ -163,6 +168,7 @@ export default function CategorySearchCreateField({
           </div>
           <button
             type="button"
+            id={clearButtonId || undefined}
             onClick={handleClear}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600 dark:hover:bg-slate-800"
             aria-label={t('common.clear')}
@@ -175,6 +181,7 @@ export default function CategorySearchCreateField({
           <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-white px-3 py-1 dark:border-slate-700/60 dark:bg-slate-900/60 focus-within:border-primary-300">
             <Search size={16} className="shrink-0 text-slate-400" />
             <input
+              id={inputId || undefined}
               className="flex-1 bg-transparent w-1/3 text-sm focus:border-none border-none focus:ring-0 outline-none placeholder:text-slate-400 dark:text-slate-200"
               placeholder={searchPlaceholder || placeholder || t('categories.selectCategory')}
               value={query}
@@ -188,6 +195,7 @@ export default function CategorySearchCreateField({
             {query ? (
               <button
                 type="button"
+                id={searchClearButtonId || undefined}
                 onClick={() => {
                   setQuery('');
                   setResults([]);
@@ -228,6 +236,7 @@ export default function CategorySearchCreateField({
                 <div className="border-t border-slate-100/80 px-4 py-3 dark:border-slate-800/50">
                   <button
                     type="button"
+                    id={createButtonId || undefined}
                     className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm text-primary-700 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
                     onClick={handleCreate}
                     disabled={creating}
