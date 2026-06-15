@@ -15,6 +15,7 @@ const NAV_ROLE_MAP = {
   purchases: ['owner', 'staff', 'admin', 'super_admin'],
   parties: ['owner', 'staff', 'admin', 'super_admin'],
   tasks: ['owner', 'staff', 'admin', 'super_admin'],
+  attendance: ['owner', 'staff', 'admin', 'super_admin'],
   ledger: ['owner', 'staff', 'admin', 'super_admin'],
   analytics: ['owner', 'staff', 'admin', 'super_admin'],
   settings: ['owner', 'staff', 'admin', 'super_admin'],
@@ -34,14 +35,17 @@ export default function Sidebar() {
         { key: 'purchases', label: t('nav.expenses'), route: '/app/purchases' },
         { key: 'tasks', label: t('nav.tasks'), route: '/app/tasks' },
         { key: 'parties', label: t('nav.parties'), route: '/app/parties' },
+        { key: 'attendance', label: t('nav.attendance'), route: '/app/attendance' },
         { key: 'ledger', label: t('nav.ledger'), route: '/app/ledger' },
         { key: 'analytics', label: t('nav.analytics'), route: '/app/analytics' },
         { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
       ],
     businessProfile,
-  ).map((item) => (item?.key === 'purchases'
-    ? { ...item, label: t('nav.expenses') }
-    : item));
+  ).map((item) => {
+    if (item?.key === 'purchases') return { ...item, label: t('nav.expenses') };
+    if (item?.key === 'attendance') return { ...item, label: t('nav.attendance') };
+    return item;
+  });
 
   const visibleNavItems = navigation
     .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))

@@ -595,6 +595,79 @@ export const api = {
       { method: "DELETE" },
       mutationConfig(["staff"]),
     ),
+  punchIn: (coordinates) =>
+    request(
+      "/api/staff/attendance/punch-in",
+      { method: "POST", body: JSON.stringify(coordinates) },
+      mutationConfig(["attendance"]),
+    ),
+  punchOut: (coordinates) =>
+    request(
+      "/api/staff/attendance/punch-out",
+      { method: "POST", body: JSON.stringify(coordinates) },
+      mutationConfig(["attendance"]),
+    ),
+  getTodayAttendance: () =>
+    request(
+      "/api/staff/attendance/today",
+      {},
+      listCache(["attendance"], CACHE_TTL.short),
+    ),
+  getAttendanceHistory: (params = {}) =>
+    listRequest(
+      "/api/staff/attendance/history",
+      params,
+      listCache(["attendance"], CACHE_TTL.short),
+    ),
+
+  getStaffSalaryRecords: (membershipId) =>
+    request(
+      `/api/staff/${membershipId}/salary-records`,
+      {},
+      listCache(["staff", "salary-records"], CACHE_TTL.short),
+    ).catch((err) => {
+      console.warn("Backend salary-records endpoint not found. Falling back to local storage.", err);
+      const key = `mms_mock_salary_${membershipId}`;
+      const records = JSON.parse(localStorage.getItem(key) || '[]');
+      return { records };
+    }),
+
+  addStaffSalaryRecord: (membershipId, data) =>
+    request(
+      `/api/staff/${membershipId}/salary-records`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["staff", "salary-records"]),
+    ).catch((err) => {
+      console.warn("Backend salary-records endpoint not found. Falling back to local storage.", err);
+      const key = `mms_mock_salary_${membershipId}`;
+      const records = JSON.parse(localStorage.getItem(key) || '[]');
+      const newRecord = {
+        id: Math.random().toString(36).substr(2, 9),
+        date: data.date,
+        amount: Number(data.amount),
+        type: data.type,
+        monthYear: data.monthYear,
+        note: data.note,
+        createdAt: new Date().toISOString()
+      };
+      records.unshift(newRecord);
+      localStorage.setItem(key, JSON.stringify(records));
+      return { success: true, record: newRecord };
+    }),
+
+  deleteStaffSalaryRecord: (membershipId, recordId) =>
+    request(
+      `/api/staff/${membershipId}/salary-records/${recordId}`,
+      { method: "DELETE" },
+      mutationConfig(["staff", "salary-records"]),
+    ).catch((err) => {
+      console.warn("Backend salary-records endpoint not found. Falling back to local storage.", err);
+      const key = `mms_mock_salary_${membershipId}`;
+      let records = JSON.parse(localStorage.getItem(key) || '[]');
+      records = records.filter(r => r.id !== recordId);
+      localStorage.setItem(key, JSON.stringify(records));
+      return { success: true };
+    }),
 
   getTaskMeta: (options = {}) =>
     request(

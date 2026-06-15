@@ -74,6 +74,7 @@ function normalizeDashboardSummary(payload = {}) {
     );
   const purchaseTotal = firstNumber(summary, ['purchaseTotal']) ?? 0;
   const expenseTotal = firstNumber(summary, ['expenseTotal']) ?? 0;
+  const salaryExpenseTotal = firstNumber(summary, ['salaryExpenseTotal']) ?? 0;
   const cashPaid = firstNumber(summary, ['cashPaid'])
     ?? firstNumber(summary?.breakdown?.cashPaid, ['total'])
     ?? (
@@ -93,6 +94,7 @@ function normalizeDashboardSummary(payload = {}) {
     purchaseTotal,
     serviceTotal,
     expenseTotal,
+    salaryExpenseTotal,
     profitOrLoss,
     profitOrLossStatus: summary.profitOrLossStatus || (profitOrLoss > 0 ? 'profit' : profitOrLoss < 0 ? 'loss' : 'break_even'),
     productCount: asNumber(summary.productCount),
@@ -110,6 +112,7 @@ function normalizeDashboardSummary(payload = {}) {
       cashPaid: {
         purchases: firstNumber(summary?.breakdown?.cashPaid, ['purchases']) ?? 0,
         expenses: firstNumber(summary?.breakdown?.cashPaid, ['expenses']) ?? 0,
+        salaryExpenses: firstNumber(summary?.breakdown?.cashPaid, ['salaryExpenses']) ?? 0,
         total: firstNumber(summary?.breakdown?.cashPaid, ['total']) ?? cashPaid,
       },
     },
@@ -319,6 +322,11 @@ export default function Dashboard() {
             <div id='expenses' className="min-w-0 rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-slate-500">{t('dashboard.expenses')}</p>
               <p className="mt-1 break-words text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.expenseTotal)}</p>
+              {summary.salaryExpenseTotal > 0 && (
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  {t('dashboard.includesSalary')}: {formatMoney(summary.salaryExpenseTotal)}
+                </p>
+              )}
             </div>
             <div id='profit-loss' className="min-w-0 rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-slate-500">{t('dashboard.profitLoss')}</p>

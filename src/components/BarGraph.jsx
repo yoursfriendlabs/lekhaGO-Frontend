@@ -78,6 +78,7 @@ function BarGraph({
               dataKey={bar.dataKey}
               name={bar.label ?? bar.dataKey}
               fill={bar.color ?? color}
+              stackId={bar.stackId}
               radius={[4, 4, 0, 0]}
             />
           ))}

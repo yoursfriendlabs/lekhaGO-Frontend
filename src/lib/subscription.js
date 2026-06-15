@@ -26,6 +26,7 @@ const ALL_FEATURES = [
   'units',
   'banks',
   'order-attributes',
+  'attendance',
 ];
 
 const DEFAULT_PLAN_FEATURES = {
@@ -40,6 +41,7 @@ const DEFAULT_PLAN_FEATURES = {
     'profile',
     'subscription',
     'account',
+    'attendance',
   ]),
   growth: new Set(ALL_FEATURES),
   custom: new Set(ALL_FEATURES),

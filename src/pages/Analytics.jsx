@@ -294,6 +294,11 @@ function normalizeProfitLossSeries(items) {
       firstNumber(item, ["totalExpenses", "purchaseAndExpenseTotal"]) ?? 0;
     const profitOrLoss =
       firstNumber(item, ["profitOrLoss", "amount"]) ?? revenue - totalExpenses;
+    const salaryExpenses = firstNumber(item, ["salaryExpenses"]) ?? 0;
+    const expenses =
+      firstNumber(item, ["expenses", "directExpenseTotal", "expenseTotal"]) ??
+      0;
+    const generalExpenses = Math.max(0, expenses - salaryExpenses);
 
     return {
       key: String(
@@ -304,9 +309,9 @@ function normalizeProfitLossSeries(items) {
       directSales: firstNumber(item, ["directSales", "salesTotal"]) ?? 0,
       services: firstNumber(item, ["services", "serviceTotal"]) ?? 0,
       purchases: firstNumber(item, ["purchases", "purchaseTotal"]) ?? 0,
-      expenses:
-        firstNumber(item, ["expenses", "directExpenseTotal", "expenseTotal"]) ??
-        0,
+      expenses,
+      salaryExpenses,
+      generalExpenses,
       totalExpenses,
       profitOrLoss,
       status:
@@ -359,6 +364,8 @@ function normalizeTimelineSeries(items) {
     const expenseTotal =
       firstNumber(item, ["directExpenseTotal", "expenseTotal", "expenses"]) ??
       0;
+    const salaryExpenses = firstNumber(item, ["salaryExpenses"]) ?? 0;
+    const generalExpenses = Math.max(0, expenseTotal - salaryExpenses);
     const expenseCashPaid =
       firstNumber(item, ["directExpenseCashPaid", "expenseCashPaid"]) ?? 0;
     const expensePending =
@@ -397,6 +404,8 @@ function normalizeTimelineSeries(items) {
       serviceCashReceived,
       servicePending,
       expenseTotal,
+      salaryExpenses,
+      generalExpenses,
       expenseCashPaid,
       expensePending,
       purchasesAndExpensesTotal,
@@ -560,6 +569,8 @@ function normalizeAnalyticsSummary(payload = {}) {
     services: point.serviceTotal,
     purchases: point.purchaseTotal,
     expenses: point.expenseTotal,
+    salaryExpenses: point.salaryExpenses,
+    generalExpenses: point.generalExpenses,
     totalExpenses: point.purchasesAndExpensesTotal,
     profitOrLoss: point.profitOrLoss,
     status: point.profitOrLossStatus,
@@ -870,19 +881,27 @@ function applyExpenseCategorySelection(analytics, categoryKey) {
 }
 
 function resolveExpenseCategoryName(row, t) {
+  const key = String(row?.categoryKey || "").trim();
+  if (key === "staff-salary") {
+    return t("staffManagement.salary", "Staff Salary");
+  }
   const label = String(row?.categoryName || "").trim();
   if (label) return label;
 
   return t("analytics.uncategorizedCategory");
 }
 
-function normalizeCategoryFilterOption(item = {}) {
+function normalizeCategoryFilterOption(item = {}, t) {
   const value = String(
     item?.categoryKey || item?.key || item?.category?.key || "",
   ).trim();
-  const label = String(
+  let label = String(
     item?.categoryName || item?.name || item?.label || value,
   ).trim();
+
+  if (value === "staff-salary") {
+    label = t ? t("staffManagement.salary", "Staff Salary") : "Staff Salary";
+  }
 
   if (!value) return null;
 
@@ -1829,12 +1848,13 @@ export default function Analytics() {
       mergeFilterOptions(
         expenseCategoryOptions,
         expenseCategoryAnalytics.breakdown.map((row) =>
-          normalizeCategoryFilterOption(row),
+          normalizeCategoryFilterOption(row, t),
         ),
         expenseCategoryAnalytics.summary.topCategory
           ? [
               normalizeCategoryFilterOption(
                 expenseCategoryAnalytics.summary.topCategory,
+                t,
               ),
             ]
           : [],
@@ -1846,7 +1866,7 @@ export default function Analytics() {
                   expenseCategoryAnalytics.breakdown.find(
                     (row) => row.categoryKey === expenseFilters.categoryKey,
                   )?.categoryName || expenseFilters.categoryKey,
-              }),
+              }, t),
             ]
           : [],
       ),
@@ -1855,6 +1875,7 @@ export default function Analytics() {
       expenseCategoryAnalytics.summary.topCategory,
       expenseCategoryOptions,
       expenseFilters.categoryKey,
+      t,
     ],
   );
 
@@ -2096,9 +2117,22 @@ export default function Analytics() {
               color: "#10b981",
             },
             {
-              dataKey: "totalExpenses",
-              label: t("analytics.totalOutgoing"),
+              dataKey: "purchases",
+              label: t("nav.purchases"),
               color: "#f59e0b",
+              stackId: "outflows",
+            },
+            {
+              dataKey: "generalExpenses",
+              label: t("analytics.generalExpenses"),
+              color: "#d97706",
+              stackId: "outflows",
+            },
+            {
+              dataKey: "salaryExpenses",
+              label: t("staffManagement.salary"),
+              color: "#9b6835",
+              stackId: "outflows",
             },
             {
               dataKey: "profitOrLoss",

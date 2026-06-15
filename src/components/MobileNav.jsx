@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Boxes, Users, ShoppingCart, Briefcase, Settings2, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Boxes, Users, ShoppingCart, Briefcase, Settings2, ClipboardList, Clock } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
@@ -14,6 +14,7 @@ const NAV_ROLE_MAP = {
   purchases: ['owner', 'staff', 'admin', 'super_admin'],
   parties: ['owner', 'staff', 'admin', 'super_admin'],
   tasks: ['owner', 'staff', 'admin', 'super_admin'],
+  attendance: ['owner', 'staff', 'admin', 'super_admin'],
   settings: ['owner', 'staff', 'admin', 'super_admin'],
 };
 
@@ -26,6 +27,7 @@ const ICON_MAP = {
   purchases: ShoppingCart,
   parties: Users,
   tasks: ClipboardList,
+  attendance: Clock,
   settings: Settings2,
 };
 
@@ -43,12 +45,15 @@ export default function MobileNav() {
         { key: 'purchases', label: t('nav.expenses'), route: '/app/purchases' },
         { key: 'tasks', label: t('nav.tasks'), route: '/app/tasks' },
         { key: 'parties', label: t('nav.parties'), route: '/app/parties' },
+        { key: 'attendance', label: t('nav.attendance'), route: '/app/attendance' },
         { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
       ],
     businessProfile,
-  ).map((item) => (item?.key === 'purchases'
-    ? { ...item, label: t('nav.expenses') }
-    : item));
+  ).map((item) => {
+    if (item?.key === 'purchases') return { ...item, label: t('nav.expenses') };
+    if (item?.key === 'attendance') return { ...item, label: t('nav.attendance') };
+    return item;
+  });
   const visibleNavItems = navigation
     .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
     .filter((item) => hasFeatureAccess(item.key));
