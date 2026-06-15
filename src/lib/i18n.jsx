@@ -756,6 +756,9 @@ const dictionaries = {
     },
     products: {
       title: 'Products',
+      outOfStock: 'Out of Stock',
+
+
       subtitle: 'Create catalog items and track pricing.',
       catalog: 'Product catalog',
       noProducts: 'No products yet.',
@@ -2561,6 +2564,7 @@ const dictionaries = {
     },
     products: {
       title: 'उत्पादन',
+      outOfStock: 'स्टक सकिएको',
       subtitle: 'क्याटलग आइटम र मूल्य सेट गर्नुहोस्।',
       catalog: 'उत्पादन क्याटलग',
       noProducts: 'उत्पादन छैन।',
