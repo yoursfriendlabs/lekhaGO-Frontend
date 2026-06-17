@@ -26,10 +26,7 @@ export default function Staff() {
 
   return (
     <div className="min-w-0 space-y-6 pb-28 md:pb-0">
-      <PageHeader
-        title={t('staffManagement.title')}
-        description={t('staffManagement.subtitle')}
-      />
+
 
       {businessProfile ? (
         <StaffManagement businessId={businessId} />
