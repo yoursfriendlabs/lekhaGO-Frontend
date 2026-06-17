@@ -9,11 +9,10 @@ import './styles.css';
 installChunkLoadRecovery();
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <AppErrorBoundary>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </AppErrorBoundary>
-  </StrictMode>
+  <AppErrorBoundary>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </AppErrorBoundary>
 );
+

@@ -19,10 +19,9 @@ import {
   normalizeTaskNotificationSummary,
 } from "./tasks";
 
-
-
 const DEFAULT_API_BASE = "http://localhost:4000";
-const INVALID_TOKEN_REGEX = /(invalid|expired|malformed|missing).*(token|jwt|session)|token.*(invalid|expired)|jwt.*(invalid|expired)|session expired|unauthenticated/i;
+const INVALID_TOKEN_REGEX =
+  /(invalid|expired|malformed|missing).*(token|jwt|session)|token.*(invalid|expired)|jwt.*(invalid|expired)|session expired|unauthenticated/i;
 
 function normalizeApiBase(value) {
   const apiBase = String(value || "").trim() || DEFAULT_API_BASE;
@@ -565,6 +564,33 @@ export const api = {
     request("/api/staff/meta", {}, listCache(["staff"], CACHE_TTL.short)).then(
       normalizeStaffMeta,
     ),
+
+  // GET /api/staff/:membershipId
+  getStaffMember: (membershipId) =>
+    request(
+      `/api/staff/${membershipId}`,
+      {},
+      listCache(["staff", "member", String(membershipId)], CACHE_TTL.short),
+    ).catch((err) => {
+      // keep behavior predictable in UI; rethrow so caller's catch can decide what to show
+      console.warn("Backend /api/staff/:id endpoint not found.", err);
+      throw err;
+    }),
+
+  // GET /api/staff/:membershipId/attendance?from=YYYY-MM-DD&to=YYYY-MM-DD
+  getStaffAttendance: (membershipId, params = {}) =>
+    listRequest(
+      `/api/staff/${membershipId}/attendance`,
+      params,
+      listCache(["staff", "attendance", String(membershipId)], CACHE_TTL.short),
+    ).catch((err) => {
+      console.warn(
+        "Backend /api/staff/:id/attendance endpoint not found.",
+        err,
+      );
+      throw err;
+    }),
+
   listStaff: () =>
     request("/api/staff", {}, listCache(["staff"], CACHE_TTL.short)).then(
       normalizeStaffCollection,
@@ -626,9 +652,12 @@ export const api = {
       {},
       listCache(["staff", "salary-records"], CACHE_TTL.short),
     ).catch((err) => {
-      console.warn("Backend salary-records endpoint not found. Falling back to local storage.", err);
+      console.warn(
+        "Backend salary-records endpoint not found. Falling back to local storage.",
+        err,
+      );
       const key = `mms_mock_salary_${membershipId}`;
-      const records = JSON.parse(localStorage.getItem(key) || '[]');
+      const records = JSON.parse(localStorage.getItem(key) || "[]");
       return { records };
     }),
 
@@ -637,23 +666,48 @@ export const api = {
       `/api/staff/${membershipId}/salary-records`,
       { method: "POST", body: JSON.stringify(data) },
       mutationConfig(["staff", "salary-records"]),
-    ).catch((err) => {
-      console.warn("Backend salary-records endpoint not found. Falling back to local storage.", err);
-      const key = `mms_mock_salary_${membershipId}`;
-      const records = JSON.parse(localStorage.getItem(key) || '[]');
-      const newRecord = {
-        id: Math.random().toString(36).substr(2, 9),
-        date: data.date,
-        amount: Number(data.amount),
-        type: data.type,
-        monthYear: data.monthYear,
-        note: data.note,
-        createdAt: new Date().toISOString()
-      };
-      records.unshift(newRecord);
-      localStorage.setItem(key, JSON.stringify(records));
-      return { success: true, record: newRecord };
-    }),
+    )
+      .then((backendResult) => {
+        // Even when backend succeeds, mirror to localStorage for consistency
+        const key = `mms_mock_salary_${membershipId}`;
+        const existing = JSON.parse(localStorage.getItem(key) || "[]");
+        const newRecord = {
+          id:
+            backendResult?.record?.id ||
+            backendResult?.id ||
+            Math.random().toString(36).substr(2, 9),
+          date: data.date,
+          amount: Number(data.amount),
+          type: data.type,
+          monthYear: data.monthYear,
+          note: data.note,
+          createdAt: new Date().toISOString(),
+        };
+        existing.unshift(newRecord);
+        localStorage.setItem(key, JSON.stringify(existing));
+        return { records: existing, record: newRecord };
+      })
+      .catch((err) => {
+        console.warn(
+          "Backend salary-records endpoint not found. Falling back to local storage.",
+          err,
+        );
+        invalidateApiCache(["staff", "salary-records"]);
+        const key = `mms_mock_salary_${membershipId}`;
+        const records = JSON.parse(localStorage.getItem(key) || "[]");
+        const newRecord = {
+          id: Math.random().toString(36).substr(2, 9),
+          date: data.date,
+          amount: Number(data.amount),
+          type: data.type,
+          monthYear: data.monthYear,
+          note: data.note,
+          createdAt: new Date().toISOString(),
+        };
+        records.unshift(newRecord);
+        localStorage.setItem(key, JSON.stringify(records));
+        return { records, record: newRecord };
+      }),
 
   deleteStaffSalaryRecord: (membershipId, recordId) =>
     request(
@@ -661,12 +715,16 @@ export const api = {
       { method: "DELETE" },
       mutationConfig(["staff", "salary-records"]),
     ).catch((err) => {
-      console.warn("Backend salary-records endpoint not found. Falling back to local storage.", err);
+      console.warn(
+        "Backend salary-records endpoint not found. Falling back to local storage.",
+        err,
+      );
+      invalidateApiCache(["staff", "salary-records"]);
       const key = `mms_mock_salary_${membershipId}`;
-      let records = JSON.parse(localStorage.getItem(key) || '[]');
-      records = records.filter(r => r.id !== recordId);
-      localStorage.setItem(key, JSON.stringify(records));
-      return { success: true };
+      let recordsInStorage = JSON.parse(localStorage.getItem(key) || "[]");
+      recordsInStorage = recordsInStorage.filter((r) => r.id !== recordId);
+      localStorage.setItem(key, JSON.stringify(recordsInStorage));
+      return { records: recordsInStorage };
     }),
 
   getTaskMeta: (options = {}) =>
@@ -703,19 +761,33 @@ export const api = {
     request(
       `/api/tasks/${id}`,
       { method: "PATCH", body: JSON.stringify(data) },
-      mutationConfig([detailTags("task", id), "tasks", "task-notifications", "dashboard"]),
+      mutationConfig([
+        detailTags("task", id),
+        "tasks",
+        "task-notifications",
+        "dashboard",
+      ]),
     ).then((payload) => normalizeTaskDetail(payload)),
   createTaskComment: (id, data) =>
     request(
       `/api/tasks/${id}/comments`,
       { method: "POST", body: JSON.stringify(data) },
-      mutationConfig([detailTags("task", id), "tasks", "task-notifications", "dashboard"]),
+      mutationConfig([
+        detailTags("task", id),
+        "tasks",
+        "task-notifications",
+        "dashboard",
+      ]),
     ),
   getTaskNotificationSummary: (options = {}) =>
     request(
       "/api/tasks/notifications/summary",
       {},
-      listCache(["task-notifications", "tasks", "dashboard"], CACHE_TTL.short, options),
+      listCache(
+        ["task-notifications", "tasks", "dashboard"],
+        CACHE_TTL.short,
+        options,
+      ),
     ).then((payload) => normalizeTaskNotificationSummary(payload)),
   markTaskNotificationsRead: () =>
     request(

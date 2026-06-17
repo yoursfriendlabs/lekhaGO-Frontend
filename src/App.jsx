@@ -33,6 +33,7 @@ const Tasks = lazy(() => import('./pages/Tasks'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Attendance = lazy(() => import('./pages/Attendance'));
 const Staff = lazy(() => import('./pages/Staff'));
+const StaffSalaryProfile = lazy(() => import('./pages/StaffSalaryProfile'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
@@ -343,6 +344,10 @@ function AppShell() {
                   <Route path="analytics" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="analytics"><Analytics /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="attendance" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="attendance"><Attendance /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="staff" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="staff"><Staff /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route
+                    path="staff-salary/:membershipId"
+                    element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="staff"><StaffSalaryProfile /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>}
+                  />
                   <Route path="admin" element={<Navigate to="/app/settings" replace />} />
                   <Route
                     path="order-attributes"

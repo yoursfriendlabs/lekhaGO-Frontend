@@ -838,7 +838,7 @@ export default function StaffManagement({ businessId }) {
         {!businessId ? <Notice title={t('staffManagement.businessRequired')} tone="warn" /> : null}
         {!canManageStaff ? <Notice title={t('staffManagement.viewOnlyNotice')} tone="info" /> : null}
 
-        <div className="grid gap-4 md:grid-cols-3">
+        {/* <div className="grid gap-4 md:grid-cols-3">
           <SummaryCard
             label={t('staffManagement.summary.totalUsers')}
             value={summary.totalUsers}
@@ -857,7 +857,7 @@ export default function StaffManagement({ businessId }) {
             hint={t('staffManagement.summary.availableSlotsHint')}
             icon={RefreshCw}
           />
-        </div>
+        </div> */}
 
         <TeamSeatUsagePanel
           summary={summary}
@@ -933,11 +933,19 @@ export default function StaffManagement({ businessId }) {
                         onClick: () => openView(member),
                       },
                       !isOwner && {
-                        label: t('staffManagement.salary', 'Salary'),
+                        label: t('staffManagement.salary', 'Staff Salary'),
                         icon: DollarSign,
                         onClick: () => {
                           setSalaryMember(member);
                           setSalaryOpen(true);
+                        },
+                      },
+                      !isOwner && {
+                        label: t('SalaryProfile', 'Salary Details'),
+                        icon: Eye,
+                        onClick: () => {
+                          // open in same tab (no _blank)
+                          window.location.href = `/app/staff-salary/${encodeURIComponent(member.membershipId)}`;
                         },
                       },
                       canManageStaff && !isOwner && {
@@ -1036,13 +1044,13 @@ export default function StaffManagement({ businessId }) {
                     icon: Eye,
                     onClick: () => openView(member),
                   },
-                  !isOwner && {
-                    label: t('staffManagement.salary', 'Salary'),
-                    icon: DollarSign,
-                    onClick: () => {
-                      setSalaryMember(member);
-                      setSalaryOpen(true);
-                    },
+                      !isOwner && {
+                        label: t('staffManagement.salary', 'Staff Salary'),
+                        icon: DollarSign,
+                        onClick: () => {
+                          setSalaryMember(member);
+                          setSalaryOpen(true);
+                        },
                   },
                   canManageStaff && !isOwner && {
                     label: t('common.edit'),
@@ -1084,7 +1092,7 @@ export default function StaffManagement({ businessId }) {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <div>
                         <p className="text-xs uppercase tracking-[0.14em] text-slate-400">{t('auth.phone')}</p>
