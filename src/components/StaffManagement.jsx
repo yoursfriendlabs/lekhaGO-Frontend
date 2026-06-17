@@ -1,7 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Search, ShieldCheck, Users, Eye, Edit, Trash2, DollarSign } from 'lucide-react';
+import {
+  Search,
+  Eye,
+  Edit,
+  Trash2,
+  DollarSign,
+  Users,
+  ShieldCheck,
+  UserCheck,
+  UserX,
+  Plus,
+  X,
+  Check,
+  Phone,
+} from 'lucide-react';
 import Notice from './Notice';
 import ActionMenu from './ActionMenu';
+import RefreshButton from './RefreshButton.jsx';
 import ConfirmDialog from './ui/ConfirmDialog.jsx';
 import { Dialog } from './ui/Dialog.tsx';
 import TeamSeatUsagePanel from './subscription/TeamSeatUsagePanel.jsx';
@@ -17,7 +32,6 @@ import {
 } from '../lib/staff';
 
 const EMPTY_META = normalizeStaffMeta({});
-const STATUS_FILTERS = ['all', 'active', 'inactive'];
 
 function formatDate(value) {
   if (!value) return '-';
@@ -64,10 +78,73 @@ function normalizeErrorMessage(error, fallback) {
   return error?.message || fallback;
 }
 
+/* ── Shared visual primitives, mirrored from the Services page ── */
+
+function OverviewMetric({ icon: Icon, label, value, tone = 'slate' }) {
+  const styles = {
+    slate: {
+      wrapper: 'border-slate-200/70 bg-white/80 dark:border-slate-800/60 dark:bg-slate-950/40',
+      icon: 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900',
+    },
+    blue: {
+      wrapper: 'border-blue-200/70 bg-blue-50/70 dark:border-blue-900/40 dark:bg-blue-900/20',
+      icon: 'bg-blue-600 text-white',
+    },
+    amber: {
+      wrapper: 'border-amber-200/70 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-900/20',
+      icon: 'bg-amber-500 text-white',
+    },
+    rose: {
+      wrapper: 'border-rose-200/70 bg-rose-50/80 dark:border-rose-900/40 dark:bg-rose-900/20',
+      icon: 'bg-rose-500 text-white',
+    },
+    emerald: {
+      wrapper: 'border-emerald-200/70 bg-emerald-50/80 dark:border-emerald-900/40 dark:bg-emerald-900/20',
+      icon: 'bg-emerald-500 text-white',
+    },
+  };
+
+  const palette = styles[tone] || styles.slate;
+
+  return (
+    <div className={`rounded-2xl border px-3 py-2.5 shadow-sm shadow-slate-200/20 ${palette.wrapper}`}>
+      <div className="flex items-center justify-between gap-2.5">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+            {label}
+          </p>
+          <p className="mt-1 whitespace-nowrap text-base font-semibold leading-tight text-slate-900 dark:text-white">
+            {value}
+          </p>
+        </div>
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${palette.icon}`}>
+          <Icon size={15} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FilterChip({ label, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex min-w-0 items-center justify-center rounded-full border px-2.5 py-1.5 text-xs font-semibold leading-tight transition sm:px-4 sm:py-2 sm:text-sm ${
+        active
+          ? 'border-primary-300 bg-primary-50 text-primary-700 shadow-sm dark:border-primary-700/70 dark:bg-primary-900/30 dark:text-primary-200'
+          : 'border-slate-200/80 bg-white/80 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-700'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 function StatusBadge({ active, t }) {
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
         active
           ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
           : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
@@ -78,10 +155,24 @@ function StatusBadge({ active, t }) {
   );
 }
 
+function LoginBadge({ hasLogin, t }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ${
+        hasLogin
+          ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
+          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+      }`}
+    >
+      {hasLogin ? t('staffManagement.loginAccess') : t('staffManagement.nonLoginStaff')}
+    </span>
+  );
+}
+
 function EmailVerificationBadge({ emailVerified, t }) {
   if (emailVerified === false) {
     return (
-      <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+      <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
         {t('auth.emailVerificationPending')}
       </span>
     );
@@ -89,30 +180,13 @@ function EmailVerificationBadge({ emailVerified, t }) {
 
   if (emailVerified === true) {
     return (
-      <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+      <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
         {t('auth.emailVerified')}
       </span>
     );
   }
 
   return null;
-}
-
-function SummaryCard({ label, value, hint, icon: Icon }) {
-  return (
-    <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-5 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</p>
-          <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-white">{value}</p>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{hint}</p>
-        </div>
-        <div className="rounded-2xl bg-slate-100 p-3 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-          <Icon size={20} />
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function PermissionSelector({ value, levels, disabled, onChange, t }) {
@@ -140,6 +214,8 @@ function PermissionSelector({ value, levels, disabled, onChange, t }) {
   );
 }
 
+/* ── Staff create / edit / view dialog ── */
+
 function StaffFormDialog({
   mode,
   form,
@@ -162,383 +238,417 @@ function StaffFormDialog({
   const permissionsCustomized = JSON.stringify(categoryDefaults) !== JSON.stringify(form.permissions);
 
   useEffect(() => {
-    if (mode) {
-      setActiveTab('general');
-    }
+    if (mode) setActiveTab('general');
   }, [mode]);
 
+  if (!mode) return null;
+
+  const dialogTitle = mode === 'create'
+    ? t('staffManagement.createTitle')
+    : mode === 'edit'
+      ? t('staffManagement.editTitle')
+      : t('staffManagement.viewTitle');
+
   return (
-    <Dialog
-      isOpen={Boolean(mode)}
-      onClose={onClose}
-      title={mode === 'create'
-        ? t('staffManagement.createTitle')
-        : mode === 'edit'
-          ? t('staffManagement.editTitle')
-          : t('staffManagement.viewTitle')}
-      size="wide"
-      footer={readOnly ? (
-        <button type="button" className="btn-secondary w-full sm:w-auto" onClick={onClose}>
-          {t('common.close')}
-        </button>
-      ) : (
-        <>
-          <button type="button" className="btn-secondary w-full sm:w-auto" onClick={onClose} disabled={saving}>
-            {t('common.cancel')}
-          </button>
-          <button type="submit" form="staff-management-form" className="btn-primary w-full sm:w-auto" disabled={saving}>
-            {saving
-              ? t('common.saving')
-              : isCreate
-                ? t('staffManagement.createAction')
-                : t('staffManagement.saveAction')}
-          </button>
-        </>
-      )}
+    <div
+      className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm"
+      onClick={(event) => {
+        if (event.target === event.currentTarget && !saving) onClose();
+      }}
     >
-      <form id="staff-management-form" className="space-y-6" onSubmit={onSubmit}>
-        {/* Tab Selection */}
-        <div className="flex gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
-          <button
-            type="button"
-            onClick={() => setActiveTab('general')}
-            className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-              activeTab === 'general'
-                ? 'bg-[#9c5f22] text-white font-bold'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
-            }`}
-          >
-            {t('staffManagement.tabs.profileInfo')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('permissions')}
-            className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
-              activeTab === 'permissions'
-                ? 'bg-[#9c5f22] text-white font-bold'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
-            }`}
-          >
-            {t('staffManagement.tabs.accessPermissions')}
-          </button>
-        </div>
-
-        {activeTab === 'general' ? (
-          <div className="space-y-6">
-            {/* Section 1: Personal & Job Details */}
-            <section className="rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 md:p-6 dark:border-slate-800/70 dark:bg-slate-900/60">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between border-b border-slate-200/50 pb-4 dark:border-slate-800/50">
-                <div>
-                  <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('staffManagement.detailsTitle')}</h3>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.detailsSubtitle')}</p>
-                </div>
-                {readOnly ? (
-                  <span className="inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    {t('staffManagement.viewOnly')}
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <div>
-                  <label className="label" htmlFor="staff-name">{t('auth.name')}</label>
-                  <input
-                    id="staff-name"
-                    className="input mt-1"
-                    value={form.name}
-                    onChange={(event) => onFieldChange('name', event.target.value)}
-                    disabled={readOnly}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-phone">{t('auth.phone')}</label>
-                  <input
-                    id="staff-phone"
-                    className="input mt-1"
-                    value={form.phone}
-                    onChange={(event) => onFieldChange('phone', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={t('auth.phonePlaceholder')}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-role">{t('staffManagement.roleLabel')}</label>
-                  <select
-                    id="staff-role"
-                    className="input mt-1"
-                    value={form.role}
-                    onChange={(event) => onFieldChange('role', event.target.value)}
-                    disabled={readOnly || !isCreate}
-                  >
-                    <option value="staff">{t('staffManagement.roles.staff')}</option>
-                    {form.role === 'owner' ? <option value="owner">{t('staffManagement.roles.owner')}</option> : null}
-                  </select>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.roleHelper')}</p>
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-category">{t('staffManagement.categoryLabel')}</label>
-                  <select
-                    id="staff-category"
-                    className="input mt-1"
-                    value={form.staffCategory}
-                    onChange={(event) => onFieldChange('staffCategory', event.target.value)}
-                    disabled={readOnly}
-                  >
-                    {meta.categories
-                      .filter((category) => category.key !== 'owner' || form.role === 'owner')
-                      .map((category) => (
-                        <option key={category.key} value={category.key}>{category.label}</option>
-                      ))}
-                  </select>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {selectedCategory?.description || t('staffManagement.categoryHelper')}
-                  </p>
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-job-title">{t('staffManagement.jobTitle')}</label>
-                  <input
-                    id="staff-job-title"
-                    className="input mt-1"
-                    value={form.jobTitle}
-                    onChange={(event) => onFieldChange('jobTitle', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={t('staffManagement.jobTitlePlaceholder')}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-joined-date">{t('staffManagement.joinedDate')}</label>
-                  <input
-                    id="staff-joined-date"
-                    className="input mt-1"
-                    type="date"
-                    value={form.joinedDate}
-                    onChange={(event) => onFieldChange('joinedDate', event.target.value)}
-                    disabled={readOnly}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-shift">{t('staffManagement.shift')}</label>
-                  <input
-                    id="staff-shift"
-                    className="input mt-1"
-                    value={form.shift}
-                    onChange={(event) => onFieldChange('shift', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={t('staffManagement.shiftPlaceholder')}
-                  />
-                </div>
-                <div className="md:col-span-2 xl:col-span-2">
-                  <label className="label" htmlFor="staff-address">{t('staffManagement.address')}</label>
-                  <input
-                    id="staff-address"
-                    className="input mt-1"
-                    value={form.address}
-                    onChange={(event) => onFieldChange('address', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={t('staffManagement.addressPlaceholder')}
-                  />
-                </div>
-              </div>
-
-              {!isCreate ? (
-                <label className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm text-slate-700 dark:border-slate-800/70 dark:bg-slate-950/50 dark:text-slate-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={form.isActive}
-                    onChange={(event) => onFieldChange('isActive', event.target.checked)}
-                    disabled={readOnly}
-                    className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  {t('staffManagement.activeAccount')}
-                </label>
-              ) : null}
-            </section>
-
-            {/* Section 2: Compensation & Salary */}
-            <section className="rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 md:p-6 dark:border-slate-800/70 dark:bg-slate-900/60">
-              <div className="border-b border-slate-200/50 pb-4 dark:border-slate-800/50">
-                <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('staffManagement.salary')}</h3>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Manage payment and salary tracking parameters for this staff member.</p>
-              </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="label" htmlFor="staff-salary">{t('staffManagement.salary')}</label>
-                  <input
-                    id="staff-salary"
-                    className="input mt-1"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="0.01"
-                    value={form.salary}
-                    onChange={(event) => onFieldChange('salary', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={t('staffManagement.compensationPlaceholder')}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="staff-total-received">{t('staffManagement.totalReceived')}</label>
-                  <input
-                    id="staff-total-received"
-                    className="input mt-1"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="0.01"
-                    value={form.totalReceived}
-                    onChange={(event) => onFieldChange('totalReceived', event.target.value)}
-                    disabled={readOnly}
-                    placeholder={t('staffManagement.totalReceivedPlaceholder')}
-                  />
-                </div>
-              </div>
-            </section>
+      <div className="flex h-full items-end justify-center md:items-center md:p-5 xl:p-6">
+        <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#fcfaf6] shadow-2xl dark:bg-slate-950 md:h-[calc(100dvh-2.5rem)] md:max-h-[calc(100dvh-2.5rem)] md:max-w-[1100px] md:rounded-[32px] md:border md:border-slate-200/70 md:dark:border-slate-800/70">
+          <div className="flex items-center gap-3 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-8">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary-700 dark:text-primary-200">
+                {t('staffManagement.title')}
+              </p>
+              <h2 className="mt-1 truncate font-serif text-xl text-slate-900 dark:text-white md:text-2xl">
+                {dialogTitle}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="rounded-2xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            >
+              <X size={20} />
+            </button>
           </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Section 3: Login & Account Access */}
-            <section className="rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 md:p-6 dark:border-slate-800/70 dark:bg-slate-900/60">
-              <div className="border-b border-slate-200/50 pb-4 dark:border-slate-800/50">
-                <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('staffManagement.loginAccess')}</h3>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Control if this staff member can log in to perform transactions or view workspace features.</p>
-              </div>
 
-              <div className="mt-6 space-y-4">
-                <div className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{t('staffManagement.hasLogin')}</p>
-                    <p className="text-xs text-slate-500 mt-1">If enabled, credentials are required to sign in.</p>
-                  </div>
-
-                  {/* Toggle Switch */}
+          <form id="staff-management-form" className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit}>
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
+              <div className="mx-auto w-full max-w-[920px] space-y-4">
+                <div className="flex gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
                   <button
                     type="button"
-                    disabled={readOnly}
-                    onClick={() => onFieldChange('hasLogin', !form.hasLogin)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
-                      form.hasLogin ? 'bg-[#9c5f22]' : 'bg-slate-200 dark:bg-slate-800'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    onClick={() => setActiveTab('general')}
+                    className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                      activeTab === 'general'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
+                    }`}
                   >
-                    <span
-                      aria-hidden="true"
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        form.hasLogin ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
+                    {t('staffManagement.tabs.profileInfo')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('permissions')}
+                    className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                      activeTab === 'permissions'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {t('staffManagement.tabs.accessPermissions')}
                   </button>
                 </div>
 
-                {form.hasLogin && (
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {(isCreate || wasNonLogin) ? (
-                      <div>
-                        <label className="label" htmlFor="staff-email">{t('auth.emailAddress')}</label>
-                        <input
-                          id="staff-email"
-                          className="input mt-1"
-                          type="email"
-                          value={form.email}
-                          onChange={(event) => onFieldChange('email', event.target.value)}
-                          disabled={readOnly}
-                          required
-                        />
+                {activeTab === 'general' ? (
+                  <div className="space-y-4">
+                    <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
+                      <div className="flex flex-col gap-3 border-b border-slate-200/50 pb-4 lg:flex-row lg:items-start lg:justify-between dark:border-slate-800/50">
+                        <div>
+                          <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('staffManagement.detailsTitle')}</h3>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.detailsSubtitle')}</p>
+                        </div>
+                        {readOnly ? (
+                          <span className="inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            {t('staffManagement.viewOnly')}
+                          </span>
+                        ) : null}
                       </div>
-                    ) : (
-                      <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{t('auth.emailAddress')}</p>
-                        <p className="mt-2 break-words text-sm font-medium text-slate-800 dark:text-slate-100">{form.email || '-'}</p>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.emailImmutable')}</p>
-                      </div>
-                    )}
-                    <div>
-                      <label className="label" htmlFor="staff-password">
-                        {isCreate ? t('auth.password') : t('staffManagement.newPassword')}
-                      </label>
-                      <input
-                        id="staff-password"
-                        className="input mt-1"
-                        type="password"
-                        value={form.password}
-                        onChange={(event) => onFieldChange('password', event.target.value)}
-                        disabled={readOnly}
-                        placeholder={isCreate ? t('staffManagement.passwordCreateHint') : t('staffManagement.passwordEditHint')}
-                        required={isCreate || wasNonLogin}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
 
-            {/* Section 4: Permissions */}
-            <section className="rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 md:p-6 dark:border-slate-800/70 dark:bg-slate-900/60">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('staffManagement.permissionsTitle')}</h3>
-                  <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.permissionsSubtitle')}</p>
-                </div>
-                {!readOnly ? (
-                  <button type="button" className="btn-secondary w-full justify-center sm:w-auto" onClick={onApplyPreset}>
-                    {t('staffManagement.resetToPreset')}
-                  </button>
-                ) : null}
-              </div>
-
-              <div
-                className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
-                  permissionsCustomized
-                    ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200'
-                    : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-200'
-                }`}
-              >
-                <p className="font-semibold">
-                  {permissionsCustomized
-                    ? t('staffManagement.permissionPresetCustomized')
-                    : t('staffManagement.permissionPresetApplied', { category: selectedCategory?.label || '-' })}
-                </p>
-                <p className="mt-1 text-xs opacity-80">
-                  {permissionsCustomized
-                    ? t('staffManagement.permissionPresetCustomizedHint')
-                    : t('staffManagement.permissionPresetAppliedHint')}
-                </p>
-              </div>
-
-              <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                {meta.features.map((feature) => {
-                  const permissionKey = getPermissionKeyForFeature(feature.key) || feature.key;
-
-                  return (
-                    <div key={feature.key} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
-                      <div className="flex h-full flex-col gap-4">
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-900 dark:text-white">{feature.label}</p>
-                          <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                            {feature.description || t('staffManagement.permissionDescriptionFallback')}
+                      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div>
+                          <label className="label" htmlFor="staff-name">{t('auth.name')}</label>
+                          <input
+                            id="staff-name"
+                            className="input mt-1"
+                            value={form.name}
+                            onChange={(event) => onFieldChange('name', event.target.value)}
+                            disabled={readOnly}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="label" htmlFor="staff-phone">{t('auth.phone')}</label>
+                          <input
+                            id="staff-phone"
+                            className="input mt-1"
+                            value={form.phone}
+                            onChange={(event) => onFieldChange('phone', event.target.value)}
+                            disabled={readOnly}
+                            placeholder={t('auth.phonePlaceholder')}
+                          />
+                        </div>
+                        <div>
+                          <label className="label" htmlFor="staff-role">{t('staffManagement.roleLabel')}</label>
+                          <select
+                            id="staff-role"
+                            className="input mt-1"
+                            value={form.role}
+                            onChange={(event) => onFieldChange('role', event.target.value)}
+                            disabled={readOnly || !isCreate}
+                          >
+                            <option value="staff">{t('staffManagement.roles.staff')}</option>
+                            {form.role === 'owner' ? <option value="owner">{t('staffManagement.roles.owner')}</option> : null}
+                          </select>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.roleHelper')}</p>
+                        </div>
+                        <div>
+                          <label className="label" htmlFor="staff-category">{t('staffManagement.categoryLabel')}</label>
+                          <select
+                            id="staff-category"
+                            className="input mt-1"
+                            value={form.staffCategory}
+                            onChange={(event) => onFieldChange('staffCategory', event.target.value)}
+                            disabled={readOnly}
+                          >
+                            {meta.categories
+                              .filter((category) => category.key !== 'owner' || form.role === 'owner')
+                              .map((category) => (
+                                <option key={category.key} value={category.key}>{category.label}</option>
+                              ))}
+                          </select>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {selectedCategory?.description || t('staffManagement.categoryHelper')}
                           </p>
                         </div>
-                        <div className="w-full">
-                          <PermissionSelector
-                            value={form.permissions[permissionKey] || 'none'}
-                            levels={levels}
+                        <div>
+                          <label className="label" htmlFor="staff-job-title">{t('staffManagement.jobTitle')}</label>
+                          <input
+                            id="staff-job-title"
+                            className="input mt-1"
+                            value={form.jobTitle}
+                            onChange={(event) => onFieldChange('jobTitle', event.target.value)}
                             disabled={readOnly}
-                            onChange={(value) => onPermissionChange(permissionKey, value)}
-                            t={t}
+                            placeholder={t('staffManagement.jobTitlePlaceholder')}
+                          />
+                        </div>
+                        <div>
+                          <label className="label" htmlFor="staff-joined-date">{t('staffManagement.joinedDate')}</label>
+                          <input
+                            id="staff-joined-date"
+                            className="input mt-1"
+                            type="date"
+                            value={form.joinedDate}
+                            onChange={(event) => onFieldChange('joinedDate', event.target.value)}
+                            disabled={readOnly}
+                          />
+                        </div>
+                        <div>
+                          <label className="label" htmlFor="staff-shift">{t('staffManagement.shift')}</label>
+                          <input
+                            id="staff-shift"
+                            className="input mt-1"
+                            value={form.shift}
+                            onChange={(event) => onFieldChange('shift', event.target.value)}
+                            disabled={readOnly}
+                            placeholder={t('staffManagement.shiftPlaceholder')}
+                          />
+                        </div>
+                        <div className="md:col-span-2 xl:col-span-2">
+                          <label className="label" htmlFor="staff-address">{t('staffManagement.address')}</label>
+                          <input
+                            id="staff-address"
+                            className="input mt-1"
+                            value={form.address}
+                            onChange={(event) => onFieldChange('address', event.target.value)}
+                            disabled={readOnly}
+                            placeholder={t('staffManagement.addressPlaceholder')}
+                          />
+                        </div>
+                      </div>
+
+                      {!isCreate ? (
+                        <label className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm text-slate-700 dark:border-slate-800/70 dark:bg-slate-950/50 dark:text-slate-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={form.isActive}
+                            onChange={(event) => onFieldChange('isActive', event.target.checked)}
+                            disabled={readOnly}
+                            className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                          />
+                          {t('staffManagement.activeAccount')}
+                        </label>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
+                      <div className="border-b border-slate-200/50 pb-4 dark:border-slate-800/50">
+                        <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('staffManagement.salary')}</h3>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          Manage payment and salary tracking parameters for this staff member.
+                        </p>
+                      </div>
+
+                      <div className="mt-5 grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="label" htmlFor="staff-salary">{t('staffManagement.salary')}</label>
+                          <input
+                            id="staff-salary"
+                            className="input mt-1"
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            step="0.01"
+                            value={form.salary}
+                            onChange={(event) => onFieldChange('salary', event.target.value)}
+                            disabled={readOnly}
+                            placeholder={t('staffManagement.compensationPlaceholder')}
+                          />
+                        </div>
+                        <div>
+                          <label className="label" htmlFor="staff-total-received">{t('staffManagement.totalReceived')}</label>
+                          <input
+                            id="staff-total-received"
+                            className="input mt-1"
+                            type="number"
+                            inputMode="decimal"
+                            min="0"
+                            step="0.01"
+                            value={form.totalReceived}
+                            onChange={(event) => onFieldChange('totalReceived', event.target.value)}
+                            disabled={readOnly}
+                            placeholder={t('staffManagement.totalReceivedPlaceholder')}
                           />
                         </div>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
+                      <div className="border-b border-slate-200/50 pb-4 dark:border-slate-800/50">
+                        <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('staffManagement.loginAccess')}</h3>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          Control if this staff member can log in to perform transactions or view workspace features.
+                        </p>
+                      </div>
+
+                      <div className="mt-5 space-y-4">
+                        <div className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900 dark:text-white">{t('staffManagement.hasLogin')}</p>
+                            <p className="mt-1 text-xs text-slate-500">If enabled, credentials are required to sign in.</p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={readOnly}
+                            onClick={() => onFieldChange('hasLogin', !form.hasLogin)}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                              form.hasLogin ? 'bg-primary-600' : 'bg-slate-200 dark:bg-slate-800'
+                            } disabled:cursor-not-allowed disabled:opacity-50`}
+                          >
+                            <span
+                              aria-hidden="true"
+                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                form.hasLogin ? 'translate-x-5' : 'translate-x-0'
+                              }`}
+                            />
+                          </button>
+                        </div>
+
+                        {form.hasLogin && (
+                          <div className="grid gap-4 md:grid-cols-2">
+                            {(isCreate || wasNonLogin) ? (
+                              <div>
+                                <label className="label" htmlFor="staff-email">{t('auth.emailAddress')}</label>
+                                <input
+                                  id="staff-email"
+                                  className="input mt-1"
+                                  type="email"
+                                  value={form.email}
+                                  onChange={(event) => onFieldChange('email', event.target.value)}
+                                  disabled={readOnly}
+                                  required
+                                />
+                              </div>
+                            ) : (
+                              <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{t('auth.emailAddress')}</p>
+                                <p className="mt-2 break-words text-sm font-medium text-slate-800 dark:text-slate-100">{form.email || '-'}</p>
+                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.emailImmutable')}</p>
+                              </div>
+                            )}
+                            <div>
+                              <label className="label" htmlFor="staff-password">
+                                {isCreate ? t('auth.password') : t('staffManagement.newPassword')}
+                              </label>
+                              <input
+                                id="staff-password"
+                                className="input mt-1"
+                                type="password"
+                                value={form.password}
+                                onChange={(event) => onFieldChange('password', event.target.value)}
+                                disabled={readOnly}
+                                placeholder={isCreate ? t('staffManagement.passwordCreateHint') : t('staffManagement.passwordEditHint')}
+                                required={isCreate || wasNonLogin}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('staffManagement.permissionsTitle')}</h3>
+                          <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.permissionsSubtitle')}</p>
+                        </div>
+                        {!readOnly ? (
+                          <button type="button" className="btn-secondary w-full justify-center sm:w-auto" onClick={onApplyPreset}>
+                            {t('staffManagement.resetToPreset')}
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div
+                        className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
+                          permissionsCustomized
+                            ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200'
+                            : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-200'
+                        }`}
+                      >
+                        <p className="font-semibold">
+                          {permissionsCustomized
+                            ? t('staffManagement.permissionPresetCustomized')
+                            : t('staffManagement.permissionPresetApplied', { category: selectedCategory?.label || '-' })}
+                        </p>
+                        <p className="mt-1 text-xs opacity-80">
+                          {permissionsCustomized
+                            ? t('staffManagement.permissionPresetCustomizedHint')
+                            : t('staffManagement.permissionPresetAppliedHint')}
+                        </p>
+                      </div>
+
+                      <div className="mt-5 grid gap-4 xl:grid-cols-2">
+                        {meta.features.map((feature) => {
+                          const permissionKey = getPermissionKeyForFeature(feature.key) || feature.key;
+
+                          return (
+                            <div key={feature.key} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
+                              <div className="flex h-full flex-col gap-4">
+                                <div className="min-w-0">
+                                  <p className="font-medium text-slate-900 dark:text-white">{feature.label}</p>
+                                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                                    {feature.description || t('staffManagement.permissionDescriptionFallback')}
+                                  </p>
+                                </div>
+                                <div className="w-full">
+                                  <PermissionSelector
+                                    value={form.permissions[permissionKey] || 'none'}
+                                    levels={levels}
+                                    disabled={readOnly}
+                                    onChange={(value) => onPermissionChange(permissionKey, value)}
+                                    t={t}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </section>
-          </div>
-        )}
-      </form>
-    </Dialog>
+            </div>
+
+            <div className="border-t border-slate-200/70 bg-white/90 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-8">
+              <div className="mx-auto flex w-full max-w-[920px] flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                {readOnly ? (
+                  <button type="button" className="btn-secondary w-full sm:w-auto" onClick={onClose}>
+                    {t('common.close')}
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" className="btn-ghost w-full sm:w-auto" onClick={onClose} disabled={saving}>
+                      {t('common.cancel')}
+                    </button>
+                    <button type="submit" className="btn-primary w-full sm:w-auto" disabled={saving}>
+                      {saving
+                        ? t('common.saving')
+                        : isCreate
+                          ? t('staffManagement.createAction')
+                          : t('staffManagement.saveAction')}
+                      <Check size={14} className="ml-1.5 inline" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
   );
 }
+
+/* ── Main component ── */
 
 export default function StaffManagement({ businessId }) {
   const { t } = useI18n();
@@ -563,6 +673,12 @@ export default function StaffManagement({ businessId }) {
   const [salaryMember, setSalaryMember] = useState(null);
   const [salaryOpen, setSalaryOpen] = useState(false);
 
+  useEffect(() => {
+    if (notice.type !== 'success' && notice.type !== 'error') return;
+    const timer = setTimeout(() => setNotice({ type: '', message: '' }), 3000);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
   const filteredMembers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
@@ -584,6 +700,29 @@ export default function StaffManagement({ businessId }) {
       return matchesQuery && matchesStatus && matchesCategory;
     });
   }, [categoryFilter, members, query, statusFilter]);
+
+  const staffOverview = useMemo(() => {
+    const activeCount = members.filter((member) => member.user?.isActive !== false).length;
+    const inactiveCount = members.length - activeCount;
+    const loginCount = members.filter((member) => member.hasLogin !== false).length;
+
+    return {
+      totalUsers: summary.totalUsers ?? members.length,
+      activeCount,
+      inactiveCount,
+      loginCount,
+      availableSlots: summary.availableSlots ?? 0,
+    };
+  }, [members, summary]);
+
+  const statusFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: t('staffManagement.statusFilters.all') },
+      { value: 'active', label: t('staffManagement.statusFilters.active') },
+      { value: 'inactive', label: t('staffManagement.statusFilters.inactive') },
+    ],
+    [t],
+  );
 
   const reloadStaff = async () => {
     if (!businessId) {
@@ -615,9 +754,16 @@ export default function StaffManagement({ businessId }) {
     }
   };
 
-  const handleRefresh = () => {
-    invalidateApiCache(['staff']);
-    reloadStaff();
+  const [refreshingStaff, setRefreshingStaff] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshingStaff(true);
+    try {
+      invalidateApiCache(['staff']);
+      await reloadStaff();
+    } finally {
+      setRefreshingStaff(false);
+    }
   };
 
   useEffect(() => {
@@ -631,52 +777,35 @@ export default function StaffManagement({ businessId }) {
     setDialogMode('create');
   };
 
+  const buildFormFromMember = (member) => ({
+    membershipId: member.membershipId,
+    name: member.user?.name || '',
+    email: member.user?.email || '',
+    phone: member.user?.phone || '',
+    password: '',
+    role: member.role || 'staff',
+    staffCategory: member.staffCategory || '',
+    jobTitle: member.jobTitle || '',
+    joinedDate: toDateInputValue(member.joinedDate || member.joinedAt),
+    shift: member.shift || '',
+    address: member.address || '',
+    compensation: member.compensation ?? '',
+    salary: member.salary ?? member.compensation ?? '',
+    hasLogin: member.hasLogin !== false,
+    totalReceived: member.totalReceived ?? '',
+    isActive: member.user?.isActive !== false,
+    permissions: { ...member.permissions },
+    permissionsDirty: false,
+  });
+
   const openView = (member) => {
-    setForm({
-      membershipId: member.membershipId,
-      name: member.user?.name || '',
-      email: member.user?.email || '',
-      phone: member.user?.phone || '',
-      password: '',
-      role: member.role || 'staff',
-      staffCategory: member.staffCategory || '',
-      jobTitle: member.jobTitle || '',
-      joinedDate: toDateInputValue(member.joinedDate || member.joinedAt),
-      shift: member.shift || '',
-      address: member.address || '',
-      compensation: member.compensation ?? '',
-      salary: member.salary ?? member.compensation ?? '',
-      hasLogin: member.hasLogin !== false,
-      totalReceived: member.totalReceived ?? '',
-      isActive: member.user?.isActive !== false,
-      permissions: { ...member.permissions },
-      permissionsDirty: false,
-    });
+    setForm(buildFormFromMember(member));
     setDialogMode('view');
   };
 
   const openEdit = (member) => {
     if (!canManageStaff || member.role === 'owner') return;
-    setForm({
-      membershipId: member.membershipId,
-      name: member.user?.name || '',
-      email: member.user?.email || '',
-      phone: member.user?.phone || '',
-      password: '',
-      role: member.role || 'staff',
-      staffCategory: member.staffCategory || '',
-      jobTitle: member.jobTitle || '',
-      joinedDate: toDateInputValue(member.joinedDate || member.joinedAt),
-      shift: member.shift || '',
-      address: member.address || '',
-      compensation: member.compensation ?? '',
-      salary: member.salary ?? member.compensation ?? '',
-      hasLogin: member.hasLogin !== false,
-      totalReceived: member.totalReceived ?? '',
-      isActive: member.user?.isActive !== false,
-      permissions: { ...member.permissions },
-      permissionsDirty: false,
-    });
+    setForm(buildFormFromMember(member));
     setDialogMode('edit');
   };
 
@@ -807,340 +936,345 @@ export default function StaffManagement({ businessId }) {
     return null;
   }
 
+  const money = (value) =>
+    t('currency.formatted', {
+      symbol: t('currency.symbol'),
+      amount: Number(value || 0).toFixed(2),
+    });
+
   return (
-    <>
-      <div className="card space-y-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h2 className="font-serif text-2xl text-slate-900 dark:text-white">{t('staffManagement.title')}</h2>
-            <p className="mt-2 max-w-3xl text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.subtitle')}</p>
-          </div>
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-            <button type="button" className="btn-secondary justify-center" onClick={handleRefresh} disabled={loading}>
-              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-              {t('staffManagement.refresh')}
-            </button>
+    <div className="space-y-6">
+      {/* ── Hero ── */}
+      <section className="overflow-hidden rounded-[32px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.22),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(249,245,239,0.96))] shadow-sm shadow-primary-950/10 dark:border-primary-900/40 dark:bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.18),transparent_42%),linear-gradient(135deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))]">
+        <div className="p-5 md:p-8">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
+              <h1 className="mt-0 font-serif text-3xl text-slate-900 dark:text-white md:text-3xl">
+                {t('staffManagement.title')}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 md:text-base">
+                {t('staffManagement.subtitle')}
+              </p>
+            </div>
+
             {canManageStaff ? (
               <button
+                className="btn-primary w-full sm:w-auto"
                 type="button"
-                className="btn-primary justify-center"
                 onClick={openCreate}
                 disabled={!businessId || summary.availableSlots <= 0}
               >
+                <Plus size={16} className="mr-1.5 inline" />
                 {t('staffManagement.addStaff')}
               </button>
             ) : null}
           </div>
+
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-hide sm:grid sm:grid-cols-2 xl:grid-cols-4">
+            <OverviewMetric
+              icon={Users}
+              label={t('staffManagement.summary.totalUsers')}
+              value={staffOverview.totalUsers}
+            />
+            <OverviewMetric
+              icon={UserCheck}
+              label={t('staffManagement.status.active')}
+              value={staffOverview.activeCount}
+              tone="emerald"
+            />
+            <OverviewMetric
+              icon={UserX}
+              label={t('staffManagement.status.inactive')}
+              value={staffOverview.inactiveCount}
+              tone="amber"
+            />
+            <OverviewMetric
+              icon={ShieldCheck}
+              label={t('staffManagement.summary.availableSlots')}
+              value={staffOverview.availableSlots}
+              tone="rose"
+            />
+          </div>
         </div>
+      </section>
 
-        {notice.message ? <Notice title={notice.message} tone={notice.type || 'info'} /> : null}
-        {loadError ? <Notice title={loadError} tone="error" /> : null}
-        {!businessId ? <Notice title={t('staffManagement.businessRequired')} tone="warn" /> : null}
-        {!canManageStaff ? <Notice title={t('staffManagement.viewOnlyNotice')} tone="info" /> : null}
+      {notice.message ? <Notice title={notice.message} tone={notice.type || 'info'} /> : null}
+      {loadError ? <Notice title={loadError} tone="error" /> : null}
+      {!businessId ? <Notice title={t('staffManagement.businessRequired')} tone="warn" /> : null}
+      {!canManageStaff ? <Notice title={t('staffManagement.viewOnlyNotice')} tone="info" /> : null}
 
-        {/* <div className="grid gap-4 md:grid-cols-3">
-          <SummaryCard
-            label={t('staffManagement.summary.totalUsers')}
-            value={summary.totalUsers}
-            hint={t('staffManagement.summary.totalUsersHint')}
-            icon={Users}
-          />
-          <SummaryCard
-            label={t('staffManagement.summary.maxUsers')}
-            value={summary.maxUsers}
-            hint={t('staffManagement.summary.maxUsersHint')}
-            icon={ShieldCheck}
-          />
-          <SummaryCard
-            label={t('staffManagement.summary.availableSlots')}
-            value={summary.availableSlots}
-            hint={t('staffManagement.summary.availableSlotsHint')}
-            icon={RefreshCw}
-          />
-        </div> */}
+      <TeamSeatUsagePanel
+        summary={summary}
+        staffing={subscription?.staffing}
+        loading={loading}
+        t={t}
+      />
 
-        <TeamSeatUsagePanel
-          summary={summary}
-          staffing={subscription?.staffing}
-          loading={loading}
-          t={t}
-        />
+      {/* ── Staff table card ── */}
+      <div className="card !p-0 overflow-hidden">
+        <div className="border-b border-slate-200/70 px-4 py-4 dark:border-slate-800/70 md:px-6 md:py-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-2xl">
+              <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
+                {t('staffManagement.title')}
+              </h3>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                {t('staffManagement.subtitle')}
+              </p>
+            </div>
 
-        <div className="grid gap-4 xl:grid-cols-[1.35fr,0.85fr,0.8fr]">
-          <div>
-            <label className="label">{t('common.search')}</label>
-            <div className="relative mt-1">
-              <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                className="input pl-10"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder={t('staffManagement.searchPlaceholder')}
+            <div className="grid w-full gap-3 xl:max-w-3xl xl:grid-cols-[1.2fr_1fr_auto] xl:items-end">
+              <div>
+                <label className="label">{t('common.search')}</label>
+                <div className="relative mt-1">
+                  <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    className="input w-full pl-8"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder={t('staffManagement.searchPlaceholder')}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="label">{t('staffManagement.categoryLabel')}</label>
+                <select
+                  className="input mt-1"
+                  value={categoryFilter}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                >
+                  <option value="all">{t('staffManagement.allCategories')}</option>
+                  {meta.categories.map((category) => (
+                    <option key={category.key} value={category.key}>{category.label}</option>
+                  ))}
+                </select>
+              </div>
+              <RefreshButton
+                className="min-h-[44px] xl:self-end"
+                refreshing={refreshingStaff}
+                onClick={handleRefresh}
               />
             </div>
           </div>
-          <div>
-            <label className="label">{t('common.status')}</label>
-            <select className="input mt-1" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              {STATUS_FILTERS.map((filterKey) => (
-                <option key={filterKey} value={filterKey}>
-                  {t(`staffManagement.statusFilters.${filterKey}`)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label">{t('staffManagement.categoryLabel')}</label>
-            <select className="input mt-1" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
-              <option value="all">{t('staffManagement.allCategories')}</option>
-              {meta.categories.map((category) => (
-                <option key={category.key} value={category.key}>{category.label}</option>
-              ))}
-            </select>
+
+          <div className="mt-4 flex flex-wrap gap-1.5 sm:gap-2">
+            {statusFilterOptions.map((option) => (
+              <FilterChip
+                key={option.value}
+                label={option.label}
+                active={statusFilter === option.value}
+                onClick={() => setStatusFilter(option.value)}
+              />
+            ))}
           </div>
         </div>
 
-        {loading ? (
-          <div className="rounded-3xl border border-dashed border-slate-300/80 bg-slate-50/80 p-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
-            {t('common.loading')}
-          </div>
-        ) : filteredMembers.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-300/80 bg-slate-50/80 p-10 text-center dark:border-slate-700 dark:bg-slate-900/50">
-            <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('staffManagement.emptyTitle')}</h3>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.emptyDescription')}</p>
-          </div>
-        ) : (
-          <>
-            <div className="hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[980px] text-sm text-slate-600 dark:text-slate-300">
-                <thead className="text-left text-xs uppercase tracking-[0.14em] text-slate-400">
-                  <tr>
-                    <th className="py-3 pr-4">{t('staffManagement.employee', 'Employee')}</th>
-                    <th className="py-3 pr-4">{t('staffManagement.contact', 'Contact')}</th>
-                    <th className="py-3 pr-4">{t('staffManagement.roleJoined', 'Role & Joined')}</th>
-                    <th className="py-3 pr-4">{t('staffManagement.salary')}</th>
-                    <th className="py-3 pr-4">{t('common.status')}</th>
-                    <th className="py-3 text-right">{t('common.actions')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMembers.map((member) => {
-                    const isOwner = member.role === 'owner';
-                    const menuActions = [
-                      {
-                        label: t('common.view'),
-                        icon: Eye,
-                        onClick: () => openView(member),
+        <div className="px-4 py-4 md:px-6 md:py-6">
+          {loading ? (
+            <div className="rounded-3xl border border-dashed border-slate-300/80 bg-slate-50/80 p-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+              {t('common.loading')}
+            </div>
+          ) : filteredMembers.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-slate-300/80 bg-slate-50/80 p-10 text-center dark:border-slate-700 dark:bg-slate-900/50">
+              <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('staffManagement.emptyTitle')}</h3>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.emptyDescription')}</p>
+            </div>
+          ) : (
+            <>
+              {/* Mobile cards */}
+              <div className="space-y-3 md:hidden">
+                {filteredMembers.map((member) => {
+                  const isOwner = member.role === 'owner';
+                  const menuActions = [
+                    { label: t('common.view'), icon: Eye, onClick: () => openView(member) },
+                    !isOwner && {
+                      label: t('staffManagement.salary', 'Staff Salary'),
+                      icon: DollarSign,
+                      onClick: () => {
+                        setSalaryMember(member);
+                        setSalaryOpen(true);
                       },
-                      !isOwner && {
-                        label: t('staffManagement.salary', 'Staff Salary'),
-                        icon: DollarSign,
-                        onClick: () => {
-                          setSalaryMember(member);
-                          setSalaryOpen(true);
-                        },
-                      },
-                      !isOwner && {
-                        label: t('SalaryProfile', 'Salary Details'),
-                        icon: Eye,
-                        onClick: () => {
-                          // open in same tab (no _blank)
-                          window.location.href = `/app/staff-salary/${encodeURIComponent(member.membershipId)}`;
-                        },
-                      },
-                      canManageStaff && !isOwner && {
-                        label: t('common.edit'),
-                        icon: Edit,
-                        onClick: () => openEdit(member),
-                      },
-                      canManageStaff && !isOwner && {
-                        label: t('common.delete'),
-                        icon: Trash2,
-                        tone: 'danger',
-                        onClick: () => setDeleteMember(member),
-                      },
-                    ].filter(Boolean);
+                    },
+                    canManageStaff && !isOwner && {
+                      label: t('common.edit'),
+                      icon: Edit,
+                      onClick: () => openEdit(member),
+                    },
+                    canManageStaff && !isOwner && {
+                      label: t('common.delete'),
+                      icon: Trash2,
+                      tone: 'danger',
+                      onClick: () => setDeleteMember(member),
+                    },
+                  ].filter(Boolean);
 
-                    return (
-                      <tr key={member.membershipId} className="border-t border-slate-200/70 hover:bg-slate-50/30 dark:border-slate-800/70 dark:hover:bg-slate-900/10 transition">
-                        <td className="py-4 pr-4 font-medium text-slate-900 dark:text-white">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#9c5f22]/10 text-sm font-semibold text-[#9c5f22] dark:bg-[#9c5f22]/20 dark:text-[#dca060]">
-                              {getInitials(member.user?.name || member.name || '-')}
+                  return (
+                    <div
+                      key={member.membershipId}
+                      className="rounded-[26px] border border-slate-200/70 bg-white/90 p-4 text-sm shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 flex-1 items-start gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-sm font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-200">
+                            {getInitials(member.user?.name || member.name || '-')}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-base font-semibold text-slate-900 dark:text-white">
+                              {member.user?.name || member.name || '-'}
+                            </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <span className="text-xs text-slate-500 dark:text-slate-400">
+                                {member.category?.label || '-'}{member.jobTitle ? ` • ${member.jobTitle}` : ''}
+                              </span>
+                              <LoginBadge hasLogin={member.hasLogin} t={t} />
                             </div>
-                            <div className="min-w-0">
-                              <p className="font-semibold text-slate-900 dark:text-white truncate">
-                                {member.user?.name || member.name || '-'}
-                              </p>
-                              <div className="mt-1 flex items-center gap-2 flex-wrap">
-                                <span className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                                  {member.category?.label || '-'} {member.jobTitle ? `• ${member.jobTitle}` : ''}
-                                </span>
-                                <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                  member.hasLogin
-                                    ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
-                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                                } whitespace-nowrap`}>
-                                  {member.hasLogin ? t('staffManagement.loginAccess') : t('staffManagement.nonLoginStaff')}
-                                </span>
+                          </div>
+                        </div>
+
+                        <div className="min-w-[88px] rounded-[20px] border border-slate-200/70 bg-slate-50/80 p-2.5 text-right dark:border-slate-800/70 dark:bg-slate-950/40">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                            {t('staffManagement.salary')}
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
+                            {money(member.salary)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <StatusBadge active={member.user?.isActive !== false} t={t} />
+                        {member.hasLogin && member.user?.email ? (
+                          <span className="text-xs text-slate-500 dark:text-slate-400">{member.user.email}</span>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-4 flex items-center justify-between border-t border-slate-200/70 pt-3 dark:border-slate-800/70">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {t('staffManagement.joined', 'Joined')}: {formatDate(member.joinedAt || member.joinedDate)}
+                        </span>
+                        <ActionMenu actions={menuActions} label={t('common.actions')} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full min-w-[980px] text-sm">
+                  <thead className="text-left text-xs uppercase tracking-[0.18em] text-slate-400">
+                    <tr>
+                      <th className="py-2 pr-4">{t('staffManagement.employee', 'Employee')}</th>
+                      <th className="py-2 pr-4">{t('staffManagement.contact', 'Contact')}</th>
+                      <th className="py-2 pr-4">{t('staffManagement.roleJoined', 'Role & Joined')}</th>
+                      <th className="py-2 pr-4 text-right">{t('staffManagement.salary')}</th>
+                      <th className="py-2 pr-4">{t('common.status')}</th>
+                      <th className="py-2 text-right">{t('common.actions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredMembers.map((member) => {
+                      const isOwner = member.role === 'owner';
+                      const menuActions = [
+                        { label: t('common.view'), icon: Eye, onClick: () => openView(member) },
+                        !isOwner && {
+                          label: t('staffManagement.salary', 'Staff Salary'),
+                          icon: DollarSign,
+                          onClick: () => {
+                            setSalaryMember(member);
+                            setSalaryOpen(true);
+                          },
+                        },
+                        !isOwner && {
+                          label: t('SalaryProfile', 'Salary Details'),
+                          icon: Eye,
+                          onClick: () => {
+                            window.location.href = `/app/staff-salary/${encodeURIComponent(member.membershipId)}`;
+                          },
+                        },
+                        canManageStaff && !isOwner && {
+                          label: t('common.edit'),
+                          icon: Edit,
+                          onClick: () => openEdit(member),
+                        },
+                        canManageStaff && !isOwner && {
+                          label: t('common.delete'),
+                          icon: Trash2,
+                          tone: 'danger',
+                          onClick: () => setDeleteMember(member),
+                        },
+                      ].filter(Boolean);
+
+                      return (
+                        <tr
+                          key={member.membershipId}
+                          className="border-t border-slate-200/70 transition hover:bg-slate-50/30 dark:border-slate-800/70 dark:hover:bg-slate-900/10"
+                        >
+                          <td className="py-3 pr-4 font-medium text-slate-900 dark:text-white">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-sm font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-200">
+                                {getInitials(member.user?.name || member.name || '-')}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold text-slate-900 dark:text-white">
+                                  {member.user?.name || member.name || '-'}
+                                </p>
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                  <span className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
+                                    {member.category?.label || '-'} {member.jobTitle ? `• ${member.jobTitle}` : ''}
+                                  </span>
+                                  <LoginBadge hasLogin={member.hasLogin} t={t} />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="py-4 pr-4">
-                          <div className="space-y-1">
-                            {member.hasLogin ? (
-                              <>
-                                <p className="truncate font-medium text-slate-800 dark:text-slate-200">
-                                  {member.user?.email || member.email || '-'}
+                          </td>
+                          <td className="py-3 pr-4">
+                            <div className="space-y-1">
+                              {member.hasLogin ? (
+                                <>
+                                  <p className="truncate font-medium text-slate-800 dark:text-slate-200">
+                                    {member.user?.email || member.email || '-'}
+                                  </p>
+                                  <EmailVerificationBadge emailVerified={member.user?.emailVerified} t={t} />
+                                </>
+                              ) : (
+                                <p className="italic text-slate-400">{t('staffManagement.noLoginPlaceholder')}</p>
+                              )}
+                              {member.user?.phone || member.phone ? (
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  {member.user?.phone || member.phone}
                                 </p>
-                                <EmailVerificationBadge emailVerified={member.user?.emailVerified} t={t} />
-                              </>
-                            ) : (
-                              <p className="text-slate-400 font-normal italic">{t('staffManagement.noLoginPlaceholder')}</p>
-                            )}
-                            {member.user?.phone || member.phone ? (
-                              <p className="text-xs text-slate-500 dark:text-slate-400">
-                                {member.user?.phone || member.phone}
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="py-3 pr-4">
+                            <div className="space-y-1">
+                              <p className="font-medium capitalize text-slate-800 dark:text-slate-200">
+                                {t(`staffManagement.roles.${member.role || 'staff'}`)}
                               </p>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="py-4 pr-4">
-                          <div className="space-y-1">
-                            <p className="font-medium text-slate-800 dark:text-slate-200 capitalize">
-                              {t(`staffManagement.roles.${member.role || 'staff'}`)}
-                            </p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              {t('staffManagement.joined', 'Joined')}: {formatDate(member.joinedAt || member.joinedDate)}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="py-4 pr-4 font-semibold text-slate-900 dark:text-white">
-                          {t('currency.formatted', {
-                            symbol: t('currency.symbol'),
-                            amount: Number(member.salary || 0).toFixed(2),
-                          })}
-                        </td>
-                        <td className="py-4 pr-4">
-                          <StatusBadge active={member.user?.isActive !== false} t={t} />
-                        </td>
-                        <td className="py-4 text-right whitespace-nowrap">
-                          <ActionMenu actions={menuActions} label={t('common.actions')} />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="grid gap-4 lg:hidden">
-              {filteredMembers.map((member) => {
-                const isOwner = member.role === 'owner';
-                const menuActions = [
-                  {
-                    label: t('common.view'),
-                    icon: Eye,
-                    onClick: () => openView(member),
-                  },
-                      !isOwner && {
-                        label: t('staffManagement.salary', 'Staff Salary'),
-                        icon: DollarSign,
-                        onClick: () => {
-                          setSalaryMember(member);
-                          setSalaryOpen(true);
-                        },
-                  },
-                  canManageStaff && !isOwner && {
-                    label: t('common.edit'),
-                    icon: Edit,
-                    onClick: () => openEdit(member),
-                  },
-                  canManageStaff && !isOwner && {
-                    label: t('common.delete'),
-                    icon: Trash2,
-                    tone: 'danger',
-                    onClick: () => setDeleteMember(member),
-                  },
-                ].filter(Boolean);
-
-                return (
-                  <article key={member.membershipId} className="rounded-3xl border border-slate-200/70 bg-white/85 p-5 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60 relative">
-                    <div className="absolute right-4 top-4">
-                      <ActionMenu actions={menuActions} label={t('common.actions')} />
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#9c5f22]/10 text-sm font-semibold text-[#9c5f22] dark:bg-[#9c5f22]/20 dark:text-[#dca060]">
-                        {getInitials(member.user?.name || member.name || '-')}
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-white pr-8 truncate">
-                          {member.user?.name || member.name || '-'}
-                        </h3>
-                        <div className="mt-1 flex flex-col gap-1">
-                          <span className={`inline-flex self-start rounded-full px-2 py-0.5 text-2xs font-semibold ${
-                            member.hasLogin
-                              ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
-                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                          }`}>
-                            {member.hasLogin ? t('staffManagement.loginAccess') : t('staffManagement.nonLoginStaff')}
-                          </span>
-                          {member.hasLogin && member.user?.email && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{member.user.email}</p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.14em] text-slate-400">{t('auth.phone')}</p>
-                        <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{member.user?.phone || '-'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.14em] text-slate-400">{t('staffManagement.roleLabel')}</p>
-                        <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{t(`staffManagement.roles.${member.role || 'staff'}`)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.14em] text-slate-400">{t('staffManagement.categoryLabel')}</p>
-                        <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{member.category?.label || '-'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.14em] text-slate-400">{t('staffManagement.jobTitle')}</p>
-                        <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{member.jobTitle || '-'}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.14em] text-slate-400">{t('staffManagement.salary')}</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
-                          {t('currency.formatted', {
-                            symbol: t('currency.symbol'),
-                            amount: Number(member.salary || 0).toFixed(2),
-                          })}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.14em] text-slate-400">{t('common.status')}</p>
-                        <div className="mt-1">
-                          <StatusBadge active={member.user?.isActive !== false} t={t} />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      {member.hasLogin && (
-                        <EmailVerificationBadge emailVerified={member.user?.emailVerified} t={t} />
-                      )}
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
-                        {t('staffManagement.joinedAt')}: {formatDate(member.joinedAt)}
-                      </span>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </>
-        )}
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                {t('staffManagement.joined', 'Joined')}: {formatDate(member.joinedAt || member.joinedDate)}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="py-3 pr-4 text-right font-semibold text-slate-900 dark:text-white">
+                            {money(member.salary)}
+                          </td>
+                          <td className="py-3 pr-4">
+                            <StatusBadge active={member.user?.isActive !== false} t={t} />
+                          </td>
+                          <td className="py-3 text-right">
+                            <ActionMenu actions={menuActions} label={t('common.actions')} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <StaffFormDialog
@@ -1177,26 +1311,22 @@ export default function StaffManagement({ businessId }) {
           : t('common.confirmDelete')}
         confirming={deleteSaving}
       />
-    </>
+    </div>
   );
 }
 
-function SalaryAdvanceDialog({
-  isOpen,
-  member,
-  t,
-  onClose,
-}) {
+/* ── Salary advance / payment history dialog ── */
+
+function SalaryAdvanceDialog({ isOpen, member, t, onClose }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [adding, setAdding] = useState(false);
 
-  // Form states
   const [amount, setAmount] = useState('');
-  const [type, setType] = useState('advance'); // 'advance' or 'salary'
+  const [type, setType] = useState('advance');
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [monthYear, setMonthYear] = useState(() => new Date().toISOString().slice(0, 7)); // 'YYYY-MM'
+  const [monthYear, setMonthYear] = useState(() => new Date().toISOString().slice(0, 7));
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -1226,8 +1356,8 @@ function SalaryAdvanceDialog({
     }
   }, [isOpen, member]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     if (!amount || Number(amount) <= 0) return;
     setSaving(true);
     setError('');
@@ -1268,22 +1398,14 @@ function SalaryAdvanceDialog({
 
     records.forEach((r) => {
       if (r.monthYear === currentMonthYear) {
-        if (r.type === 'salary') {
-          totalPaidThisMonth += Number(r.amount || 0);
-        } else if (r.type === 'advance') {
-          totalAdvanceThisMonth += Number(r.amount || 0);
-        }
+        if (r.type === 'salary') totalPaidThisMonth += Number(r.amount || 0);
+        else if (r.type === 'advance') totalAdvanceThisMonth += Number(r.amount || 0);
       }
     });
 
     const netRemaining = monthlySalary - totalAdvanceThisMonth - totalPaidThisMonth;
 
-    return {
-      monthlySalary,
-      totalPaidThisMonth,
-      totalAdvanceThisMonth,
-      netRemaining,
-    };
+    return { monthlySalary, totalPaidThisMonth, totalAdvanceThisMonth, netRemaining };
   }, [records, member, currentMonthYear]);
 
   if (!isOpen || !member) return null;
@@ -1303,53 +1425,42 @@ function SalaryAdvanceDialog({
       <div className="space-y-6">
         {error ? <Notice title={error} tone="error" /> : null}
 
-        {/* Stats Grid */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
-            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-              {t('staffManagement.salaryRecords.totalSalary')}
-            </p>
-            <p className="mt-2 text-xl font-bold text-slate-900 dark:text-white">
-              {t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.monthlySalary.toFixed(2) })}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-amber-200/70 bg-amber-50/20 p-4 dark:border-amber-800/40 dark:bg-amber-950/10">
-            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-amber-600/80">
-              {t('staffManagement.salaryRecords.totalAdvance')}
-            </p>
-            <p className="mt-2 text-xl font-bold text-amber-700 dark:text-amber-300">
-              {t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.totalAdvanceThisMonth.toFixed(2) })}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/20 p-4 dark:border-emerald-800/40 dark:bg-emerald-950/10">
-            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-emerald-600/80">
-              {t('staffManagement.salaryRecords.totalPaid')}
-            </p>
-            <p className="mt-2 text-xl font-bold text-emerald-700 dark:text-emerald-300">
-              {t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.totalPaidThisMonth.toFixed(2) })}
-            </p>
-          </div>
-          <div className="rounded-2xl border border-sky-200/70 bg-sky-50/20 p-4 dark:border-sky-800/40 dark:bg-sky-950/10">
-            <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-sky-600/80">
-              {t('staffManagement.salaryRecords.netBalance')}
-            </p>
-            <p className={`mt-2 text-xl font-bold ${stats.netRemaining < 0 ? 'text-rose-600 dark:text-rose-300' : 'text-sky-700 dark:text-sky-300'}`}>
-              {t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.netRemaining.toFixed(2) })}
-            </p>
-          </div>
+          <OverviewMetric
+            icon={DollarSign}
+            label={t('staffManagement.salaryRecords.totalSalary')}
+            value={t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.monthlySalary.toFixed(2) })}
+          />
+          <OverviewMetric
+            icon={DollarSign}
+            label={t('staffManagement.salaryRecords.totalAdvance')}
+            value={t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.totalAdvanceThisMonth.toFixed(2) })}
+            tone="amber"
+          />
+          <OverviewMetric
+            icon={Check}
+            label={t('staffManagement.salaryRecords.totalPaid')}
+            value={t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.totalPaidThisMonth.toFixed(2) })}
+            tone="emerald"
+          />
+          <OverviewMetric
+            icon={ShieldCheck}
+            label={t('staffManagement.salaryRecords.netBalance')}
+            value={t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.netRemaining.toFixed(2) })}
+            tone={stats.netRemaining < 0 ? 'rose' : 'blue'}
+          />
         </div>
 
-        {/* Toggle Adding Button */}
         {!adding ? (
-          <button
-            type="button"
-            className="btn-primary gap-2"
-            onClick={() => setAdding(true)}
-          >
-            + {t('staffManagement.salaryRecords.addRecord')}
+          <button type="button" className="btn-primary gap-2" onClick={() => setAdding(true)}>
+            <Plus size={15} className="mr-1 inline" />
+            {t('staffManagement.salaryRecords.addRecord')}
           </button>
         ) : (
-          <form onSubmit={handleSubmit} className="rounded-2xl border border-slate-200/70 bg-slate-50/50 p-5 dark:border-slate-800/60 dark:bg-slate-900/40 space-y-4">
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-4 rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-5 dark:border-slate-800/60 dark:bg-slate-900/40"
+          >
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label className="label" htmlFor="record-amount">{t('staffManagement.salaryRecords.amount')}</label>
@@ -1361,7 +1472,7 @@ function SalaryAdvanceDialog({
                   step="0.01"
                   className="input mt-1"
                   value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
+                  onChange={(event) => setAmount(event.target.value)}
                   required
                 />
               </div>
@@ -1371,7 +1482,7 @@ function SalaryAdvanceDialog({
                   id="record-type"
                   className="input mt-1"
                   value={type}
-                  onChange={(e) => setType(e.target.value)}
+                  onChange={(event) => setType(event.target.value)}
                 >
                   <option value="advance">{t('staffManagement.salaryRecords.salaryAdvance')}</option>
                   <option value="salary">{t('staffManagement.salaryRecords.salaryPayment')}</option>
@@ -1384,7 +1495,7 @@ function SalaryAdvanceDialog({
                   type="date"
                   className="input mt-1"
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(event) => setDate(event.target.value)}
                   required
                 />
               </div>
@@ -1395,7 +1506,7 @@ function SalaryAdvanceDialog({
                   type="month"
                   className="input mt-1"
                   value={monthYear}
-                  onChange={(e) => setMonthYear(e.target.value)}
+                  onChange={(event) => setMonthYear(event.target.value)}
                   required
                 />
               </div>
@@ -1408,44 +1519,34 @@ function SalaryAdvanceDialog({
                 className="input mt-1"
                 placeholder="E.g. Festival advance, June Salary part 1..."
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={(event) => setNote(event.target.value)}
               />
             </div>
-            <div className="flex gap-2 justify-end">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setAdding(false)}
-                disabled={saving}
-              >
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setAdding(false)} disabled={saving}>
                 {t('common.cancel')}
               </button>
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={saving}
-              >
+              <button type="submit" className="btn-primary" disabled={saving}>
                 {saving ? t('common.saving') : t('common.save')}
               </button>
             </div>
           </form>
         )}
 
-        {/* History Log Table */}
         <div className="space-y-3">
           <h4 className="font-serif text-base text-slate-800 dark:text-white">
             {t('staffManagement.salaryRecords.history')}
           </h4>
           {loading ? (
-            <p className="text-center py-6 text-sm text-slate-400">{t('common.loading')}</p>
+            <p className="py-6 text-center text-sm text-slate-400">{t('common.loading')}</p>
           ) : records.length === 0 ? (
-            <p className="text-center py-6 text-sm text-slate-400 italic">
+            <p className="py-6 text-center text-sm italic text-slate-400">
               {t('staffManagement.salaryRecords.empty')}
             </p>
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-slate-200/60 dark:border-slate-800/60">
               <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-                <thead className="text-left bg-slate-50 dark:bg-slate-900/40 text-2xs uppercase tracking-[0.14em] text-slate-400 border-b border-slate-200/60 dark:border-slate-800/60">
+                <thead className="border-b border-slate-200/60 bg-slate-50 text-left text-[10px] uppercase tracking-[0.18em] text-slate-400 dark:border-slate-800/60 dark:bg-slate-900/40">
                   <tr>
                     <th className="p-3">{t('staffManagement.salaryRecords.date')}</th>
                     <th className="p-3">{t('staffManagement.salaryRecords.monthYear')}</th>
@@ -1458,14 +1559,16 @@ function SalaryAdvanceDialog({
                 <tbody className="divide-y divide-slate-200/60 dark:divide-slate-800/60">
                   {records.map((r) => (
                     <tr key={r.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-900/10">
-                      <td className="p-3 whitespace-nowrap">{r.date}</td>
-                      <td className="p-3 whitespace-nowrap">{r.monthYear}</td>
-                      <td className="p-3 whitespace-nowrap">
-                        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          r.type === 'salary'
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-                        }`}>
+                      <td className="whitespace-nowrap p-3">{r.date}</td>
+                      <td className="whitespace-nowrap p-3">{r.monthYear}</td>
+                      <td className="whitespace-nowrap p-3">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                            r.type === 'salary'
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                          }`}
+                        >
                           {r.type === 'salary'
                             ? t('staffManagement.salaryRecords.salaryPayment')
                             : t('staffManagement.salaryRecords.salaryAdvance')}
@@ -1474,12 +1577,12 @@ function SalaryAdvanceDialog({
                       <td className="p-3 font-semibold text-slate-900 dark:text-white">
                         {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(r.amount || 0).toFixed(2) })}
                       </td>
-                      <td className="p-3 max-w-[200px] truncate" title={r.note}>{r.note || '-'}</td>
+                      <td className="max-w-[200px] truncate p-3" title={r.note}>{r.note || '-'}</td>
                       <td className="p-3 text-right">
                         <button
                           type="button"
                           onClick={() => handleDelete(r.id)}
-                          className="text-rose-600 hover:text-rose-500 font-semibold"
+                          className="font-semibold text-rose-600 hover:text-rose-500"
                         >
                           {t('common.delete')}
                         </button>
