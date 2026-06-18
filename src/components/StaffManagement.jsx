@@ -1014,14 +1014,14 @@ export default function StaffManagement({ businessId }) {
       <div className="card !p-0 overflow-hidden">
         <div className="border-b border-slate-200/70 px-4 py-4 dark:border-slate-800/70 md:px-6 md:py-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-2xl">
+            {/* <div className="max-w-2xl">
               <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
                 {t('staffManagement.title')}
               </h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                 {t('staffManagement.subtitle')}
               </p>
-            </div>
+            </div> */}
 
             <div className="grid w-full gap-3 xl:max-w-3xl xl:grid-cols-[1.2fr_1fr_auto] xl:items-end">
               <div>
