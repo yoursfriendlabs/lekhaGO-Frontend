@@ -293,7 +293,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-6 grid gap-3 sm:grid-cols-1 lg:grid-cols-1">
             <div id='amount-pending' className="min-w-0 rounded-2xl border border-amber-200/70 bg-white/80 p-4 dark:border-amber-700/40 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-amber-500/80">{t('dashboard.amountPending')}</p>
               <p  className="mt-1 break-words text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.pendingAmount)}</p>
