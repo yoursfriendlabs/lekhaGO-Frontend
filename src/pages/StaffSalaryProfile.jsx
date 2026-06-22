@@ -489,7 +489,7 @@ function InlineSalaryEditor({ value, onSave, membershipId }) {
     }
     setSaving(true);
     try {
-      await api.updateStaff(membershipId, { baseSalary: numeric });
+      await api.updateStaff(membershipId, { salary: numeric, compensation: numeric });
       onSave(numeric);
       setEditing(false);
       showSuccess("Base salary updated.");

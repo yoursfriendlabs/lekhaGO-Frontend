@@ -1085,7 +1085,7 @@ export default function StaffManagement({ businessId }) {
                 {filteredMembers.map((member) => {
                   const isOwner = member.role === 'owner';
                   const menuActions = [
-                    { label: t('common.view'), icon: Eye, onClick: () => openView(member) },
+                    isOwner && { label: t('common.view'), icon: Eye, onClick: () => openView(member) },
                     !isOwner && {
                       label: t('staffManagement.salary', 'Staff Salary'),
                       icon: DollarSign,
@@ -1175,7 +1175,7 @@ export default function StaffManagement({ businessId }) {
                     {filteredMembers.map((member) => {
                       const isOwner = member.role === 'owner';
                       const menuActions = [
-                        { label: t('common.view'), icon: Eye, onClick: () => openView(member) },
+                        isOwner && { label: t('common.view'), icon: Eye, onClick: () => openView(member) },
                         !isOwner && {
                           label: t('staffManagement.salary', 'Staff Salary'),
                           icon: DollarSign,
