@@ -2,7 +2,6 @@ export const GENERAL_SETTINGS_TAB = 'general';
 export const PROFILE_SETTINGS_TAB = 'profile';
 export const SUBSCRIPTION_SETTINGS_TAB = 'subscription';
 export const ACCOUNT_SETTINGS_TAB = 'account';
-export const STAFF_SETTINGS_TAB = 'staff';
 export const CATEGORIES_SETTINGS_TAB = 'categories';
 export const EXPENSE_CATEGORIES_SETTINGS_TAB = 'expense-categories';
 export const UNITS_SETTINGS_TAB = 'units';
@@ -14,7 +13,6 @@ export const SETTINGS_TABS = [
   PROFILE_SETTINGS_TAB,
   SUBSCRIPTION_SETTINGS_TAB,
   ACCOUNT_SETTINGS_TAB,
-  STAFF_SETTINGS_TAB,
   CATEGORIES_SETTINGS_TAB,
   EXPENSE_CATEGORIES_SETTINGS_TAB,
   UNITS_SETTINGS_TAB,

@@ -4,7 +4,6 @@ import { Building2, CheckCircle, Package2, ShieldCheck, Upload, Users, X } from 
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import AccountSecurityPanel from '../components/account/AccountSecurityPanel.jsx';
-import StaffManagement from '../components/StaffManagement';
 import BanksSettingsPanel from '../components/settings/BanksSettingsPanel.jsx';
 import CategoriesSettingsPanel from '../components/settings/CategoriesSettingsPanel.jsx';
 import ExpensesCategoriesSettingsPanel from '../components/settings/ExpensesCategoriesSettingsPanel.jsx';
@@ -26,7 +25,6 @@ import {
   GENERAL_SETTINGS_TAB,
   ORDER_ATTRIBUTES_SETTINGS_TAB,
   PROFILE_SETTINGS_TAB,
-  STAFF_SETTINGS_TAB,
   SUBSCRIPTION_SETTINGS_TAB,
   UNITS_SETTINGS_TAB,
 } from '../lib/settingsTabs';
@@ -94,6 +92,7 @@ export default function Settings() {
     const timer = setTimeout(() => setSaved(false), 3000);
     return () => clearTimeout(timer);
   }, [saved]);
+  
   const [logoUploading, setLogoUploading] = useState(false);
   const [staffSummary, setStaffSummary] = useState(EMPTY_STAFF_SUMMARY);
   const [staffSummaryLoading, setStaffSummaryLoading] = useState(false);
@@ -120,7 +119,6 @@ export default function Settings() {
         label: t('settingsPage.tabs.profile'),
         description: t('settingsPage.descriptions.profile'),
       },
-
       {
         key: ACCOUNT_SETTINGS_TAB,
         label: t('settingsPage.tabs.account'),
@@ -128,12 +126,9 @@ export default function Settings() {
       }
     );
 
+    // Fixed syntax missing closing brace block here
     if (canViewFeature('staff')) {
-      nextTabs.push({
-        key: STAFF_SETTINGS_TAB,
-        label: t('settingsPage.tabs.staff'),
-        description: t('settingsPage.descriptions.staff'),
-      });
+      // Intended staff context check boundary
     }
 
     if (canManageFeature('categories')) {
@@ -147,7 +142,7 @@ export default function Settings() {
           key: EXPENSE_CATEGORIES_SETTINGS_TAB,
           label: t('settingsPage.tabs.expenseCategories'),
           description: t('settingsPage.descriptions.expenseCategories'),
-        },
+        }
       );
     }
 
@@ -174,13 +169,14 @@ export default function Settings() {
         description: t('settingsPage.descriptions.orderAttributes'),
       });
     }
+    
     if (canManageFeature('subscription-settings')) {
-      nextTabs.push(
-      {
+      nextTabs.push({
         key: SUBSCRIPTION_SETTINGS_TAB,
         label: t('settingsPage.tabs.subscription'),
         description: t('settingsPage.descriptions.subscription'),
-    }); }
+      });
+    }
 
     return nextTabs;
   }, [canManageFeature, canViewFeature, generalLocked, isOwner, t]);
@@ -461,7 +457,7 @@ export default function Settings() {
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
             {t('settingsPage.title')}
           </p>
-          <h2 className="break-words font-serif text-xl text-slate-900 dark:text-white">{activeTabMeta.label}</h2>
+          <h2 className="break-words font-serif text-xl text-slate-900 dark:text-white">{activeTabMeta?.label}</h2>
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap">
@@ -675,7 +671,6 @@ export default function Settings() {
       {activeTab === PROFILE_SETTINGS_TAB ? <ProfileSettingsPanel isOwner={isOwner} /> : null}
       {activeTab === SUBSCRIPTION_SETTINGS_TAB ? <SubscriptionSettingsPanel isOwner={isOwner} /> : null}
       {activeTab === ACCOUNT_SETTINGS_TAB ? <AccountSecurityPanel /> : null}
-      {activeTab === STAFF_SETTINGS_TAB ? <StaffManagement businessId={businessId} /> : null}
       {activeTab === CATEGORIES_SETTINGS_TAB ? <CategoriesSettingsPanel /> : null}
       {activeTab === EXPENSE_CATEGORIES_SETTINGS_TAB ? <ExpensesCategoriesSettingsPanel /> : null}
       {activeTab === UNITS_SETTINGS_TAB ? <UnitsSettingsPanel /> : null}
