@@ -1108,7 +1108,7 @@ function ExpenseCategoryAnalyticsSection({
               value={filters.categoryKey}
               onChange={onFilterChange}
             >
-              <option value="">{`${t("common.all")} ${t("analytics.categoryName")}`}</option>
+              <option value="">{`${t("All")} ${t("analytics.categoryName")}`}</option>
               {categoryOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
