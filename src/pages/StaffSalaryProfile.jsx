@@ -35,9 +35,6 @@ import { useSnackbar } from "../lib/snackbar.jsx";
 import { Badge } from "../components/Badge";
 import { useLoadingState } from "../hooks/useLoadingState";
 
-// ─────────────────────────────────────────────────────────
-// SKELETON LOADERS
-// ─────────────────────────────────────────────────────────
 
 function Skeleton({ className = "", lines = 1 }) {
   return (
@@ -86,9 +83,6 @@ function TableSkeleton({ rows = 4 }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────
-// PRIMITIVES & DISPLAY COMPONENTS
-// ─────────────────────────────────────────────────────────
 
 function HoursBadge({ duration }) {
   if (!duration) {
@@ -343,9 +337,7 @@ function LocationDisplay({ record }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────
-// STAFF PROFILE CARD
-// ─────────────────────────────────────────────────────────
+
 
 function StaffProfileCard({ meta, loading }) {
   const ini = toInitials(meta.name);
@@ -474,9 +466,6 @@ function StaffProfileCard({ meta, loading }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────
-// INLINE SALARY EDITOR
-// ─────────────────────────────────────────────────────────
 
 function InlineSalaryEditor({ value, onSave, membershipId }) {
   const { showSuccess, showError } = useSnackbar();
@@ -811,9 +800,7 @@ function PayrollEntryPanel({
   );
 }
 
-// ─────────────────────────────────────────────────────────
-// MAIN PAGE
-// ─────────────────────────────────────────────────────────
+
 
 export default function StaffSalaryProfile() {
   const { t } = useI18n();
