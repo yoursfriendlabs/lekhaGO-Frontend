@@ -39,6 +39,7 @@ import {
   MessageCircle, Pencil,
 } from "lucide-react";
 import { buildPaymentPayload, requiresBankSelection } from "../lib/payments";
+import { normalizePaymentType } from "../lib/paymentType";
 import { getDueWhatsAppMessage, getWhatsAppLink } from "../lib/whatsapp.js";
 
 const emptyForm = {
@@ -111,6 +112,9 @@ function txReducer(state, action) {
         row?.type === "payment_in" || row?.type === "payment_out";
       const resolvedAmount = isPayment ? row?.amount : row?.totalAmount;
 
+      // Normalize payment data from the row (handles both flat and nested paymentType formats)
+      const paymentInfo = normalizePaymentType(row);
+
       return {
         ...state,
         isOpen: true,
@@ -122,8 +126,8 @@ function txReducer(state, action) {
           amount: toAmount(resolvedAmount ?? 0),
           txDate: toDateInputValue(row?.date || row?.txDate || row?.createdAt),
           note: row?.note || "",
-          paymentMethod: row?.paymentMethod || "cash",
-          bankId: row?.bankId || "",
+          paymentMethod: paymentInfo.method || "cash",
+          bankId: paymentInfo.bankId || "",
           serviceId: "",
           _rowType: row?.type ?? "",
         },
