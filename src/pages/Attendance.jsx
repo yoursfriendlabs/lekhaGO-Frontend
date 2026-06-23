@@ -265,7 +265,7 @@ export default function Attendance() {
               <p className="font-serif text-4xl tracking-widest font-bold text-slate-800 dark:text-white">
                 {formattedTime}
               </p>
-              <p className="mt-1 text-xs text-slate-400 uppercase tracking-widest">{t('dashboard.profitLoss')}</p>
+              <p className="mt-1 text-xs text-slate-400 uppercase tracking-widest">CURRENT TIME</p>
             </div>
 
             {/* Current punch state summaries */}
