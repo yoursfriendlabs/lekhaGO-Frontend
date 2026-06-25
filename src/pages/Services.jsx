@@ -583,7 +583,8 @@ export default function Services() {
       sub: "E-commerce orders",
     },
   ];
-  const selectedStore = storeOptions.find((o) => o.value === storeType);
+  const selectedStore =
+    storeOptions.find((o) => o.value === storeType) || storeOptions[0];
 
   // ── List state ──
   const [statusFilter, setStatusFilter] = useState("all");
@@ -1352,6 +1353,7 @@ export default function Services() {
     setAmountReceived("0");
     setIsPaid(false);
     setStoreType("physical");
+    setStoreDropdownOpen(false);
     setFormNotice({ type: "", message: "" });
     setEditingId(null);
     setShowItemForm(false);
@@ -1439,7 +1441,8 @@ export default function Services() {
           0,
         ) <= 0;
       setIsPaid(computedIsPaid);
-      setStoreType(full.storeType || "physical");
+      const savedStoreType = full.storeType || "physical";
+      setStoreType(savedStoreType);
       setItems(
         rawItems.length > 0
           ? rawItems.map((i) => ({
@@ -1889,6 +1892,49 @@ export default function Services() {
     : editingId
       ? t("common.update")
       : t("services.saveOrder");
+  const renderStoreTypeDropdown = () => (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setStoreDropdownOpen((o) => !o)}
+        className="flex items-center gap-1.5 whitespace-nowrap rounded-[24px] border border-slate-200/70 bg-white px-3 py-3 text-sm font-medium text-slate-700 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-200"
+      >
+        <selectedStore.icon size={15} />
+        {selectedStore.value === "physical" ? "Physical" : "Online"}
+        <ChevronDown
+          size={13}
+          className={`text-slate-400 transition-transform ${storeDropdownOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {storeDropdownOpen && (
+        <div className="absolute right-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-900">
+          {storeOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                setStoreType(opt.value);
+                setStoreDropdownOpen(false);
+              }}
+              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              <opt.icon size={15} className="shrink-0 text-slate-400" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                  {opt.label}
+                </p>
+                <p className="text-[11px] text-slate-400">{opt.sub}</p>
+              </div>
+              {storeType === opt.value && (
+                <Check size={13} className="shrink-0 text-emerald-500" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   // ── Render ──
   return (
@@ -2529,6 +2575,7 @@ export default function Services() {
                                     </div>
                                   ) : null}
                                 </div>
+                                {renderStoreTypeDropdown()}
                                 <button
                                   type="button"
                                   onClick={clearParty}
@@ -2564,60 +2611,7 @@ export default function Services() {
                                     ) : null}
                                   </div>
 
-                                  {/* store type dropdown */}
-                                  <div className="relative">
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        setStoreDropdownOpen((o) => !o)
-                                      }
-                                      className="flex items-center gap-1.5 rounded-[24px] border border-slate-200/70 bg-white px-3 py-3 text-sm font-medium text-slate-700 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-200 whitespace-nowrap"
-                                    >
-                                      <selectedStore.icon size={15} />
-                                      {selectedStore.value === "physical"
-                                        ? "Physical"
-                                        : "Online"}
-                                      <ChevronDown
-                                        size={13}
-                                        className={`text-slate-400 transition-transform ${storeDropdownOpen ? "rotate-180" : ""}`}
-                                      />
-                                    </button>
-
-                                    {storeDropdownOpen && (
-                                      <div className="absolute right-0 top-full mt-1.5 z-50 w-44 rounded-2xl border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-900 overflow-hidden">
-                                        {storeOptions.map((opt) => (
-                                          <button
-                                            key={opt.value}
-                                            type="button"
-                                            onClick={() => {
-                                              setStoreType(opt.value);
-                                              setStoreDropdownOpen(false);
-                                            }}
-                                            className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
-                                          >
-                                            <opt.icon
-                                              size={15}
-                                              className="shrink-0 text-slate-400"
-                                            />
-                                            <div className="flex-1">
-                                              <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                                                {opt.label}
-                                              </p>
-                                              <p className="text-[11px] text-slate-400">
-                                                {opt.sub}
-                                              </p>
-                                            </div>
-                                            {storeType === opt.value && (
-                                              <Check
-                                                size={13}
-                                                className="text-emerald-500 shrink-0"
-                                              />
-                                            )}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
+                                  {renderStoreTypeDropdown()}
                                 </div>
 
                                 {partyDropdownOpen &&
