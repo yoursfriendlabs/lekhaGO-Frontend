@@ -468,15 +468,11 @@ export default function Tasks() {
     }
   };
 
+  // One-direction sync: debounced input value → URL search param
   useEffect(() => {
     if (searchParams.get('q') === debouncedQuery) return;
     updateParams({ q: debouncedQuery || null }, { resetPage: true });
   }, [debouncedQuery]);
-
-  useEffect(() => {
-    const nextQuery = searchParams.get('q') || '';
-    setQueryInput((current) => (current === nextQuery ? current : nextQuery));
-  }, [searchParams]);
 
   useEffect(() => {
     loadMeta().catch(() => {});

@@ -681,6 +681,34 @@ export default function QuickPos() {
       );
       const nextSequences = await api.getNextSequences().catch(() => null);
 
+      // Update local product stock levels immediately so the UI reflects
+      // the correct inventory without requiring a page refresh.
+      setProducts((prevProducts) =>
+        prevProducts.map((product) => {
+          const cartItem = cart.find(
+            (item) => item.productId === product.id,
+          );
+          if (!cartItem) return product;
+
+          const quantitySold = Number(cartItem.quantity || 0);
+          const conversionRate = Number(cartItem.conversionRate || 0);
+          const unitType = cartItem.unitType || "primary";
+
+          let stockReduction = quantitySold;
+          if (unitType === "secondary" && conversionRate > 0) {
+            stockReduction = quantitySold / conversionRate;
+          }
+
+          return {
+            ...product,
+            stockOnHand: Math.max(
+              0,
+              Number(product.stockOnHand || 0) - stockReduction,
+            ),
+          };
+        }),
+      );
+
       invalidateProducts();
       setSuggestedInvoiceNo(nextSequences?.nextSaleInvoiceNo || "");
       setSuccessState({

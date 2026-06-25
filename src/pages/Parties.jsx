@@ -946,11 +946,15 @@ export default function Parties() {
       const nextPartyId = String(savedTransaction?.partyId || payload.partyId || '');
       invalidateParties();
       setPartyReloadKey((prev) => prev + 1);
-      setStatementReloadKey((prev) => prev + 1);
 
       if (nextPartyId) {
-        setTxPage(1);
-        setSelectedId(nextPartyId);
+        if (nextPartyId !== selectedId) {
+          setTxPage(1);
+          setSelectedId(nextPartyId);
+        } else {
+          // Same party — just refresh the statement without changing page or selectedId
+          setStatementReloadKey((prev) => prev + 1);
+        }
       }
 
       setStatus({

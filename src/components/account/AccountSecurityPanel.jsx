@@ -63,7 +63,15 @@ export default function AccountSecurityPanel() {
     event.preventDefault();
 
     if (!canSubmit) {
-      setStatus({ type: 'error', message: newPasswordError || samePasswordError || confirmPasswordError || t('auth.errors.generic') });
+      if (!form.currentPassword) {
+        setStatus({ type: 'error', message: t('auth.currentPasswordRequired') || t('auth.errors.generic') });
+      } else if (!form.newPassword) {
+        setStatus({ type: 'error', message: t('auth.newPasswordRequired') || t('auth.errors.generic') });
+      } else if (!form.confirmPassword) {
+        setStatus({ type: 'error', message: t('auth.confirmPasswordRequired') || t('auth.errors.generic') });
+      } else {
+        setStatus({ type: 'error', message: newPasswordError || samePasswordError || confirmPasswordError || t('auth.errors.generic') });
+      }
       return;
     }
 

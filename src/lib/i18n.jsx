@@ -1857,6 +1857,9 @@ const dictionaries = {
         passwordLowercase: 'Add at least one lowercase letter.',
         passwordNumber: 'Add at least one number.',
         passwordMismatch: 'The passwords do not match.',
+        currentPasswordRequired: 'Enter your current password.',
+        newPasswordRequired: 'Enter a new password.',
+        confirmPasswordRequired: 'Confirm your new password.',
       },
     },
     landing: {
@@ -3732,6 +3735,9 @@ const dictionaries = {
         passwordLowercase: 'कम्तीमा एउटा सानो अक्षर थप्नुहोस्।',
         passwordNumber: 'कम्तीमा एउटा नम्बर थप्नुहोस्।',
         passwordMismatch: 'दुई पासवर्ड उस्तै छैनन्।',
+        currentPasswordRequired: 'हालको पासवर्ड लेख्नुहोस्।',
+        newPasswordRequired: 'नयाँ पासवर्ड लेख्नुहोस्।',
+        confirmPasswordRequired: 'नयाँ पासवर्ड पुष्टि गर्नुहोस्।',
       },
     },
     landing: {
