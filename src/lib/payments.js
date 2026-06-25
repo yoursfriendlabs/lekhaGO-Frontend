@@ -14,6 +14,7 @@ export function normalizePaymentFields(source = {}) {
 
 export function buildPaymentPayload(source = {}, options = {}) {
   const {
+    includeEmptyBankId = false,
     noteKey = 'paymentNote',
   } = options;
 
@@ -24,6 +25,8 @@ export function buildPaymentPayload(source = {}, options = {}) {
 
   if (payment.bankId) {
     payload.bankId = payment.bankId;
+  } else if (includeEmptyBankId) {
+    payload.bankId = null;
   }
 
   if (payment.paymentNote) {
