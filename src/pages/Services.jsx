@@ -603,6 +603,7 @@ export default function Services() {
 
   const [page, setPage] = useState(1);
   const [refreshingServices, setRefreshingServices] = useState(false);
+  const refreshInFlightRef = useRef(false);
   const [pageSize, setPageSize] = useState(10);
 
   // ── New order dialog ──
@@ -780,10 +781,14 @@ export default function Services() {
   };
 
   const refreshServices = async () => {
+    if (refreshInFlightRef.current) return;
+
+    refreshInFlightRef.current = true;
     setRefreshingServices(true);
     try {
       await loadServices();
     } finally {
+      refreshInFlightRef.current = false;
       setRefreshingServices(false);
     }
   };
@@ -2046,6 +2051,7 @@ export default function Services() {
                 className="min-h-[44px] xl:self-end"
                 refreshing={refreshingServices}
                 onClick={refreshServices}
+                disableWhileRefreshing={false}
               />
             </div>
           </div>

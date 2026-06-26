@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Clock, Navigation, Search, MapPin, RefreshCw, Calendar, ShieldCheck, AlertCircle, CheckCircle2 } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
 import Notice from '../components/Notice.jsx';
+import RefreshButton from '../components/RefreshButton.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
@@ -26,6 +27,7 @@ export default function Attendance() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [staffList, setStaffList] = useState([]);
   const [staffLoading, setStaffLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   
   // Filter inputs
   const [selectedStaffId, setSelectedStaffId] = useState('');
@@ -45,12 +47,12 @@ export default function Attendance() {
   }, []);
 
   // Fetch today's status on businessId / mount
-  const loadTodayStatus = async () => {
+  const loadTodayStatus = useCallback(async (options = {}) => {
     if (!businessId) return;
     setTodayLoading(true);
     setApiError('');
     try {
-      const response = await api.getTodayAttendance();
+      const response = await api.getTodayAttendance(options);
       setTodayStatus(response?.attendance || null);
     } catch (err) {
       console.error(err);
@@ -58,33 +60,36 @@ export default function Attendance() {
     } finally {
       setTodayLoading(false);
     }
-  };
+  }, [businessId, t]);
 
   // Fetch staff list for owners/managers
-  const loadStaffList = async () => {
+  const loadStaffList = useCallback(async (options = {}) => {
     if (!isOwner || !businessId) return;
     setStaffLoading(true);
     try {
-      const response = await api.listStaff();
+      const response = await api.listStaff(options);
       const members = Array.isArray(response?.members) ? response.members : [];
       // Filter out members who have user records
       const validStaff = members.filter(m => m.user?.id);
       setStaffList(validStaff);
       
       // Auto-select the current user if they are in the list, or the first staff member
-      if (validStaff.length > 0 && !selectedStaffId) {
-        const matchingMe = validStaff.find(m => m.user?.id === user?.id);
-        setSelectedStaffId(matchingMe ? matchingMe.user.id : validStaff[0].user.id);
+      if (validStaff.length > 0) {
+        setSelectedStaffId((current) => {
+          if (current) return current;
+          const matchingMe = validStaff.find(m => m.user?.id === user?.id);
+          return matchingMe ? matchingMe.user.id : validStaff[0].user.id;
+        });
       }
     } catch (err) {
       console.error(err);
     } finally {
       setStaffLoading(false);
     }
-  };
+  }, [businessId, isOwner, user?.id]);
 
   // Fetch historical attendance records
-  const loadHistoryLogs = async () => {
+  const loadHistoryLogs = useCallback(async (options = {}) => {
     if (!businessId) return;
     setHistoryLoading(true);
     try {
@@ -97,7 +102,7 @@ export default function Attendance() {
         params.businessUserId = selectedStaffId;
       }
 
-      const response = await api.getAttendanceHistory(params);
+      const response = await api.getAttendanceHistory(params, options);
       setHistory(response?.history || []);
     } catch (err) {
       console.error(err);
@@ -105,20 +110,35 @@ export default function Attendance() {
     } finally {
       setHistoryLoading(false);
     }
-  };
+  }, [businessId, dateFrom, dateTo, isOwner, selectedStaffId, showError, t]);
+
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) return;
+
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadTodayStatus({ force: true }),
+        loadStaffList({ force: true }),
+        loadHistoryLogs({ force: true }),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadHistoryLogs, loadStaffList, loadTodayStatus, refreshing]);
 
   useEffect(() => {
     if (businessId) {
       loadTodayStatus();
       loadStaffList();
     }
-  }, [businessId]);
+  }, [businessId, loadStaffList, loadTodayStatus]);
 
   useEffect(() => {
     if (businessId && (!isOwner || selectedStaffId)) {
       loadHistoryLogs();
     }
-  }, [businessId, selectedStaffId, dateFrom, dateTo]);
+  }, [businessId, dateFrom, dateTo, isOwner, loadHistoryLogs, selectedStaffId]);
 
   // Geolocation punch logic
   const handlePunch = () => {
@@ -222,18 +242,11 @@ export default function Attendance() {
         title={t('attendance.title')}
         subtitle={t('attendance.subtitle')}
         action={
-          <button
-            type="button"
-            className="btn-secondary gap-2 justify-center"
-            onClick={() => {
-              loadTodayStatus();
-              loadHistoryLogs();
-            }}
-            disabled={todayLoading || historyLoading}
-          >
-            <RefreshCw size={16} className={todayLoading || historyLoading ? 'animate-spin' : ''} />
-            {t('staffManagement.refresh')}
-          </button>
+          <RefreshButton
+            className="justify-center"
+            refreshing={refreshing || todayLoading || historyLoading || staffLoading}
+            onClick={handleRefresh}
+          />
         }
       />
 

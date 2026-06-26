@@ -45,13 +45,21 @@ export default function AccountSecurityPanel() {
     () => getPasswordDifferenceMessage(form.currentPassword, form.newPassword, t),
     [form.currentPassword, form.newPassword, t]
   );
-  const canSubmit =
+  const hasAllPasswordFields =
     Boolean(form.currentPassword)
     && Boolean(form.newPassword)
-    && Boolean(form.confirmPassword)
+    && Boolean(form.confirmPassword);
+  const canSubmit =
+    hasAllPasswordFields
     && !newPasswordError
     && !samePasswordError
     && !confirmPasswordError;
+  const submitDisabled =
+    saving
+    || (
+      hasAllPasswordFields
+      && Boolean(newPasswordError || samePasswordError || confirmPasswordError)
+    );
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -64,11 +72,11 @@ export default function AccountSecurityPanel() {
 
     if (!canSubmit) {
       if (!form.currentPassword) {
-        setStatus({ type: 'error', message: t('auth.currentPasswordRequired') || t('auth.errors.generic') });
+        setStatus({ type: 'error', message: t('auth.errors.currentPasswordRequired') || t('auth.errors.generic') });
       } else if (!form.newPassword) {
-        setStatus({ type: 'error', message: t('auth.newPasswordRequired') || t('auth.errors.generic') });
+        setStatus({ type: 'error', message: t('auth.errors.newPasswordRequired') || t('auth.errors.generic') });
       } else if (!form.confirmPassword) {
-        setStatus({ type: 'error', message: t('auth.confirmPasswordRequired') || t('auth.errors.generic') });
+        setStatus({ type: 'error', message: t('auth.errors.confirmPasswordRequired') || t('auth.errors.generic') });
       } else {
         setStatus({ type: 'error', message: newPasswordError || samePasswordError || confirmPasswordError || t('auth.errors.generic') });
       }
@@ -156,7 +164,7 @@ export default function AccountSecurityPanel() {
 
         {status.message ? <Notice title={status.message} tone={status.type === 'error' ? 'error' : status.type === 'success' ? 'success' : 'info'} /> : null}
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-4" onSubmit={handleSubmit} noValidate>
           <PasswordField
             id="current-password"
             name="currentPassword"
@@ -190,7 +198,7 @@ export default function AccountSecurityPanel() {
             required
             error={confirmPasswordError}
           />
-          <button className="btn-primary w-full justify-center sm:w-auto" type="submit" disabled={saving || !canSubmit}>
+          <button className="btn-primary w-full justify-center sm:w-auto" type="submit" disabled={submitDisabled}>
             {saving ? (
               <span className="inline-flex items-center gap-2">
                 <SpinnerIcon className="h-4 w-4" />

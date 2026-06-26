@@ -578,11 +578,15 @@ export const api = {
     }),
 
   // GET /api/staff/:membershipId/attendance?from=YYYY-MM-DD&to=YYYY-MM-DD
-  getStaffAttendance: (membershipId, params = {}) =>
+  getStaffAttendance: (membershipId, params = {}, options = {}) =>
     listRequest(
       `/api/staff/${membershipId}/attendance`,
       params,
-      listCache(["staff", "attendance", String(membershipId)], CACHE_TTL.short),
+      listCache(
+        ["staff", "attendance", String(membershipId)],
+        CACHE_TTL.short,
+        options,
+      ),
     ).catch((err) => {
       console.warn(
         "Backend /api/staff/:id/attendance endpoint not found.",
@@ -591,10 +595,12 @@ export const api = {
       throw err;
     }),
 
-  listStaff: () =>
-    request("/api/staff", {}, listCache(["staff"], CACHE_TTL.short)).then(
-      normalizeStaffCollection,
-    ),
+  listStaff: (options = {}) =>
+    request(
+      "/api/staff",
+      {},
+      listCache(["staff"], CACHE_TTL.short, options),
+    ).then(normalizeStaffCollection),
   createStaff: (data) =>
     request(
       "/api/staff",
@@ -633,17 +639,17 @@ export const api = {
       { method: "POST", body: JSON.stringify(coordinates) },
       mutationConfig(["attendance"]),
     ),
-  getTodayAttendance: () =>
+  getTodayAttendance: (options = {}) =>
     request(
       "/api/staff/attendance/today",
       {},
-      listCache(["attendance"], CACHE_TTL.short),
+      listCache(["attendance"], CACHE_TTL.short, options),
     ),
-  getAttendanceHistory: (params = {}) =>
+  getAttendanceHistory: (params = {}, options = {}) =>
     listRequest(
       "/api/staff/attendance/history",
       params,
-      listCache(["attendance"], CACHE_TTL.short),
+      listCache(["attendance"], CACHE_TTL.short, options),
     ),
 
   getStaffSalaryRecords: (membershipId) =>

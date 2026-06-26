@@ -71,6 +71,23 @@ describe('AccountSecurityPanel', () => {
     expect(await screen.findByText(/current password is incorrect/i)).toBeInTheDocument();
   });
 
+  it('shows a required message when confirm password is empty', async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(<AccountSecurityPanel />, { route: '/app/settings', withAuth: true });
+
+    await user.type(screen.getByLabelText(/current password/i), 'CurrentPass1');
+    await user.type(screen.getByLabelText(/^new password$/i), 'StrongPass1');
+
+    const submit = screen.getByRole('button', { name: /change password/i });
+    expect(submit).toBeEnabled();
+
+    await user.click(submit);
+
+    expect(await screen.findByText(/confirm your new password/i)).toBeInTheDocument();
+    expect(changePassword).not.toHaveBeenCalled();
+  });
+
   it('prevents reusing the current password on the client', async () => {
     const user = userEvent.setup();
 
