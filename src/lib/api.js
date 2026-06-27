@@ -28,7 +28,7 @@ function normalizeApiBase(value) {
   return apiBase.replace(/\/+$/, "");
 }
 
-export const API_BASE = "https://api.yoursfriend.com" || normalizeApiBase(import.meta.env.VITE_API_BASE_URL);
+export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE_URL);
 
 const INACTIVE_USER_REGEX = /user is inactive/i;
 const SESSION_EXPIRED_MESSAGE = "Your session expired. Please log in again.";
