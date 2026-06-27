@@ -1,5 +1,5 @@
 import React, { lazy, Suspense } from 'react';
-import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { Link, Navigate, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { ThemeProvider } from './lib/theme';
 import { I18nProvider, useI18n } from './lib/i18n.jsx';
@@ -27,8 +27,7 @@ const CafeOrders = lazy(() => import('./pages/CafeOrders'));
 const Services = lazy(() => import('./pages/Services'));
 const Parties = lazy(() => import('./pages/Parties'));
 const Banks = lazy(() => import('./pages/Banks'));
-const Ledger = lazy(() => import('./pages/Ledger'));
-const Analytics = lazy(() => import('./pages/Analytics'));
+const Reports = lazy(() => import('./pages/Reports'));
 const Tasks = lazy(() => import('./pages/Tasks'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Attendance = lazy(() => import('./pages/Attendance'));
@@ -153,6 +152,13 @@ function ActivationOnlyRoute({ children }) {
 
   if (!hasUnverifiedEmail(user)) return <Navigate to="/app" replace />;
   return children;
+}
+
+function LedgerRedirect() {
+  const [searchParams] = useSearchParams();
+  const partyId = searchParams.get('partyId');
+  const target = partyId ? `/app/reports?tab=party&partyId=${partyId}` : `/app/reports?tab=party`;
+  return <Navigate to={target} replace />;
 }
 
 function InvoiceAccessRoute({ children }) {
@@ -340,9 +346,10 @@ function AppShell() {
                     )}
                   />
                   <Route path="banks" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="banks"><Banks /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="ledger" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="ledger"><Ledger /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="analytics" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="analytics"><Analytics /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="attendance" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="attendance"><Attendance /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="ledger" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="reports"><LedgerRedirect /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="analytics" element={<Navigate to="/app/reports?tab=overview" replace />} />
+                  <Route path="reports" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="reports"><Reports /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="attendance" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={['staff']}><SubscriptionFeatureRoute featureKey="attendance"><Attendance /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="staff" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="staff"><Staff /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route
                     path="staff-salary/:membershipId"

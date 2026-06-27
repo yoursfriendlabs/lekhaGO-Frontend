@@ -216,6 +216,30 @@ export function AuthProvider({ children }) {
   );
 
   const getFeatureAccessLevel = useCallback((featureKey) => {
+    if (featureKey === 'reports') {
+      const getBaseAccess = (key) => {
+        const level = getFeatureAccessLevelFromAccessControl(accessControl, key, role);
+        if (level && level !== 'none' && hasSubscriptionFeatureAccess(key)) {
+          return level;
+        }
+        if (!level && hasSubscriptionFeatureAccess(key)) {
+          return 'manage';
+        }
+        return 'none';
+      };
+
+      const analyticsLevel = getBaseAccess('analytics');
+      const ledgerLevel = getBaseAccess('ledger');
+
+      if (analyticsLevel === 'manage' || ledgerLevel === 'manage') {
+        return 'manage';
+      }
+      if (analyticsLevel === 'view' || ledgerLevel === 'view') {
+        return 'view';
+      }
+      return 'none';
+    }
+
     const accessLevel = getFeatureAccessLevelFromAccessControl(accessControl, featureKey, role);
     if (accessLevel) {
       if (!hasSubscriptionFeatureAccess(featureKey)) {
@@ -272,6 +296,27 @@ export function AuthProvider({ children }) {
       active = false;
     };
   }, [token]);
+
+  useEffect(() => {
+    if (!SHOULD_BOOTSTRAP_AUTH || !token || !businessId || typeof api.getSubscription !== 'function') {
+      return undefined;
+    }
+
+    let active = true;
+
+    api.getSubscription()
+      .then((payload) => {
+        if (!active) return;
+        updateSubscription(payload);
+      })
+      .catch((err) => {
+        console.warn('Failed to fetch active subscription on session load/update', err);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [token, businessId, updateSubscription]);
 
   const subscriptionAccess = useMemo(
     () => subscription?.access || null,

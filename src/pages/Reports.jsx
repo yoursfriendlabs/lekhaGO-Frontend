@@ -1,15 +1,38 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  CalendarRange,
+  Download,
+  FilterX,
+  Printer,
+  RefreshCw,
+  ScrollText,
+  Users,
+  WalletCards,
+  TrendingUp,
+  PieChart as PieIcon,
+  BarChart2,
+  TableProperties
+} from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import Notice from "../components/Notice";
 import BarGraph from "../components/BarGraph";
 import PieChart from "../components/PieChart";
+import Pagination from '../components/Pagination';
 import PartyFilterSelect from "../components/PartyFilterSelect.jsx";
 import CreatorFilterSelect from "../components/CreatorFilterSelect.jsx";
 import RefreshButton from "../components/RefreshButton.jsx";
-import { api, invalidateApiCache } from "../lib/api";
+import { api, invalidateApiCache, API_BASE } from "../lib/api";
 import { formatCurrency } from "../lib/currency";
 import { useI18n } from "../lib/i18n.jsx";
+import { useAuth } from "../lib/auth";
+import { useBusinessSettings } from "../lib/businessSettings";
 import dayjs, { formatMaybeDate, todayISODate } from "../lib/datetime";
+import { normalizeLookupParty, toPartyLookupOption } from '../lib/lookups.js';
+import { getPaymentTypeDisplay, hasPaymentTypeData } from '../lib/paymentType';
+import { printElement } from '../lib/print';
 
 const EMPTY_METRIC_TOTALS = Object.freeze({
   count: 0,
@@ -121,7 +144,6 @@ function firstNumber(source, keys = []) {
     const parsed = Number(source?.[key]);
     if (Number.isFinite(parsed)) return parsed;
   }
-
   return null;
 }
 
@@ -131,14 +153,12 @@ function normalizeStringList(value) {
       .map((item) => String(item || "").trim())
       .filter(Boolean);
   }
-
   if (typeof value === "string") {
     return value
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
   }
-
   return [];
 }
 
@@ -150,52 +170,45 @@ function getProfitLossStatus(amount) {
 
 function formatSeriesLabel(rawLabel, fallbackLabel) {
   const label = rawLabel ? String(rawLabel) : fallbackLabel;
-
   if (/^\d{4}-\d{2}$/.test(label)) {
     const parsedMonth = dayjs(`${label}-01`);
     return parsedMonth.isValid() ? parsedMonth.format("MMM YYYY") : label;
   }
-
   if (/^\d{4}-\d{2}-\d{2}/.test(label) || label.includes("T")) {
     const parsedDate = dayjs(label);
     return parsedDate.isValid() ? parsedDate.format("D MMM") : label;
   }
-
   return label;
 }
 
 function getGroupByDateRange(groupBy) {
   const today = dayjs();
-
   if (groupBy === "day") {
     const value = today.format("YYYY-MM-DD");
     return { fromDate: value, toDate: value };
   }
-
   if (groupBy === "week") {
     return {
       fromDate: today.startOf("week").format("YYYY-MM-DD"),
       toDate: today.endOf("week").format("YYYY-MM-DD"),
     };
   }
-
   if (groupBy === "month") {
     return {
       fromDate: today.startOf("month").format("YYYY-MM-DD"),
       toDate: today.endOf("month").format("YYYY-MM-DD"),
     };
   }
-
   return null;
 }
 
+// Stats normalizers
 function normalizeMetricTotals(source, cashKey) {
   const base =
     source && typeof source === "object" && !Array.isArray(source)
       ? source
       : {};
   const totalFallback = asNumber(source);
-
   return {
     count: asNumber(base.count),
     total: firstNumber(base, ["total", "amount"]) ?? totalFallback,
@@ -255,7 +268,6 @@ function normalizeBreakdownSeries(
   { totalKeys, cashKeys, pendingKeys, cashField = "received" },
 ) {
   if (!Array.isArray(items)) return [];
-
   return items.map((item, index) => {
     const rawLabel =
       item?.label ||
@@ -264,7 +276,6 @@ function normalizeBreakdownSeries(
       item?.date ||
       item?.bucketStart ||
       item?.key;
-
     return {
       key: String(
         item?.key || item?.period || item?.date || item?.bucketStart || index,
@@ -279,7 +290,6 @@ function normalizeBreakdownSeries(
 
 function normalizeProfitLossSeries(items) {
   if (!Array.isArray(items)) return [];
-
   return items.map((item, index) => {
     const rawLabel =
       item?.label ||
@@ -324,7 +334,6 @@ function normalizeProfitLossSeries(items) {
 
 function normalizeTimelineSeries(items) {
   if (!Array.isArray(items)) return [];
-
   return items.map((item, index) => {
     const rawLabel =
       item?.label ||
@@ -681,7 +690,17 @@ function buildProfitLossFallback(summary) {
             amount: latestPoint.profitOrLoss,
             status: latestPoint.status,
           }
-        : { ...EMPTY_PROFIT_LOSS.summary.current },
+        : {
+            label: "",
+            revenue: 0,
+            directSales: 0,
+            services: 0,
+            purchases: 0,
+            expenses: 0,
+            totalExpenses: 0,
+            amount: 0,
+            status: "break_even",
+          },
     },
     series: {
       profitLoss: summary.series.profitLoss,
@@ -699,7 +718,6 @@ function metricToneClasses(tone, value) {
       ? "text-rose-600 dark:text-rose-400"
       : "text-emerald-600 dark:text-emerald-400";
   }
-
   return "text-slate-500 dark:text-slate-400";
 }
 
@@ -712,7 +730,6 @@ function formatQuantityValue(value) {
 
 function normalizeShareRatio(value) {
   const parsed = asNumber(value);
-
   if (parsed <= 0) return 0;
   if (parsed <= 1) return parsed;
   if (parsed <= 100) return parsed / 100;
@@ -721,7 +738,6 @@ function normalizeShareRatio(value) {
 
 function formatPercentValue(value) {
   const normalized = normalizeShareRatio(value);
-
   return normalized.toLocaleString(undefined, {
     style: "percent",
     minimumFractionDigits: normalized > 0 && normalized < 0.1 ? 1 : 0,
@@ -887,7 +903,6 @@ function resolveExpenseCategoryName(row, t) {
   }
   const label = String(row?.categoryName || "").trim();
   if (label) return label;
-
   return t("analytics.uncategorizedCategory");
 }
 
@@ -902,9 +917,7 @@ function normalizeCategoryFilterOption(item = {}, t) {
   if (value === "staff-salary") {
     label = t ? t("staffManagement.salary", "Staff Salary") : "Staff Salary";
   }
-
   if (!value) return null;
-
   return {
     value,
     label: label || value,
@@ -914,19 +927,16 @@ function normalizeCategoryFilterOption(item = {}, t) {
 function mergeFilterOptions(...groups) {
   const seen = new Set();
   const merged = [];
-
   groups.flat().forEach((item) => {
     if (!item?.value || seen.has(item.value)) return;
     seen.add(item.value);
     merged.push(item);
   });
-
   return merged.sort((left, right) => left.label.localeCompare(right.label));
 }
 
 function CompactValueList({ items = [], maxVisible = 4 }) {
   if (!items.length) return null;
-
   const visibleItems = items.slice(0, maxVisible);
   const hiddenCount = Math.max(items.length - visibleItems.length, 0);
 
@@ -1081,22 +1091,7 @@ function ExpenseCategoryAnalyticsSection({
     analytics.summary.uncategorizedAmount <= 0;
 
   return (
-    <section className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
-            {t("analytics.expenseCategoriesTitle")}
-          </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            {t("analytics.expenseCategoriesSubtitle")}
-          </p>
-        </div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-          {t("analytics.totalCategories")}:{" "}
-          {formatQuantityValue(analytics.summary.totalCategories)}
-        </span>
-      </div>
-
+    <div className="space-y-6">
       <div className="card">
         <div className="grid gap-4 md:grid-cols-3">
           <div>
@@ -1136,6 +1131,9 @@ function ExpenseCategoryAnalyticsSection({
             </select>
           </div>
         </div>
+        <p className="mt-3 text-xs text-slate-500">
+          {loading ? t("common.loading") : caption}
+        </p>
       </div>
 
       {loading ? (
@@ -1159,7 +1157,7 @@ function ExpenseCategoryAnalyticsSection({
         </div>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="card">
               <p className="text-xs uppercase text-slate-400">
                 {t("analytics.expenses")}
@@ -1206,9 +1204,7 @@ function ExpenseCategoryAnalyticsSection({
                 <p className="flex items-center justify-between gap-3">
                   <span>{t("analytics.uncategorizedCategories")}</span>
                   <span className="font-medium text-slate-900 dark:text-white">
-                    {formatQuantityValue(
-                      analytics.summary.uncategorizedCategories,
-                    )}
+                    {formatQuantityValue(analytics.summary.uncategorizedCategories)}
                   </span>
                 </p>
               </div>
@@ -1258,39 +1254,8 @@ function ExpenseCategoryAnalyticsSection({
                     {topCategory ? formatPercentValue(topCategory.shareOfTotal) : "—"}
                   </span>
                 </p>
-                <p className="flex items-center justify-between gap-3">
-                  <span>{t("analytics.lastExpenseDate")}</span>
-                  <span className="font-medium text-slate-900 dark:text-white">
-                    {topCategory?.lastExpenseDate
-                      ? formatMaybeDate(topCategory.lastExpenseDate, "D MMM YYYY")
-                      : "—"}
-                  </span>
-                </p>
               </div>
             </div>
-
-            {hasUncategorizedAmount ? (
-              <div className="card">
-                <p className="text-xs uppercase text-slate-400">
-                  {t("analytics.uncategorizedAmount")}
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-                  {formatMoney(analytics.summary.uncategorizedAmount)}
-                </p>
-                <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                  {t("analytics.shareOfTotal")}:{" "}
-                  {formatPercentValue(
-                    analytics.summary.categorizedAmount +
-                      analytics.summary.uncategorizedAmount >
-                      0
-                      ? analytics.summary.uncategorizedAmount /
-                          (analytics.summary.categorizedAmount +
-                            analytics.summary.uncategorizedAmount)
-                      : 0,
-                  )}
-                </p>
-              </div>
-            ) : null}
           </div>
 
           {hasUncategorizedAmount ? (
@@ -1324,7 +1289,7 @@ function ExpenseCategoryAnalyticsSection({
             />
           ) : null}
 
-          <div className="grid gap-4 xl:grid-cols-3">
+          <div className="grid gap-6 xl:grid-cols-3">
             <div className="card xl:col-span-1">
               <h4 className="font-serif text-xl text-slate-900 dark:text-white">
                 {t("analytics.expenseCategoryChart")}
@@ -1412,69 +1377,24 @@ function ExpenseCategoryAnalyticsSection({
 
                     <div className="mt-4 grid gap-3 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-2 xl:grid-cols-3">
                       <div>
-                        <p className="uppercase tracking-[0.14em]">
-                          {t("analytics.paid")}
-                        </p>
+                        <p className="uppercase tracking-[0.14em]">{t("analytics.paid")}</p>
                         <p className="mt-1 font-medium text-emerald-600 dark:text-emerald-400">
                           {formatMoney(row.cashPaid)}
                         </p>
                       </div>
                       <div>
-                        <p className="uppercase tracking-[0.14em]">
-                          {t("analytics.pending")}
-                        </p>
+                        <p className="uppercase tracking-[0.14em]">{t("analytics.pending")}</p>
                         <p className="mt-1 font-medium text-rose-600 dark:text-rose-400">
                           {formatMoney(row.pending)}
                         </p>
                       </div>
                       <div>
-                        <p className="uppercase tracking-[0.14em]">
-                          {t("analytics.expenseCount")}
-                        </p>
+                        <p className="uppercase tracking-[0.14em]">{t("analytics.expenseCount")}</p>
                         <p className="mt-1 font-medium text-slate-900 dark:text-white">
                           {formatQuantityValue(row.expenseCount)}
                         </p>
                       </div>
-                      <div>
-                        <p className="uppercase tracking-[0.14em]">
-                          {t("analytics.lineCount")}
-                        </p>
-                        <p className="mt-1 font-medium text-slate-900 dark:text-white">
-                          {formatQuantityValue(row.lineCount)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="uppercase tracking-[0.14em]">
-                          {t("analytics.lastExpenseDate")}
-                        </p>
-                        <p className="mt-1 font-medium text-slate-900 dark:text-white">
-                          {row.lastExpenseDate
-                            ? formatMaybeDate(row.lastExpenseDate, "D MMM YYYY")
-                            : "—"}
-                        </p>
-                      </div>
                     </div>
-
-                    {row.lineDescriptions.length || row.supplierNames.length ? (
-                      <div className="mt-4 grid gap-3 border-t border-slate-200/70 pt-4 text-xs text-slate-500 dark:border-slate-800/70 dark:text-slate-400">
-                        {row.lineDescriptions.length ? (
-                          <div>
-                            <p className="uppercase tracking-[0.14em]">
-                              {t("common.details")}
-                            </p>
-                            <CompactValueList items={row.lineDescriptions} />
-                          </div>
-                        ) : null}
-                        {row.supplierNames.length ? (
-                          <div>
-                            <p className="uppercase tracking-[0.14em]">
-                              {t("analytics.suppliers")}
-                            </p>
-                            <CompactValueList items={row.supplierNames} />
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
                   </div>
                 ))}
               </div>
@@ -1482,30 +1402,176 @@ function ExpenseCategoryAnalyticsSection({
           </div>
         </>
       )}
-    </section>
+    </div>
   );
 }
 
-export default function Analytics() {
+// Helpers for Party Statements (ledger)
+function formatStatementDate(value) {
+  if (!value) return '-';
+  const match = String(value).match(/^\d{4}-\d{2}-\d{2}/);
+  const dateStr = match ? match[0] : value;
+  const parsed = dayjs(dateStr);
+  return parsed.isValid() ? parsed.format('DD/MM/YYYY') : value;
+}
+
+function formatLedgerText(value) {
+  const text = String(value ?? '').trim();
+  return text || '-';
+}
+
+function formatStatusText(value) {
+  const text = formatLedgerText(value);
+  return text === '-' ? text : text.replace(/_/g, ' ');
+}
+
+function getLedgerTypeMeta(type, t) {
+  const map = {
+    sale: { label: t('ledger.sale'), className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+    purchase: { label: t('ledger.purchase'), className: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
+    expense: { label: t('purchases.expense'), className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300' },
+    service: { label: t('ledger.service'), className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+    payment_in: { label: t('parties.paymentIn'), className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300' },
+    payment_out: { label: t('parties.paymentOut'), className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+  };
+
+  return map[type] || {
+    label: formatLedgerText(type),
+    className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+  };
+}
+
+function getStatusToneClass(status) {
+  const normalized = String(status || '').trim().toLowerCase();
+  if (['paid', 'completed', 'received', 'settled', 'success', 'active'].includes(normalized)) {
+    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
+  }
+  if (['pending', 'draft', 'open', 'in_progress', 'processing'].includes(normalized)) {
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
+  }
+  if (['cancelled', 'void', 'failed', 'inactive'].includes(normalized)) {
+    return 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300';
+  }
+  return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
+}
+
+function getBalanceToneClass(value) {
+  if (!Number.isFinite(Number(value))) return 'text-slate-700 dark:text-slate-300';
+  const amount = Number(value);
+  if (amount > 0) return 'text-rose-700 dark:text-rose-300';
+  if (amount < 0) return 'text-emerald-700 dark:text-emerald-300';
+  return 'text-slate-700 dark:text-slate-300';
+}
+
+function getBalanceLabel(value, t) {
+  if (!Number.isFinite(Number(value))) return t('ledger.currentBalance');
+  const amount = Number(value);
+  if (amount > 0) return t('parties.toGive');
+  if (amount < 0) return t('parties.toReceive');
+  return t('parties.settled');
+}
+
+function toResolvedPartyOption(raw) {
+  const party = normalizeLookupParty(raw);
+  if (!party.id) return null;
+  return toPartyLookupOption(party);
+}
+
+function PaymentMethodCell({ paymentDisplay, align = 'left' }) {
+  const alignClass = align === 'right' ? 'text-right' : '';
+  return (
+    <div className={`min-w-0 ${alignClass}`}>
+      <p className={`truncate text-sm font-medium text-slate-700 dark:text-slate-300 ${alignClass}`}>
+        {paymentDisplay.label}
+      </p>
+      {paymentDisplay.balanceText ? (
+        <p className={`truncate text-xs text-slate-500 dark:text-slate-400 ${alignClass}`}>
+          {paymentDisplay.balanceText}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function StatusPill({ status }) {
+  const label = formatStatusText(status);
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${getStatusToneClass(status)}`}>
+      {label}
+    </span>
+  );
+}
+
+function toCsvCell(value) {
+  const text = String(value ?? '');
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map(toCsvCell).join(',')).join('\r\n');
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// MAIN PAGE EXPORT
+export default function Reports() {
   const { t } = useI18n();
+  const { role, canViewFeature } = useAuth();
+  const { settings: biz } = useBusinessSettings();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Unified Tab Resolution based on permissions
+  const availableTabs = useMemo(() => {
+    const list = [];
+    if (canViewFeature('analytics')) {
+      list.push({ key: 'overview', label: t('analytics.overallMix') || 'Overview', icon: PieIcon });
+      list.push({ key: 'expense', label: t('analytics.expenses') || 'Expense Analytics', icon: BarChart2 });
+    }
+    if (canViewFeature('ledger')) {
+      list.push({ key: 'party', label: t('ledger.statementTitle') || 'Party Statements', icon: ScrollText });
+    }
+    if (canViewFeature('analytics')) {
+      list.push({ key: 'timeline', label: t('analytics.timelineSummary') || 'Timeline', icon: TableProperties });
+    }
+    return list;
+  }, [canViewFeature, t]);
+
+  const activeTab = useMemo(() => {
+    const requested = searchParams.get('tab');
+    if (availableTabs.some((tabObj) => tabObj.key === requested)) {
+      return requested;
+    }
+    return availableTabs[0]?.key || 'overview';
+  }, [searchParams, availableTabs]);
+
+  const handleTabChange = (key) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('tab', key);
+    setSearchParams(nextParams);
+  };
+
+  // State 1: Analytics Data (Overview, Expense, Timeline)
   const [summary, setSummary] = useState(() => EMPTY_SUMMARY);
   const [profitLoss, setProfitLoss] = useState(() => EMPTY_PROFIT_LOSS);
-  const [expenseCategoryAnalytics, setExpenseCategoryAnalytics] = useState(
-    () => EMPTY_EXPENSE_CATEGORY_ANALYTICS,
-  );
-  const [popularItems, setPopularItems] = useState(
-    () => EMPTY_POPULAR_ANALYTICS,
-  );
-  const [popularCategories, setPopularCategories] = useState(
-    () => EMPTY_POPULAR_ANALYTICS,
-  );
-  const [expenseCategoryError, setExpenseCategoryError] = useState("");
+  const [expenseCategoryAnalytics, setExpenseCategoryAnalytics] = useState(() => EMPTY_EXPENSE_CATEGORY_ANALYTICS);
+  const [popularItems, setPopularItems] = useState(() => EMPTY_POPULAR_ANALYTICS);
+  const [popularCategories, setPopularCategories] = useState(() => EMPTY_POPULAR_ANALYTICS);
   const [popularItemsError, setPopularItemsError] = useState("");
   const [popularCategoriesError, setPopularCategoriesError] = useState("");
-  const [status, setStatus] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [expenseCategoryError, setExpenseCategoryError] = useState("");
+  const [analyticsStatus, setAnalyticsStatus] = useState("");
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsRefreshing, setAnalyticsRefreshing] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+
+  // Filters for Analytics
   const [filters, setFilters] = useState({
     fromDate: dayjs().startOf("month").format("YYYY-MM-DD"),
     toDate: todayISODate(),
@@ -1519,16 +1585,35 @@ export default function Analytics() {
     toDate: todayISODate(),
     categoryKey: "",
   });
-  const [selectedPartyFilterOption, setSelectedPartyFilterOption] =
-    useState(null);
-  const [selectedSupplierFilterOption, setSelectedSupplierFilterOption] =
-    useState(null);
+
+  const [selectedPartyFilterOption, setSelectedPartyFilterOption] = useState(null);
+  const [selectedSupplierFilterOption, setSelectedSupplierFilterOption] = useState(null);
   const [expenseCategoryOptions, setExpenseCategoryOptions] = useState([]);
   const refreshModeRef = useRef(false);
 
-  useEffect(() => {
-    let isActive = true;
+  // State 2: Ledger Data (Party Statements)
+  const defaultFrom = useMemo(() => dayjs().startOf('month').format('YYYY-MM-DD'), []);
+  const defaultTo = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
+  const initialPartyId = searchParams.get('partyId') || '';
+  const initialFrom = searchParams.get('from') || defaultFrom;
+  const initialTo = searchParams.get('to') || defaultTo;
 
+  const [ledger, setLedger] = useState({ items: [], total: 0, limit: 25, offset: 0 });
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerRefreshing, setLedgerRefreshing] = useState(false);
+  const [ledgerStatus, setLedgerStatus] = useState('');
+  const [selectedPartyId, setSelectedPartyId] = useState(initialPartyId);
+  const [selectedPartyOption, setSelectedPartyOption] = useState(null);
+  const [ledgerFilters, setLedgerFilters] = useState(() => ({ from: initialFrom, to: initialTo }));
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const printRef = useRef(null);
+  const requestIdRef = useRef(0);
+
+  // FETCH: Categories (on mount if analytics view is allowed)
+  useEffect(() => {
+    if (!canViewFeature('analytics')) return;
+    let isActive = true;
     api.listCategories({ type: "expense", limit: 100, offset: 0 })
       .then((response) => {
         if (!isActive) return;
@@ -1544,18 +1629,21 @@ export default function Analytics() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [canViewFeature]);
 
+  // FETCH: Analytics Data
   useEffect(() => {
+    if (!canViewFeature('analytics') || activeTab === 'party') return;
+
     let isActive = true;
     const isRefreshRequest = refreshModeRef.current;
 
     if (isRefreshRequest) {
-      setRefreshing(true);
+      setAnalyticsRefreshing(true);
     } else {
-      setLoading(true);
+      setAnalyticsLoading(true);
     }
-    setStatus("");
+    setAnalyticsStatus("");
     setExpenseCategoryError("");
 
     const sharedParams = {
@@ -1607,7 +1695,7 @@ export default function Analytics() {
             setExpenseCategoryError("");
             setPopularItems(EMPTY_POPULAR_ANALYTICS);
             setPopularCategories(EMPTY_POPULAR_ANALYTICS);
-            setStatus(
+            setAnalyticsStatus(
               summaryResult.reason?.message || t("auth.errors.generic"),
             );
             return;
@@ -1669,12 +1757,12 @@ export default function Analytics() {
         setExpenseCategoryError("");
         setPopularItems(EMPTY_POPULAR_ANALYTICS);
         setPopularCategories(EMPTY_POPULAR_ANALYTICS);
-        setStatus(error.message || t("auth.errors.generic"));
+        setAnalyticsStatus(error.message || t("auth.errors.generic"));
       })
       .finally(() => {
         if (!isActive) return;
-        setLoading(false);
-        setRefreshing(false);
+        setAnalyticsLoading(false);
+        setAnalyticsRefreshing(false);
         refreshModeRef.current = false;
       });
 
@@ -1682,6 +1770,8 @@ export default function Analytics() {
       isActive = false;
     };
   }, [
+    canViewFeature,
+    activeTab,
     filters.createdBy,
     filters.fromDate,
     filters.groupBy,
@@ -1695,6 +1785,285 @@ export default function Analytics() {
     t,
   ]);
 
+  // FETCH: Ledger data (Party Statements)
+  const fetchLedger = useCallback(async ({ refresh = false, force = false } = {}) => {
+    if (!canViewFeature('ledger') || activeTab !== 'party') return;
+
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+
+    if (refresh) setLedgerRefreshing(true);
+    else setLedgerLoading(true);
+    setLedgerStatus('');
+
+    try {
+      const response = await api.ledgerReport({
+        limit: pageSize,
+        offset: (page - 1) * pageSize,
+        ...(selectedPartyId ? { partyId: selectedPartyId } : {}),
+        ...(ledgerFilters.from ? { from: ledgerFilters.from } : {}),
+        ...(ledgerFilters.to ? { to: ledgerFilters.to } : {}),
+      }, { force });
+
+      if (requestId !== requestIdRef.current) return;
+      setLedger(response);
+    } catch (error) {
+      if (requestId !== requestIdRef.current) return;
+      setLedgerStatus(error?.message || t('common.noData'));
+
+      if (!refresh) {
+        setLedger({
+          items: [],
+          total: 0,
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
+        });
+      }
+    } finally {
+      if (requestId !== requestIdRef.current) return;
+      setLedgerLoading(false);
+      setLedgerRefreshing(false);
+    }
+  }, [canViewFeature, activeTab, ledgerFilters.from, ledgerFilters.to, page, pageSize, selectedPartyId, t]);
+
+  useEffect(() => {
+    fetchLedger();
+  }, [fetchLedger]);
+
+  // Sync Party parameters
+  useEffect(() => {
+    if (activeTab !== 'party') return;
+    setSelectedPartyId(initialPartyId);
+    setSelectedPartyOption((current) => (
+      initialPartyId && String(current?.value || '') === String(initialPartyId)
+        ? current
+        : null
+    ));
+  }, [initialPartyId, activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'party' || !selectedPartyId) {
+      setSelectedPartyOption(null);
+      return undefined;
+    }
+    if (String(selectedPartyOption?.value || '') === String(selectedPartyId)) {
+      return undefined;
+    }
+    const matchedParty = ledger.items.find((row) => String(row.partyId || '') === String(selectedPartyId));
+    const matchedOption = matchedParty ? toResolvedPartyOption({ ...matchedParty, id: selectedPartyId }) : null;
+
+    if (matchedOption) {
+      setSelectedPartyOption(matchedOption);
+      return undefined;
+    }
+
+    let isActive = true;
+    api.getParty(selectedPartyId)
+      .then((party) => {
+        if (!isActive) return;
+        const option = toResolvedPartyOption(party);
+        if (option) setSelectedPartyOption(option);
+      })
+      .catch(() => {});
+
+    return () => {
+      isActive = false;
+    };
+  }, [ledger.items, selectedPartyId, selectedPartyOption, activeTab]);
+
+  const updateSearchState = useCallback((nextValues) => {
+    const nextParams = new URLSearchParams(searchParams);
+    const nextPartyId = String(nextValues.partyId || '').trim();
+    const nextFrom = String(nextValues.from || '').trim();
+    const nextTo = String(nextValues.to || '').trim();
+
+    if (nextPartyId) nextParams.set('partyId', nextPartyId);
+    else nextParams.delete('partyId');
+
+    if (nextFrom) nextParams.set('from', nextFrom);
+    else nextParams.delete('from');
+
+    if (nextTo) nextParams.set('to', nextTo);
+    else nextParams.delete('to');
+
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  // Calculations for Ledger UI
+  const statementRows = useMemo(() => ledger.items.map((row) => ({
+    ...row,
+    referenceDisplay: formatLedgerText(row.referenceNo),
+    partyDisplay: formatLedgerText(row.partyName),
+    statusDisplay: formatStatusText(row.status),
+    typeMeta: getLedgerTypeMeta(row.type, t),
+    paymentDisplay: hasPaymentTypeData(row)
+      ? getPaymentTypeDisplay(row, {
+          cashLabel: t('payments.cash'),
+          bankLabel: t('payments.bank'),
+          balancePrefix: t('payments.balancePrefix'),
+          formatMoney: (amount) => formatMoney(amount),
+        })
+      : { label: '-', balanceText: '' },
+  })), [ledger.items, t]);
+
+  const ledgerSummary = useMemo(() => {
+    const totalDebit = statementRows.reduce((sum, row) => sum + Number(row.debit || 0), 0);
+    const totalCredit = statementRows.reduce((sum, row) => sum + Number(row.credit || 0), 0);
+    const currentBalance = statementRows.length
+      ? statementRows[statementRows.length - 1].runningBalance
+      : null;
+
+    return {
+      totalDebit,
+      totalCredit,
+      currentBalance,
+      entries: ledger.total || statementRows.length,
+    };
+  }, [ledger.total, statementRows]);
+
+  const selectedPartyLabel = selectedPartyId
+    ? selectedPartyOption?.entity?.name || selectedPartyOption?.label || t('ledger.party')
+    : t('ledger.allParties');
+  const hasActivePartyFilter = Boolean(selectedPartyId);
+  const hasCustomDateFilter = ledgerFilters.from !== defaultFrom || ledgerFilters.to !== defaultTo;
+  const hasAnyFilter = hasActivePartyFilter || hasCustomDateFilter;
+  const timeSpanLabel = ledgerFilters.from || ledgerFilters.to
+    ? `${t('ledger.from')}: ${formatStatementDate(ledgerFilters.from)}  ·  ${t('ledger.to')}: ${formatStatementDate(ledgerFilters.to)}`
+    : t('ledger.allTime');
+  const logoSrc = useMemo(() => {
+    if (!biz?.logoUrl) return null;
+    return biz.logoUrl.startsWith('http') ? biz.logoUrl : `${API_BASE}${biz.logoUrl}`;
+  }, [biz?.logoUrl]);
+  const balanceToneClass = getBalanceToneClass(ledgerSummary.currentBalance);
+  const balanceLabel = getBalanceLabel(ledgerSummary.currentBalance, t);
+
+  const summaryCards = [
+    {
+      key: 'balance',
+      label: balanceLabel,
+      value: formatCurrency(ledgerSummary.currentBalance, { symbol: t('currency.symbol') }),
+      icon: WalletCards,
+      valueClassName: balanceToneClass,
+      accentClassName: 'bg-white/80 text-primary-700 ring-1 ring-primary-100',
+    },
+    {
+      key: 'debit',
+      label: t('ledger.totalDebit'),
+      value: formatCurrency(ledgerSummary.totalDebit, { symbol: t('currency.symbol') }),
+      icon: ArrowDownLeft,
+      valueClassName: 'text-rose-700 dark:text-rose-300',
+      accentClassName: 'bg-rose-50 text-rose-700 ring-1 ring-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/40',
+    },
+    {
+      key: 'credit',
+      label: t('ledger.totalCredit'),
+      value: formatCurrency(ledgerSummary.totalCredit, { symbol: t('currency.symbol') }),
+      icon: ArrowUpRight,
+      valueClassName: 'text-emerald-700 dark:text-emerald-300',
+      accentClassName: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/40',
+    },
+    {
+      key: 'entries',
+      label: t('ledger.totalEntries'),
+      value: String(ledgerSummary.entries),
+      icon: ScrollText,
+      valueClassName: 'text-slate-900 dark:text-slate-100',
+      accentClassName: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700',
+    },
+  ];
+
+  const handleLedgerPartyChange = (option) => {
+    const partyId = option?.value || '';
+    setSelectedPartyId(partyId);
+    setSelectedPartyOption(option || null);
+    setPage(1);
+    updateSearchState({
+      partyId,
+      from: ledgerFilters.from,
+      to: ledgerFilters.to,
+    });
+  };
+
+  const handleLedgerDateChange = (field, value) => {
+    const nextFilters = {
+      ...ledgerFilters,
+      [field]: value,
+    };
+    setLedgerFilters(nextFilters);
+    setPage(1);
+    updateSearchState({
+      partyId: selectedPartyId,
+      from: nextFilters.from,
+      to: nextFilters.to,
+    });
+  };
+
+  const handleResetFilters = () => {
+    const nextFilters = { from: defaultFrom, to: defaultTo };
+    setSelectedPartyId('');
+    setSelectedPartyOption(null);
+    setLedgerFilters(nextFilters);
+    setPage(1);
+    updateSearchState({
+      partyId: '',
+      from: nextFilters.from,
+      to: nextFilters.to,
+    });
+  };
+
+  const handleDownloadExcel = () => {
+    const rows = [
+      [t('ledger.statementTitle')],
+      [t('ledger.party'), selectedPartyLabel],
+      [t('common.date'), timeSpanLabel],
+      ['Exported', dayjs().format('D MMM YYYY, HH:mm')],
+      [],
+      [balanceLabel, formatCurrency(ledgerSummary.currentBalance, { symbol: t('currency.symbol') })],
+      [t('ledger.totalDebit'), formatCurrency(ledgerSummary.totalDebit, { symbol: t('currency.symbol') })],
+      [t('ledger.totalCredit'), formatCurrency(ledgerSummary.totalCredit, { symbol: t('currency.symbol') })],
+      [t('ledger.totalEntries'), ledgerSummary.entries],
+      [],
+      [
+        t('common.date'),
+        t('ledger.referenceNo'),
+        t('ledger.party'),
+        t('ledger.type'),
+        t('common.status'),
+        t('payments.paymentMethod'),
+        t('ledger.debit'),
+        t('ledger.credit'),
+        t('ledger.runningBalance'),
+      ],
+      ...statementRows.map((row) => [
+        formatStatementDate(row.date),
+        row.referenceDisplay,
+        row.partyDisplay,
+        row.typeMeta.label,
+        row.statusDisplay,
+        [row.paymentDisplay.label, row.paymentDisplay.balanceText].filter(Boolean).join(' - '),
+        row.debit > 0 ? formatCurrency(row.debit, { symbol: t('currency.symbol') }) : '',
+        row.credit > 0 ? formatCurrency(row.credit, { symbol: t('currency.symbol') }) : '',
+        formatCurrency(row.runningBalance, { symbol: t('currency.symbol') }),
+      ]),
+    ];
+    downloadCsv(`ledger-${dayjs().format('YYYY-MM-DD-HHmm')}.csv`, rows);
+  };
+
+  const handlePrint = () => {
+    const now = dayjs();
+    printElement(printRef.current, {
+      prepareClone: (clone) => {
+        clone.querySelectorAll('[data-printed-at]').forEach((node) => {
+          node.textContent = now.format('D MMM YYYY, HH:mm');
+        });
+        clone.querySelectorAll('[data-printed-date]').forEach((node) => {
+          node.textContent = now.format('D MMM YYYY');
+        });
+      },
+    });
+  };
+
+  // Shared Action Handlers
   const handleFilterChange = (event) => {
     const { name, value } = event.target;
     if (name === "groupBy") {
@@ -1706,7 +2075,6 @@ export default function Analytics() {
       }));
       return;
     }
-
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -1726,10 +2094,14 @@ export default function Analytics() {
   };
 
   const handleRefresh = () => {
-    if (loading || refreshing) return;
-    invalidateApiCache(["analytics"]);
-    refreshModeRef.current = true;
-    setRefreshTick((prev) => prev + 1);
+    if (activeTab === 'party') {
+      fetchLedger({ refresh: true, force: true });
+    } else {
+      if (analyticsLoading || analyticsRefreshing) return;
+      invalidateApiCache(["analytics"]);
+      refreshModeRef.current = true;
+      setRefreshTick((prev) => prev + 1);
+    }
   };
 
   const formatMoney = (value) => {
@@ -1738,7 +2110,6 @@ export default function Analytics() {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-
     return t("currency.formatted", {
       symbol: t("currency.symbol"),
       amount: formatted,
@@ -1823,7 +2194,6 @@ export default function Analytics() {
       week: t("analytics.filters.week"),
       month: t("analytics.filters.month"),
     };
-
     return `${labelMap[filters.groupBy] || labelMap.auto} | ${filters.fromDate || "-"} to ${filters.toDate || "-"}`;
   }, [filters.fromDate, filters.groupBy, filters.toDate, t]);
 
@@ -1834,7 +2204,6 @@ export default function Analytics() {
       week: t("analytics.filters.week"),
       month: t("analytics.filters.month"),
     };
-
     return `${labelMap[filters.groupBy] || labelMap.auto} | ${expenseFilters.fromDate || "-"} to ${expenseFilters.toDate || "-"}`;
   }, [
     expenseFilters.fromDate,
@@ -1883,411 +2252,816 @@ export default function Analytics() {
     "net",
     profitLoss.summary.profitLoss.amount,
   );
-  const isBusy = loading || refreshing;
+  const isBusy = analyticsLoading || analyticsRefreshing;
+  const isLedgerBusy = ledgerLoading || ledgerRefreshing;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 min-w-0 max-w-full">
       <PageHeader
-        title={t("analytics.title")}
+        title={t("nav.reports") || "Reports"}
         subtitle={t("analytics.subtitle")}
+        action={
+          activeTab === 'party' ? (
+            <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
+              <button className="btn-secondary min-h-[44px]" type="button" onClick={handlePrint}>
+                <Printer size={16} /> {t('ledger.printPdf')}
+              </button>
+              <button
+                className="btn-ghost inline-flex min-h-[44px] items-center justify-center gap-2"
+                type="button"
+                onClick={handleRefresh}
+                disabled={isLedgerBusy}
+                aria-busy={isLedgerBusy}
+              >
+                <RefreshCw size={16} className={isLedgerBusy ? 'animate-spin' : ''} />
+                {isLedgerBusy ? t('common.loading') : t('topbar.refresh')}
+              </button>
+              <button
+                className="btn-primary inline-flex min-h-[44px] items-center justify-center gap-2"
+                type="button"
+                onClick={handleDownloadExcel}
+                disabled={ledgerLoading}
+              >
+                <Download size={16} /> {t('ledger.downloadExcel')}
+              </button>
+            </div>
+          ) : (
+            <RefreshButton
+              className="min-h-[44px] w-full xl:w-auto"
+              refreshing={analyticsRefreshing}
+              onClick={handleRefresh}
+            />
+          )
+        }
       />
 
-      {status ? <Notice title={status} tone="error" /> : null}
+      {analyticsStatus ? <Notice title={analyticsStatus} tone="error" /> : null}
 
-      <div className="card space-y-4">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div className="grid flex-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-            <div>
-              <label className="label">{t("common.from")}</label>
-              <input
-                type="date"
-                className="input mt-1"
-                name="fromDate"
-                value={filters.fromDate}
-                onChange={handleFilterChange}
-              />
+      {/* Tabs Switch */}
+      <div className="flex flex-wrap gap-2 border-b border-slate-200/80 pb-[1px] dark:border-slate-800">
+        {availableTabs.map((tabObj) => {
+          const isActive = activeTab === tabObj.key;
+          const TabIcon = tabObj.icon;
+
+          return (
+            <button
+              key={tabObj.key}
+              type="button"
+              onClick={() => handleTabChange(tabObj.key)}
+              className={`relative pb-3 px-2 text-sm font-semibold flex items-center gap-2 transition-colors after:absolute after:left-0 after:-bottom-[1px] after:h-0.5 after:w-full after:origin-left after:rounded-full after:transition-transform after:duration-200 after:content-[''] ${
+                isActive
+                  ? 'text-primary-600 after:scale-x-100 after:bg-primary-600 dark:text-primary-300 dark:after:bg-primary-300 font-bold'
+                  : 'text-slate-500 after:scale-x-0 after:bg-transparent hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+            >
+              <TabIcon size={16} />
+              {tabObj.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* RENDER VIEW: OVERVIEW */}
+      {activeTab === 'overview' && (
+        <div className="space-y-8 animate-fadeIn">
+          {/* Overview Filter box */}
+          <div className="card">
+            <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+              <div>
+                <label className="label">{t("common.from")}</label>
+                <input
+                  type="date"
+                  className="input mt-1"
+                  name="fromDate"
+                  value={filters.fromDate}
+                  onChange={handleFilterChange}
+                />
+              </div>
+              <div>
+                <label className="label">{t("common.to")}</label>
+                <input
+                  type="date"
+                  className="input mt-1"
+                  name="toDate"
+                  value={filters.toDate}
+                  onChange={handleFilterChange}
+                />
+              </div>
+              <div>
+                <label className="label">{t("analytics.filters.groupBy")}</label>
+                <select
+                  className="input mt-1"
+                  name="groupBy"
+                  value={filters.groupBy}
+                  onChange={handleFilterChange}
+                >
+                  <option value="auto">{t("analytics.filters.auto")}</option>
+                  <option value="day">{t("analytics.filters.day")}</option>
+                  <option value="week">{t("analytics.filters.week")}</option>
+                  <option value="month">{t("analytics.filters.month")}</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">{t("services.filterByParty")}</label>
+                <PartyFilterSelect
+                  className="mt-1"
+                  value={filters.partyId}
+                  selectedOption={selectedPartyFilterOption}
+                  onChange={handlePartyFilterChange}
+                  placeholder={t("services.allParties")}
+                  searchPlaceholder={t("parties.searchPlaceholder")}
+                  showPhone={false}
+                />
+              </div>
+              <div>
+                <label className="label">{t("purchases.supplier")}</label>
+                <PartyFilterSelect
+                  className="mt-1"
+                  type="supplier"
+                  value={filters.supplierId}
+                  selectedOption={selectedSupplierFilterOption}
+                  onChange={handleSupplierFilterChange}
+                  placeholder={t("purchases.selectSupplier")}
+                  searchPlaceholder={t("parties.searchPlaceholder")}
+                  showPhone={false}
+                />
+              </div>
+              <div>
+                <label className="label">{t("filters.createdBy")}</label>
+                <CreatorFilterSelect
+                  className="mt-1"
+                  value={filters.createdBy}
+                  onChange={(val) =>
+                    setFilters((prev) => ({ ...prev, createdBy: val }))
+                  }
+                />
+              </div>
             </div>
-            <div>
-              <label className="label">{t("common.to")}</label>
-              <input
-                type="date"
-                className="input mt-1"
-                name="toDate"
-                value={filters.toDate}
-                onChange={handleFilterChange}
-              />
+            <p className="mt-3 text-xs text-slate-500">
+              {isBusy ? t("common.loading") : seriesCaption}
+            </p>
+          </div>
+
+          {/* Core Stat Cards */}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="card border border-primary-50 bg-gradient-to-br from-white to-primary-50/10">
+              <p className="text-xs uppercase text-slate-400 font-semibold tracking-wider">
+                {t("analytics.salesAndServices")}
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                {formatMoney(summary.totals.sales.total)}
+              </p>
+              {renderSummaryLines([
+                {
+                  label: t("analytics.directSales"),
+                  value: summary.totals.directSales.total,
+                  tone: "info",
+                },
+                {
+                  label: t("nav.services"),
+                  value: summary.totals.services.total,
+                  tone: "info",
+                },
+              ])}
             </div>
-            <div>
-              <label className="label">{t("analytics.filters.groupBy")}</label>
-              <select
-                className="input mt-1"
-                name="groupBy"
-                value={filters.groupBy}
-                onChange={handleFilterChange}
-              >
-                <option value="auto">{t("analytics.filters.auto")}</option>
-                <option value="day">{t("analytics.filters.day")}</option>
-                <option value="week">{t("analytics.filters.week")}</option>
-                <option value="month">{t("analytics.filters.month")}</option>
-              </select>
+            <div className="card">
+              <p className="text-xs uppercase text-slate-400 font-semibold tracking-wider">
+                {t("analytics.purchaseSpend")}
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                {formatMoney(summary.totals.purchases.total)}
+              </p>
+              {renderSummaryLines([
+                {
+                  label: t("analytics.paid"),
+                  value: summary.totals.purchases.cashPaid,
+                  tone: "success",
+                },
+                {
+                  label: t("analytics.pending"),
+                  value: summary.totals.purchases.pending,
+                  tone: "danger",
+                },
+              ])}
             </div>
-            <div>
-              <label className="label">{t("services.filterByParty")}</label>
-              <PartyFilterSelect
-                className="mt-1"
-                value={filters.partyId}
-                selectedOption={selectedPartyFilterOption}
-                onChange={handlePartyFilterChange}
-                placeholder={t("services.allParties")}
-                searchPlaceholder={t("parties.searchPlaceholder")}
-                showPhone={false}
-              />
+            <div className="card">
+              <p className="text-xs uppercase text-slate-400 font-semibold tracking-wider">
+                {t("analytics.expenses")}
+              </p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                {formatMoney(summary.totals.expenses.total)}
+              </p>
+              {renderSummaryLines([
+                {
+                  label: t("analytics.paid"),
+                  value: summary.totals.expenses.cashPaid,
+                  tone: "warning",
+                },
+                {
+                  label: t("analytics.pending"),
+                  value: summary.totals.expenses.pending,
+                  tone: "danger",
+                },
+              ])}
             </div>
-            <div>
-              <label className="label">{t("purchases.supplier")}</label>
-              <PartyFilterSelect
-                className="mt-1"
-                type="supplier"
-                value={filters.supplierId}
-                selectedOption={selectedSupplierFilterOption}
-                onChange={handleSupplierFilterChange}
-                placeholder={t("purchases.selectSupplier")}
-                searchPlaceholder={t("parties.searchPlaceholder")}
-                showPhone={false}
-              />
-            </div>
-            <div>
-              <label className="label">{t("filters.createdBy")}</label>
-              <CreatorFilterSelect
-                className="mt-1"
-                value={filters.createdBy}
-                onChange={(value) =>
-                  setFilters((prev) => ({ ...prev, createdBy: value }))
-                }
-              />
+            <div className="card">
+              <p className="text-xs uppercase text-slate-400 font-semibold tracking-wider">
+                {t("analytics.profitLoss")}
+              </p>
+              <p className={`mt-2 text-2xl font-semibold ${profitLossValueClass}`}>
+                {formatMoney(profitLoss.summary.profitLoss.amount)}
+              </p>
+              {renderSummaryLines([
+                {
+                  label: t("analytics.salesAndServices"),
+                  value: profitLoss.summary.profitLoss.revenue,
+                  tone: "success",
+                },
+                {
+                  label: t("analytics.totalOutgoing"),
+                  value: profitLoss.summary.profitLoss.totalExpenses,
+                  tone: "warning",
+                },
+              ])}
             </div>
           </div>
 
-          <div className="xl:pb-0.5">
-            <RefreshButton
-              className="min-h-[44px] w-full xl:w-auto"
-              refreshing={refreshing}
-              onClick={handleRefresh}
+          {/* Charts Row */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <BarGraph
+              title={t("analytics.profitLossTrend")}
+              caption={seriesCaption}
+              data={profitLoss.series.profitLoss}
+              nameKey="label"
+              bars={[
+                {
+                  dataKey: "revenue",
+                  label: t("analytics.salesAndServices"),
+                  color: "#10b981",
+                },
+                {
+                  dataKey: "purchases",
+                  label: t("nav.purchases"),
+                  color: "#f59e0b",
+                  stackId: "outflows",
+                },
+                {
+                  dataKey: "generalExpenses",
+                  label: t("analytics.generalExpenses"),
+                  color: "#d97706",
+                  stackId: "outflows",
+                },
+                {
+                  dataKey: "salaryExpenses",
+                  label: t("staffManagement.salary"),
+                  color: "#9b6835",
+                  stackId: "outflows",
+                },
+                {
+                  dataKey: "profitOrLoss",
+                  label: t("analytics.profitLoss"),
+                  color: "#0f172a",
+                },
+              ]}
+              valueFormatter={formatMoney}
+              axisFormatter={formatCompactMoney}
+            />
+            <div className="card">
+              <h3 className="mb-4 font-serif text-xl text-slate-900 dark:text-white font-medium">
+                {t("analytics.overallMix")}
+              </h3>
+              <div className="h-[350px]">
+                <PieChart data={pieData} height={350} valueFormatter={formatMoney} />
+              </div>
+            </div>
+          </div>
+
+          {/* Rankings Table */}
+          <div className="grid gap-6 xl:grid-cols-2">
+            <PopularRankingCard
+              title={t("analytics.popularItems")}
+              subtitle={t("analytics.popularSubtitle")}
+              rows={popularItems.items}
+              loading={isBusy}
+              error={popularItemsError}
+              emptyLabel={t("analytics.noPopularItems")}
+              typeLabel={t("nav.items")}
+              t={t}
+              formatMoney={formatMoney}
+            />
+            <PopularRankingCard
+              title={t("analytics.popularCategories")}
+              subtitle={t("analytics.popularSubtitle")}
+              rows={popularCategories.items}
+              loading={isBusy}
+              error={popularCategoriesError}
+              emptyLabel={t("analytics.noPopularCategories")}
+              typeLabel={t("analytics.categoryName")}
+              t={t}
+              formatMoney={formatMoney}
             />
           </div>
         </div>
+      )}
 
-        <p className="text-xs text-slate-500">
-          {isBusy ? t("common.loading") : seriesCaption}
-        </p>
-      </div>
+      {/* RENDER VIEW: EXPENSE ANALYTICS */}
+      {activeTab === 'expense' && (
+        <div className="animate-fadeIn">
+          <ExpenseCategoryAnalyticsSection
+            analytics={visibleExpenseCategoryAnalytics}
+            loading={isBusy}
+            error={expenseCategoryError}
+            onRetry={handleRefresh}
+            t={t}
+            formatMoney={formatMoney}
+            formatCompactMoney={formatCompactMoney}
+            caption={expenseSeriesCaption}
+            filters={expenseFilters}
+            onFilterChange={handleExpenseFilterChange}
+            categoryOptions={availableExpenseCategoryOptions}
+          />
+        </div>
+      )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="card">
-          <p className="text-xs uppercase text-slate-400">
-            {t("analytics.salesAndServices")}
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-            {formatMoney(summary.totals.sales.total)}
-          </p>
-          {renderSummaryLines([
-            {
-              label: t("analytics.directSales"),
-              value: summary.totals.directSales.total,
-              tone: "info",
-            },
-            {
-              label: t("nav.services"),
-              value: summary.totals.services.total,
-              tone: "info",
-            },
-          ])}
-        </div>
-        <div className="card">
-          <p className="text-xs uppercase text-slate-400">
-            {t("analytics.purchaseSpend")}
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-            {formatMoney(summary.totals.purchases.total)}
-          </p>
-          {renderSummaryLines([
-            {
-              label: t("analytics.paid"),
-              value: summary.totals.purchases.cashPaid,
-              tone: "success",
-            },
-            {
-              label: t("analytics.pending"),
-              value: summary.totals.purchases.pending,
-              tone: "danger",
-            },
-          ])}
-        </div>
-        <div className="card">
-          <p className="text-xs uppercase text-slate-400">
-            {t("analytics.expenses")}
-          </p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-            {formatMoney(summary.totals.expenses.total)}
-          </p>
-          {renderSummaryLines([
-            {
-              label: t("analytics.paid"),
-              value: summary.totals.expenses.cashPaid,
-              tone: "warning",
-            },
-            {
-              label: t("analytics.pending"),
-              value: summary.totals.expenses.pending,
-              tone: "danger",
-            },
-          ])}
-        </div>
-        <div className="card">
-          <p className="text-xs uppercase text-slate-400">
-            {t("analytics.profitLoss")}
-          </p>
-          <p className={`mt-2 text-2xl font-semibold ${profitLossValueClass}`}>
-            {formatMoney(profitLoss.summary.profitLoss.amount)}
-          </p>
-          {renderSummaryLines([
-            {
-              label: t("analytics.salesAndServices"),
-              value: profitLoss.summary.profitLoss.revenue,
-              tone: "success",
-            },
-            {
-              label: t("analytics.totalOutgoing"),
-              value: profitLoss.summary.profitLoss.totalExpenses,
-              tone: "warning",
-            },
-          ])}
-        </div>
-      </div>
+      {/* RENDER VIEW: PARTY STATEMENTS */}
+      {activeTab === 'party' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Printable Statement Block */}
+          <div ref={printRef} className="space-y-6">
+            <div className="hidden print:block">
+              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
+                <div className="h-1.5 w-full bg-primary" />
+                <div className="flex items-start justify-between gap-6 border-b border-slate-200 px-8 pb-6 pt-6">
+                  <div className="flex min-w-0 items-start gap-4">
+                    {logoSrc ? (
+                      <img
+                        src={logoSrc}
+                        alt="Logo"
+                        className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 bg-white object-contain p-1 shadow-sm"
+                      />
+                    ) : null}
+                    <div className="min-w-0">
+                      <h1 className={`font-serif font-bold leading-tight text-slate-900 ${logoSrc ? 'text-2xl' : 'text-3xl'}`}>
+                        {biz?.companyName || 'PasalManager'}
+                      </h1>
+                      {(biz?.address || biz?.phone || biz?.email || biz?.panVat) ? (
+                        <div className="mt-1.5 space-y-0.5">
+                          {biz?.address ? <p className="whitespace-pre-wrap text-xs leading-snug text-slate-500">{biz.address}</p> : null}
+                          {(biz?.phone || biz?.email) ? <p className="text-xs text-slate-500">{[biz.phone, biz.email].filter(Boolean).join('  ·  ')}</p> : null}
+                          {biz?.panVat ? <p className="text-xs font-semibold text-slate-600">PAN / VAT No: {biz.panVat}</p> : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs font-bold uppercase tracking-widest text-primary-600">{t('ledger.statementTitle')}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">{selectedPartyLabel}</p>
+                    <p className="mt-1 text-xs text-slate-500">{timeSpanLabel}</p>
+                    <p className="mt-2 text-xs text-slate-400" data-printed-at>{dayjs().format('D MMM YYYY, HH:mm')}</p>
+                  </div>
+                </div>
+                <div className="border-b border-slate-200 bg-slate-50 px-8 py-6">
+                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{balanceLabel}</p>
+                      <p className={`mt-1.5 text-sm font-semibold ${balanceToneClass}`}>
+                        {formatMoney(ledgerSummary.currentBalance)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('ledger.totalDebit')}</p>
+                      <p className="mt-1.5 text-sm font-semibold text-slate-900">
+                        {formatMoney(ledgerSummary.totalDebit)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('ledger.totalCredit')}</p>
+                      <p className="mt-1.5 text-sm font-semibold text-slate-900">
+                        {formatMoney(ledgerSummary.totalCredit)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('ledger.totalEntries')}</p>
+                      <p className="mt-1.5 text-sm font-semibold text-slate-900">{ledgerSummary.entries}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="px-8 py-6">
+                  <table className="w-full text-sm text-slate-700">
+                    <thead className="text-xs text-slate-400 uppercase">
+                      <tr className="tracking-wider border-b pb-2">
+                        <th className="pb-3 text-left">{t('common.date')}</th>
+                        <th className="pb-3 text-left">{t('ledger.referenceNo')}</th>
+                        <th className="pb-3 text-left">{t('ledger.party')}</th>
+                        <th className="pb-3 text-left">{t('ledger.type')}</th>
+                        <th className="pb-3 text-left">{t('common.status')}</th>
+                        <th className="pb-3 text-left">{t('payments.paymentMethod')}</th>
+                        <th className="pb-3 text-right">{t('ledger.debit')}</th>
+                        <th className="pb-3 text-right">{t('ledger.credit')}</th>
+                        <th className="pb-3 text-right">{t('ledger.runningBalance')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {statementRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="py-4 text-slate-400 text-center">{t('ledger.noTransactions')}</td>
+                        </tr>
+                      ) : (
+                        statementRows.map((row) => (
+                          <tr key={`print-${row.type}-${row.id}`}>
+                            <td className="py-3">{formatStatementDate(row.date)}</td>
+                            <td className="py-3">{row.referenceDisplay}</td>
+                            <td className="py-3">{row.partyDisplay}</td>
+                            <td className="py-3">{row.typeMeta.label}</td>
+                            <td className="py-3">{row.statusDisplay}</td>
+                            <td className="py-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-slate-700">{row.paymentDisplay.label}</p>
+                                {row.paymentDisplay.balanceText ? <p className="truncate text-xs text-slate-500">{row.paymentDisplay.balanceText}</p> : null}
+                              </div>
+                            </td>
+                            <td className="py-3 text-right text-rose-700">
+                              {row.debit > 0 ? formatMoney(row.debit) : '-'}
+                            </td>
+                            <td className="py-3 text-right text-emerald-700">
+                              {row.credit > 0 ? formatMoney(row.credit) : '-'}
+                            </td>
+                            <td className={`py-3 text-right ${getBalanceToneClass(row.runningBalance)}`}>
+                              {formatMoney(row.runningBalance)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-8 py-4">
+                  <p className="text-xs text-slate-400">{t('ledger.totalEntries')}: {ledgerSummary.entries}</p>
+                  <p className="text-xs text-slate-400">Printed on <span data-printed-date>{dayjs().format('D MMM YYYY')}</span></p>
+                </div>
+              </div>
+            </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <BarGraph
-          title={t("analytics.salesTrend")}
-          caption={seriesCaption}
-          data={summary.series.sales}
-          nameKey="label"
-          bars={[
-            {
-              dataKey: "received",
-              label: t("analytics.received"),
-              color: "#10b981",
-            },
-            {
-              dataKey: "pending",
-              label: t("analytics.pending"),
-              color: "#facc15",
-            },
-          ]}
-          valueFormatter={formatMoney}
-          axisFormatter={formatCompactMoney}
-        />
-        <BarGraph
-          title={t("analytics.outgoingTrend")}
-          caption={seriesCaption}
-          data={summary.series.purchasesAndExpenses}
-          nameKey="label"
-          bars={[
-            { dataKey: "paid", label: t("analytics.paid"), color: "#d97706" },
-            {
-              dataKey: "pending",
-              label: t("analytics.pending"),
-              color: "#f97316",
-            },
-          ]}
-          valueFormatter={formatMoney}
-          axisFormatter={formatCompactMoney}
-        />
-      </div>
+            {/* Screen UI Block */}
+            <div className="space-y-6 print:hidden">
+              {/* Header Box / Filter Bar */}
+              <div className="card bg-[radial-gradient(circle_at_top_left,_rgba(155,104,53,0.08),_transparent_40%)]">
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-4">
+                    <h2 className="font-serif text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                      {selectedPartyLabel}
+                    </h2>
+                    <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                      {timeSpanLabel}
+                    </p>
+                  </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <BarGraph
-          title={t("analytics.profitLossTrend")}
-          caption={seriesCaption}
-          data={profitLoss.series.profitLoss}
-          nameKey="label"
-          bars={[
-            {
-              dataKey: "revenue",
-              label: t("analytics.salesAndServices"),
-              color: "#10b981",
-            },
-            {
-              dataKey: "purchases",
-              label: t("nav.purchases"),
-              color: "#f59e0b",
-              stackId: "outflows",
-            },
-            {
-              dataKey: "generalExpenses",
-              label: t("analytics.generalExpenses"),
-              color: "#d97706",
-              stackId: "outflows",
-            },
-            {
-              dataKey: "salaryExpenses",
-              label: t("staffManagement.salary"),
-              color: "#9b6835",
-              stackId: "outflows",
-            },
-            {
-              dataKey: "profitOrLoss",
-              label: t("analytics.profitLoss"),
-              color: "#0f172a",
-            },
-          ]}
-          valueFormatter={formatMoney}
-          axisFormatter={formatCompactMoney}
-        />
-        <div className="card">
-          <h3 className="mb-4 font-serif text-xl text-slate-900 dark:text-white">
-            {t("analytics.overallMix")}
-          </h3>
-          <div className="h-[350px]">
-            <PieChart data={pieData} height={350} valueFormatter={formatMoney} />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="label">{t('ledger.party')}</label>
+                      <PartyFilterSelect
+                        className="mt-1"
+                        value={selectedPartyId}
+                        selectedOption={selectedPartyOption}
+                        onChange={handleLedgerPartyChange}
+                        placeholder={t('ledger.allParties')}
+                        searchPlaceholder={t('ledger.searchPlaceholder')}
+                        showPhone={false}
+                      />
+                    </div>
+                    <div className="grid gap-2 grid-cols-2">
+                      <div>
+                        <label className="label" htmlFor="ledger-from">{t('ledger.from')}</label>
+                        <input
+                          id="ledger-from"
+                          className="input mt-1"
+                          type="date"
+                          value={ledgerFilters.from}
+                          onChange={(e) => handleLedgerDateChange('from', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="label" htmlFor="ledger-to">{t('ledger.to')}</label>
+                        <input
+                          id="ledger-to"
+                          className="input mt-1"
+                          type="date"
+                          value={ledgerFilters.to}
+                          onChange={(e) => handleLedgerDateChange('to', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end mt-4">
+                  {hasAnyFilter ? (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary-700 transition hover:text-primary-600 dark:text-primary-300 dark:hover:text-primary-200"
+                      onClick={handleResetFilters}
+                    >
+                      <FilterX size={13} />
+                      {t('common.clear')}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              {/* Stats summary cards */}
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {summaryCards.map((card) => {
+                  const Icon = card.icon;
+                  return (
+                    <div
+                      key={card.key}
+                      className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/50"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
+                            {card.label}
+                          </p>
+                          <p className={`mt-3 text-lg font-semibold ${card.valueClassName}`}>
+                            {card.value}
+                          </p>
+                        </div>
+                        <span className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${card.accentClassName}`}>
+                          <Icon size={18} />
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Transactions Table */}
+              <div className="card space-y-4">
+                {ledgerStatus ? (
+                  <Notice title={ledgerStatus} tone="error" />
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[980px] text-sm">
+                        <thead className="text-xs uppercase text-slate-400">
+                          <tr>
+                            <th className="py-2.5 pr-4 text-left">{t('common.date')}</th>
+                            <th className="py-2.5 pr-4 text-left">{t('ledger.referenceNo')}</th>
+                            <th className="py-2.5 pr-4 text-left">{t('ledger.party')}</th>
+                            <th className="py-2.5 pr-4 text-left">{t('ledger.type')}</th>
+                            <th className="py-2.5 pr-4 text-left">{t('common.status')}</th>
+                            <th className="py-2.5 pr-4 text-left">{t('payments.paymentMethod')}</th>
+                            <th className="py-2.5 pr-4 text-right">{t('ledger.debit')}</th>
+                            <th className="py-2.5 pr-4 text-right">{t('ledger.credit')}</th>
+                            <th className="py-2.5 text-right">{t('ledger.runningBalance')}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {isLedgerBusy && statementRows.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} className="py-4 text-slate-400 text-center">{t('common.loading')}</td>
+                            </tr>
+                          ) : statementRows.length === 0 ? (
+                            <tr>
+                              <td colSpan={9} className="py-4 text-slate-400 text-center">{t('ledger.noTransactions')}</td>
+                            </tr>
+                          ) : (
+                            statementRows.map((row) => (
+                              <tr key={`${row.type}-${row.id}`} className="align-top hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                                <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">{formatStatementDate(row.date)}</td>
+                                <td className="py-3 pr-4 text-slate-700 dark:text-slate-300">{row.referenceDisplay}</td>
+                                <td className="py-3 pr-4 text-slate-700 dark:text-slate-300">{row.partyDisplay}</td>
+                                <td className="py-3 pr-4">
+                                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${row.typeMeta.className}`}>
+                                    {row.typeMeta.label}
+                                  </span>
+                                </td>
+                                <td className="py-3 pr-4">
+                                  <StatusPill status={row.status} />
+                                </td>
+                                <td className="py-3 pr-4">
+                                  <PaymentMethodCell paymentDisplay={row.paymentDisplay} />
+                                </td>
+                                <td className="py-3 pr-4 text-right font-semibold text-rose-700 dark:text-rose-300">
+                                  {row.debit > 0 ? formatMoney(row.debit) : '-'}
+                                </td>
+                                <td className="py-3 pr-4 text-right font-semibold text-emerald-700 dark:text-emerald-300">
+                                  {row.credit > 0 ? formatMoney(row.credit) : '-'}
+                                </td>
+                                <td className={`py-3 text-right font-semibold ${getBalanceToneClass(row.runningBalance)}`}>
+                                  {formatMoney(row.runningBalance)}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <Pagination
+                      page={page}
+                      pageSize={pageSize}
+                      total={ledger.total}
+                      onPageChange={setPage}
+                      onPageSizeChange={(size) => {
+                        setPageSize(size);
+                        setPage(1);
+                      }}
+                      pageSizeOptions={[10, 25, 50]}
+                    />
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <ExpenseCategoryAnalyticsSection
-        analytics={visibleExpenseCategoryAnalytics}
-        loading={isBusy}
-        error={expenseCategoryError}
-        onRetry={handleRefresh}
-        t={t}
-        formatMoney={formatMoney}
-        formatCompactMoney={formatCompactMoney}
-        caption={expenseSeriesCaption}
-        filters={expenseFilters}
-        onFilterChange={handleExpenseFilterChange}
-        categoryOptions={availableExpenseCategoryOptions}
-      />
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <PopularRankingCard
-          title={t("analytics.popularItems")}
-          subtitle={t("analytics.popularSubtitle")}
-          rows={popularItems.items}
-          loading={isBusy}
-          error={popularItemsError}
-          emptyLabel={t("analytics.noPopularItems")}
-          typeLabel={t("nav.items")}
-          t={t}
-          formatMoney={formatMoney}
-        />
-        <PopularRankingCard
-          title={t("analytics.popularCategories")}
-          subtitle={t("analytics.popularSubtitle")}
-          rows={popularCategories.items}
-          loading={isBusy}
-          error={popularCategoriesError}
-          emptyLabel={t("analytics.noPopularCategories")}
-          typeLabel={t("analytics.categoryName")}
-          t={t}
-          formatMoney={formatMoney}
-        />
-      </div>
-
-      <div className="card">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
-            {t("analytics.timelineSummary")}
-          </h3>
-          <span className="text-xs text-slate-500">
-            {summary.series.timeline.length} {t("analytics.points")}
-          </span>
-        </div>
-
-        {summary.series.timeline.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">
-            {t("analytics.noSeries")}
-          </p>
-        ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-              <thead className="text-xs uppercase text-slate-400">
-                <tr>
-                  <th className="py-2 text-left">{t("analytics.period")}</th>
-                  <th className="py-2 text-right">
-                    {t("analytics.salesAndServices")}
-                  </th>
-                  <th className="py-2 text-right">{t("nav.purchases")}</th>
-                  <th className="py-2 text-right">{t("analytics.expenses")}</th>
-                  <th className="py-2 text-right">
-                    {t("analytics.profitLoss")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {summary.series.timeline.map((row) => (
-                  <tr
-                    key={row.key}
-                    className="border-t border-slate-200/70 dark:border-slate-800/70"
-                  >
-                    <td className="py-2">{row.label}</td>
-                    {renderTimelineCell(row.salesTotal, [
-                      {
-                        label: t("analytics.directSales"),
-                        value: row.directSalesTotal,
-                        tone: "info",
-                      },
-                      {
-                        label: t("nav.services"),
-                        value: row.serviceTotal,
-                        tone: "info",
-                      },
-                    ])}
-                    {renderTimelineCell(row.purchaseTotal, [
-                      {
-                        label: t("analytics.paid"),
-                        value: row.purchaseCashPaid,
-                        tone: "success",
-                      },
-                      {
-                        label: t("analytics.pending"),
-                        value: row.purchasePending,
-                        tone: "danger",
-                      },
-                    ])}
-                    {renderTimelineCell(row.expenseTotal, [
-                      {
-                        label: t("analytics.paid"),
-                        value: row.expenseCashPaid,
-                        tone: "warning",
-                      },
-                      {
-                        label: t("analytics.pending"),
-                        value: row.expensePending,
-                        tone: "danger",
-                      },
-                    ])}
-                    {renderTimelineCell(
-                      row.profitOrLoss,
-                      [
-                        {
-                          label: t("analytics.totalOutgoing"),
-                          value: row.purchasesAndExpensesTotal,
-                          tone: "warning",
-                        },
-                        {
-                          label: t("analytics.salesAndServices"),
-                          value: row.salesTotal,
-                          tone: "success",
-                        },
-                      ],
-                      true,
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* RENDER VIEW: TIMELINE */}
+      {activeTab === 'timeline' && (
+        <div className="space-y-6 animate-fadeIn">
+          {/* Filters for Timeline */}
+          <div className="card">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <label className="label">{t("common.from")}</label>
+                <input
+                  type="date"
+                  className="input mt-1"
+                  name="fromDate"
+                  value={filters.fromDate}
+                  onChange={handleFilterChange}
+                />
+              </div>
+              <div>
+                <label className="label">{t("common.to")}</label>
+                <input
+                  type="date"
+                  className="input mt-1"
+                  name="toDate"
+                  value={filters.toDate}
+                  onChange={handleFilterChange}
+                />
+              </div>
+              <div>
+                <label className="label">{t("analytics.filters.groupBy")}</label>
+                <select
+                  className="input mt-1"
+                  name="groupBy"
+                  value={filters.groupBy}
+                  onChange={handleFilterChange}
+                >
+                  <option value="auto">{t("analytics.filters.auto")}</option>
+                  <option value="day">{t("analytics.filters.day")}</option>
+                  <option value="week">{t("analytics.filters.week")}</option>
+                  <option value="month">{t("analytics.filters.month")}</option>
+                </select>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              {isBusy ? t("common.loading") : seriesCaption}
+            </p>
           </div>
-        )}
-      </div>
+
+          {/* Timeline trend graphs */}
+          <div className="grid gap-6 md:grid-cols-2">
+            <BarGraph
+              title={t("analytics.salesTrend")}
+              caption={seriesCaption}
+              data={summary.series.sales}
+              nameKey="label"
+              bars={[
+                {
+                  dataKey: "received",
+                  label: t("analytics.received"),
+                  color: "#10b981",
+                },
+                {
+                  dataKey: "pending",
+                  label: t("analytics.pending"),
+                  color: "#facc15",
+                },
+              ]}
+              valueFormatter={formatMoney}
+              axisFormatter={formatCompactMoney}
+            />
+            <BarGraph
+              title={t("analytics.outgoingTrend")}
+              caption={seriesCaption}
+              data={summary.series.purchasesAndExpenses}
+              nameKey="label"
+              bars={[
+                { dataKey: "paid", label: t("analytics.paid"), color: "#d97706" },
+                {
+                  dataKey: "pending",
+                  label: t("analytics.pending"),
+                  color: "#f97316",
+                },
+              ]}
+              valueFormatter={formatMoney}
+              axisFormatter={formatCompactMoney}
+            />
+          </div>
+
+          {/* Timeline detailed table */}
+          <div className="card">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200/80 pb-4 dark:border-slate-800">
+              <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
+                {t("analytics.timelineSummary")}
+              </h3>
+              <span className="text-xs text-slate-500 font-medium">
+                {summary.series.timeline.length} {t("analytics.points")}
+              </span>
+            </div>
+
+            {summary.series.timeline.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">
+                {t("analytics.noSeries")}
+              </p>
+            ) : (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[720px] text-sm text-slate-600 dark:text-slate-300">
+                  <thead className="text-xs uppercase text-slate-400 tracking-wider">
+                    <tr className="border-b pb-2">
+                      <th className="py-2.5 text-left">{t("analytics.period")}</th>
+                      <th className="py-2.5 text-right">
+                        {t("analytics.salesAndServices")}
+                      </th>
+                      <th className="py-2.5 text-right">{t("nav.purchases")}</th>
+                      <th className="py-2.5 text-right">{t("analytics.expenses")}</th>
+                      <th className="py-2.5 text-right">
+                        {t("analytics.profitLoss")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {summary.series.timeline.map((row) => (
+                      <tr
+                        key={row.key}
+                        className="hover:bg-slate-50/50 dark:hover:bg-slate-800/15 transition-colors align-top"
+                      >
+                        <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">{row.label}</td>
+                        {renderTimelineCell(row.salesTotal, [
+                          {
+                            label: t("analytics.directSales"),
+                            value: row.directSalesTotal,
+                            tone: "info",
+                          },
+                          {
+                            label: t("nav.services"),
+                            value: row.serviceTotal,
+                            tone: "info",
+                          },
+                        ])}
+                        {renderTimelineCell(row.purchaseTotal, [
+                          {
+                            label: t("analytics.paid"),
+                            value: row.purchaseCashPaid,
+                            tone: "success",
+                          },
+                          {
+                            label: t("analytics.pending"),
+                            value: row.purchasePending,
+                            tone: "danger",
+                          },
+                        ])}
+                        {renderTimelineCell(row.expenseTotal, [
+                          {
+                            label: t("analytics.paid"),
+                            value: row.expenseCashPaid,
+                            tone: "warning",
+                          },
+                          {
+                            label: t("analytics.pending"),
+                            value: row.expensePending,
+                            tone: "danger",
+                          },
+                        ])}
+                        {renderTimelineCell(
+                          row.profitOrLoss,
+                          [
+                            {
+                              label: t("analytics.totalOutgoing"),
+                              value: row.purchasesAndExpensesTotal,
+                              tone: "warning",
+                            },
+                            {
+                              label: t("analytics.salesAndServices"),
+                              value: row.salesTotal,
+                              tone: "success",
+                            },
+                          ],
+                          true,
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
