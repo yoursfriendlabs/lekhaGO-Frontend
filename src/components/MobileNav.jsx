@@ -14,8 +14,9 @@ const NAV_ROLE_MAP = {
   purchases: ['owner', 'staff', 'admin', 'super_admin'],
   parties: ['owner', 'staff', 'admin', 'super_admin'],
   tasks: ['owner', 'staff', 'admin', 'super_admin'],
-  attendance: ['owner', 'staff', 'admin', 'super_admin'],
+  attendance: ['staff'],
   staff: ['owner', 'staff', 'admin', 'super_admin'],
+  reports: ['owner', 'staff', 'admin', 'super_admin'],
   settings: ['owner', 'staff', 'admin', 'super_admin'],
 };
 
@@ -30,29 +31,50 @@ const ICON_MAP = {
   tasks: ClipboardList,
   attendance: Clock,
   staff: Users,
+  reports: ClipboardList,
   settings: Settings2,
 };
 
 export default function MobileNav() {
-  const { t } = useI18n();
+  const t = useI18n().t;
   const { role, hasFeatureAccess } = useAuth();
   const { businessProfile } = useBusinessSettings();
-  const navigation = getNavigationForBusinessType(
+  const rawNavigation = getNavigationForBusinessType(
     Array.isArray(businessProfile?.navigation) && businessProfile.navigation.length
       ? businessProfile.navigation
-    : [
-        { key: 'dashboard', label: t('nav.home'), route: '/app' },
-        { key: 'inventory', label: t('nav.items'), route: '/app/inventory' },
-        { key: 'sales', label: t('nav.sales'), route: '/app/sales' },
-        { key: 'purchases', label: t('nav.expenses'), route: '/app/purchases' },
-        { key: 'tasks', label: t('nav.tasks'), route: '/app/tasks' },
-        { key: 'parties', label: t('nav.parties'), route: '/app/parties' },
-        { key: 'attendance', label: t('nav.attendance'), route: '/app/attendance' },
-        { key: 'staff', label: t('nav.staff'), route: '/app/staff' },
-        { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
-      ],
+      : [
+          { key: 'dashboard', label: t('nav.home'), route: '/app' },
+          { key: 'inventory', label: t('nav.items'), route: '/app/inventory' },
+          { key: 'sales', label: t('nav.sales'), route: '/app/sales' },
+          { key: 'purchases', label: t('nav.expenses'), route: '/app/purchases' },
+          { key: 'tasks', label: t('nav.tasks'), route: '/app/tasks' },
+          { key: 'parties', label: t('nav.parties'), route: '/app/parties' },
+          { key: 'attendance', label: t('nav.attendance'), route: '/app/attendance' },
+          { key: 'staff', label: t('nav.staff'), route: '/app/staff' },
+          { key: 'reports', label: t('nav.reports') || 'Reports', route: '/app/reports' },
+          { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
+        ],
     businessProfile,
-  ).map((item) => {
+  );
+
+  let hasReports = false;
+  const processedNavigation = [];
+  rawNavigation.forEach((item) => {
+    if (item.key === 'analytics' || item.key === 'ledger' || item.key === 'reports') {
+      if (!hasReports) {
+        processedNavigation.push({
+          key: 'reports',
+          label: t('nav.reports') || 'Reports',
+          route: '/app/reports',
+        });
+        hasReports = true;
+      }
+    } else {
+      processedNavigation.push(item);
+    }
+  });
+
+  const navigation = processedNavigation.map((item) => {
     if (item?.key === 'purchases') return { ...item, label: t('nav.expenses') };
     if (item?.key === 'attendance') return { ...item, label: t('nav.attendance') };
     if (item?.key === 'staff') return { ...item, label: t('nav.staff') };

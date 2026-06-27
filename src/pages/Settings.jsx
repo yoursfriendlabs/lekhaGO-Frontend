@@ -170,7 +170,7 @@ export default function Settings() {
       });
     }
     
-    if (canManageFeature('subscription-settings')) {
+    if (canManageFeature('subscription')) {
       nextTabs.push({
         key: SUBSCRIPTION_SETTINGS_TAB,
         label: t('settingsPage.tabs.subscription'),

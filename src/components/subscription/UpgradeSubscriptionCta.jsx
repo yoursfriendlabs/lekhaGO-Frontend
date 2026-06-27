@@ -8,7 +8,7 @@ import { getSubscriptionStatusState } from '../../lib/subscription.js';
 import { buildSettingsTabPath, SUBSCRIPTION_SETTINGS_TAB } from '../../lib/settingsTabs';
 import { formatSubscriptionDaysRemainingLabel, formatSubscriptionStatusDate } from './SubscriptionStatusBanner.jsx';
 
-const PAID_PLAN_KEYS = new Set(['growth', 'custom']);
+const PAID_PLAN_KEYS = new Set(['growth', 'custom', 'pro', 'premium']);
 
 export function shouldShowUpgradeCta(subscription, role) {
   if (role !== 'owner') return false;
