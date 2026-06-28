@@ -1889,6 +1889,25 @@ export default function Reports() {
     setSearchParams(nextParams, { replace: true });
   }, [searchParams, setSearchParams]);
 
+  const formatCompactMoney = (value) => {
+    return formatCurrency(asNumber(value), {
+      symbol: t("currency.symbol"),
+      compact: true,
+    });
+  };
+
+  const formatMoney = (value) => {
+    const amount = asNumber(value);
+    const formatted = amount.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return t("currency.formatted", {
+      symbol: t("currency.symbol"),
+      amount: formatted,
+    });
+  };
+
   // Calculations for Ledger UI
   const statementRows = useMemo(() => ledger.items.map((row) => ({
     ...row,
@@ -2102,25 +2121,6 @@ export default function Reports() {
       refreshModeRef.current = true;
       setRefreshTick((prev) => prev + 1);
     }
-  };
-
-  const formatMoney = (value) => {
-    const amount = asNumber(value);
-    const formatted = amount.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    return t("currency.formatted", {
-      symbol: t("currency.symbol"),
-      amount: formatted,
-    });
-  };
-
-  const formatCompactMoney = (value) => {
-    return formatCurrency(asNumber(value), {
-      symbol: t("currency.symbol"),
-      compact: true,
-    });
   };
 
   const renderSummaryLines = (items) => (

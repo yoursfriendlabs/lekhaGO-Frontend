@@ -464,7 +464,7 @@ export default function Dashboard() {
                   <div key={order.id || order.orderNo} className={`flex items-center justify-between rounded-2xl p-3 ${rowClass}`}>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{order.orderNo || String(order.id ?? '').slice(0, 6) || '-'}</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{order.customerName || String(order.id ?? '').slice(0, 6) || '-'}</p>
                         {order.vehicleId ? (
                           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{order.vehicleId}</span>
                         ) : null}
@@ -526,7 +526,7 @@ export default function Dashboard() {
               recentSales.map((sale) => (
                 <div key={sale.id || sale.invoiceNo} className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{sale.invoiceNo || String(sale.id ?? '').slice(0, 6) || '-'}</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{sale.customerName || String(sale.id ?? '').slice(0, 6) || '-'}</p>
                     <p className="text-xs text-slate-500">{formatDate(sale.saleDate)} - {sale.status || t('nav.sales')}</p>
                   </div>
                   <p className="shrink-0 text-sm font-semibold text-emerald-700 dark:text-emerald-300">{formatMoney(sale.grandTotal)}</p>
