@@ -23,8 +23,9 @@ const NAV_ROLE_MAP = {
 
 export default function Sidebar() {
   const t = useI18n().t;
-  const { role, hasFeatureAccess } = useAuth();
+  const { role, hasFeatureAccess, accessControl } = useAuth();
   const { businessProfile } = useBusinessSettings();
+  const isGeneralStaff = accessControl?.staffCategory === 'general_staff';
   const rawNavigation = getNavigationForBusinessType(
     Array.isArray(businessProfile?.navigation) && businessProfile.navigation.length
       ? businessProfile.navigation
@@ -69,7 +70,8 @@ export default function Sidebar() {
 
   const visibleNavItems = navigation
     .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
-    .filter((item) => hasFeatureAccess(item.key));
+    .filter((item) => hasFeatureAccess(item.key))
+    .filter((item) => !(isGeneralStaff && item.key === 'dashboard'));
 
   return (
     <aside className="hidden h-full w-64 flex-col gap-6 border-r border-slate-200/70 bg-white/80 p-6 dark:border-slate-800/70 dark:bg-slate-950/70 md:fixed md:inset-y-0 md:left-0 md:flex md:overflow-y-auto">

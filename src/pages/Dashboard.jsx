@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { BarChart3, BellRing, Boxes, Clock, ClipboardList, Package, ShoppingCart, UserCheck } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
@@ -177,8 +177,13 @@ function getRangeStart(range) {
 
 export default function Dashboard() {
   const { t } = useI18n();
-  const { canViewFeature, canManageFeature } = useAuth();
+  const { canViewFeature, canManageFeature, accessControl } = useAuth();
   const { businessProfile } = useBusinessSettings();
+
+  /* ── Redirect general staff to their salary profile ── */
+  if (accessControl?.staffCategory === 'general_staff' && accessControl?.membershipId) {
+    return <Navigate to={`/app/staff-salary/${encodeURIComponent(accessControl.membershipId)}`} replace />;
+  }
   const [summary, setSummary] = useState(() => EMPTY_SUMMARY);
   const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -452,6 +457,7 @@ export default function Dashboard() {
             ) : (
               upcomingDeliveries.map((order) => {
                 const days = getDeliveryDaysLeft(order.deliveryDate);
+                const customerName = order.customerName || order.partyName || order.party?.name;
                 const isUrgent = days !== null && days < 3;
                 const isWarning = days !== null && days >= 3 && days < 8;
                 const rowClass = isUrgent
@@ -464,14 +470,14 @@ export default function Dashboard() {
                   <div key={order.id || order.orderNo} className={`flex items-center justify-between rounded-2xl p-3 ${rowClass}`}>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{order.customerName || String(order.id ?? '').slice(0, 6) || '-'}</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{customerName || String(order.id ?? '').slice(0, 6) || '-'}</p>
                         {order.vehicleId ? (
                           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{order.vehicleId}</span>
                         ) : null}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
-                        {order.partyName || order.customerName ? (
-                          <span className="text-xs text-slate-500">{order.partyName || order.customerName}</span>
+                        {order.orderNo ? (
+                          <span className="text-xs text-slate-500">{order.orderNo}</span>
                         ) : null}
                         <DeliveryTag date={order.deliveryDate} />
                       </div>

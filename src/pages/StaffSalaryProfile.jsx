@@ -454,6 +454,18 @@ function StaffProfileCard({ meta, loading }) {
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-xs text-slate-400">Shift Started</span>
+              <span className="text-right text-xs font-semibold text-slate-800 dark:text-slate-200">
+                {meta.shiftStarted ? String(meta.shiftStarted).slice(0, 5) : "—"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-xs text-slate-400">Shift Ended</span>
+              <span className="text-right text-xs font-semibold text-slate-800 dark:text-slate-200">
+                {meta.shiftEnded ? String(meta.shiftEnded).slice(0, 5) : "—"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2 text-xs text-slate-400">Joined</span>
               <span className="text-right text-xs font-semibold text-slate-800 dark:text-slate-200">
                 {formatMaybeDate(meta.joinedAt) || "—"}
@@ -821,6 +833,8 @@ export default function StaffSalaryProfile() {
     jobTitle: "",
     category: "",
     shift: "",
+    shiftStarted: "",
+    shiftEnded: "",
     status: "active",
     joinedAt: null,
     address: "",
@@ -871,6 +885,8 @@ export default function StaffSalaryProfile() {
           jobTitle: m.jobTitle || "",
           category: m.category?.label || m.category || "",
           shift: m.shift || "",
+          shiftStarted: m.shiftStarted || "",
+          shiftEnded: m.shiftEnded || "",
           status: m.status || "active",
           joinedAt: m.joinedAt || m.createdAt || null,
           address: m.address || "",
@@ -1141,6 +1157,8 @@ export default function StaffSalaryProfile() {
                     </div>
                     <Field label="Schedule" value="Monthly" />
                     <Field label="Shift" value={employeeMeta.shift || "—"} />
+                    <Field label="Shift Started" value={employeeMeta.shiftStarted ? String(employeeMeta.shiftStarted).slice(0, 5) : "—"} />
+                    <Field label="Shift Ended" value={employeeMeta.shiftEnded ? String(employeeMeta.shiftEnded).slice(0, 5) : "—"} />
                     <Field label="Settlement" value="Advances + partials" />
                   </div>
                 )}

@@ -37,8 +37,9 @@ const ICON_MAP = {
 
 export default function MobileNav() {
   const t = useI18n().t;
-  const { role, hasFeatureAccess } = useAuth();
+  const { role, hasFeatureAccess, accessControl } = useAuth();
   const { businessProfile } = useBusinessSettings();
+  const isGeneralStaff = accessControl?.staffCategory === 'general_staff';
   const rawNavigation = getNavigationForBusinessType(
     Array.isArray(businessProfile?.navigation) && businessProfile.navigation.length
       ? businessProfile.navigation
@@ -82,7 +83,8 @@ export default function MobileNav() {
   });
   const visibleNavItems = navigation
     .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
-    .filter((item) => hasFeatureAccess(item.key));
+    .filter((item) => hasFeatureAccess(item.key))
+    .filter((item) => !(isGeneralStaff && item.key === 'dashboard'));
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200/70 bg-white/95 px-2 py-2 shadow-lg backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/90 md:hidden">

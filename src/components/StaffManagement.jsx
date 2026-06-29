@@ -32,6 +32,11 @@ import {
 } from '../lib/staff';
 
 const EMPTY_META = normalizeStaffMeta({});
+const STAFF_FORM_CATEGORY_KEYS = new Set(['general_staff', 'custom']);
+
+/* ── General staff permission restrictions ── */
+const GENERAL_STAFF_ALLOWED_FEATURE_KEYS = new Set(['attendance', 'tasks', 'staff']);
+// const GENERAL_STAFF_DASHBOARD_LEVEL = 'view';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -50,8 +55,28 @@ function toDateInputValue(value) {
   return String(value).slice(0, 10);
 }
 
+function toTimeInputValue(value) {
+  if (!value) return '';
+  return String(value).slice(0, 5);
+}
+
+function getStaffFormCategoryKey(categoryKey) {
+  if (categoryKey === 'owner') return 'owner';
+  return STAFF_FORM_CATEGORY_KEYS.has(categoryKey) ? categoryKey : 'custom';
+}
+
+function getStaffFormCategories(meta, role) {
+  return meta.categories.filter((category) => (
+    STAFF_FORM_CATEGORY_KEYS.has(category.key) || (role === 'owner' && category.key === 'owner')
+  ));
+}
+
 function buildEmptyForm(meta, role = 'staff') {
-  const defaultCategory = meta.categories.find((category) => category.key !== 'owner')?.key || meta.categories[0]?.key || '';
+  const defaultCategory = meta.categories.find((category) => category.key === 'general_staff')?.key
+    || meta.categories.find((category) => category.key === 'custom')?.key
+    || meta.categories.find((category) => category.key !== 'owner')?.key
+    || meta.categories[0]?.key
+    || '';
   return {
     membershipId: '',
     name: '',
@@ -63,6 +88,8 @@ function buildEmptyForm(meta, role = 'staff') {
     jobTitle: '',
     joinedDate: todayISODate(),
     shift: '',
+    shiftStarted: '',
+    shiftEnded: '',
     address: '',
     compensation: '',
     salary: '',
@@ -234,8 +261,16 @@ function StaffFormDialog({
   const readOnly = mode === 'view';
   const levels = meta.accessLevels;
   const selectedCategory = meta.categories.find((category) => category.key === form.staffCategory) || null;
+  const formCategories = getStaffFormCategories(meta, form.role);
   const categoryDefaults = getCategoryPermissions(meta, form.staffCategory);
   const permissionsCustomized = JSON.stringify(categoryDefaults) !== JSON.stringify(form.permissions);
+  const isGeneralStaff = form.staffCategory === 'general_staff';
+
+  /* ── Filter features for general_staff: only attendance, tasks, staff (salary) ── */
+  const visibleFeatures = useMemo(() => {
+    if (!isGeneralStaff) return meta.features;
+    return meta.features.filter((feature) => GENERAL_STAFF_ALLOWED_FEATURE_KEYS.has(feature.key));
+  }, [isGeneralStaff, meta.features]);
 
   useEffect(() => {
     if (mode) setActiveTab('general');
@@ -366,11 +401,9 @@ function StaffFormDialog({
                             onChange={(event) => onFieldChange('staffCategory', event.target.value)}
                             disabled={readOnly}
                           >
-                            {meta.categories
-                              .filter((category) => category.key !== 'owner' || form.role === 'owner')
-                              .map((category) => (
-                                <option key={category.key} value={category.key}>{category.label}</option>
-                              ))}
+                            {formCategories.map((category) => (
+                              <option key={category.key} value={category.key}>{category.label}</option>
+                            ))}
                           </select>
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                             {selectedCategory?.description || t('staffManagement.categoryHelper')}
@@ -407,6 +440,28 @@ function StaffFormDialog({
                             onChange={(event) => onFieldChange('shift', event.target.value)}
                             disabled={readOnly}
                             placeholder={t('staffManagement.shiftPlaceholder')}
+                          />
+                        </div>
+                        <div>
+                          <label className="label" htmlFor="staff-shift-started">{t('staffManagement.shiftStarted')}</label>
+                          <input
+                            id="staff-shift-started"
+                            className="input mt-1"
+                            type="time"
+                            value={form.shiftStarted}
+                            onChange={(event) => onFieldChange('shiftStarted', event.target.value)}
+                            disabled={readOnly}
+                          />
+                        </div>
+                        <div>
+                          <label className="label" htmlFor="staff-shift-ended">{t('staffManagement.shiftEnded')}</label>
+                          <input
+                            id="staff-shift-ended"
+                            className="input mt-1"
+                            type="time"
+                            value={form.shiftEnded}
+                            onChange={(event) => onFieldChange('shiftEnded', event.target.value)}
+                            disabled={readOnly}
                           />
                         </div>
                         <div className="md:col-span-2 xl:col-span-2">
@@ -586,7 +641,7 @@ function StaffFormDialog({
                       </div>
 
                       <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                        {meta.features.map((feature) => {
+                        {visibleFeatures.map((feature) => {
                           const permissionKey = getPermissionKeyForFeature(feature.key) || feature.key;
 
                           return (
@@ -690,6 +745,8 @@ export default function StaffManagement({ businessId }) {
           member.user?.phone,
           member.jobTitle,
           member.shift,
+          member.shiftStarted,
+          member.shiftEnded,
           member.address,
           member.category?.label,
         ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery));
@@ -784,10 +841,12 @@ export default function StaffManagement({ businessId }) {
     phone: member.user?.phone || '',
     password: '',
     role: member.role || 'staff',
-    staffCategory: member.staffCategory || '',
+    staffCategory: getStaffFormCategoryKey(member.staffCategory || ''),
     jobTitle: member.jobTitle || '',
     joinedDate: toDateInputValue(member.joinedDate || member.joinedAt),
     shift: member.shift || '',
+    shiftStarted: toTimeInputValue(member.shiftStarted),
+    shiftEnded: toTimeInputValue(member.shiftEnded),
     address: member.address || '',
     compensation: member.compensation ?? '',
     salary: member.salary ?? member.compensation ?? '',
@@ -857,6 +916,14 @@ export default function StaffManagement({ businessId }) {
 
     if (!canManageStaff) return;
 
+    const isGeneralStaffPayload = form.staffCategory === 'general_staff';
+
+    /* ── Enforce dashboard = 'view' for general_staff ── */
+    let finalPermissions = normalizePermissionMap(form.permissions);
+    if (isGeneralStaffPayload) {
+      finalPermissions = { ...finalPermissions, dashboard: 'view' };
+    }
+
     const payload = {
       name: form.name.trim(),
       phone: form.phone.trim(),
@@ -866,12 +933,14 @@ export default function StaffManagement({ businessId }) {
       joinedDate: form.joinedDate || null,
       joinedAt: form.joinedDate || null,
       shift: form.shift.trim(),
+      shiftStarted: form.shiftStarted || null,
+      shiftEnded: form.shiftEnded || null,
       address: form.address.trim(),
       salary: form.salary === '' ? null : Number(form.salary),
       compensation: form.salary === '' ? null : Number(form.salary),
       hasLogin: Boolean(form.hasLogin),
       totalReceived: form.totalReceived === '' ? null : Number(form.totalReceived),
-      permissions: normalizePermissionMap(form.permissions),
+      permissions: finalPermissions,
     };
 
     if (dialogMode === 'create') {
@@ -1043,7 +1112,9 @@ export default function StaffManagement({ businessId }) {
                   onChange={(event) => setCategoryFilter(event.target.value)}
                 >
                   <option value="all">{t('staffManagement.allCategories')}</option>
-                  {meta.categories.map((category) => (
+                  {meta.categories.filter((category) => (
+                    STAFF_FORM_CATEGORY_KEYS.has(category.key)
+                  )).map((category) => (
                     <option key={category.key} value={category.key}>{category.label}</option>
                   ))}
                 </select>
@@ -1144,6 +1215,11 @@ export default function StaffManagement({ businessId }) {
                         <StatusBadge active={member.user?.isActive !== false} t={t} />
                         {member.hasLogin && member.user?.email ? (
                           <span className="text-xs text-slate-500 dark:text-slate-400">{member.user.email}</span>
+                        ) : null}
+                        {member.shiftStarted || member.shiftEnded ? (
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            {t('staffManagement.shift')}: {toTimeInputValue(member.shiftStarted) || '-'} - {toTimeInputValue(member.shiftEnded) || '-'}
+                          </span>
                         ) : null}
                       </div>
 
@@ -1254,6 +1330,11 @@ export default function StaffManagement({ businessId }) {
                               <p className="text-xs text-slate-500 dark:text-slate-400">
                                 {t('staffManagement.joined', 'Joined')}: {formatDate(member.joinedAt || member.joinedDate)}
                               </p>
+                              {member.shiftStarted || member.shiftEnded ? (
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  {t('staffManagement.shift')}: {toTimeInputValue(member.shiftStarted) || '-'} - {toTimeInputValue(member.shiftEnded) || '-'}
+                                </p>
+                              ) : null}
                             </div>
                           </td>
                           <td className="py-3 pr-4 text-right font-semibold text-slate-900 dark:text-white">

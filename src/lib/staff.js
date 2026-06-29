@@ -106,6 +106,8 @@ export function normalizeStaffMember(member, meta) {
     jobTitle: pickString(source.jobTitle) || null,
     joinedDate: pickString(source.joinedDate, source.joinedAt) || null,
     shift: pickString(source.shift) || null,
+    shiftStarted: pickString(source.shiftStarted, source.shift_started) || null,
+    shiftEnded: pickString(source.shiftEnded, source.shift_ended) || null,
     address: pickString(source.address, user.address) || null,
     compensation: pickNumber(source.compensation, source.salary),
     salary: pickNumber(source.salary, source.compensation),
