@@ -9,8 +9,11 @@ import {
   Lock,
   Mail,
   Phone,
+  ShoppingBasket,
   Store,
   UserRound,
+  UtensilsCrossed,
+  Wrench,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -28,10 +31,11 @@ const btnPrimary =
   'font-semibold text-white shadow-lg transition-all duration-300 hover:scale-[1.01] hover:from-[#8a5d2f] hover:to-[#9e7751] ' +
   'hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none';
 
-const REGISTRATION_HIDDEN_TYPES = new Set(['jewellery', 'cafe']);
-
 const typeIconMap = {
   retail: Store,
+  service: Wrench,
+  general_store: ShoppingBasket,
+  hospitality: UtensilsCrossed,
 };
 
 function getTypeIcon(type) {
@@ -39,10 +43,7 @@ function getTypeIcon(type) {
 }
 
 function getRegistrationBusinessTypes(items) {
-  return (Array.isArray(items) ? items : []).filter((item) => {
-    const value = String(item?.value || '').toLowerCase();
-    return value && !REGISTRATION_HIDDEN_TYPES.has(value);
-  });
+  return Array.isArray(items) ? items : [];
 }
 
 function buildStatusCopy(status, t) {
