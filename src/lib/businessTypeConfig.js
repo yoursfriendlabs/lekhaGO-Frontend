@@ -25,6 +25,28 @@ export function getNavigationForBusinessType(navigation = [], businessProfile) {
         : item
   ));
 
+  const tablesEnabled = businessProfile?.settings?.enabledModules?.includes("tables") || businessProfile?.type === "cafe";
+  if (tablesEnabled) {
+    if (!normalized.some((item) => item?.key === 'billing')) {
+      const salesIndex = normalized.findIndex((item) => item?.key === 'sales' || item?.key === 'orders');
+      const insertIndex = salesIndex >= 0 ? salesIndex + 1 : 1;
+      normalized = [
+        ...normalized.slice(0, insertIndex),
+        { key: 'billing', label: 'Billing Counter', route: '/app/billing' },
+        ...normalized.slice(insertIndex),
+      ];
+    }
+    if (!normalized.some((item) => item?.key === 'tables')) {
+      const billingIndex = normalized.findIndex((item) => item?.key === 'billing');
+      const insertIndex = billingIndex >= 0 ? billingIndex + 1 : 1;
+      normalized = [
+        ...normalized.slice(0, insertIndex),
+        { key: 'tables', label: 'Tables', route: '/app/tables' },
+        ...normalized.slice(insertIndex),
+      ];
+    }
+  }
+
   if (isRetailBusinessType(businessProfile) && !normalized.some((item) => item?.key === 'sales')) {
     const servicesIndex = normalized.findIndex((item) => item?.key === 'services');
     const inventoryIndex = normalized.findIndex((item) => item?.key === 'inventory');

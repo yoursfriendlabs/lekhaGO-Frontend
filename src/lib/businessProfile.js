@@ -199,12 +199,13 @@ const DEFAULT_BUSINESS_TYPES = [
   },
   {
     value: "cafe",
-    label: "Cafe",
+    label: "Cafe / Restaurant",
     description:
       "POS-style cafe flow with menu, ingredients, and quick order capture.",
     navigation: [
       { key: "dashboard", label: "Dashboard", route: "/app" },
       { key: "orders", label: "Orders", route: "/app/orders" },
+      { key: "tables", label: "Tables", route: "/app/tables" },
       { key: "inventory", label: "Menu & Stock", route: "/app/inventory" },
       { key: "sales", label: "POS", route: "/app/pos" },
       { key: "purchases", label: "Expenses", route: "/app/purchases" },
@@ -226,6 +227,7 @@ const DEFAULT_BUSINESS_TYPES = [
       services: false,
       cafePos: true,
       jewelleryService: false,
+      tables: true,
     },
     inventory: {
       title: "Menu & Stock",
@@ -288,6 +290,7 @@ const DEFAULT_BUSINESS_TYPES = [
         "ledger",
         "analytics",
         "settings",
+        "tables",
       ],
       defaultOrderFlow: "cafe_pos",
       defaultOrderChannel: "takeaway",

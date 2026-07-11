@@ -1401,6 +1401,37 @@ export const api = {
       },
     });
   },
+
+  getTables: (params = {}, options = {}) =>
+    listRequest(
+      "/api/tables",
+      params,
+      listCache(["tables"], CACHE_TTL.short, options),
+    ),
+  getTable: (id) =>
+    request(
+      `/api/tables/${id}`,
+      {},
+      listCache(detailTags("table", id), CACHE_TTL.short),
+    ),
+  createTable: (data) =>
+    request(
+      "/api/tables",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["tables"]),
+    ),
+  updateTable: (id, data) =>
+    request(
+      `/api/tables/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([detailTags("table", id), "tables"]),
+    ),
+  deleteTable: (id) =>
+    request(
+      `/api/tables/${id}`,
+      { method: "DELETE" },
+      mutationConfig([detailTags("table", id), "tables"]),
+    ),
 };
 
 export { toQueryKey };

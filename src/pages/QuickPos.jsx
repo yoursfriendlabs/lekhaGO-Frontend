@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   ChevronRight,
@@ -170,12 +170,17 @@ const emptyCheckoutForm = {
   paymentMethod: "cash",
   bankId: "",
   paymentNote: "",
+  tableId: "",
 };
 
 const MOBILE_PRODUCT_PAGE_SIZE = 9;
 const MOBILE_PRODUCT_SCROLL_THRESHOLD = 120;
 
 export default function QuickPos() {
+  const [searchParams] = useSearchParams();
+  const queryTableId = searchParams.get("tableId") || "";
+  const queryRef = searchParams.get("ref") || "";
+
   const { t } = useI18n();
   const { showError } = useSnackbar();
   const { businessId, user } = useAuth();
@@ -193,11 +198,22 @@ export default function QuickPos() {
   const [partySelectorOpen, setPartySelectorOpen] = useState(false);
   const [selectedParty, setSelectedParty] = useState(null);
   const [checkoutForm, setCheckoutForm] = useState(emptyCheckoutForm);
+  const [allTables, setAllTables] = useState([]);
+  const [activeTableId, setActiveTableId] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [tableSelectorOpen, setTableSelectorOpen] = useState(false);
+  const [activeSessionOption, setActiveSessionOption] = useState(() => {
+    if (queryTableId) return "dine_in";
+    return null;
+  });
+
+  const vacantTables = useMemo(() => allTables.filter((t) => t.status === "vacant"), [allTables]);
   const [showAmountReceivedInput, setShowAmountReceivedInput] = useState(false);
   const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState("");
   const [isPaid, setIsPaid] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successState, setSuccessState] = useState(null);
+  const [activeAttributes, setActiveAttributes] = useState({});
   const [mobileStep, setMobileStep] = useState("items");
   const [productUnitTypes, setProductUnitTypes] = useState({});
   const [visibleProductCount, setVisibleProductCount] = useState(
@@ -245,6 +261,7 @@ export default function QuickPos() {
   useEffect(() => {
     if (!businessId) {
       setProducts([]);
+      setAllTables([]);
       setLoading(false);
       return;
     }
@@ -256,8 +273,9 @@ export default function QuickPos() {
     Promise.all([
       api.listProducts({ limit: 500 }),
       api.getNextSequences().catch(() => null),
+      api.getTables({ isActive: "true", limit: 100 }).catch(() => null),
     ])
-      .then(([productResponse, sequenceResponse]) => {
+      .then(([productResponse, sequenceResponse, tablesResponse]) => {
         if (!isActive) return;
         const normalizedProducts = (productResponse?.items || [])
           .map(normalizePosProduct)
@@ -265,10 +283,12 @@ export default function QuickPos() {
 
         setProducts(normalizedProducts);
         setSuggestedInvoiceNo(sequenceResponse?.nextSaleInvoiceNo || "");
+        setAllTables(tablesResponse?.items || []);
       })
       .catch((error) => {
         if (!isActive) return;
         setProducts([]);
+        setAllTables([]);
         setStatus({ type: "error", message: error.message });
       })
       .finally(() => {
@@ -279,6 +299,99 @@ export default function QuickPos() {
       isActive = false;
     };
   }, [businessId]);
+
+  const handleTableChange = async (tableId) => {
+    setActiveTableId(tableId);
+    setCheckoutForm((prev) => ({ ...prev, tableId }));
+
+    if (!tableId) {
+      ignoreAutoSaveRef.current = true;
+      setCart([]);
+      setEditingId(null);
+      setCheckoutForm(emptyCheckoutForm);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const activeSales = await api.listSales({ limit: 120 });
+      const activeOrder = (activeSales?.items || []).find(
+        (sale) => String(sale.tableId) === String(tableId) && sale.status === "due"
+      );
+
+      if (activeOrder) {
+        const fullSale = await api.getSale(activeOrder.id);
+        const saleItems = fullSale?.SaleItems || [];
+
+        const mappedCart = saleItems.map((item) => {
+          const product = productsById[String(item.productId)];
+          const uPrice = String(item.unitPrice || 0);
+          return {
+            productId: item.productId,
+            name: product?.name || item.productName || "Unknown Product",
+            categoryName: product?.categoryName || "",
+            quantity: Number(item.quantity || 0),
+            unitType: item.unitType || "primary",
+            unitPrice: uPrice,
+            taxRate: Number(item.taxRate || 0),
+            lineTotal: Number(item.lineTotal || 0).toFixed(2),
+            primaryUnit: product?.primaryUnit || "",
+            secondaryUnit: product?.secondaryUnit || "",
+            conversionRate: Number(item.conversionRate || product?.conversionRate || 0),
+            secondarySalePrice: Number(product?.secondarySalePrice || 0),
+            salePrice: Number(product?.salePrice || product?.sellingPrice || 0),
+            stockOnHand: Number(product?.stockOnHand || 0),
+          };
+        });
+
+        ignoreAutoSaveRef.current = true;
+        setEditingId(activeOrder.id);
+        setCart(mappedCart);
+
+        setCheckoutForm({
+          saleDate: fullSale.saleDate || todayISODate(),
+          invoiceNo: fullSale.invoiceNo || "",
+          notes: fullSale.notes || "",
+          discount: String(fullSale.discount || 0),
+          amountReceived: String(fullSale.amountReceived || 0),
+          paymentMethod: fullSale.paymentMethod || "cash",
+          bankId: fullSale.bankId || "",
+          paymentNote: fullSale.paymentNote || "",
+          tableId: String(tableId),
+        });
+        setActiveAttributes(fullSale?.attributes || {});
+      } else {
+        await api.updateTable(tableId, { status: "occupied" }).catch(() => null);
+        ignoreAutoSaveRef.current = true;
+        setCart([]);
+        setEditingId(null);
+        setCheckoutForm({
+          ...emptyCheckoutForm,
+          tableId: String(tableId),
+        });
+        setActiveAttributes({});
+      }
+    } catch (err) {
+      showError(err.message || "Failed to load table orders.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (businessProfile) {
+      const tablesEnabled = businessProfile?.settings?.enabledModules?.includes("tables");
+      if (!tablesEnabled) {
+        setActiveSessionOption("takeaway");
+      }
+    }
+  }, [businessProfile]);
+
+  useEffect(() => {
+    if (queryTableId && allTables.length > 0 && products.length > 0) {
+      handleTableChange(queryTableId);
+    }
+  }, [queryTableId, allTables.length, products.length]);
 
   const categoryOptions = useMemo(() => {
     const categories = [
@@ -436,6 +549,119 @@ export default function QuickPos() {
 
   const getProductById = (productId) => productsById[String(productId)] || null;
 
+  const ignoreAutoSaveRef = useRef(false);
+
+  const submittingRef = useRef(submitting);
+  const cartRef = useRef(cart);
+  const editingIdRef = useRef(editingId);
+  const activeTableIdRef = useRef(activeTableId);
+  const checkoutFormRef = useRef(checkoutForm);
+  const activeAttributesRef = useRef(activeAttributes);
+  const selectedPartyRef = useRef(selectedParty);
+
+  useEffect(() => {
+    submittingRef.current = submitting;
+    cartRef.current = cart;
+    editingIdRef.current = editingId;
+    activeTableIdRef.current = activeTableId;
+    checkoutFormRef.current = checkoutForm;
+    activeAttributesRef.current = activeAttributes;
+    selectedPartyRef.current = selectedParty;
+  });
+
+  const isTablesEnabled = useMemo(() => {
+    return businessProfile?.settings?.enabledModules?.includes("tables");
+  }, [businessProfile]);
+
+  useEffect(() => {
+    if (!isTablesEnabled || !activeTableId || loading) return;
+
+    if (ignoreAutoSaveRef.current) {
+      ignoreAutoSaveRef.current = false;
+      return;
+    }
+
+    const delayDebounce = setTimeout(async () => {
+      const currentSubmitting = submittingRef.current;
+      const currentCart = cartRef.current;
+      const currentEditingId = editingIdRef.current;
+      const currentActiveTableId = activeTableIdRef.current;
+      const currentCheckoutForm = checkoutFormRef.current;
+      const currentActiveAttributes = activeAttributesRef.current;
+      const currentSelectedParty = selectedPartyRef.current;
+
+      if (currentSubmitting || !currentActiveTableId) return;
+
+      try {
+        if (currentCart.length === 0) {
+          if (currentEditingId) {
+            await api.deleteSale(currentEditingId);
+            setEditingId(null);
+            await api.updateTable(currentActiveTableId, { status: "vacant" }).catch(() => null);
+          }
+          return;
+        }
+
+        const matchedTable = allTables.find((t) => String(t.id) === String(currentActiveTableId));
+        const resolvedTableNo = matchedTable ? matchedTable.name : "";
+
+        const subTotal = currentCart.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
+        const discountAmount = Math.max(Number(currentCheckoutForm.discount || 0), 0);
+        const beforeTax = Math.max(subTotal - discountAmount, 0);
+        const taxRate = Number(currentCheckoutForm.taxRate || 0);
+        const taxTotal = (beforeTax * taxRate) / 100;
+        const grandTotal = beforeTax + taxTotal;
+
+        const payload = {
+          saleDate: currentCheckoutForm.saleDate || todayISODate(),
+          notes: currentCheckoutForm.notes || "",
+          tableId: String(currentActiveTableId),
+          status: "due",
+          partyId: currentSelectedParty?.id || null,
+          amountReceived: 0,
+          paymentMethod: "cash",
+          subTotal,
+          taxTotal,
+          discount: discountAmount,
+          discountTotal: discountAmount,
+          grandTotal,
+          attributes: {
+            ...(currentActiveAttributes || {}),
+            order_status: currentActiveAttributes?.order_status || "new",
+            order_type: "dine_in",
+            table_no: resolvedTableNo || currentActiveAttributes?.table_no || "",
+          },
+          items: currentCart.map((item) => ({
+            productId: item.productId,
+            quantity: Number(item.quantity || 0),
+            unitType: item.unitType || "primary",
+            conversionRate: Number(
+              item.conversionRate ||
+                getProductById(item.productId)?.conversionRate ||
+                0,
+            ),
+            unitPrice: Number(item.unitPrice || 0),
+            taxRate: Number(item.taxRate || 0),
+            lineTotal: Number(item.lineTotal || 0),
+          })),
+        };
+
+        if (currentEditingId) {
+          await api.updateSale(currentEditingId, payload);
+        } else {
+          const created = await api.createSale(payload);
+          if (created?.id) {
+            setEditingId(created.id);
+          }
+        }
+      } catch (err) {
+        console.error("Auto-save error:", err);
+      }
+    }, 800);
+
+    return () => clearTimeout(delayDebounce);
+  }, [cart, activeTableId, editingId, isTablesEnabled, checkoutForm, selectedParty, activeAttributes, loading]);
+
   const addProductToCart = (product, unitType = "primary") => {
     if (!product?.id) return;
 
@@ -583,6 +809,18 @@ export default function QuickPos() {
     });
     setIsPaid(true);
     setStatus({ type: "info", message: "" });
+    setActiveTableId("");
+    setEditingId(null);
+    setActiveAttributes({});
+  };
+
+  const handleSuccessClose = () => {
+    setSuccessState(null);
+    if (queryRef === "orders") {
+      navigate("/app/orders");
+    } else if (queryRef === "billing") {
+      navigate("/app/billing");
+    }
   };
 
   const handleSubmit = async (nextAction = "save") => {
@@ -641,9 +879,15 @@ export default function QuickPos() {
       const manualInvoiceNo = String(checkoutForm.invoiceNo || "").trim();
       const { paymentMethod, bankId, paymentNote, discount, ...headerFields } =
         checkoutForm;
+      const isPaidBill = dueAmount <= 0;
+      const orderStatus = isPaidBill ? "completed" : (activeAttributes?.order_status || "new");
+      const matchedTable = allTables.find((t) => String(t.id) === String(checkoutForm.tableId));
+      const resolvedTableNo = matchedTable ? matchedTable.name : "";
+
       const payload = {
         ...headerFields,
-        status: dueAmount > 0 ? "due" : "paid",
+        tableId: checkoutForm.tableId || null,
+        status: isPaidBill ? "paid" : "due",
         partyId: selectedParty?.id || null,
         amountReceived: receivedAmount,
         ...(Number(receivedAmount || 0) > 0
@@ -654,6 +898,12 @@ export default function QuickPos() {
         discount: totals.discountTotal,
         discountTotal: totals.discountTotal,
         grandTotal: totals.grandTotal,
+        attributes: {
+          ...(activeAttributes || {}),
+          order_status: orderStatus,
+          order_type: activeAttributes?.order_type || "dine_in",
+          table_no: resolvedTableNo || activeAttributes?.table_no || "",
+        },
         items: cart.map((item) => ({
           productId: item.productId,
           quantity: Number(item.quantity || 0),
@@ -676,9 +926,23 @@ export default function QuickPos() {
       }
 
       const creatorValue = getCurrentCreatorValue(user);
-      const created = await api.createSale(
-        creatorValue ? { ...payload, createdBy: creatorValue } : payload,
-      );
+      const salePayload = creatorValue ? { ...payload, createdBy: creatorValue } : payload;
+      let created;
+      if (editingId) {
+        created = await api.updateSale(editingId, payload);
+      } else {
+        created = await api.createSale(salePayload);
+      }
+
+      // Sync table status in database
+      if (payload.tableId) {
+        if (payload.status === "paid") {
+          await api.updateTable(payload.tableId, { status: "vacant" }).catch(() => null);
+        } else {
+          await api.updateTable(payload.tableId, { status: "occupied" }).catch(() => null);
+        }
+      }
+
       const nextSequences = await api.getNextSequences().catch(() => null);
 
       // Update local product stock levels immediately so the UI reflects
@@ -938,6 +1202,138 @@ export default function QuickPos() {
     </div>
   );
 
+  if (loading && !products.length && !allTables.length) {
+    return (
+      <div className="min-w-0 space-y-5 pb-28 md:pb-0">
+        <PageHeader title={salesTitle} subtitle={t("quickPos.subtitle")} />
+        <div className="rounded-[32px] border border-dashed border-slate-200 bg-white/90 p-12 text-center text-slate-500 max-w-4xl mx-auto flex items-center justify-center h-64">
+          <div className="space-y-3">
+            <span className="h-6 w-6 rounded-full border-2 border-[#9b6835] border-t-transparent animate-spin inline-block" />
+            <p className="text-sm font-semibold">{t("common.loading") || "Loading POS..."}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+
+
+  if (isTablesEnabled && activeSessionOption === null) {
+    return (
+      <div className="min-w-0 space-y-5 pb-28 md:pb-0">
+        <PageHeader
+          title={salesTitle}
+          subtitle={t("quickPos.subtitle")}
+          action={
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {(queryRef === "orders" || queryRef === "billing") && (
+                <button
+                  type="button"
+                  className="btn-ghost h-11 justify-center rounded-[18px]"
+                  onClick={() => navigate(queryRef === "orders" ? "/app/orders" : "/app/billing")}
+                >
+                  ← {queryRef === "orders" ? "Seating Map" : "Billing Counter"}
+                </button>
+              )}
+              <Link className="btn-ghost h-11 justify-center rounded-[18px]" to="/app/sales">
+                {t("quickPos.detailedSales")}
+              </Link>
+            </div>
+          }
+        />
+
+        {status.message ? (
+          <Notice title={status.message} tone={status.type} />
+        ) : null}
+
+        <div className="rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-sm max-w-4xl mx-auto space-y-6">
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-bold text-slate-800">Select Order Type & Seating Area</h2>
+            <p className="text-sm text-slate-500">Choose one of the order options below to start adding items to order.</p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSessionOption("takeaway");
+                setActiveTableId("");
+              }}
+              className="rounded-3xl border-2 border-slate-200 bg-white p-6 hover:border-[#9c5f22] hover:bg-[#9c5f22]/5 transition text-left space-y-2 flex flex-col justify-between"
+            >
+              <div>
+                <span className="inline-flex items-center justify-center p-3 rounded-2xl bg-amber-50 text-amber-600 mb-2">
+                  <ShoppingBag size={24} />
+                </span>
+                <h3 className="text-lg font-bold text-slate-800">Takeaway / Walk-in</h3>
+                <p className="text-xs text-slate-500">Dine-out order, ready for direct billing and quick checkout.</p>
+              </div>
+              <span className="text-xs font-bold text-[#9c5f22] flex items-center gap-1 pt-2">
+                Start Walk-in Order <ArrowRight size={14} />
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSessionOption("delivery");
+                setActiveTableId("");
+              }}
+              className="rounded-3xl border-2 border-slate-200 bg-white p-6 hover:border-[#9c5f22] hover:bg-[#9c5f22]/5 transition text-left space-y-2 flex flex-col justify-between"
+            >
+              <div>
+                <span className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-50 text-blue-600 mb-2">
+                  <Package2 size={24} />
+                </span>
+                <h3 className="text-lg font-bold text-slate-800">Home Delivery</h3>
+                <p className="text-xs text-slate-500">Delivery order, reference party addresses and track runner details.</p>
+              </div>
+              <span className="text-xs font-bold text-[#9c5f22] flex items-center gap-1 pt-2">
+                Start Delivery Order <ArrowRight size={14} />
+              </span>
+            </button>
+          </div>
+
+          <div className="border-t border-slate-100 pt-6">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Dine-in Floor Map</h3>
+            
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {allTables.map((table) => {
+                const isOccupied = table.status === "occupied";
+                return (
+                  <button
+                    key={table.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveSessionOption("dine_in");
+                      handleTableChange(table.id);
+                    }}
+                    className={`rounded-2xl border p-4 text-left transition flex flex-col justify-between h-24 ${
+                      isOccupied
+                        ? "border-amber-200 bg-amber-50/50 hover:bg-amber-100 text-amber-800"
+                        : "border-slate-200 bg-white hover:border-[#9c5f22] hover:bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1 w-full">
+                      <span className="text-sm font-bold truncate max-w-[80%]">{table.name}</span>
+                      <span className={`h-2 w-2 rounded-full ${isOccupied ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`} />
+                    </div>
+                    {table.capacity && (
+                      <span className="text-xs text-slate-400">{table.capacity} seats</span>
+                    )}
+                    <span className="text-[10px] uppercase font-bold tracking-wider pt-2">
+                      {isOccupied ? "Active Bill" : "Available"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-w-0 space-y-5 pb-28 md:pb-0">
       <PageHeader
@@ -945,6 +1341,41 @@ export default function QuickPos() {
         subtitle={isMobile ? "" : t("quickPos.subtitle")}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
+            {(queryRef === "orders" || queryRef === "billing") && (
+              <button
+                type="button"
+                className="btn-ghost h-11 justify-center rounded-[18px]"
+                onClick={() => navigate(queryRef === "orders" ? "/app/orders" : "/app/billing")}
+              >
+                ← {queryRef === "orders" ? "Seating Map" : "Billing Counter"}
+              </button>
+            )}
+
+            {isTablesEnabled && (
+              <button
+                type="button"
+                onClick={() => setTableSelectorOpen(true)}
+                className={`btn-secondary h-11 justify-center rounded-[18px] px-4 font-semibold transition ${
+                  activeTableId
+                    ? "bg-[#9c5f22]/10 text-[#9c5f22] border-[#9c5f22]/30"
+                    : "bg-slate-50 text-slate-700 border-slate-200"
+                }`}
+              >
+                {activeTableId ? (
+                  <>
+                    <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse mr-2" />
+                    Table: {allTables.find((t) => String(t.id) === String(activeTableId))?.name || activeTableId} {editingId ? " (Editing)" : ""}
+                  </>
+                ) : activeSessionOption === "takeaway" ? (
+                  "Walk-in / Takeaway ▾"
+                ) : activeSessionOption === "delivery" ? (
+                  "Delivery ▾"
+                ) : (
+                  "Change Seating ▾"
+                )}
+              </button>
+            )}
+
             <Link className="btn-ghost h-11 justify-center rounded-[18px]" to="/app/sales">
               {t("quickPos.detailedSales")}
             </Link>
@@ -979,6 +1410,25 @@ export default function QuickPos() {
           className={`space-y-5 ${isMobile && mobileStep !== "items" ? "hidden" : ""}`}
         >
           <div className="rounded-[28px] border border-secondary-200/70 bg-white/90 p-3 shadow-sm sm:rounded-[32px]">
+            {businessProfile?.settings?.enabledModules?.includes("tables") && (
+              <div className="flex items-center justify-between bg-[#9c5f22]/5 rounded-2xl p-3 mb-3 border border-[#9c5f22]/10 md:hidden">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#9c5f22]/80">Active Order Table</p>
+                  <p className="text-sm font-bold text-slate-800">
+                    {activeTableId
+                      ? `${allTables.find((t) => String(t.id) === String(activeTableId))?.name || activeTableId}${editingId ? " (Active Bill)" : ""}`
+                      : "No Table / Takeaway"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setTableSelectorOpen(true)}
+                  className="px-3 py-1.5 bg-[#9c5f22] text-white text-xs font-bold rounded-xl shadow"
+                >
+                  Change Table
+                </button>
+              </div>
+            )}
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
               <div className="relative flex-1">
                 <Search
@@ -1802,7 +2252,7 @@ export default function QuickPos() {
           {status.message ? (
             <Notice title={status.message} tone={status.type} />
           ) : null}
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className={`grid gap-2 sm:grid-cols-2 ${businessProfile?.settings?.enabledModules?.includes('tables') ? 'lg:grid-cols-3' : ''}`}>
             <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 transition focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-200">
               <span className="text-xs font-medium uppercase text-slate-500">
                 {t("quickPos.invoiceNumber")}
@@ -1836,6 +2286,31 @@ export default function QuickPos() {
                 }
               />
             </label>
+
+            {businessProfile?.settings?.enabledModules?.includes('tables') && (
+              <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 transition focus-within:border-[#9c5f22] focus-within:ring-1 focus-within:ring-[#9c5f22]/20">
+                <span className="text-xs font-medium uppercase text-slate-500">
+                  {t("tables.tableName") || "Table"}
+                </span>
+                <select
+                  className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
+                  value={checkoutForm.tableId || ""}
+                  onChange={(event) =>
+                    setCheckoutForm((previous) => ({
+                      ...previous,
+                      tableId: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="">No Table / Takeaway</option>
+                  {vacantTables.map((table) => (
+                    <option key={table.id} value={table.id}>
+                      {table.name} {table.capacity ? `(Cap: ${table.capacity})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
@@ -2171,9 +2646,9 @@ export default function QuickPos() {
         title={t("quickPos.selectPartyTitle")}
       />
 
-      <QuickActionSuccessDialog
+       <QuickActionSuccessDialog
         isOpen={Boolean(successState)}
-        onClose={() => setSuccessState(null)}
+        onClose={handleSuccessClose}
         closeLabel={t("common.close")}
         title={t("quickPos.saleRecorded")}
         description={
@@ -2208,12 +2683,107 @@ export default function QuickPos() {
           <button
             type="button"
             className="btn-ghost h-14 w-full justify-center rounded-[22px] text-base"
-            onClick={() => setSuccessState(null)}
+            onClick={handleSuccessClose}
           >
             {t("quickPos.newSale")}
           </button>
         }
       />
+
+      {/* Table Selector Modal */}
+      <Dialog
+        isOpen={tableSelectorOpen}
+        onClose={() => setTableSelectorOpen(false)}
+        title="Select Table Plan"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+            Choose Table or Seating Area
+          </p>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSessionOption("takeaway");
+                handleTableChange("");
+                setTableSelectorOpen(false);
+              }}
+              className={`rounded-2xl border p-4 text-center transition flex flex-col justify-center items-center h-24 ${
+                activeSessionOption === "takeaway" && !activeTableId
+                  ? "border-[#9c5f22] bg-[#9c5f22]/5 font-bold text-[#9c5f22]"
+                  : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+              }`}
+            >
+              <span className="text-sm font-semibold">Walk-in / Takeaway</span>
+              <span className="text-[10px] text-slate-400 mt-1">No table reference</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSessionOption("delivery");
+                handleTableChange("");
+                setTableSelectorOpen(false);
+              }}
+              className={`rounded-2xl border p-4 text-center transition flex flex-col justify-center items-center h-24 ${
+                activeSessionOption === "delivery" && !activeTableId
+                  ? "border-[#9c5f22] bg-[#9c5f22]/5 font-bold text-[#9c5f22]"
+                  : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+              }`}
+            >
+              <span className="text-sm font-semibold">Home Delivery</span>
+              <span className="text-[10px] text-slate-400 mt-1">No table reference</span>
+            </button>
+
+            {allTables.map((table) => {
+              const isSelected = String(table.id) === String(activeTableId);
+              const isOccupied = table.status === "occupied";
+
+              return (
+                <button
+                  key={table.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveSessionOption("dine_in");
+                    handleTableChange(table.id);
+                    setTableSelectorOpen(false);
+                  }}
+                  className={`rounded-2xl border p-4 text-center transition flex flex-col justify-center items-center h-24 relative ${
+                    isSelected
+                      ? "border-[#9c5f22] bg-[#9c5f22]/5 font-bold text-[#9c5f22]"
+                      : isOccupied
+                        ? "border-amber-200 bg-amber-50/50 hover:bg-amber-50 text-amber-800"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  <span className="text-sm font-bold truncate max-w-full">{table.name}</span>
+                  {table.capacity && (
+                    <span className="text-[10px] text-slate-400 mt-0.5">{table.capacity} seats</span>
+                  )}
+                  <span className="mt-1.5 flex items-center gap-1">
+                    <span className={`h-1.5 w-1.5 rounded-full ${isOccupied ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`} />
+                    <span className="text-[9px] uppercase tracking-wider font-bold">
+                      {isOccupied ? "Occupied" : "Vacant"}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setTableSelectorOpen(false)}
+              className="btn-secondary rounded-xl py-2 px-4 text-xs font-semibold"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

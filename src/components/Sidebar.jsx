@@ -15,6 +15,8 @@ const NAV_ROLE_MAP = {
   purchases: ['owner', 'staff', 'admin', 'super_admin'],
   parties: ['owner', 'staff', 'admin', 'super_admin'],
   tasks: ['owner', 'staff', 'admin', 'super_admin'],
+  tables: ['owner', 'staff', 'admin', 'super_admin'],
+  billing: ['owner', 'staff', 'admin', 'super_admin'],
   attendance: ['staff'],
   staff: ['owner', 'staff', 'admin', 'super_admin'],
   reports: ['owner', 'staff', 'admin', 'super_admin'],

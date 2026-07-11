@@ -107,6 +107,7 @@ const makeEmptyHeader = () => ({
   attachment: "",
   attachments: [],
   attributes: {},
+  tableId: "",
 });
 
 function normalizeAttachmentUrls(...values) {
@@ -695,6 +696,7 @@ export default function Services() {
   const [newPartyPhone, setNewPartyPhone] = useState("");
   const [creatingParty, setCreatingParty] = useState(false);
   const [header, setHeader] = useState(() => makeEmptyHeader());
+  const [vacantTables, setVacantTables] = useState([]);
   const [items, setItems] = useState([]);
   const quantityInputRef = useRef(null);
   const descriptionInputRef = useRef(null);
@@ -1369,12 +1371,33 @@ export default function Services() {
     setMobileStep("details");
   };
 
+  const loadVacantTables = async (currentTableId = '') => {
+    try {
+      const data = await api.getTables({ status: 'vacant', isActive: 'true', limit: 100 });
+      let items = data?.items || [];
+      if (currentTableId && !items.some(t => t.id === currentTableId)) {
+        try {
+          const currentTable = await api.getTable(currentTableId);
+          if (currentTable) {
+            items = [currentTable, ...items];
+          }
+        } catch (e) {
+          console.warn('Failed to fetch current table details', e);
+        }
+      }
+      setVacantTables(items);
+    } catch (err) {
+      console.error('Failed to load vacant tables', err);
+    }
+  };
+
   const openDialog = async () => {
     if (!canManageServices) return;
     resetForm();
     setDialogOpen(true);
 
     if (businessId) {
+      loadVacantTables();
       try {
         const data = await api.getNextSequences();
         setSuggestedOrderNo(data?.nextServiceOrderNo || "");
@@ -1424,6 +1447,9 @@ export default function Services() {
         type: "customer",
       };
 
+      const currentTableId = full.tableId || full.Table?.id || full.table?.id || "";
+      loadVacantTables(currentTableId);
+
       setHeader({
         partyId: full.partyId || "",
         orderNo: full.orderNo || "",
@@ -1435,6 +1461,7 @@ export default function Services() {
           normalizeAttachmentUrls(full.attachments, full.attachment)[0] || "",
         attachments: normalizeAttachmentUrls(full.attachments, full.attachment),
         attributes: normalizeJewelleryAttributes(full.attributes || {}),
+        tableId: currentTableId,
       });
       cacheProducts(hydratedProducts);
       setSuggestedOrderNo(full.orderNo || "");
@@ -1596,6 +1623,7 @@ export default function Services() {
       );
       const payload = {
         ...headerFields,
+        tableId: header.tableId || null,
         storeType,
         attributes: normalizedAttributes,
         attachments: attachmentUrls,
@@ -2138,6 +2166,13 @@ export default function Services() {
                             <p className="text-xs text-slate-500 dark:text-slate-400">
                               Created by {getCreatorDisplayName(order)}
                             </p>
+                            {(order.Table || order.table || order.tableId) && (
+                              <div className="mt-1">
+                                <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                                  Table: {order.Table?.name || order.table?.name || order.tableId}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -2317,6 +2352,13 @@ export default function Services() {
                           <div className="text-xs text-slate-400">
                             Created by {getCreatorDisplayName(order)}
                           </div>
+                          {(order.Table || order.table || order.tableId) && (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                                Table: {order.Table?.name || order.table?.name || order.tableId}
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 pr-4">
                           {order.status !== "closed" ? (
@@ -2729,7 +2771,7 @@ export default function Services() {
                             )}
                           </div>
 
-                          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                          <div className={`mt-4 grid gap-3 sm:grid-cols-3 ${businessProfile?.settings?.enabledModules?.includes('tables') ? 'lg:grid-cols-4' : ''}`}>
                             <div>
                               <label className="label">
                                 {t("services.orderNo")}
@@ -2760,7 +2802,7 @@ export default function Services() {
                                 </option>
                               </select>
                             </div>
-                            <div>
+                             <div>
                               <label className="label">
                                 {t("services.deliveryDate")}
                               </label>
@@ -2772,6 +2814,24 @@ export default function Services() {
                                 onChange={handleHeaderChange}
                               />
                             </div>
+                            {businessProfile?.settings?.enabledModules?.includes('tables') && (
+                              <div>
+                                <label className="label">{t('tables.tableName') || 'Table'}</label>
+                                <select
+                                  name="tableId"
+                                  className="input mt-1"
+                                  value={header.tableId || ''}
+                                  onChange={handleHeaderChange}
+                                >
+                                  <option value="">No Table / Takeaway</option>
+                                  {vacantTables.map((table) => (
+                                    <option key={table.id} value={table.id}>
+                                      {table.name} {table.capacity ? `(Cap: ${table.capacity})` : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
                           </div>
                         </FormSectionCard>
 

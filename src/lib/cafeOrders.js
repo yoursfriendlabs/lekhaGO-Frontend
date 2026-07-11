@@ -109,12 +109,14 @@ export function buildCafeTableMap(orders = [], tables = getDefaultCafeTables()) 
 
   orders.forEach((order) => {
     const meta = getCafeOrderAttributes(order);
-    if (!meta.tableNo || !activeStatuses.has(meta.orderStatus)) return;
-    occupancyByTable.set(meta.tableNo, order);
+    if (!activeStatuses.has(meta.orderStatus)) return;
+    const tableIdentifier = order.tableId || meta.tableNo;
+    if (!tableIdentifier) return;
+    occupancyByTable.set(String(tableIdentifier), order);
   });
 
   return tables.map((table) => {
-    const order = occupancyByTable.get(table.id) || occupancyByTable.get(table.label) || null;
+    const order = occupancyByTable.get(String(table.id)) || occupancyByTable.get(table.label) || null;
     const orderMeta = order ? getCafeOrderAttributes(order) : null;
     const statusMeta = orderMeta ? getCafeOrderStatusMeta(orderMeta.orderStatus) : null;
 

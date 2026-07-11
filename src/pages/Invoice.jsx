@@ -108,6 +108,14 @@ export default function Invoice() {
                 Created By:{' '}
                 <span className="font-medium text-slate-700 dark:text-slate-300">{creatorName}</span>
               </p>
+              {(record.Table || record.table || record.tableId || record.attributes?.table_no) && (
+                <p className="mt-1 text-sm text-slate-500">
+                  Table:{' '}
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    {record.Table?.name || record.table?.name || record.attributes?.table_no}
+                  </span>
+                </p>
+              )}
             </div>
             {record.notes && (
               <div>
@@ -229,6 +237,11 @@ export default function Invoice() {
             <div>
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Details</p>
               <p className="mt-1">Created By: {creatorName}</p>
+              {(record.Table || record.table || record.tableId || record.attributes?.table_no) && (
+                <p className="mt-1">
+                  Table: {record.Table?.name || record.table?.name || record.attributes?.table_no}
+                </p>
+              )}
               {/* {record.notes ? <p className="mt-1 whitespace-pre-wrap">Notes: {record.notes}</p> : null} */}
             </div>
           </div>

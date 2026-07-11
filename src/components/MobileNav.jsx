@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Boxes, Users, ShoppingCart, Briefcase, Settings2, ClipboardList, Clock } from 'lucide-react';
+import { LayoutDashboard, Boxes, Users, ShoppingCart, Briefcase, Settings2, ClipboardList, Clock, Receipt, Coffee } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
@@ -14,6 +14,8 @@ const NAV_ROLE_MAP = {
   purchases: ['owner', 'staff', 'admin', 'super_admin'],
   parties: ['owner', 'staff', 'admin', 'super_admin'],
   tasks: ['owner', 'staff', 'admin', 'super_admin'],
+  tables: ['owner', 'staff', 'admin', 'super_admin'],
+  billing: ['owner', 'staff', 'admin', 'super_admin'],
   attendance: ['staff'],
   staff: ['owner', 'staff', 'admin', 'super_admin'],
   reports: ['owner', 'staff', 'admin', 'super_admin'],
@@ -29,6 +31,8 @@ const ICON_MAP = {
   purchases: ShoppingCart,
   parties: Users,
   tasks: ClipboardList,
+  tables: Coffee,
+  billing: Receipt,
   attendance: Clock,
   staff: Users,
   reports: ClipboardList,

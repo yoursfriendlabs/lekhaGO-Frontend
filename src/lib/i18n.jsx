@@ -108,6 +108,30 @@ const dictionaries = {
       sell: 'Sell',
       service: 'Services',
       stats: 'Stats',
+      tables: 'Tables',
+      billing: 'Billing Counter',
+    },
+    tables: {
+      title: 'Table Management',
+      subtitle: 'Create, update, and manage restaurant seating layout and tables.',
+      addTable: 'Add Table',
+      editTable: 'Edit Table',
+      tableName: 'Table Name',
+      capacity: 'Capacity',
+      status: 'Status',
+      active: 'Active',
+      actions: 'Actions',
+      vacant: 'Vacant',
+      occupied: 'Occupied',
+      all: 'All Statuses',
+      deleteConfirm: 'Are you sure you want to delete this table?',
+      saveTable: 'Save Table',
+      messages: {
+        created: 'Table created successfully.',
+        updated: 'Table updated successfully.',
+        deleted: 'Table deleted successfully.',
+        deleteError: 'Failed to delete table. Make sure it has no active sales or unpaid orders.'
+      }
     },
     settingsPage: {
       title: 'Settings',
@@ -1991,6 +2015,30 @@ const dictionaries = {
       service: 'सेवा',
       // expenses: 'खर्च',
       stats: 'तथ्याङ्क',
+      tables: 'टेबल',
+      billing: 'बिलिङ काउन्टर',
+    },
+    tables: {
+      title: 'टेबल व्यवस्थापन',
+      subtitle: 'रेस्टुरेन्टको सिट लेआउट र टेबलहरू सिर्जना, अपडेट र व्यवस्थापन गर्नुहोस्।',
+      addTable: 'टेबल थप्नुहोस्',
+      editTable: 'टेबल सम्पादन गर्नुहोस्',
+      tableName: 'टेबलको नाम',
+      capacity: 'क्षमता (सिट संख्या)',
+      status: 'स्थिति',
+      active: 'सक्रिय',
+      actions: 'कार्यहरू',
+      vacant: 'खाली',
+      occupied: 'व्यस्त (Occupied)',
+      all: 'सबै स्थिति',
+      deleteConfirm: 'के तपाईं यो टेबल हटाउन निश्चित हुनुहुन्छ?',
+      saveTable: 'टेबल सेभ गर्नुहोस्',
+      messages: {
+        created: 'टेबल सफलतापूर्वक थपियो।',
+        updated: 'टेबल सफलतापूर्वक अपडेट गरियो।',
+        deleted: 'टेबल सफलतापूर्वक हटाइयो।',
+        deleteError: 'टेबल हटाउन सकिएन। टेबलमा सक्रिय वा भुक्तानी नगरिएका अर्डरहरू नभएको निश्चित गर्नुहोस्।'
+      }
     },
     settingsPage: {
       title: 'सेटिङ',

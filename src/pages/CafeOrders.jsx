@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Clock, FileText, Pencil, Plus, ShoppingCart, Store, Trash2, Users } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
@@ -74,6 +74,7 @@ function deriveUnitPrice(product, unitType = 'primary') {
 }
 
 export default function CafeOrders() {
+  const navigate = useNavigate();
   const { businessId, user } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const { t } = useI18n();
@@ -119,7 +120,17 @@ export default function CafeOrders() {
   const [items, setItems] = useState([{ ...emptyItem }]);
 
   const salesRoute = businessProfile?.salesFlow?.route || '/app/pos';
-  const cafeTables = useMemo(() => getDefaultCafeTables(12), []);
+  const [backendTables, setBackendTables] = useState([]);
+
+  const cafeTables = useMemo(() => {
+    if (backendTables.length > 0) {
+      return backendTables.map((t) => ({
+        id: String(t.id),
+        label: t.name,
+      }));
+    }
+    return getDefaultCafeTables(12);
+  }, [backendTables]);
 
   const formatMoney = (value) => {
     const amount = Number(value || 0);
@@ -152,8 +163,22 @@ export default function CafeOrders() {
     }
   };
 
+  const loadBackendTables = async () => {
+    if (!businessId) {
+      setBackendTables([]);
+      return;
+    }
+    try {
+      const data = await api.getTables({ isActive: 'true', limit: 100 });
+      setBackendTables(data?.items || []);
+    } catch (err) {
+      console.error('Failed to load tables', err);
+    }
+  };
+
   useEffect(() => {
     loadOrders();
+    loadBackendTables();
   }, [businessId]);
 
   useEffect(() => {
@@ -308,7 +333,7 @@ export default function CafeOrders() {
         invoiceNo: order.invoiceNo || '',
         orderStatus: meta.orderStatus,
         orderType: meta.orderType,
-        tableNo: meta.tableNo,
+        tableNo: order.tableId || meta.tableNo,
         waiterName: meta.waiterName,
         guestCount: meta.guestCount || '2',
       });
@@ -359,16 +384,21 @@ export default function CafeOrders() {
     try {
       const manualInvoiceNo = String(orderFields.invoiceNo || '').trim();
       const { paymentMethod, bankId, paymentNote, ...headerFields } = orderFields;
+      
+      const matchedTable = backendTables.find(t => String(t.id) === String(orderFields.tableNo) || String(t.name) === String(orderFields.tableNo));
+      const resolvedTableNo = orderFields.orderType === 'dine_in' ? (matchedTable ? matchedTable.name : orderFields.tableNo) : '';
+
       const attributes = buildCafeOrderAttributes(attributeSnapshot, {
         orderStatus: orderFields.orderStatus,
         orderType: orderFields.orderType,
-        tableNo: orderFields.orderType === 'dine_in' ? orderFields.tableNo : '',
+        tableNo: resolvedTableNo,
         waiterName: orderFields.waiterName,
         guestCount: orderFields.guestCount,
       });
 
       const payload = {
         ...headerFields,
+        tableId: orderFields.orderType === 'dine_in' && matchedTable ? matchedTable.id : null,
         partyId: null,
         amountReceived: receivedAmount,
         attributes,
@@ -529,7 +559,7 @@ export default function CafeOrders() {
             <Link className="btn-ghost w-full justify-center sm:w-auto" to={salesRoute}>
               Open POS
             </Link>
-            <button className="btn-primary w-full sm:w-auto" type="button" onClick={() => openCreate()}>
+            <button className="btn-primary w-full sm:w-auto" type="button" onClick={() => navigate('/app/pos?ref=orders')}>
               <Plus size={16} className="mr-1.5 inline" />
               New Order
             </button>
@@ -567,7 +597,7 @@ export default function CafeOrders() {
                 <button
                   key={table.id}
                   type="button"
-                  onClick={() => setSelectedTableFilter((current) => (current === table.id ? '' : table.id))}
+                  onClick={() => navigate(`/app/pos?tableId=${table.id}&ref=orders`)}
                   className={`rounded-3xl border p-3.5 text-left transition sm:p-4 ${
                     isActive
                       ? 'border-[#9b6835] bg-[#9b6835]/8 shadow-sm'
@@ -751,7 +781,7 @@ export default function CafeOrders() {
                               type="button"
                               title="Edit order"
                               className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
-                              onClick={() => openEdit(order.id)}
+                              onClick={() => navigate(`/app/pos?tableId=${order.tableId || ''}&ref=orders`)}
                             >
                               <Pencil size={15} />
                             </button>

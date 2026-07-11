@@ -123,6 +123,7 @@ export default function Sales() {
     paymentNote: '',
     attachment: '',
     attributes: {},
+    tableId: '',
   });
   const [items, setItems] = useState([]);
   const quantityInputRef = useRef(null);
@@ -130,6 +131,7 @@ export default function Sales() {
   const [itemDraft, setItemDraft] = useState({ ...emptyItem });
   const [editingItemIdx, setEditingItemIdx] = useState(null);
   const [status, setStatus] = useState({ type: 'info', message: '' });
+  const [vacantTables, setVacantTables] = useState([]);
 
   useEffect(() => {
     if (status.type !== 'success' && status.type !== 'error') return;
@@ -446,6 +448,7 @@ export default function Sales() {
       paymentNote: '',
       attachment: '',
       attributes: {},
+      tableId: '',
     });
     setItems([]);
     setDeletedItemIds([]);
@@ -468,6 +471,26 @@ export default function Sales() {
     setShowItemDialog(false);
   };
 
+  const loadVacantTables = async (currentTableId = '') => {
+    try {
+      const data = await api.getTables({ status: 'vacant', isActive: 'true', limit: 100 });
+      let items = data?.items || [];
+      if (currentTableId && !items.some(t => t.id === currentTableId)) {
+        try {
+          const currentTable = await api.getTable(currentTableId);
+          if (currentTable) {
+            items = [currentTable, ...items];
+          }
+        } catch (e) {
+          console.warn('Failed to fetch current table details', e);
+        }
+      }
+      setVacantTables(items);
+    } catch (err) {
+      console.error('Failed to load vacant tables', err);
+    }
+  };
+
   const openCreate = async () => {
     if (!canManageSales) return;
     if (openingSaleForm) return;
@@ -479,6 +502,7 @@ export default function Sales() {
 
     try {
       if (businessId) {
+        loadVacantTables();
         try {
           const data = await api.getNextSequences();
           setSuggestedInvoiceNo(data?.nextSaleInvoiceNo || '');
@@ -522,6 +546,10 @@ export default function Sales() {
       const hydratedProducts = saleItems
         .map((item) => normalizeLookupProduct(item))
         .filter((product) => product.id);
+      
+      const currentTableId = sale.tableId || sale.Table?.id || sale.table?.id || '';
+      loadVacantTables(currentTableId);
+
       setHeader({
         partyId: sale.partyId || sale.customerId || '',
         invoiceNo: sale.invoiceNo || '',
@@ -532,6 +560,7 @@ export default function Sales() {
         ...normalizePaymentFields(sale),
         attachment: sale.attachment || '',
         attributes: sale.attributes || {},
+        tableId: currentTableId,
       });
       cacheProducts(hydratedProducts);
       setSelectedCustomer(party.id ? party : null);
@@ -584,6 +613,7 @@ export default function Sales() {
       const { paymentMethod, bankId, paymentNote, ...headerFields } = header;
       const payload = {
         ...headerFields,
+        tableId: header.tableId || null,
         status: derivedStatus,
         partyId: header.partyId || null,
         amountReceived: receivedAmount,
@@ -762,6 +792,24 @@ export default function Sales() {
                     <label className="label">{t('sales.saleDate')}</label>
                     <input type="date" className="input mt-1" name="saleDate" value={header.saleDate} onChange={handleHeaderChange} />
                   </div>
+                  {businessProfile?.settings?.enabledModules?.includes('tables') && (
+                    <div>
+                      <label className="label">{t('tables.tableName') || 'Table'}</label>
+                      <select
+                        name="tableId"
+                        className="input mt-1"
+                        value={header.tableId || ''}
+                        onChange={handleHeaderChange}
+                      >
+                        <option value="">No Table / Takeaway</option>
+                        {vacantTables.map((table) => (
+                          <option key={table.id} value={table.id}>
+                            {table.name} {table.capacity ? `(Cap: ${table.capacity})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
               </FormSectionCard>
 
@@ -1174,6 +1222,13 @@ export default function Sales() {
                         metaClassName="text-[11px]"
                       />
                       <p className="mt-1 text-xs text-slate-400 truncate">Created By: {getCreatorDisplayName(sale)}</p>
+                      {(sale.Table || sale.table || sale.tableId) && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                            Table: {sale.Table?.name || sale.table?.name || sale.tableId}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className="text-right shrink-0">
                       <StatusBadge status={sale.status} />
@@ -1260,6 +1315,13 @@ export default function Sales() {
                       <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
                         <div>{customerName || <span className="text-slate-400">—</span>}</div>
                         <div className="text-xs text-slate-400">Created By: {getCreatorDisplayName(sale)}</div>
+                        {(sale.Table || sale.table || sale.tableId) && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                              Table: {sale.Table?.name || sale.table?.name || sale.tableId}
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       <td className="py-2.5 pr-4">

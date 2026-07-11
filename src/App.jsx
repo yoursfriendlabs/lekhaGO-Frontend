@@ -42,6 +42,8 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const ActivateAccount = lazy(() => import('./pages/ActivateAccount'));
 const Landing = lazy(() => import('./pages/Landing'));
 const Invoice = lazy(() => import('./pages/Invoice'));
+const Tables = lazy(() => import('./pages/Tables'));
+const CashierBilling = lazy(() => import('./pages/CashierBilling'));
 
 const OWNER_AND_STAFF_ROLES = ['owner', 'staff'];
 
@@ -195,7 +197,7 @@ function AppShell() {
   const servicesEnabled = businessProfile?.modules?.services !== false;
   const cafeOrdersEnabled = businessProfile?.modules?.orders === true || businessProfile?.type === 'cafe';
   const salesRoute = businessProfile?.salesFlow?.route || '/app/pos';
-  const posPageElement = businessProfile?.type === 'cafe' && cafeOrdersEnabled ? <CafeOrders /> : <QuickPos />;
+  const posPageElement = <QuickPos />;
   const subscriptionGuard = getSubscriptionGuard(subscription);
   const subscriptionStatusState = getSubscriptionStatusState(subscription);
   const hasRecoverableBusinessMismatch = role === 'owner' && subscriptionAccess?.guard === 'business_missing';
@@ -333,6 +335,8 @@ function AppShell() {
                     )}
                   />
                   <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="parties"><Parties /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="tables" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="tables"><Tables /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="billing" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="sales"><CashierBilling /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route
                     path="tasks"
                     element={(
