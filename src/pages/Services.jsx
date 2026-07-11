@@ -221,10 +221,10 @@ function getDeliveryDaysLeft(deliveryDate) {
   return d.diff(today, "day");
 }
 
-function DeliveryBadge({ date }) {
+function DeliveryBadge({ date, isGym }) {
   if (!date) return <span className="text-slate-400">—</span>;
   const days = getDeliveryDaysLeft(date);
-  const label = formatMaybeDate(date, "D MMM");
+  const label = formatMaybeDate(date, "D MMM YYYY");
   const base =
     "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold";
   if (days === null) {
@@ -239,7 +239,7 @@ function DeliveryBadge({ date }) {
       <span
         className={`${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`}
       >
-        <Clock size={10} /> {label} · Overdue
+        <Clock size={10} /> {label} · {isGym ? "Expired" : "Overdue"}
       </span>
     );
   }
@@ -270,12 +270,12 @@ function DeliveryBadge({ date }) {
   );
 }
 
-function ClosedDeliveryLabel() {
+function ClosedDeliveryLabel({ isGym }) {
   const { t } = useI18n();
 
   return (
     <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-      {t("services.closed")}
+      {isGym ? "Completed / Inactive" : t("services.closed")}
     </span>
   );
 }
@@ -541,6 +541,7 @@ export default function Services() {
   const partyDropdownRef = useRef(null);
   const { settings: bizSettings, businessProfile } = useBusinessSettings();
   const businessType = String(businessProfile?.type || "").toLowerCase();
+  const isGym = businessType === "gym";
   const showGoldJewelleryDetails = businessType === "gold";
   const servicesFlow = businessProfile?.servicesFlow || {};
   const servicesEnabled = servicesFlow.enabled !== false;
@@ -2178,9 +2179,9 @@ export default function Services() {
 
                         <div className="mt-3 flex flex-wrap items-center gap-1.5">
                           {order.status !== "closed" ? (
-                            <DeliveryBadge date={order.deliveryDate} />
+                            <DeliveryBadge date={order.deliveryDate} isGym={isGym} />
                           ) : (
-                            <ClosedDeliveryLabel />
+                            <ClosedDeliveryLabel isGym={isGym} />
                           )}
                           <PaymentTypeSummary
                             source={order}
@@ -2281,7 +2282,7 @@ export default function Services() {
                     {t("services.customer")}
                   </th>
                   <th className="py-2 pr-4 text-left">
-                    {t("services.deliveryDate")}
+                    {isGym ? "Subscription End Date" : t("services.deliveryDate")}
                   </th>
                   <th className="py-2 pr-4 text-left">
                     {t("services.status")}
@@ -2362,9 +2363,9 @@ export default function Services() {
                         </td>
                         <td className="py-3 pr-4">
                           {order.status !== "closed" ? (
-                            <DeliveryBadge date={order.deliveryDate} />
+                            <DeliveryBadge date={order.deliveryDate} isGym={isGym} />
                           ) : (
-                            <ClosedDeliveryLabel />
+                            <ClosedDeliveryLabel isGym={isGym} />
                           )}
                         </td>
                         <td className="py-3 pr-4">
@@ -2804,7 +2805,7 @@ export default function Services() {
                             </div>
                              <div>
                               <label className="label">
-                                {t("services.deliveryDate")}
+                                {isGym ? "Subscription End Date" : t("services.deliveryDate")}
                               </label>
                               <input
                                 type="date"
@@ -2813,6 +2814,28 @@ export default function Services() {
                                 value={header.deliveryDate}
                                 onChange={handleHeaderChange}
                               />
+                              {isGym && (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {[
+                                    { label: "+1 Month", days: 30 },
+                                    { label: "+3 Months", days: 90 },
+                                    { label: "+6 Months", days: 180 },
+                                    { label: "+1 Year", days: 365 },
+                                  ].map((opt) => (
+                                    <button
+                                      key={opt.label}
+                                      type="button"
+                                      onClick={() => {
+                                        const nextDate = dayjs().add(opt.days, "day").format("YYYY-MM-DD");
+                                        setHeader((prev) => ({ ...prev, deliveryDate: nextDate }));
+                                      }}
+                                      className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:border-[#9c5f22] text-xs font-bold text-slate-600 bg-white hover:bg-[#9c5f22]/5 transition shadow-sm"
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                             {businessProfile?.settings?.enabledModules?.includes('tables') && (
                               <div>
@@ -3856,7 +3879,8 @@ export default function Services() {
                     date={
                       invoiceOrder.status !== "closed" &&
                       invoiceOrder.deliveryDate
-                        ? formatMaybeDate(
+                        ? (isGym ? "Expiry Date: " : "") +
+                          formatMaybeDate(
                             invoiceOrder.deliveryDate,
                             "MMMM D, YYYY",
                           )
