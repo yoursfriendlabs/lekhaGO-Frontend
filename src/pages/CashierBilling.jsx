@@ -132,9 +132,24 @@ export default function CashierBilling() {
     setLoadingSaleDetails(true);
     try {
       const fullSale = await api.getSale(table.activeSale.id);
+      const rawItems = fullSale.SaleItems || [];
+      const uniqueItems = [];
+      const seen = new Set();
+      for (const item of rawItems) {
+        if (!seen.has(item.productId)) {
+          seen.add(item.productId);
+          uniqueItems.push(item);
+        }
+      }
+      const correctSubTotal = uniqueItems.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
+      const discountAmount = Math.max(Number(fullSale.discount || 0), 0);
+      const beforeTax = Math.max(correctSubTotal - discountAmount, 0);
+      const taxRate = Number(fullSale.taxRate || 0);
+      const correctGrandTotal = beforeTax + (beforeTax * taxRate) / 100;
+
       setActiveSale(fullSale);
       setCheckoutForm({
-        amountReceived: String(fullSale.grandTotal || 0),
+        amountReceived: String(correctGrandTotal.toFixed(2)),
         discount: String(fullSale.discount || 0),
         taxRate: String(fullSale.taxRate || 0),
         paymentMethod: fullSale.paymentMethod || 'cash',
@@ -168,7 +183,16 @@ export default function CashierBilling() {
   const computedTotals = useMemo(() => {
     if (!activeSale) return { subTotal: 0, taxTotal: 0, discountTotal: 0, grandTotal: 0 };
 
-    const items = activeSale.SaleItems || [];
+    const rawItems = activeSale.SaleItems || [];
+    const items = [];
+    const seenProducts = new Set();
+    for (const item of rawItems) {
+      if (!seenProducts.has(item.productId)) {
+        seenProducts.add(item.productId);
+        items.push(item);
+      }
+    }
+
     const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
     const discountAmount = Math.max(Number(checkoutForm.discount || 0), 0);
     const beforeTax = Math.max(subTotal - discountAmount, 0);
@@ -184,11 +208,26 @@ export default function CashierBilling() {
     };
   }, [activeSale, checkoutForm.discount, checkoutForm.taxRate]);
 
+  const changeAmount = useMemo(() => {
+    const received = Number(checkoutForm.amountReceived || 0);
+    const total = computedTotals.grandTotal;
+    return Math.max(received - total, 0);
+  }, [checkoutForm.amountReceived, computedTotals.grandTotal]);
+
   // Adjust received amount dynamically on discount changes
   const handleDiscountChange = (val) => {
     setCheckoutForm((prev) => {
       const nextDiscount = val;
-      const subTotal = activeSale?.SaleItems?.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) || 0;
+      const rawItems = activeSale?.SaleItems || [];
+      const items = [];
+      const seen = new Set();
+      for (const item of rawItems) {
+        if (!seen.has(item.productId)) {
+          seen.add(item.productId);
+          items.push(item);
+        }
+      }
+      const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
       const beforeTax = Math.max(subTotal - Number(nextDiscount || 0), 0);
       const taxRate = Number(prev.taxRate || 0);
       const nextGrand = beforeTax + (beforeTax * taxRate) / 100;
@@ -205,7 +244,16 @@ export default function CashierBilling() {
   const handleTaxRateChange = (val) => {
     setCheckoutForm((prev) => {
       const nextTaxRate = val;
-      const subTotal = activeSale?.SaleItems?.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) || 0;
+      const rawItems = activeSale?.SaleItems || [];
+      const items = [];
+      const seen = new Set();
+      for (const item of rawItems) {
+        if (!seen.has(item.productId)) {
+          seen.add(item.productId);
+          items.push(item);
+        }
+      }
+      const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
       const discountAmount = Number(prev.discount || 0);
       const beforeTax = Math.max(subTotal - discountAmount, 0);
       const nextGrand = beforeTax + (beforeTax * Number(nextTaxRate || 0)) / 100;
@@ -257,6 +305,7 @@ export default function CashierBilling() {
       setStatus({ type: 'info', message: '' });
 
       const isPaidBill = received >= computedTotals.grandTotal;
+      const apiAmountReceived = isPaidBill ? computedTotals.grandTotal : received;
 
       const paymentPayload = {
         paymentMethod: checkoutForm.paymentMethod,
@@ -272,7 +321,7 @@ export default function CashierBilling() {
       const salePayload = {
         ...activeSale,
         status: isPaidBill ? 'paid' : 'due',
-        amountReceived: received,
+        amountReceived: apiAmountReceived,
         discount: computedTotals.discountTotal,
         discountTotal: computedTotals.discountTotal,
         taxRate: Number(checkoutForm.taxRate || 0),
@@ -281,16 +330,36 @@ export default function CashierBilling() {
         subTotal: computedTotals.subTotal,
         attributes: resolvedAttributes,
         ...(received > 0 ? buildPaymentPayload(paymentPayload) : { paymentMethod: 'cash' }),
-        items: (activeSale.SaleItems || []).map((item) => ({
-          id: item.id,
-          productId: item.productId,
-          quantity: Number(item.quantity || 0),
-          unitType: item.unitType || 'primary',
-          conversionRate: Number(item.conversionRate || 0),
-          unitPrice: Number(item.unitPrice || 0),
-          taxRate: Number(item.taxRate || 0),
-          lineTotal: Number(item.lineTotal || 0),
-        })),
+        items: (() => {
+          const rawItems = activeSale.SaleItems || [];
+          const unique = [];
+          const duplicates = [];
+          const seen = new Set();
+          for (const item of rawItems) {
+            if (!seen.has(item.productId)) {
+              seen.add(item.productId);
+              unique.push(item);
+            } else {
+              duplicates.push(item);
+            }
+          }
+          return [
+            ...unique.map((item) => ({
+              id: item.id,
+              productId: item.productId,
+              quantity: Number(item.quantity || 0),
+              unitType: item.unitType || 'primary',
+              conversionRate: Number(item.conversionRate || 0),
+              unitPrice: Number(item.unitPrice || 0),
+              taxRate: Number(item.taxRate || 0),
+              lineTotal: Number(item.lineTotal || 0),
+            })),
+            ...duplicates.map((item) => ({
+              id: item.id,
+              _delete: true,
+            })),
+          ];
+        })(),
       };
 
       const updatedSale = await api.updateSale(activeSale.id, salePayload);
@@ -597,17 +666,28 @@ export default function CashierBilling() {
               <div className="space-y-2">
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Order Summary</p>
                 <div className="max-h-48 overflow-y-auto border border-slate-100 rounded-2xl divide-y divide-slate-50 bg-slate-50/30">
-                  {(activeSale.SaleItems || []).map((item) => (
-                    <div key={item.id} className="p-3 flex items-center justify-between text-sm">
-                      <div className="min-w-0 pr-2">
-                        <p className="font-semibold text-slate-800 truncate">{item.productName || item.Product?.name || 'Unknown Item'}</p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          {item.quantity} x {formatMoney(item.unitPrice)}
-                        </p>
+                  {(() => {
+                    const rawItems = activeSale.SaleItems || [];
+                    const items = [];
+                    const seen = new Set();
+                    for (const item of rawItems) {
+                      if (!seen.has(item.productId)) {
+                        seen.add(item.productId);
+                        items.push(item);
+                      }
+                    }
+                    return items.map((item) => (
+                      <div key={item.id} className="p-3 flex items-center justify-between text-sm">
+                        <div className="min-w-0 pr-2">
+                          <p className="font-semibold text-slate-800 truncate">{item.productName || item.Product?.name || 'Unknown Item'}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {item.quantity} x {formatMoney(item.unitPrice)}
+                          </p>
+                        </div>
+                        <span className="font-bold text-slate-800 shrink-0">{formatMoney(item.lineTotal)}</span>
                       </div>
-                      <span className="font-bold text-slate-800 shrink-0">{formatMoney(item.lineTotal)}</span>
-                    </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
               </div>
 
@@ -698,6 +778,17 @@ export default function CashierBilling() {
                     </button>
                   ))}
                 </div>
+
+                {/* Change return section */}
+                {changeAmount > 0 && (
+                  <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex justify-between items-center text-sm font-bold shadow-sm">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles size={16} className="text-emerald-600" />
+                      Change to Return
+                    </span>
+                    <span className="text-base text-emerald-700">{formatMoney(changeAmount)}</span>
+                  </div>
+                )}
 
                 {/* Payment Method Fields */}
                 <PaymentMethodFields

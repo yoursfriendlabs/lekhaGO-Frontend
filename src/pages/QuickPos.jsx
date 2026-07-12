@@ -194,6 +194,7 @@ export default function QuickPos() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [cart, setCart] = useState([]);
+  const [deletedItemIds, setDeletedItemIds] = useState([]);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [partySelectorOpen, setPartySelectorOpen] = useState(false);
   const [selectedParty, setSelectedParty] = useState(null);
@@ -309,6 +310,7 @@ export default function QuickPos() {
       setCart([]);
       setEditingId(null);
       setCheckoutForm(emptyCheckoutForm);
+      setDeletedItemIds([]);
       return;
     }
 
@@ -327,6 +329,7 @@ export default function QuickPos() {
           const product = productsById[String(item.productId)];
           const uPrice = String(item.unitPrice || 0);
           return {
+            id: item.id,
             productId: item.productId,
             name: product?.name || item.productName || "Unknown Product",
             categoryName: product?.categoryName || "",
@@ -347,6 +350,7 @@ export default function QuickPos() {
         ignoreAutoSaveRef.current = true;
         setEditingId(activeOrder.id);
         setCart(mappedCart);
+        setDeletedItemIds([]);
 
         setCheckoutForm({
           saleDate: fullSale.saleDate || todayISODate(),
@@ -365,6 +369,7 @@ export default function QuickPos() {
         ignoreAutoSaveRef.current = true;
         setCart([]);
         setEditingId(null);
+        setDeletedItemIds([]);
         setCheckoutForm({
           ...emptyCheckoutForm,
           tableId: String(tableId),
@@ -631,27 +636,53 @@ export default function QuickPos() {
             order_type: "dine_in",
             table_no: resolvedTableNo || currentActiveAttributes?.table_no || "",
           },
-          items: currentCart.map((item) => ({
-            productId: item.productId,
-            quantity: Number(item.quantity || 0),
-            unitType: item.unitType || "primary",
-            conversionRate: Number(
-              item.conversionRate ||
-                getProductById(item.productId)?.conversionRate ||
-                0,
-            ),
-            unitPrice: Number(item.unitPrice || 0),
-            taxRate: Number(item.taxRate || 0),
-            lineTotal: Number(item.lineTotal || 0),
-          })),
+          items: [
+            ...currentCart.map((item) => ({
+              id: item.id,
+              productId: item.productId,
+              quantity: Number(item.quantity || 0),
+              unitType: item.unitType || "primary",
+              conversionRate: Number(
+                item.conversionRate ||
+                  getProductById(item.productId)?.conversionRate ||
+                  0,
+              ),
+              unitPrice: Number(item.unitPrice || 0),
+              taxRate: Number(item.taxRate || 0),
+              lineTotal: Number(item.lineTotal || 0),
+            })),
+            ...deletedItemIds.map((id) => ({ id, _delete: true })),
+          ],
         };
 
         if (currentEditingId) {
-          await api.updateSale(currentEditingId, payload);
+          const res = await api.updateSale(currentEditingId, payload);
+          if (res?.SaleItems) {
+            setCart((prevCart) =>
+              prevCart.map((cartItem) => {
+                const dbItem = res.SaleItems.find(
+                  (db) => db.productId === cartItem.productId
+                );
+                return dbItem ? { ...cartItem, id: dbItem.id } : cartItem;
+              })
+            );
+          }
+          setDeletedItemIds([]);
         } else {
           const created = await api.createSale(payload);
           if (created?.id) {
             setEditingId(created.id);
+            if (created?.SaleItems) {
+              setCart((prevCart) =>
+                prevCart.map((cartItem) => {
+                  const dbItem = created.SaleItems.find(
+                    (db) => db.productId === cartItem.productId
+                  );
+                  return dbItem ? { ...cartItem, id: dbItem.id } : cartItem;
+                })
+              );
+            }
+            setDeletedItemIds([]);
           }
         }
       } catch (err) {
@@ -660,7 +691,7 @@ export default function QuickPos() {
     }, 800);
 
     return () => clearTimeout(delayDebounce);
-  }, [cart, activeTableId, editingId, isTablesEnabled, checkoutForm, selectedParty, activeAttributes, loading]);
+  }, [cart, activeTableId, editingId, isTablesEnabled, checkoutForm, selectedParty, activeAttributes, loading, deletedItemIds]);
 
   const addProductToCart = (product, unitType = "primary") => {
     if (!product?.id) return;
@@ -738,8 +769,12 @@ export default function QuickPos() {
       return;
     }
 
-    setCart((previous) =>
-      previous
+    setCart((previous) => {
+      const targetItem = previous.find((item) => item.productId === productId);
+      if (targetItem && requestedQty <= 0 && targetItem.id) {
+        setDeletedItemIds((current) => [...current, targetItem.id]);
+      }
+      return previous
         .map((item) => {
           if (item.productId !== productId) return item;
           const quantity = requestedQty;
@@ -749,8 +784,8 @@ export default function QuickPos() {
             lineTotal: (quantity * Number(item.unitPrice || 0)).toFixed(2),
           };
         })
-        .filter((item) => Number(item.quantity || 0) > 0),
-    );
+        .filter((item) => Number(item.quantity || 0) > 0);
+    });
   };
 
   const updateCartPrice = (productId, nextPrice) => {
@@ -812,6 +847,7 @@ export default function QuickPos() {
     setActiveTableId("");
     setEditingId(null);
     setActiveAttributes({});
+    setDeletedItemIds([]);
   };
 
   const handleSuccessClose = () => {
@@ -904,19 +940,23 @@ export default function QuickPos() {
           order_type: activeAttributes?.order_type || "dine_in",
           table_no: resolvedTableNo || activeAttributes?.table_no || "",
         },
-        items: cart.map((item) => ({
-          productId: item.productId,
-          quantity: Number(item.quantity || 0),
-          unitType: item.unitType || "primary",
-          conversionRate: Number(
-            item.conversionRate ||
-              getProductById(item.productId)?.conversionRate ||
-              0,
-          ),
-          unitPrice: Number(item.unitPrice || 0),
-          taxRate: Number(item.taxRate || 0),
-          lineTotal: Number(item.lineTotal || 0),
-        })),
+        items: [
+          ...cart.map((item) => ({
+            id: item.id,
+            productId: item.productId,
+            quantity: Number(item.quantity || 0),
+            unitType: item.unitType || "primary",
+            conversionRate: Number(
+              item.conversionRate ||
+                getProductById(item.productId)?.conversionRate ||
+                0,
+            ),
+            unitPrice: Number(item.unitPrice || 0),
+            taxRate: Number(item.taxRate || 0),
+            lineTotal: Number(item.lineTotal || 0),
+          })),
+          ...deletedItemIds.map((id) => ({ id, _delete: true })),
+        ],
       };
 
       if (manualInvoiceNo) {
