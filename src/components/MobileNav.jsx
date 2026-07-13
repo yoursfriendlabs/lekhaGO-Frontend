@@ -35,6 +35,7 @@ const ICON_MAP = {
   billing: Receipt,
   attendance: Clock,
   staff: Users,
+  'staff-salary': Users,
   reports: ClipboardList,
   settings: Settings2,
 };
@@ -85,10 +86,20 @@ export default function MobileNav() {
     if (item?.key === 'staff') return { ...item, label: t('nav.staff') };
     return item;
   });
-  const visibleNavItems = navigation
-    .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
-    .filter((item) => hasFeatureAccess(item.key))
-    .filter((item) => !(isGeneralStaff && item.key === 'dashboard'));
+
+  const membershipId = accessControl?.membershipId;
+  let visibleNavItems;
+  if (isGeneralStaff) {
+    const salaryRoute = membershipId ? `/app/staff-salary/${encodeURIComponent(membershipId)}` : '/app/staff';
+    visibleNavItems = [
+      { key: 'staff-salary', label: t('nav.staff'), route: salaryRoute },
+      { key: 'attendance', label: t('nav.attendance'), route: '/app/attendance' },
+    ];
+  } else {
+    visibleNavItems = navigation
+      .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
+      .filter((item) => hasFeatureAccess(item.key));
+  }
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200/70 bg-white/95 px-2 py-2 shadow-lg backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/90 md:hidden">

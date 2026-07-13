@@ -180,9 +180,13 @@ export default function Dashboard() {
   const { canViewFeature, canManageFeature, accessControl } = useAuth();
   const { businessProfile } = useBusinessSettings();
 
-  /* ── Redirect general staff to their salary profile ── */
-  if (accessControl?.staffCategory === 'general_staff' && accessControl?.membershipId) {
-    return <Navigate to={`/app/staff-salary/${encodeURIComponent(accessControl.membershipId)}`} replace />;
+  /* ── Redirect general staff to their salary profile (or staff list if membershipId missing) ── */
+  if (accessControl?.staffCategory === 'general_staff') {
+    if (accessControl?.membershipId) {
+      return <Navigate to={`/app/staff-salary/${encodeURIComponent(accessControl.membershipId)}`} replace />;
+    }
+
+    return <Navigate to="/app/staff" replace />;
   }
   const [summary, setSummary] = useState(() => EMPTY_SUMMARY);
   const [loadError, setLoadError] = useState('');
