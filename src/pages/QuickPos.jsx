@@ -106,12 +106,15 @@ function getConversionRate(product = {}) {
   return Number(product?.conversionRate || 0);
 }
 
-function getAvailableStockQuantity(product, unitType = "primary", fallback = {}) {
+function getAvailableStockQuantity(
+  product,
+  unitType = "primary",
+  fallback = {},
+) {
   const stockOnHand = getStockQuantity(product) || getStockQuantity(fallback);
   const conversionRate =
     getConversionRate(product) || getConversionRate(fallback);
-  const secondaryUnit =
-    product?.secondaryUnit || fallback?.secondaryUnit || "";
+  const secondaryUnit = product?.secondaryUnit || fallback?.secondaryUnit || "";
 
   if (unitType === "secondary" && secondaryUnit && conversionRate > 0) {
     return stockOnHand * conversionRate;
@@ -208,7 +211,10 @@ export default function QuickPos() {
     return null;
   });
 
-  const vacantTables = useMemo(() => allTables.filter((t) => t.status === "vacant"), [allTables]);
+  const vacantTables = useMemo(
+    () => allTables.filter((t) => t.status === "vacant"),
+    [allTables],
+  );
   const [showAmountReceivedInput, setShowAmountReceivedInput] = useState(false);
   const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState("");
   const [isPaid, setIsPaid] = useState(true);
@@ -318,7 +324,8 @@ export default function QuickPos() {
     try {
       const activeSales = await api.listSales({ limit: 120 });
       const activeOrder = (activeSales?.items || []).find(
-        (sale) => String(sale.tableId) === String(tableId) && sale.status === "due"
+        (sale) =>
+          String(sale.tableId) === String(tableId) && sale.status === "due",
       );
 
       if (activeOrder) {
@@ -340,7 +347,9 @@ export default function QuickPos() {
             lineTotal: Number(item.lineTotal || 0).toFixed(2),
             primaryUnit: product?.primaryUnit || "",
             secondaryUnit: product?.secondaryUnit || "",
-            conversionRate: Number(item.conversionRate || product?.conversionRate || 0),
+            conversionRate: Number(
+              item.conversionRate || product?.conversionRate || 0,
+            ),
             secondarySalePrice: Number(product?.secondarySalePrice || 0),
             salePrice: Number(product?.salePrice || product?.sellingPrice || 0),
             stockOnHand: Number(product?.stockOnHand || 0),
@@ -365,7 +374,9 @@ export default function QuickPos() {
         });
         setActiveAttributes(fullSale?.attributes || {});
       } else {
-        await api.updateTable(tableId, { status: "occupied" }).catch(() => null);
+        await api
+          .updateTable(tableId, { status: "occupied" })
+          .catch(() => null);
         ignoreAutoSaveRef.current = true;
         setCart([]);
         setEditingId(null);
@@ -385,7 +396,8 @@ export default function QuickPos() {
 
   useEffect(() => {
     if (businessProfile) {
-      const tablesEnabled = businessProfile?.settings?.enabledModules?.includes("tables");
+      const tablesEnabled =
+        businessProfile?.settings?.enabledModules?.includes("tables");
       if (!tablesEnabled) {
         setActiveSessionOption("takeaway");
       }
@@ -602,16 +614,26 @@ export default function QuickPos() {
           if (currentEditingId) {
             await api.deleteSale(currentEditingId);
             setEditingId(null);
-            await api.updateTable(currentActiveTableId, { status: "vacant" }).catch(() => null);
+            await api
+              .updateTable(currentActiveTableId, { status: "vacant" })
+              .catch(() => null);
           }
           return;
         }
 
-        const matchedTable = allTables.find((t) => String(t.id) === String(currentActiveTableId));
+        const matchedTable = allTables.find(
+          (t) => String(t.id) === String(currentActiveTableId),
+        );
         const resolvedTableNo = matchedTable ? matchedTable.name : "";
 
-        const subTotal = currentCart.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
-        const discountAmount = Math.max(Number(currentCheckoutForm.discount || 0), 0);
+        const subTotal = currentCart.reduce(
+          (sum, item) => sum + Number(item.lineTotal || 0),
+          0,
+        );
+        const discountAmount = Math.max(
+          Number(currentCheckoutForm.discount || 0),
+          0,
+        );
         const beforeTax = Math.max(subTotal - discountAmount, 0);
         const taxRate = Number(currentCheckoutForm.taxRate || 0);
         const taxTotal = (beforeTax * taxRate) / 100;
@@ -634,7 +656,8 @@ export default function QuickPos() {
             ...(currentActiveAttributes || {}),
             order_status: currentActiveAttributes?.order_status || "new",
             order_type: "dine_in",
-            table_no: resolvedTableNo || currentActiveAttributes?.table_no || "",
+            table_no:
+              resolvedTableNo || currentActiveAttributes?.table_no || "",
           },
           items: [
             ...currentCart.map((item) => ({
@@ -661,10 +684,10 @@ export default function QuickPos() {
             setCart((prevCart) =>
               prevCart.map((cartItem) => {
                 const dbItem = res.SaleItems.find(
-                  (db) => db.productId === cartItem.productId
+                  (db) => db.productId === cartItem.productId,
                 );
                 return dbItem ? { ...cartItem, id: dbItem.id } : cartItem;
-              })
+              }),
             );
           }
           setDeletedItemIds([]);
@@ -676,10 +699,10 @@ export default function QuickPos() {
               setCart((prevCart) =>
                 prevCart.map((cartItem) => {
                   const dbItem = created.SaleItems.find(
-                    (db) => db.productId === cartItem.productId
+                    (db) => db.productId === cartItem.productId,
                   );
                   return dbItem ? { ...cartItem, id: dbItem.id } : cartItem;
-                })
+                }),
               );
             }
             setDeletedItemIds([]);
@@ -691,7 +714,17 @@ export default function QuickPos() {
     }, 800);
 
     return () => clearTimeout(delayDebounce);
-  }, [cart, activeTableId, editingId, isTablesEnabled, checkoutForm, selectedParty, activeAttributes, loading, deletedItemIds]);
+  }, [
+    cart,
+    activeTableId,
+    editingId,
+    isTablesEnabled,
+    checkoutForm,
+    selectedParty,
+    activeAttributes,
+    loading,
+    deletedItemIds,
+  ]);
 
   const addProductToCart = (product, unitType = "primary") => {
     if (!product?.id) return;
@@ -716,7 +749,7 @@ export default function QuickPos() {
         if (newQty > availableStock) {
           showError(
             t("sales.insufficientStock") ||
-            `Insufficient stock for ${product.name}. Available: ${availableStock}`
+              `Insufficient stock for ${product.name}. Available: ${availableStock}`,
           );
           return previous;
         }
@@ -726,19 +759,21 @@ export default function QuickPos() {
           return {
             ...item,
             quantity: newQty,
-            lineTotal: Number(newQty * Number(item.unitPrice || 0)).toFixed(
-              2,
-            ),
+            lineTotal: Number(newQty * Number(item.unitPrice || 0)).toFixed(2),
           };
         });
       }
 
       // Check stock availability for new item
-      const availableStock = getAvailableStockQuantity(product, unitType, product);
+      const availableStock = getAvailableStockQuantity(
+        product,
+        unitType,
+        product,
+      );
       if (1 > availableStock) {
         showError(
           t("sales.insufficientStock") ||
-          `Insufficient stock for ${product.name}. Available: ${availableStock}`
+            `Insufficient stock for ${product.name}. Available: ${availableStock}`,
         );
         return previous;
       }
@@ -764,7 +799,7 @@ export default function QuickPos() {
     if (requestedQty > 0 && requestedQty > availableStock) {
       showError(
         t("sales.insufficientStock") ||
-        `Insufficient stock for ${product?.name}. Available: ${availableStock}`
+          `Insufficient stock for ${product?.name}. Available: ${availableStock}`,
       );
       return;
     }
@@ -897,8 +932,8 @@ export default function QuickPos() {
         .join(", ");
       setStatus({
         type: "error",
-        message: t("sales.insufficientStock") ||
-          `Insufficient stock: ${itemNames}`,
+        message:
+          t("sales.insufficientStock") || `Insufficient stock: ${itemNames}`,
       });
       return;
     }
@@ -916,8 +951,12 @@ export default function QuickPos() {
       const { paymentMethod, bankId, paymentNote, discount, ...headerFields } =
         checkoutForm;
       const isPaidBill = dueAmount <= 0;
-      const orderStatus = isPaidBill ? "completed" : (activeAttributes?.order_status || "new");
-      const matchedTable = allTables.find((t) => String(t.id) === String(checkoutForm.tableId));
+      const orderStatus = isPaidBill
+        ? "completed"
+        : activeAttributes?.order_status || "new";
+      const matchedTable = allTables.find(
+        (t) => String(t.id) === String(checkoutForm.tableId),
+      );
       const resolvedTableNo = matchedTable ? matchedTable.name : "";
 
       const payload = {
@@ -966,7 +1005,9 @@ export default function QuickPos() {
       }
 
       const creatorValue = getCurrentCreatorValue(user);
-      const salePayload = creatorValue ? { ...payload, createdBy: creatorValue } : payload;
+      const salePayload = creatorValue
+        ? { ...payload, createdBy: creatorValue }
+        : payload;
       let created;
       if (editingId) {
         created = await api.updateSale(editingId, payload);
@@ -977,9 +1018,13 @@ export default function QuickPos() {
       // Sync table status in database
       if (payload.tableId) {
         if (payload.status === "paid") {
-          await api.updateTable(payload.tableId, { status: "vacant" }).catch(() => null);
+          await api
+            .updateTable(payload.tableId, { status: "vacant" })
+            .catch(() => null);
         } else {
-          await api.updateTable(payload.tableId, { status: "occupied" }).catch(() => null);
+          await api
+            .updateTable(payload.tableId, { status: "occupied" })
+            .catch(() => null);
         }
       }
 
@@ -989,9 +1034,7 @@ export default function QuickPos() {
       // the correct inventory without requiring a page refresh.
       setProducts((prevProducts) =>
         prevProducts.map((product) => {
-          const cartItem = cart.find(
-            (item) => item.productId === product.id,
-          );
+          const cartItem = cart.find((item) => item.productId === product.id);
           if (!cartItem) return product;
 
           const quantitySold = Number(cartItem.quantity || 0);
@@ -1132,7 +1175,6 @@ export default function QuickPos() {
     });
   };
 
-
   const footerBar = (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 rounded-[24px] bg-slate-100 p-3 sm:p-4">
@@ -1249,14 +1291,14 @@ export default function QuickPos() {
         <div className="rounded-[32px] border border-dashed border-slate-200 bg-white/90 p-12 text-center text-slate-500 max-w-4xl mx-auto flex items-center justify-center h-64">
           <div className="space-y-3">
             <span className="h-6 w-6 rounded-full border-2 border-[#9b6835] border-t-transparent animate-spin inline-block" />
-            <p className="text-sm font-semibold">{t("common.loading") || "Loading POS..."}</p>
+            <p className="text-sm font-semibold">
+              {t("common.loading") || "Loading POS..."}
+            </p>
           </div>
         </div>
       </div>
     );
   }
-
-
 
   if (isTablesEnabled && activeSessionOption === null) {
     return (
@@ -1270,12 +1312,19 @@ export default function QuickPos() {
                 <button
                   type="button"
                   className="btn-ghost h-11 justify-center rounded-[18px]"
-                  onClick={() => navigate(queryRef === "orders" ? "/app/orders" : "/app/billing")}
+                  onClick={() =>
+                    navigate(
+                      queryRef === "orders" ? "/app/orders" : "/app/billing",
+                    )
+                  }
                 >
                   ← {queryRef === "orders" ? "Seating Map" : "Billing Counter"}
                 </button>
               )}
-              <Link className="btn-ghost h-11 justify-center rounded-[18px]" to="/app/sales">
+              <Link
+                className="btn-ghost h-11 justify-center rounded-[18px]"
+                to="/app/sales"
+              >
                 {t("quickPos.detailedSales")}
               </Link>
             </div>
@@ -1288,8 +1337,13 @@ export default function QuickPos() {
 
         <div className="rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-sm max-w-4xl mx-auto space-y-6">
           <div className="text-center space-y-2">
-            <h2 className="text-2xl font-bold text-slate-800">Select Order Type & Seating Area</h2>
-            <p className="text-sm text-slate-500">Choose one of the order options below to start adding items to order.</p>
+            <h2 className="text-2xl font-bold text-slate-800">
+              Select Order Type & Seating Area
+            </h2>
+            <p className="text-sm text-slate-500">
+              Choose one of the order options below to start adding items to
+              order.
+            </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1305,8 +1359,12 @@ export default function QuickPos() {
                 <span className="inline-flex items-center justify-center p-3 rounded-2xl bg-amber-50 text-amber-600 mb-2">
                   <ShoppingBag size={24} />
                 </span>
-                <h3 className="text-lg font-bold text-slate-800">Takeaway / Walk-in</h3>
-                <p className="text-xs text-slate-500">Dine-out order, ready for direct billing and quick checkout.</p>
+                <h3 className="text-lg font-bold text-slate-800">
+                  Takeaway / Walk-in
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Dine-out order, ready for direct billing and quick checkout.
+                </p>
               </div>
               <span className="text-xs font-bold text-[#9c5f22] flex items-center gap-1 pt-2">
                 Start Walk-in Order <ArrowRight size={14} />
@@ -1325,8 +1383,13 @@ export default function QuickPos() {
                 <span className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-50 text-blue-600 mb-2">
                   <Package2 size={24} />
                 </span>
-                <h3 className="text-lg font-bold text-slate-800">Home Delivery</h3>
-                <p className="text-xs text-slate-500">Delivery order, reference party addresses and track runner details.</p>
+                <h3 className="text-lg font-bold text-slate-800">
+                  Home Delivery
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Delivery order, reference party addresses and track runner
+                  details.
+                </p>
               </div>
               <span className="text-xs font-bold text-[#9c5f22] flex items-center gap-1 pt-2">
                 Start Delivery Order <ArrowRight size={14} />
@@ -1335,8 +1398,10 @@ export default function QuickPos() {
           </div>
 
           <div className="border-t border-slate-100 pt-6">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Dine-in Floor Map</h3>
-            
+            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">
+              Dine-in Floor Map
+            </h3>
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {allTables.map((table) => {
                 const isOccupied = table.status === "occupied";
@@ -1355,11 +1420,17 @@ export default function QuickPos() {
                     }`}
                   >
                     <div className="flex items-center justify-between gap-1 w-full">
-                      <span className="text-sm font-bold truncate max-w-[80%]">{table.name}</span>
-                      <span className={`h-2 w-2 rounded-full ${isOccupied ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`} />
+                      <span className="text-sm font-bold truncate max-w-[80%]">
+                        {table.name}
+                      </span>
+                      <span
+                        className={`h-2 w-2 rounded-full ${isOccupied ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`}
+                      />
                     </div>
                     {table.capacity && (
-                      <span className="text-xs text-slate-400">{table.capacity} seats</span>
+                      <span className="text-xs text-slate-400">
+                        {table.capacity} seats
+                      </span>
                     )}
                     <span className="text-[10px] uppercase font-bold tracking-wider pt-2">
                       {isOccupied ? "Active Bill" : "Available"}
@@ -1385,7 +1456,11 @@ export default function QuickPos() {
               <button
                 type="button"
                 className="btn-ghost h-11 justify-center rounded-[18px]"
-                onClick={() => navigate(queryRef === "orders" ? "/app/orders" : "/app/billing")}
+                onClick={() =>
+                  navigate(
+                    queryRef === "orders" ? "/app/orders" : "/app/billing",
+                  )
+                }
               >
                 ← {queryRef === "orders" ? "Seating Map" : "Billing Counter"}
               </button>
@@ -1404,7 +1479,11 @@ export default function QuickPos() {
                 {activeTableId ? (
                   <>
                     <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse mr-2" />
-                    Table: {allTables.find((t) => String(t.id) === String(activeTableId))?.name || activeTableId} {editingId ? " (Editing)" : ""}
+                    Table:{" "}
+                    {allTables.find(
+                      (t) => String(t.id) === String(activeTableId),
+                    )?.name || activeTableId}{" "}
+                    {editingId ? " (Editing)" : ""}
                   </>
                 ) : activeSessionOption === "takeaway" ? (
                   "Walk-in / Takeaway ▾"
@@ -1416,7 +1495,10 @@ export default function QuickPos() {
               </button>
             )}
 
-            <Link className="btn-ghost h-11 justify-center rounded-[18px]" to="/app/sales">
+            <Link
+              className="btn-ghost h-11 justify-center rounded-[18px]"
+              to="/app/sales"
+            >
               {t("quickPos.detailedSales")}
             </Link>
           </div>
@@ -1453,7 +1535,9 @@ export default function QuickPos() {
             {businessProfile?.settings?.enabledModules?.includes("tables") && (
               <div className="flex items-center justify-between bg-[#9c5f22]/5 rounded-2xl p-3 mb-3 border border-[#9c5f22]/10 md:hidden">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#9c5f22]/80">Active Order Table</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#9c5f22]/80">
+                    Active Order Table
+                  </p>
                   <p className="text-sm font-bold text-slate-800">
                     {activeTableId
                       ? `${allTables.find((t) => String(t.id) === String(activeTableId))?.name || activeTableId}${editingId ? " (Active Bill)" : ""}`
@@ -1589,7 +1673,7 @@ export default function QuickPos() {
                       }`}
                     >
                       <div className="flex flex-1 flex-col p-2.5">
-<div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
                             <p
                               className={`truncate text-xs font-bold text-slate-900 ${isOutOfStock ? "text-red-900" : ""}`}
@@ -1799,7 +1883,10 @@ export default function QuickPos() {
                               className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
                               value={item.quantity}
                               onChange={(e) =>
-                                updateCartQuantity(item.productId, e.target.value)
+                                updateCartQuantity(
+                                  item.productId,
+                                  e.target.value,
+                                )
                               }
                             />
                             <span className="min-w-0 truncate text-xs text-slate-500">
@@ -1837,7 +1924,9 @@ export default function QuickPos() {
               <div className="mt-4 min-w-0 space-y-3 border-t border-slate-200 pt-4">
                 <div className="flex items-center justify-between gap-2 text-sm text-slate-500">
                   <span className="min-w-0">{t("sales.subTotal")}</span>
-                  <span className="shrink-0 text-right">{money(totals.subTotal)}</span>
+                  <span className="shrink-0 text-right">
+                    {money(totals.subTotal)}
+                  </span>
                 </div>
 
                 <label className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(6.5rem,8rem)] items-center gap-2 text-sm text-slate-500">
@@ -1908,7 +1997,9 @@ export default function QuickPos() {
 
                 {selectedParty && (
                   <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(6.5rem,8rem)] items-center gap-2 text-sm text-slate-500">
-                    <span className="min-w-0 truncate">{t("services.amountReceived")}</span>
+                    <span className="min-w-0 truncate">
+                      {t("services.amountReceived")}
+                    </span>
                     {showAmountReceivedInput && !isPaid ? (
                       <div className="min-w-0">
                         <div className="relative">
@@ -1963,13 +2054,17 @@ export default function QuickPos() {
                 {selectedParty && dueAmount > 0 && (
                   <div className="flex items-center justify-between gap-2 text-sm font-semibold text-amber-600">
                     <span className="min-w-0">{t("sales.dueAmount")}</span>
-                    <span className="shrink-0 text-right">{money(dueAmount)}</span>
+                    <span className="shrink-0 text-right">
+                      {money(dueAmount)}
+                    </span>
                   </div>
                 )}
 
                 <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
                   <span className="min-w-0">{t("sales.grandTotal")}</span>
-                  <span className="shrink-0 text-right">{money(totals.grandTotal)}</span>
+                  <span className="shrink-0 text-right">
+                    {money(totals.grandTotal)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -2292,7 +2387,9 @@ export default function QuickPos() {
           {status.message ? (
             <Notice title={status.message} tone={status.type} />
           ) : null}
-          <div className={`grid gap-2 sm:grid-cols-2 ${businessProfile?.settings?.enabledModules?.includes('tables') ? 'lg:grid-cols-3' : ''}`}>
+          <div
+            className={`grid gap-2 sm:grid-cols-2 ${businessProfile?.settings?.enabledModules?.includes("tables") ? "lg:grid-cols-3" : ""}`}
+          >
             <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 transition focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-200">
               <span className="text-xs font-medium uppercase text-slate-500">
                 {t("quickPos.invoiceNumber")}
@@ -2327,7 +2424,7 @@ export default function QuickPos() {
               />
             </label>
 
-            {businessProfile?.settings?.enabledModules?.includes('tables') && (
+            {businessProfile?.settings?.enabledModules?.includes("tables") && (
               <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 transition focus-within:border-[#9c5f22] focus-within:ring-1 focus-within:ring-[#9c5f22]/20">
                 <span className="text-xs font-medium uppercase text-slate-500">
                   {t("tables.tableName") || "Table"}
@@ -2345,7 +2442,8 @@ export default function QuickPos() {
                   <option value="">No Table / Takeaway</option>
                   {vacantTables.map((table) => (
                     <option key={table.id} value={table.id}>
-                      {table.name} {table.capacity ? `(Cap: ${table.capacity})` : ""}
+                      {table.name}{" "}
+                      {table.capacity ? `(Cap: ${table.capacity})` : ""}
                     </option>
                   ))}
                 </select>
@@ -2402,7 +2500,9 @@ export default function QuickPos() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-slate-900">{item.name}</p>
+                      <p className="truncate font-medium text-slate-900">
+                        {item.name}
+                      </p>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1 text-slate-600">
                         <span>{t("currency.symbol")}</span>
                         <input
@@ -2460,7 +2560,9 @@ export default function QuickPos() {
                       >
                         <X size={10} />
                       </button>
-                      <span className="font-bold text-primary-700">{money(item.lineTotal)}</span>
+                      <span className="font-bold text-primary-700">
+                        {money(item.lineTotal)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -2567,18 +2669,24 @@ export default function QuickPos() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs text-slate-600">
                     <span>{t("sales.subTotal")}</span>
-                    <span className="font-semibold text-slate-900">{money(totals.subTotal)}</span>
+                    <span className="font-semibold text-slate-900">
+                      {money(totals.subTotal)}
+                    </span>
                   </div>
                   {totals.taxTotal > 0 && (
                     <div className="flex items-center justify-between text-xs text-slate-600">
                       <span>{t("sales.taxTotal")}</span>
-                      <span className="font-semibold text-slate-900">{money(totals.taxTotal)}</span>
+                      <span className="font-semibold text-slate-900">
+                        {money(totals.taxTotal)}
+                      </span>
                     </div>
                   )}
                   {totals.discountTotal > 0 && (
                     <div className="flex items-center justify-between text-xs text-slate-600">
                       <span>{t("quickPos.discount")}</span>
-                      <span className="font-semibold text-slate-900">- {money(totals.discountTotal)}</span>
+                      <span className="font-semibold text-slate-900">
+                        - {money(totals.discountTotal)}
+                      </span>
                     </div>
                   )}
                   <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-bold text-slate-900">
@@ -2686,7 +2794,7 @@ export default function QuickPos() {
         title={t("quickPos.selectPartyTitle")}
       />
 
-       <QuickActionSuccessDialog
+      <QuickActionSuccessDialog
         isOpen={Boolean(successState)}
         onClose={handleSuccessClose}
         closeLabel={t("common.close")}
@@ -2757,7 +2865,9 @@ export default function QuickPos() {
               }`}
             >
               <span className="text-sm font-semibold">Walk-in / Takeaway</span>
-              <span className="text-[10px] text-slate-400 mt-1">No table reference</span>
+              <span className="text-[10px] text-slate-400 mt-1">
+                No table reference
+              </span>
             </button>
 
             <button
@@ -2774,7 +2884,9 @@ export default function QuickPos() {
               }`}
             >
               <span className="text-sm font-semibold">Home Delivery</span>
-              <span className="text-[10px] text-slate-400 mt-1">No table reference</span>
+              <span className="text-[10px] text-slate-400 mt-1">
+                No table reference
+              </span>
             </button>
 
             {allTables.map((table) => {
@@ -2798,12 +2910,18 @@ export default function QuickPos() {
                         : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                   }`}
                 >
-                  <span className="text-sm font-bold truncate max-w-full">{table.name}</span>
+                  <span className="text-sm font-bold truncate max-w-full">
+                    {table.name}
+                  </span>
                   {table.capacity && (
-                    <span className="text-[10px] text-slate-400 mt-0.5">{table.capacity} seats</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">
+                      {table.capacity} seats
+                    </span>
                   )}
                   <span className="mt-1.5 flex items-center gap-1">
-                    <span className={`h-1.5 w-1.5 rounded-full ${isOccupied ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`} />
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${isOccupied ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`}
+                    />
                     <span className="text-[9px] uppercase tracking-wider font-bold">
                       {isOccupied ? "Occupied" : "Vacant"}
                     </span>
