@@ -7,6 +7,7 @@ export const EXPENSE_CATEGORIES_SETTINGS_TAB = 'expense-categories';
 export const UNITS_SETTINGS_TAB = 'units';
 export const BANKS_SETTINGS_TAB = 'banks';
 export const ORDER_ATTRIBUTES_SETTINGS_TAB = 'order-attributes';
+export const TABLES_FLOORS_SETTINGS_TAB = 'tables-floors';
 
 export const SETTINGS_TABS = [
   GENERAL_SETTINGS_TAB,
@@ -18,6 +19,7 @@ export const SETTINGS_TABS = [
   UNITS_SETTINGS_TAB,
   BANKS_SETTINGS_TAB,
   ORDER_ATTRIBUTES_SETTINGS_TAB,
+  TABLES_FLOORS_SETTINGS_TAB,
 ];
 
 export function buildSettingsTabPath(tab = GENERAL_SETTINGS_TAB) {

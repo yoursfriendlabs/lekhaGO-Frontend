@@ -20,7 +20,7 @@ export default function PaymentMethodFields({
   value = {},
   onChange,
   bankAccountError = '',
-  showPaymentNote = true,
+  showPaymentNote = false,
   noteLabel,
   notePlaceholder,
   className = '',

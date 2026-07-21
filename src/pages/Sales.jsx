@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Pencil, FileText, Package, Plus, Printer, Trash2 } from 'lucide-react';
+import { Pencil, FileText, Package, Plus, Printer, Trash2, TrendingUp, DollarSign, CheckCircle2, Clock, Calendar } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
@@ -23,7 +23,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import FileUpload from '../components/FileUpload';
 import DynamicAttributes from '../components/DynamicAttributes';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
-import { formatMaybeDate, todayISODate } from '../lib/datetime';
+import dayjs, { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useSaleStore } from '../stores/sales';
 import { useProductStore } from '../stores/products';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
@@ -150,8 +150,10 @@ export default function Sales() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [mobileStep, setMobileStep] = useState('details');
+  const [dateFilter, setDateFilter] = useState('all'); // 'today', 'week', 'month', 'year', 'all'
+
   const listParams = useMemo(() => ({
-    limit: 50,
+    limit: 500,
     ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
     ...(partyFilterId ? { partyId: partyFilterId } : {}),
     ...(createdByFilterId ? { createdBy: createdByFilterId } : {}),
@@ -165,7 +167,7 @@ export default function Sales() {
 
   useEffect(() => {
     setPage(1);
-  }, [createdByFilterId, partyFilterId, statusFilter]);
+  }, [createdByFilterId, partyFilterId, statusFilter, dateFilter]);
 
   const resolveCustomerName = (sale) => {
     const direct = getCustomerName(sale);
@@ -404,10 +406,50 @@ export default function Sales() {
     });
   };
 
+  const filteredSalesByDate = useMemo(() => {
+    return salesList.filter((sale) => {
+      if (dateFilter === 'all') return true;
+      const saleDateStr = sale.saleDate || sale.createdAt;
+      if (!saleDateStr) return false;
+
+      const saleDate = dayjs(saleDateStr);
+      if (!saleDate.isValid()) return false;
+
+      const now = dayjs();
+      if (dateFilter === 'today') {
+        return saleDate.isSame(now, 'day');
+      }
+      if (dateFilter === 'week') {
+        return saleDate.isSame(now, 'week');
+      }
+      if (dateFilter === 'month') {
+        return saleDate.isSame(now, 'month');
+      }
+      if (dateFilter === 'year') {
+        return saleDate.isSame(now, 'year');
+      }
+      return true;
+    });
+  }, [salesList, dateFilter]);
+
+  const salesStats = useMemo(() => {
+    const totalCount = filteredSalesByDate.length;
+    const totalAmount = filteredSalesByDate.reduce((sum, s) => sum + Number(s.grandTotal || 0), 0);
+    const paidAmount = filteredSalesByDate.reduce((sum, s) => {
+      const due = Number(s.dueAmount || 0);
+      const total = Number(s.grandTotal || 0);
+      return sum + Math.max(total - due, 0);
+    }, 0);
+    const dueAmount = filteredSalesByDate.reduce((sum, s) => sum + Number(s.dueAmount || 0), 0);
+    const avgOrderValue = totalCount > 0 ? totalAmount / totalCount : 0;
+
+    return { totalCount, totalAmount, paidAmount, dueAmount, avgOrderValue };
+  }, [filteredSalesByDate]);
+
   const exportCsv = () => {
     const rows = [
       [t('common.invoice'), t('common.date'), t('common.status'), t('sales.customer'), t('sales.subTotal'), t('sales.taxTotal'), t('sales.grandTotal'), t('sales.totalReceived'), t('sales.dueLabel')],
-      ...salesList.map((s) => [
+      ...filteredSalesByDate.map((s) => [
         s.invoiceNo || s.id,
         s.saleDate || '',
         s.status || '',
@@ -424,16 +466,16 @@ export default function Sales() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `sales-${statusFilter}.csv`;
+    link.download = `sales-${dateFilter}-${statusFilter}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
 
-  const totalSales = salesList.length;
+  const totalSales = filteredSalesByDate.length;
   const pagedSales = useMemo(() => {
     const start = (page - 1) * pageSize;
-    return salesList.slice(start, start + pageSize);
-  }, [page, pageSize, salesList]);
+    return filteredSalesByDate.slice(start, start + pageSize);
+  }, [page, pageSize, filteredSalesByDate]);
 
   const resetForm = () => {
     setHeader({
@@ -733,6 +775,90 @@ export default function Sales() {
           ) : null
         }
       />
+
+      {/* ── Period Selector & Analytics Cards ── */}
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white/40 backdrop-blur p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            <span className="text-[10px] uppercase font-bold text-slate-400 mr-1.5 whitespace-nowrap shrink-0">
+              Period:
+            </span>
+            {[
+              { key: 'today', label: 'Today' },
+              { key: 'week', label: 'This Week' },
+              { key: 'month', label: 'This Month' },
+              { key: 'year', label: 'This Year' },
+              { key: 'all', label: 'All Time' },
+            ].map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setDateFilter(item.key)}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                  dateFilter === item.key
+                    ? 'bg-[#9c5f22] text-white shadow-sm font-bold'
+                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <div className="text-xs font-semibold text-slate-500">
+            Showing <strong className="text-slate-900">{salesStats.totalCount}</strong> order{salesStats.totalCount === 1 ? '' : 's'}
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl border border-slate-100 bg-white/90 p-4 shadow-sm space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Revenue</span>
+              <span className="rounded-full bg-[#9c5f22]/10 px-2 py-0.5 text-[10px] font-bold text-[#9c5f22]">
+                {salesStats.totalCount} orders
+              </span>
+            </div>
+            <p className="text-2xl font-extrabold text-slate-900">
+              {t('currency.formatted', { symbol: t('currency.symbol'), amount: salesStats.totalAmount.toFixed(2) })}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 shadow-sm space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">Total Collected</span>
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                Paid
+              </span>
+            </div>
+            <p className="text-2xl font-extrabold text-emerald-800">
+              {t('currency.formatted', { symbol: t('currency.symbol'), amount: salesStats.paidAmount.toFixed(2) })}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 shadow-sm space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-500">Pending Due</span>
+              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+                Outstanding
+              </span>
+            </div>
+            <p className="text-2xl font-extrabold text-rose-800">
+              {t('currency.formatted', { symbol: t('currency.symbol'), amount: salesStats.dueAmount.toFixed(2) })}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-white/90 p-4 shadow-sm space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Avg Order Value</span>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                Average
+              </span>
+            </div>
+            <p className="text-2xl font-extrabold text-slate-900">
+              {t('currency.formatted', { symbol: t('currency.symbol'), amount: salesStats.avgOrderValue.toFixed(2) })}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* ── Form Dialog ── */}
       <Dialog

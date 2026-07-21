@@ -11,6 +11,7 @@ import OrderAttributesSettingsPanel from '../components/settings/OrderAttributes
 import ProfileSettingsPanel from '../components/settings/ProfileSettingsPanel.jsx';
 import SubscriptionSettingsPanel from '../components/settings/SubscriptionSettingsPanel.jsx';
 import UnitsSettingsPanel from '../components/settings/UnitsSettingsPanel.jsx';
+import TablesFloorsSettingsPanel from '../components/settings/TablesFloorsSettingsPanel.jsx';
 import { api, API_BASE } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings';
@@ -27,6 +28,7 @@ import {
   PROFILE_SETTINGS_TAB,
   SUBSCRIPTION_SETTINGS_TAB,
   UNITS_SETTINGS_TAB,
+  TABLES_FLOORS_SETTINGS_TAB,
 } from '../lib/settingsTabs';
 
 const EMPTY = {
@@ -142,6 +144,11 @@ export default function Settings() {
           key: EXPENSE_CATEGORIES_SETTINGS_TAB,
           label: t('settingsPage.tabs.expenseCategories'),
           description: t('settingsPage.descriptions.expenseCategories'),
+        },
+        {
+          key: TABLES_FLOORS_SETTINGS_TAB,
+          label: t('settingsPage.tabs.tablesFloors'),
+          description: t('settingsPage.descriptions.tablesFloors'),
         }
       );
     }
@@ -676,6 +683,7 @@ export default function Settings() {
       {activeTab === UNITS_SETTINGS_TAB ? <UnitsSettingsPanel /> : null}
       {activeTab === BANKS_SETTINGS_TAB ? <BanksSettingsPanel /> : null}
       {activeTab === ORDER_ATTRIBUTES_SETTINGS_TAB ? <OrderAttributesSettingsPanel /> : null}
+      {activeTab === TABLES_FLOORS_SETTINGS_TAB ? <TablesFloorsSettingsPanel /> : null}
     </div>
   );
 }

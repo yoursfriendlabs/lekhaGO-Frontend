@@ -423,7 +423,6 @@ export default function QuickEntry() {
                 <PaymentMethodFields
                   value={form}
                   onChange={(patch) => setForm((previous) => ({ ...previous, ...patch }))}
-                  showPaymentNote
                 />
 
                 <label>

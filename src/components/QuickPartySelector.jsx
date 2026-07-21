@@ -128,21 +128,32 @@ export default function QuickPartySelector({
           </div>
         ) : null}
 
-       <label className="relative block">
-  <Search
-    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-    size={18}
-  />
-
-  <input
-    className="input h-11 w-full rounded-[18px] bg-slate-50 pl-12 pr-4 text-sm focus:bg-white"
-    style={{ paddingLeft: '2.75rem', paddingRight: '1rem' }}
-    value={query}
-    autoFocus
-    onChange={(event) => setQuery(event.target.value)}
-    placeholder={t('quickEntry.searchPartyPlaceholder')}
-  />
-</label>
+        <div className="relative block">
+          {!query && (
+            <Search
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              size={16}
+            />
+          )}
+          <input
+            className={`input h-11 w-full rounded-[18px] bg-slate-50 text-sm focus:bg-white transition ${
+              query ? "px-3.5 pr-9" : "pl-10 pr-4"
+            }`}
+            value={query}
+            autoFocus
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('quickEntry.searchPartyPlaceholder')}
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
 
         {error ? <Notice title={error} tone="error" /> : null}
 

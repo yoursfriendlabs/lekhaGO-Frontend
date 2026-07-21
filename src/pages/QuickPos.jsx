@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
+  ArrowLeft,
   ArrowRight,
   ChevronRight,
   Minus,
@@ -8,6 +9,7 @@ import {
   Plus,
   Search,
   ShoppingBag,
+  Sparkles,
   UserRound,
   X,
 } from "lucide-react";
@@ -183,6 +185,7 @@ export default function QuickPos() {
   const [searchParams] = useSearchParams();
   const queryTableId = searchParams.get("tableId") || "";
   const queryRef = searchParams.get("ref") || "";
+  const queryCheckout = searchParams.get("checkout") || "";
 
   const { t } = useI18n();
   const { showError } = useSnackbar();
@@ -203,6 +206,9 @@ export default function QuickPos() {
   const [selectedParty, setSelectedParty] = useState(null);
   const [checkoutForm, setCheckoutForm] = useState(emptyCheckoutForm);
   const [allTables, setAllTables] = useState([]);
+  const [floors, setFloors] = useState([]);
+  const [selectedFloorFilter, setSelectedFloorFilter] = useState("all");
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState("all");
   const [activeTableId, setActiveTableId] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [tableSelectorOpen, setTableSelectorOpen] = useState(false);
@@ -211,10 +217,28 @@ export default function QuickPos() {
     return null;
   });
 
-  const vacantTables = useMemo(
-    () => allTables.filter((t) => t.status === "vacant"),
-    [allTables],
-  );
+  const vacantTables = useMemo(() => allTables.filter((t) => t.status === "vacant"), [allTables]);
+
+  const filteredTablesForSelector = useMemo(() => {
+    return allTables.filter((table) => {
+      if (selectedFloorFilter !== "all") {
+        if (selectedFloorFilter === "unassigned") {
+          if (table.categoryId || table.category?.id) return false;
+        } else {
+          const catId = table.categoryId || table.category?.id;
+          if (String(catId) !== String(selectedFloorFilter)) return false;
+        }
+      }
+
+      if (selectedStatusFilter !== "all") {
+        const isOccupied = table.status === "occupied";
+        if (selectedStatusFilter === "vacant" && isOccupied) return false;
+        if (selectedStatusFilter === "occupied" && !isOccupied) return false;
+      }
+
+      return true;
+    });
+  }, [allTables, selectedFloorFilter, selectedStatusFilter]);
   const [showAmountReceivedInput, setShowAmountReceivedInput] = useState(false);
   const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState("");
   const [isPaid, setIsPaid] = useState(true);
@@ -261,6 +285,13 @@ export default function QuickPos() {
       return;
     }
 
+    if (!Number(checkoutForm.amountReceived || 0)) {
+      setCheckoutForm((prev) => ({
+        ...prev,
+        amountReceived: totals.grandTotal.toFixed(2),
+      }));
+    }
+
     if (isMobile) setMobileStep("details");
     else setCheckoutOpen(true);
   };
@@ -269,6 +300,7 @@ export default function QuickPos() {
     if (!businessId) {
       setProducts([]);
       setAllTables([]);
+      setFloors([]);
       setLoading(false);
       return;
     }
@@ -281,8 +313,9 @@ export default function QuickPos() {
       api.listProducts({ limit: 500 }),
       api.getNextSequences().catch(() => null),
       api.getTables({ isActive: "true", limit: 100 }).catch(() => null),
+      api.listCategories({ type: "table", limit: 100 }).catch(() => null),
     ])
-      .then(([productResponse, sequenceResponse, tablesResponse]) => {
+      .then(([productResponse, sequenceResponse, tablesResponse, categoriesResponse]) => {
         if (!isActive) return;
         const normalizedProducts = (productResponse?.items || [])
           .map(normalizePosProduct)
@@ -291,11 +324,13 @@ export default function QuickPos() {
         setProducts(normalizedProducts);
         setSuggestedInvoiceNo(sequenceResponse?.nextSaleInvoiceNo || "");
         setAllTables(tablesResponse?.items || []);
+        setFloors(categoriesResponse?.items || []);
       })
       .catch((error) => {
         if (!isActive) return;
         setProducts([]);
         setAllTables([]);
+        setFloors([]);
         setStatus({ type: "error", message: error.message });
       })
       .finally(() => {
@@ -406,9 +441,14 @@ export default function QuickPos() {
 
   useEffect(() => {
     if (queryTableId && allTables.length > 0 && products.length > 0) {
-      handleTableChange(queryTableId);
+      handleTableChange(queryTableId).then(() => {
+        if (queryCheckout === "1" || queryCheckout === "true") {
+          if (isMobile) setMobileStep("details");
+          else setCheckoutOpen(true);
+        }
+      });
     }
-  }, [queryTableId, allTables.length, products.length]);
+  }, [queryTableId, allTables.length, products.length, queryCheckout]);
 
   const categoryOptions = useMemo(() => {
     const categories = [
@@ -419,7 +459,7 @@ export default function QuickPos() {
     return ["all", ...categories];
   }, [products]);
   const quickCategoryOptions = useMemo(
-    () => categoryOptions.slice(0, 3),
+    () => categoryOptions.slice(0, 7),
     [categoryOptions],
   );
   const productsById = useMemo(() => {
@@ -534,22 +574,37 @@ export default function QuickPos() {
     return { subTotal, taxTotal, discountTotal, grandTotal };
   }, [cart, checkoutForm.discount, checkoutForm.taxRate]);
 
-  useEffect(() => {
-    if (!isPaid) return;
-    setCheckoutForm((previous) => ({
-      ...previous,
-      amountReceived: totals.grandTotal.toFixed(2),
-    }));
-  }, [isPaid, totals.grandTotal]);
-
   const receivedAmount = useMemo(
-    () =>
-      isPaid
-        ? totals.grandTotal
-        : Math.min(Number(checkoutForm.amountReceived || 0), totals.grandTotal),
-    [checkoutForm.amountReceived, isPaid, totals.grandTotal],
+    () => Math.min(Number(checkoutForm.amountReceived || 0), totals.grandTotal),
+    [checkoutForm.amountReceived, totals.grandTotal],
   );
   const dueAmount = Math.max(totals.grandTotal - receivedAmount, 0);
+
+  const changeAmount = useMemo(() => {
+    const rawReceived = Number(checkoutForm.amountReceived || 0);
+    return Math.max(rawReceived - totals.grandTotal, 0);
+  }, [checkoutForm.amountReceived, totals.grandTotal]);
+
+  const quickAmountOptions = useMemo(() => {
+    const total = totals.grandTotal;
+    const roundTotal = Math.ceil(total);
+    const options = [{ label: t("common.exact") || "Exact", value: total }];
+
+    [100, 500, 1000, 2000, 5000].forEach((denom) => {
+      if (denom >= roundTotal && !options.some((o) => Math.abs(o.value - denom) < 0.01)) {
+        options.push({ label: `${t("currency.symbol") || "Rs"} ${denom}`, value: denom });
+      }
+    });
+
+    if (options.length === 1 && total > 0) {
+      const next100 = Math.ceil(total / 100) * 100;
+      const next500 = Math.ceil(total / 500) * 500;
+      if (next100 > total) options.push({ label: `${t("currency.symbol") || "Rs"} ${next100}`, value: next100 });
+      if (next500 > next100) options.push({ label: `${t("currency.symbol") || "Rs"} ${next500}`, value: next500 });
+    }
+
+    return options;
+  }, [totals.grandTotal, t]);
 
   const cartCount = useMemo(
     () => cart.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
@@ -1397,13 +1452,96 @@ export default function QuickPos() {
             </button>
           </div>
 
-          <div className="border-t border-slate-100 pt-6">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">
-              Dine-in Floor Map
-            </h3>
+          <div className="border-t border-slate-100 pt-6 space-y-4">
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Dine-in Floor Map</h3>
+              </div>
+              
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+                {/* Floor Filter Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none max-w-full">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap">Floor:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFloorFilter('all')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                      selectedFloorFilter === 'all'
+                        ? 'bg-[#9c5f22] text-white shadow-sm'
+                        : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    }`}
+                  >
+                    All Floors
+                  </button>
+                  {floors.map((floor) => (
+                    <button
+                      key={floor.id}
+                      type="button"
+                      onClick={() => setSelectedFloorFilter(floor.id)}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                        selectedFloorFilter === floor.id
+                          ? 'bg-[#9c5f22] text-white shadow-sm'
+                          : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                      }`}
+                    >
+                      {floor.name}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFloorFilter('unassigned')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                      selectedFloorFilter === 'unassigned'
+                        ? 'bg-[#9c5f22] text-white shadow-sm'
+                        : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    }`}
+                  >
+                    Unassigned
+                  </button>
+                </div>
 
+                {/* Status Filter Chips */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap">Status:</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStatusFilter('all')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                      selectedStatusFilter === 'all'
+                        ? 'bg-[#9c5f22] text-white shadow-sm'
+                        : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStatusFilter('vacant')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                      selectedStatusFilter === 'vacant'
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    }`}
+                  >
+                    Vacant
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStatusFilter('occupied')}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                      selectedStatusFilter === 'occupied'
+                        ? 'bg-amber-600 text-white shadow-sm'
+                        : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    }`}
+                  >
+                    Occupied
+                  </button>
+                </div>
+              </div>
+            </div>
+            
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {allTables.map((table) => {
+              {filteredTablesForSelector.map((table) => {
                 const isOccupied = table.status === "occupied";
                 return (
                   <button
@@ -1413,28 +1551,25 @@ export default function QuickPos() {
                       setActiveSessionOption("dine_in");
                       handleTableChange(table.id);
                     }}
-                    className={`rounded-2xl border p-4 text-left transition flex flex-col justify-between h-24 ${
+                    className={`group relative rounded-2xl border p-4 text-left transition duration-200 hover:scale-[1.02] hover:shadow-md flex flex-col justify-between h-28 ${
                       isOccupied
                         ? "border-amber-200 bg-amber-50/50 hover:bg-amber-100 text-amber-800"
-                        : "border-slate-200 bg-white hover:border-[#9c5f22] hover:bg-slate-50 text-slate-700"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-1 w-full">
-                      <span className="text-sm font-bold truncate max-w-[80%]">
-                        {table.name}
+                    <div className="flex items-center justify-between gap-2 w-full">
+                      <span className="text-sm font-bold truncate max-w-[100px]">{table.name}</span>
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${isOccupied ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+                        {isOccupied ? "Occupied" : "Vacant"}
                       </span>
-                      <span
-                        className={`h-2 w-2 rounded-full ${isOccupied ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`}
-                      />
                     </div>
-                    {table.capacity && (
-                      <span className="text-xs text-slate-400">
-                        {table.capacity} seats
+                    
+                    <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-slate-100 dark:border-slate-800 mt-2">
+                      <span className="text-[10px] text-slate-400">{table.capacity ? `${table.capacity} seats` : "No limit"}</span>
+                      <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium border border-slate-200/50 truncate max-w-[70px]">
+                        {table.category?.name || "No Floor"}
                       </span>
-                    )}
-                    <span className="text-[10px] uppercase font-bold tracking-wider pt-2">
-                      {isOccupied ? "Active Bill" : "Available"}
-                    </span>
+                    </div>
                   </button>
                 );
               })}
@@ -1452,17 +1587,14 @@ export default function QuickPos() {
         subtitle={isMobile ? "" : t("quickPos.subtitle")}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {(queryRef === "orders" || queryRef === "billing") && (
+            {isTablesEnabled && (
               <button
                 type="button"
-                className="btn-ghost h-11 justify-center rounded-[18px]"
-                onClick={() =>
-                  navigate(
-                    queryRef === "orders" ? "/app/orders" : "/app/billing",
-                  )
-                }
+                className="btn-ghost h-11 justify-center rounded-[18px] text-slate-700 hover:text-slate-900 border border-slate-200/80 bg-white shadow-2xs font-semibold px-4"
+                onClick={() => navigate(queryRef === "orders" ? "/app/orders" : "/app/billing")}
               >
-                ← {queryRef === "orders" ? "Seating Map" : "Billing Counter"}
+                <ArrowLeft size={16} className="mr-1.5" />
+                {queryRef === "orders" ? "Seating Map" : "Billing Counter"}
               </button>
             )}
 
@@ -1544,78 +1676,101 @@ export default function QuickPos() {
                       : "No Table / Takeaway"}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setTableSelectorOpen(true)}
-                  className="px-3 py-1.5 bg-[#9c5f22] text-white text-xs font-bold rounded-xl shadow"
-                >
-                  Change Table
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => navigate(queryRef === "orders" ? "/app/orders" : "/app/billing")}
+                    className="px-2.5 py-1.5 bg-white text-slate-700 border border-slate-200 text-xs font-bold rounded-xl shadow-2xs flex items-center"
+                  >
+                    <ArrowLeft size={14} className="mr-1" />
+                    Billing
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTableSelectorOpen(true)}
+                    className="px-3 py-1.5 bg-[#9c5f22] text-white text-xs font-bold rounded-xl shadow"
+                  >
+                    Change Table
+                  </button>
+                </div>
               </div>
             )}
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-              <div className="relative flex-1">
-                <Search
-                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                  size={18}
-                />
-                <input
-                  className="rounded-xl  border border-slate-200 bg-slate-50 py-2 pl-5 pr-4 text-sm focus:bg-white "
-                  style={{ paddingLeft: "2.75rem", paddingRight: "1rem" }}
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder={t("quickPos.searchPlaceholder")}
-                />
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center w-full">
-                <label className="sr-only" htmlFor="quick-pos-category">
-                  {t("quickPos.allCategories")}
-                </label>
-                <select
-                  id="quick-pos-category"
-                  className="input h-11 w-full min-w-0 rounded-[18px] bg-slate-50 px-4 text-sm font-semibold text-slate-700 focus:bg-white sm:w-auto sm:min-w-[160px]"
-                  value={selectedCategory}
-                  onChange={(event) => setSelectedCategory(event.target.value)}
-                >
-                  {categoryOptions.map((category) => (
-                    <option key={category} value={category}>
-                      {category === "all"
-                        ? t("quickPos.allCategories")
-                        : category}
-                    </option>
-                  ))}
-                </select>
-                <Link
-                  className="btn-secondary h-11 w-full justify-center rounded-[18px] text-xs sm:w-auto sm:flex-none sm:px-4"
-                  to="/app/inventory"
-                >
-                  {t("quickPos.addNewItem")}
-                </Link>
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {quickCategoryOptions.map((category) => {
-                const isActive = category === selectedCategory;
-                const label =
-                  category === "all" ? t("quickPos.allCategories") : category;
-
-                return (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => setSelectedCategory(category)}
-                    className={`min-w-0 flex-1 truncate rounded-full px-3 py-2 text-xs font-semibold transition sm:flex-none ${
-                      isActive
-                        ? "bg-primary text-white shadow-md"
-                        : "bg-white text-slate-600 border border-slate-100"
+            <div className="space-y-3">
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+                <div className="relative flex-1">
+                  {!search && (
+                    <Search
+                      className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                      size={20}
+                    />
+                  )}
+                  <input
+                    className={`h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 text-base font-medium text-slate-900 focus:bg-white focus:border-[#9c5f22] focus:ring-2 focus:ring-[#9c5f22]/10 transition shadow-2xs ${
+                      search ? "px-4 pr-10" : "pl-11 pr-4"
                     }`}
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder={t("quickPos.searchPlaceholder") || "Search menu items, code, or category..."}
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {categoryOptions.length > 7 && (
+                    <select
+                      id="quick-pos-category"
+                      className="input h-12 rounded-2xl bg-slate-50 px-3 text-xs font-bold text-slate-700 focus:bg-white border-slate-200 max-w-[150px] truncate"
+                      value={selectedCategory}
+                      onChange={(event) => setSelectedCategory(event.target.value)}
+                    >
+                      {categoryOptions.map((category) => (
+                        <option key={category} value={category}>
+                          {category === "all"
+                            ? t("quickPos.allCategories")
+                            : category}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <Link
+                    className="btn-secondary h-12 justify-center rounded-2xl text-xs font-bold px-4 shrink-0"
+                    to="/app/inventory"
                   >
-                    {label}
-                  </button>
-                );
-              })}
+                    + {t("quickPos.addNewItem")}
+                  </Link>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                {quickCategoryOptions.map((category) => {
+                  const isActive = category === selectedCategory;
+                  const label =
+                    category === "all" ? t("quickPos.allCategories") : category;
+
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => setSelectedCategory(category)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                        isActive
+                          ? "bg-[#9c5f22] text-white shadow-sm"
+                          : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
@@ -1995,70 +2150,91 @@ export default function QuickPos() {
                   </div>
                 </label>
 
-                {selectedParty && (
-                  <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(6.5rem,8rem)] items-center gap-2 text-sm text-slate-500">
-                    <span className="min-w-0 truncate">
-                      {t("services.amountReceived")}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2.5 mt-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      {t("services.amountReceived") || "Amount Received"}
                     </span>
-                    {showAmountReceivedInput && !isPaid ? (
-                      <div className="min-w-0">
-                        <div className="relative">
-                          <input
-                            autoFocus
-                            className="input h-8 rounded-lg pr-10 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="0.01"
-                            value={checkoutForm.amountReceived}
-                            onChange={(event) =>
-                              setCheckoutForm((previous) => ({
-                                ...previous,
-                                amountReceived: event.target.value,
-                              }))
-                            }
-                            onBlur={() => setShowAmountReceivedInput(false)}
-                          />
-                          <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                            {t("currency.symbol")}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex min-w-0 items-center justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            if (isPaid) setIsPaid(false);
-                            setShowAmountReceivedInput(true);
-                          }}
-                          className="min-w-0 truncate text-right font-medium transition-colors hover:text-primary-600"
-                        >
-                          {isPaid
-                            ? money(totals.grandTotal)
-                            : Number(checkoutForm.amountReceived || 0) > 0
-                              ? money(checkoutForm.amountReceived)
-                              : `+ ${t("sales.addReceived")}`}
-                        </button>
-                        <input
-                          type="checkbox"
-                          className="h-3.5 w-3.5 rounded accent-primary-600 cursor-pointer"
-                          checked={isPaid}
-                          onChange={(e) => setIsPaid(e.target.checked)}
-                          title={t("quickPos.fullyPaid")}
-                        />
-                      </div>
-                    )}
+                    <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 rounded accent-primary-600 cursor-pointer"
+                        checked={dueAmount === 0}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setIsPaid(checked);
+                          if (checked) {
+                            setCheckoutForm((prev) => ({
+                              ...prev,
+                              amountReceived: totals.grandTotal.toFixed(2),
+                            }));
+                          } else {
+                            setCheckoutForm((prev) => ({
+                              ...prev,
+                              amountReceived: "0",
+                            }));
+                          }
+                        }}
+                      />
+                      {t("quickPos.fullyPaid") || "Fully Paid"}
+                    </label>
                   </div>
-                )}
 
-                {selectedParty && dueAmount > 0 && (
-                  <div className="flex items-center justify-between gap-2 text-sm font-semibold text-amber-600">
-                    <span className="min-w-0">{t("sales.dueAmount")}</span>
-                    <span className="shrink-0 text-right">
-                      {money(dueAmount)}
+                  <div className="flex w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition">
+                    <span className="flex h-9 items-center bg-slate-100 px-2.5 text-xs font-bold text-slate-500 border-r border-slate-200 shrink-0">
+                      {t("currency.symbol") || "Rs"}
                     </span>
+                    <input
+                      className="h-9 w-full bg-transparent px-2.5 text-xs font-bold text-slate-900 focus:outline-none"
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      value={checkoutForm.amountReceived}
+                      onChange={(event) => {
+                        const val = event.target.value;
+                        setCheckoutForm((previous) => ({
+                          ...previous,
+                          amountReceived: val,
+                        }));
+                      }}
+                      placeholder="0.00"
+                    />
                   </div>
-                )}
+
+                  <div className="flex flex-wrap gap-1">
+                    {quickAmountOptions.map((opt, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          setCheckoutForm((prev) => ({
+                            ...prev,
+                            amountReceived: String(opt.value.toFixed(2)),
+                          }));
+                        }}
+                        className="px-2 py-1 rounded-lg border border-slate-200 hover:border-primary text-[11px] font-bold text-slate-700 bg-white hover:bg-primary/5 transition"
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {changeAmount > 0 ? (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 flex justify-between items-center">
+                      <span className="flex items-center gap-1">
+                        <Sparkles size={13} className="text-emerald-600" />
+                        {t("sales.changeToReturn") || "Change to Return"}
+                      </span>
+                      <span className="text-xs font-black text-emerald-700">{money(changeAmount)}</span>
+                    </div>
+                  ) : dueAmount > 0 ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 flex justify-between items-center">
+                      <span>{t("sales.dueAmount") || "Due Amount"}</span>
+                      <span className="text-xs font-black text-amber-700">{money(dueAmount)}</span>
+                    </div>
+                  ) : null}
+                </div>
 
                 <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-base font-bold text-slate-900">
                   <span className="min-w-0">{t("sales.grandTotal")}</span>
@@ -2696,79 +2872,91 @@ export default function QuickPos() {
                 </div>
               </div>
 
-              {selectedParty && (
-                <div className="rounded-lg border border-slate-200 bg-white px-3 py-3 mt-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-semibold uppercase text-slate-600">
-                        {t("services.amountReceived")}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!isPaid) setShowAmountReceivedInput(true);
-                          else setIsPaid(false);
-                        }}
-                        className={`text-sm font-bold transition-colors mt-1 ${isPaid ? "text-slate-400" : "text-primary-700"}`}
-                      >
-                        {isPaid
-                          ? money(totals.grandTotal)
-                          : Number(checkoutForm.amountReceived || 0) > 0
-                            ? money(checkoutForm.amountReceived)
-                            : `+ ${t("sales.addReceived")}`}
-                      </button>
-                    </div>
-                    <label className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 cursor-pointer hover:bg-slate-100 transition shrink-0">
-                      <input
-                        type="checkbox"
-                        className="h-3.5 w-3.5 rounded accent-primary-600"
-                        checked={isPaid}
-                        onChange={(event) => {
-                          setIsPaid(event.target.checked);
-                          if (event.target.checked)
-                            setShowAmountReceivedInput(false);
-                        }}
-                      />
-                      {t("quickPos.fullyPaid")}
-                    </label>
-                  </div>
-
-                  {showAmountReceivedInput && !isPaid && (
-                    <div className="mt-3 relative w-full">
-                      <input
-                        autoFocus
-                        className="input h-9 rounded-lg text-sm font-bold pr-8 w-full border-slate-200 focus:border-primary focus:ring-primary/10"
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        step="0.01"
-                        value={checkoutForm.amountReceived}
-                        onChange={(event) =>
-                          setCheckoutForm((previous) => ({
-                            ...previous,
-                            amountReceived: event.target.value,
-                          }))
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 space-y-3 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    {t("services.amountReceived") || "Amount Received"}
+                  </span>
+                  <label className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 cursor-pointer hover:bg-slate-100 transition shrink-0">
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 rounded accent-primary-600 cursor-pointer"
+                      checked={dueAmount === 0}
+                      onChange={(event) => {
+                        const checked = event.target.checked;
+                        setIsPaid(checked);
+                        if (checked) {
+                          setCheckoutForm((prev) => ({
+                            ...prev,
+                            amountReceived: totals.grandTotal.toFixed(2),
+                          }));
+                        } else {
+                          setCheckoutForm((prev) => ({
+                            ...prev,
+                            amountReceived: "0",
+                          }));
                         }
-                        onBlur={() => setShowAmountReceivedInput(false)}
-                      />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500">
-                        {t("currency.symbol")}
-                      </div>
-                    </div>
-                  )}
-
-                  <div
-                    className={`mt-4 rounded-2xl px-4 py-3 text-sm font-semibold flex justify-between items-center ${
-                      dueAmount > 0
-                        ? "border border-amber-100 bg-amber-50 text-amber-700"
-                        : "border border-emerald-100 bg-emerald-50 text-emerald-700"
-                    }`}
-                  >
-                    <span>{t("sales.dueAmount")}</span>
-                    <span>{money(dueAmount)}</span>
-                  </div>
+                      }}
+                    />
+                    {t("quickPos.fullyPaid") || "Fully Paid"}
+                  </label>
                 </div>
-              )}
+
+                <div className="flex w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition">
+                  <span className="flex h-10 items-center bg-slate-100 px-3 text-xs font-bold text-slate-500 border-r border-slate-200 shrink-0">
+                    {t("currency.symbol") || "Rs"}
+                  </span>
+                  <input
+                    className="h-10 w-full bg-transparent px-3 text-sm font-bold text-slate-900 focus:outline-none"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={checkoutForm.amountReceived}
+                    onChange={(event) => {
+                      const val = event.target.value;
+                      setCheckoutForm((previous) => ({
+                        ...previous,
+                        amountReceived: val,
+                      }));
+                    }}
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {quickAmountOptions.map((opt, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setCheckoutForm((prev) => ({
+                          ...prev,
+                          amountReceived: String(opt.value.toFixed(2)),
+                        }));
+                      }}
+                      className="px-2.5 py-1 rounded-xl border border-slate-200 hover:border-primary text-xs font-bold text-slate-700 bg-slate-50 hover:bg-primary/5 transition shadow-2xs"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                {changeAmount > 0 ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-bold text-emerald-800 flex justify-between items-center shadow-2xs">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles size={14} className="text-emerald-600" />
+                      {t("sales.changeToReturn") || "Change to Return"}
+                    </span>
+                    <span className="text-sm font-black text-emerald-700">{money(changeAmount)}</span>
+                  </div>
+                ) : dueAmount > 0 ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-bold text-amber-800 flex justify-between items-center shadow-2xs">
+                    <span>{t("sales.dueAmount") || "Due Amount"}</span>
+                    <span className="text-sm font-black text-amber-700">{money(dueAmount)}</span>
+                  </div>
+                ) : null}
+              </div>
 
               <div className="rounded-[28px] border border-slate-200 bg-white px-4 py-4 min-w-0">
                 <PaymentMethodFields
@@ -2846,9 +3034,102 @@ export default function QuickPos() {
         size="md"
       >
         <div className="space-y-4">
-          <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
-            Choose Table or Seating Area
-          </p>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+            <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+              Choose Table or Seating Area
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setTableSelectorOpen(false);
+                navigate("/app/billing");
+              }}
+              className="text-xs font-bold text-[#9c5f22] hover:underline flex items-center gap-1"
+            >
+              Billing Counter Grid →
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+            {/* Floor Filters */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap shrink-0">Floor:</span>
+              <button
+                type="button"
+                onClick={() => setSelectedFloorFilter('all')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                  selectedFloorFilter === 'all'
+                    ? 'bg-[#9c5f22] text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                }`}
+              >
+                All Floors
+              </button>
+              {floors.map((floor) => (
+                <button
+                  key={floor.id}
+                  type="button"
+                  onClick={() => setSelectedFloorFilter(floor.id)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                    selectedFloorFilter === floor.id
+                      ? 'bg-[#9c5f22] text-white shadow-sm'
+                      : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                  }`}
+                >
+                  {floor.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setSelectedFloorFilter('unassigned')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                  selectedFloorFilter === 'unassigned'
+                    ? 'bg-[#9c5f22] text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                }`}
+              >
+                Unassigned
+              </button>
+            </div>
+
+            {/* Status Filters */}
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100/60 pt-2.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap shrink-0">Status:</span>
+              <button
+                type="button"
+                onClick={() => setSelectedStatusFilter('all')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                  selectedStatusFilter === 'all'
+                    ? 'bg-[#9c5f22] text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                }`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedStatusFilter('vacant')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                  selectedStatusFilter === 'vacant'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                }`}
+              >
+                Vacant
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedStatusFilter('occupied')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                  selectedStatusFilter === 'occupied'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                }`}
+              >
+                Occupied
+              </button>
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <button
@@ -2858,7 +3139,7 @@ export default function QuickPos() {
                 handleTableChange("");
                 setTableSelectorOpen(false);
               }}
-              className={`rounded-2xl border p-4 text-center transition flex flex-col justify-center items-center h-24 ${
+              className={`rounded-2xl border p-4 text-center transition flex flex-col justify-center items-center h-28 ${
                 activeSessionOption === "takeaway" && !activeTableId
                   ? "border-[#9c5f22] bg-[#9c5f22]/5 font-bold text-[#9c5f22]"
                   : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
@@ -2877,7 +3158,7 @@ export default function QuickPos() {
                 handleTableChange("");
                 setTableSelectorOpen(false);
               }}
-              className={`rounded-2xl border p-4 text-center transition flex flex-col justify-center items-center h-24 ${
+              className={`rounded-2xl border p-4 text-center transition flex flex-col justify-center items-center h-28 ${
                 activeSessionOption === "delivery" && !activeTableId
                   ? "border-[#9c5f22] bg-[#9c5f22]/5 font-bold text-[#9c5f22]"
                   : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
@@ -2889,7 +3170,7 @@ export default function QuickPos() {
               </span>
             </button>
 
-            {allTables.map((table) => {
+            {filteredTablesForSelector.map((table) => {
               const isSelected = String(table.id) === String(activeTableId);
               const isOccupied = table.status === "occupied";
 
@@ -2902,30 +3183,27 @@ export default function QuickPos() {
                     handleTableChange(table.id);
                     setTableSelectorOpen(false);
                   }}
-                  className={`rounded-2xl border p-4 text-center transition flex flex-col justify-center items-center h-24 relative ${
+                  className={`group relative rounded-2xl border p-4 text-left transition duration-200 hover:scale-[1.02] hover:shadow-md flex flex-col justify-between h-28 ${
                     isSelected
-                      ? "border-[#9c5f22] bg-[#9c5f22]/5 font-bold text-[#9c5f22]"
+                      ? "border-[#9c5f22] bg-[#9c5f22]/10 font-bold text-[#9c5f22] shadow-sm"
                       : isOccupied
-                        ? "border-amber-200 bg-amber-50/50 hover:bg-amber-50 text-amber-800"
+                        ? "border-amber-200 bg-amber-50/50 hover:bg-amber-100 text-amber-800"
                         : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                   }`}
                 >
-                  <span className="text-sm font-bold truncate max-w-full">
-                    {table.name}
-                  </span>
-                  {table.capacity && (
-                    <span className="text-[10px] text-slate-400 mt-0.5">
-                      {table.capacity} seats
-                    </span>
-                  )}
-                  <span className="mt-1.5 flex items-center gap-1">
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${isOccupied ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`}
-                    />
-                    <span className="text-[9px] uppercase tracking-wider font-bold">
+                  <div className="flex items-center justify-between gap-2 w-full">
+                    <span className="text-sm font-bold truncate max-w-[90px]">{table.name}</span>
+                    <span className={`px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider ${isOccupied ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
                       {isOccupied ? "Occupied" : "Vacant"}
                     </span>
-                  </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-slate-100 dark:border-slate-800 mt-2">
+                    <span className="text-[10px] text-slate-400">{table.capacity ? `${table.capacity} seats` : "No limit"}</span>
+                    <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium border border-slate-200/50 truncate max-w-[70px]">
+                      {table.category?.name || "No Floor"}
+                    </span>
+                  </div>
                 </button>
               );
             })}

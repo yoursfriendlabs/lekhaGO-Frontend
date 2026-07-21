@@ -97,6 +97,8 @@ export default function CafeOrders() {
   const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState('');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('all');
   const [selectedTableFilter, setSelectedTableFilter] = useState('');
+  const [dialogFloorFilter, setDialogFloorFilter] = useState('all');
+  const [dialogStatusFilter, setDialogStatusFilter] = useState('all');
   const [productDirectory, setProductDirectory] = useState({});
   const [isPaid, setIsPaid] = useState(false);
   const [attributeSnapshot, setAttributeSnapshot] = useState({});
@@ -121,12 +123,18 @@ export default function CafeOrders() {
 
   const salesRoute = businessProfile?.salesFlow?.route || '/app/pos';
   const [backendTables, setBackendTables] = useState([]);
+  const [selectedFloorTab, setSelectedFloorTab] = useState('all');
+  const [floors, setFloors] = useState([]);
 
   const cafeTables = useMemo(() => {
     if (backendTables.length > 0) {
       return backendTables.map((t) => ({
         id: String(t.id),
         label: t.name,
+        capacity: t.capacity,
+        categoryId: t.categoryId,
+        category: t.category,
+        status: t.status,
       }));
     }
     return getDefaultCafeTables(12);
@@ -163,14 +171,35 @@ export default function CafeOrders() {
     }
   };
 
+  const loadFloors = async () => {
+    if (!businessId) {
+      setFloors([]);
+      return;
+    }
+    try {
+      const data = await api.listCategories({ type: 'table', limit: 100 });
+      setFloors(data?.items || []);
+    } catch (err) {
+      console.error('Failed to load floors', err);
+    }
+  };
+
   const loadBackendTables = async () => {
     if (!businessId) {
       setBackendTables([]);
       return;
     }
     try {
-      const data = await api.getTables({ isActive: 'true', limit: 100 });
-      setBackendTables(data?.items || []);
+      const params = { isActive: 'true', limit: 100 };
+      if (selectedFloorTab !== 'all' && selectedFloorTab !== 'unassigned') {
+        params.categoryId = selectedFloorTab;
+      }
+      const data = await api.getTables(params);
+      let items = data?.items || [];
+      if (selectedFloorTab === 'unassigned') {
+        items = items.filter(t => !t.categoryId && !t.category);
+      }
+      setBackendTables(items);
     } catch (err) {
       console.error('Failed to load tables', err);
     }
@@ -178,8 +207,12 @@ export default function CafeOrders() {
 
   useEffect(() => {
     loadOrders();
-    loadBackendTables();
+    loadFloors();
   }, [businessId]);
+
+  useEffect(() => {
+    loadBackendTables();
+  }, [businessId, selectedFloorTab]);
 
   useEffect(() => {
     if (!dialogOpen) return;
@@ -588,9 +621,49 @@ export default function CafeOrders() {
             ) : null}
           </div>
 
+          {/* Floor Filter Bar */}
+          <div className="mt-4 flex flex-wrap gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setSelectedFloorTab('all')}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-full transition-all border ${
+                selectedFloorTab === 'all'
+                  ? 'bg-[#9b6835] text-white border-[#9b6835] shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700'
+              }`}
+            >
+              All Tables
+            </button>
+            {floors.map((floor) => (
+              <button
+                key={floor.id}
+                type="button"
+                onClick={() => setSelectedFloorTab(floor.id)}
+                className={`px-3.5 py-1.5 text-xs font-bold rounded-full transition-all border ${
+                  selectedFloorTab === floor.id
+                    ? 'bg-[#9b6835] text-white border-[#9b6835] shadow-sm'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700'
+                }`}
+              >
+                {floor.name}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setSelectedFloorTab('unassigned')}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-full transition-all border ${
+                selectedFloorTab === 'unassigned'
+                  ? 'bg-[#9b6835] text-white border-[#9b6835] shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700'
+              }`}
+            >
+              Unassigned
+            </button>
+          </div>
+
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {tableMap.map((table) => {
-              const isActive = selectedTableFilter === table.id;
+              const isOccupied = table.occupied || table.status === 'occupied';
               const statusMeta = table.statusMeta;
 
               return (
@@ -598,24 +671,40 @@ export default function CafeOrders() {
                   key={table.id}
                   type="button"
                   onClick={() => navigate(`/app/pos?tableId=${table.id}&ref=orders`)}
-                  className={`rounded-3xl border p-3.5 text-left transition sm:p-4 ${
-                    isActive
-                      ? 'border-[#9b6835] bg-[#9b6835]/8 shadow-sm'
-                      : table.occupied
-                        ? 'border-slate-200 bg-slate-50 hover:border-slate-300'
-                        : 'border-slate-200/70 bg-white hover:border-slate-300 hover:bg-slate-50'
+                  className={`group relative rounded-3xl border p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:shadow-md flex flex-col justify-between h-36 ${
+                    isOccupied
+                      ? 'border-orange-200 bg-orange-50/40 hover:border-orange-300 dark:border-orange-500/20 dark:bg-orange-500/5'
+                      : 'border-emerald-200 bg-emerald-50/40 hover:border-emerald-300 dark:border-emerald-500/20 dark:bg-emerald-500/5'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-slate-900">{table.label}</span>
-                    <span className={`h-2.5 w-2.5 rounded-full ${statusMeta?.accent || 'bg-slate-300'}`} />
+                  <div className="w-full">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-serif text-lg sm:text-xl font-bold text-slate-800 dark:text-white group-hover:text-primary transition-colors">
+                        {table.label}
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        isOccupied
+                          ? 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-500/20 dark:text-orange-300'
+                          : 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300'
+                      }`}>
+                        {isOccupied ? 'Occupied' : 'Vacant'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      <Users size={12} className="text-slate-400" />
+                      <span>{table.capacity ? `${table.capacity} Seats` : 'No seats limit'}</span>
+                    </div>
                   </div>
-                  <p className="mt-3 text-xs uppercase tracking-[0.18em] text-slate-400">
-                    {table.occupied ? statusMeta?.label : 'Available'}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {table.orderMeta?.waiterName || (table.occupied ? 'Occupied' : 'Open for seating')}
-                  </p>
+
+                  <div className="w-full pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+                      {table.category?.name || 'No Floor'}
+                    </span>
+                    <span className="text-[11px] text-slate-500 truncate max-w-[90px]" title={table.orderMeta?.waiterName || (isOccupied ? 'Occupied' : 'Open for seating')}>
+                      {table.orderMeta?.waiterName || (isOccupied ? 'Dining' : 'Open')}
+                    </span>
+                  </div>
                 </button>
               );
             })}
@@ -993,34 +1082,142 @@ export default function CafeOrders() {
                     ) : null}
                   </div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                    {tableMap.map((table) => {
-                      const selected = orderFields.tableNo === table.id || orderFields.tableNo === table.label;
-                      const occupiedByOther = table.occupied && !selected;
-
-                      return (
+                  <div className="mt-3 flex flex-col gap-4 border-b border-slate-100 pb-3 dark:border-slate-800">
+                    {/* Floor Filter Chips */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none max-w-full">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap">Floor:</span>
+                      <button
+                        type="button"
+                        onClick={() => setDialogFloorFilter('all')}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                          dialogFloorFilter === 'all'
+                            ? 'bg-[#9b6835] text-white shadow-sm'
+                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                        }`}
+                      >
+                        All Floors
+                      </button>
+                      {floors.map((floor) => (
                         <button
-                          key={`dialog-table-${table.id}`}
+                          key={floor.id}
                           type="button"
-                          onClick={() => setOrderFields((prev) => ({ ...prev, tableNo: table.id }))}
-                          className={`rounded-2xl border px-3 py-3 text-left transition ${
-                            selected
-                              ? 'border-[#9b6835] bg-[#9b6835]/10 shadow-sm'
-                              : occupiedByOther
-                                ? 'border-amber-200 bg-amber-50 text-amber-800'
-                                : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                          onClick={() => setDialogFloorFilter(floor.id)}
+                          className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                            dialogFloorFilter === floor.id
+                              ? 'bg-[#9b6835] text-white shadow-sm'
+                              : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
                           }`}
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-semibold text-slate-900">{table.label}</span>
-                            <span className={`h-2.5 w-2.5 rounded-full ${table.statusMeta?.accent || 'bg-slate-300'}`} />
-                          </div>
-                          <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                            {selected ? 'Selected' : occupiedByOther ? (table.statusMeta?.label || 'Occupied') : 'Available'}
-                          </p>
+                          {floor.name}
                         </button>
-                      );
-                    })}
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setDialogFloorFilter('unassigned')}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                          dialogFloorFilter === 'unassigned'
+                            ? 'bg-[#9b6835] text-white shadow-sm'
+                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                        }`}
+                      >
+                        Unassigned
+                      </button>
+                    </div>
+
+                    {/* Status Filter Chips */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap">Status:</span>
+                      <button
+                        type="button"
+                        onClick={() => setDialogStatusFilter('all')}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                          dialogStatusFilter === 'all'
+                            ? 'bg-[#9b6835] text-white shadow-sm'
+                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                        }`}
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDialogStatusFilter('vacant')}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                          dialogStatusFilter === 'vacant'
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                        }`}
+                      >
+                        Vacant
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDialogStatusFilter('occupied')}
+                        className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                          dialogStatusFilter === 'occupied'
+                            ? 'bg-amber-600 text-white shadow-sm'
+                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                        }`}
+                      >
+                        Occupied
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                    {tableMap
+                      .filter((table) => {
+                        const isOccupied = table.occupied || table.status === 'occupied';
+                        // Floor filter
+                        if (dialogFloorFilter !== 'all') {
+                          if (dialogFloorFilter === 'unassigned') {
+                            if (table.categoryId || table.category?.id) return false;
+                          } else {
+                            const catId = table.categoryId || table.category?.id;
+                            if (String(catId) !== String(dialogFloorFilter)) return false;
+                          }
+                        }
+                        // Status filter
+                        if (dialogStatusFilter !== 'all') {
+                          if (dialogStatusFilter === 'vacant' && isOccupied) return false;
+                          if (dialogStatusFilter === 'occupied' && !isOccupied) return false;
+                        }
+                        return true;
+                      })
+                      .map((table) => {
+                        const selected = orderFields.tableNo === table.id || orderFields.tableNo === table.label;
+                        const occupiedByOther = table.occupied && !selected;
+
+                         const isOccupied = table.occupied || table.status === 'occupied';
+
+                         return (
+                          <button
+                            key={`dialog-table-${table.id}`}
+                            type="button"
+                            onClick={() => setOrderFields((prev) => ({ ...prev, tableNo: table.id }))}
+                            className={`group relative rounded-2xl border p-4 text-left transition duration-200 hover:scale-[1.02] hover:shadow-md flex flex-col justify-between h-28 ${
+                              selected
+                                ? 'border-[#9b6835] bg-[#9b6835]/10 shadow-sm'
+                                : occupiedByOther
+                                  ? 'border-amber-200 bg-amber-50/50 hover:bg-amber-100 text-amber-800'
+                                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2 w-full">
+                              <span className="text-sm font-bold text-slate-900 truncate max-w-[80px]">{table.label}</span>
+                              <span className={`px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider ${isOccupied ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+                                {isOccupied ? "Occupied" : "Vacant"}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-slate-100 dark:border-slate-800 mt-2">
+                              <span className="text-[10px] text-slate-400">{table.capacity ? `${table.capacity} seats` : "No limit"}</span>
+                              <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium border border-slate-200/50 truncate max-w-[70px]">
+                                {table.category?.name || "No Floor"}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
                   </div>
                 </div>
               ) : (

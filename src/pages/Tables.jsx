@@ -4,13 +4,14 @@ import Notice from '../components/Notice';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
-import { Coffee, Users, Pencil, Trash2, Plus, Search, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Coffee, Users, Pencil, Trash2, Plus, ToggleLeft, ToggleRight } from 'lucide-react';
 
 const emptyForm = {
   name: '',
   capacity: '',
   status: 'vacant',
   isActive: true,
+  categoryId: '',
 };
 
 function getTableItems(payload) {
@@ -23,15 +24,29 @@ function getTableItems(payload) {
 export default function Tables() {
   const { t } = useI18n();
   const [tables, setTables] = useState([]);
+  const [floors, setFloors] = useState([]);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [status, setStatus] = useState({ type: 'info', message: '' });
-  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(''); // '', 'vacant', 'occupied'
-  
+  const [floorFilter, setFloorFilter] = useState('all');
+
   const [editingId, setEditingId] = useState(null);
   const [deleteTable, setDeleteTable] = useState(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const loadFloors = async () => {
+    try {
+      const data = await api.listCategories({ type: 'table', limit: 100 });
+      setFloors(data?.items || []);
+    } catch (err) {
+      console.error('Failed to load floors', err);
+    }
+  };
+
+  useEffect(() => {
+    loadFloors();
+  }, []);
 
   useEffect(() => {
     if (status.type !== 'success' && status.type !== 'error') return;
@@ -42,12 +57,19 @@ export default function Tables() {
   const loadTables = async () => {
     setLoading(true);
     try {
-      const data = await api.getTables({
-        search,
+      const params = {
         status: statusFilter || undefined,
         limit: 100,
-      });
-      setTables(getTableItems(data));
+      };
+      if (floorFilter !== 'all' && floorFilter !== 'unassigned') {
+        params.categoryId = floorFilter;
+      }
+      const data = await api.getTables(params);
+      let items = getTableItems(data);
+      if (floorFilter === 'unassigned') {
+        items = items.filter(t => !t.categoryId && !t.category);
+      }
+      setTables(items);
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
     } finally {
@@ -57,7 +79,7 @@ export default function Tables() {
 
   useEffect(() => {
     loadTables();
-  }, [search, statusFilter]);
+  }, [statusFilter, floorFilter]);
 
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -72,6 +94,7 @@ export default function Tables() {
       capacity: table.capacity || '',
       status: table.status || 'vacant',
       isActive: table.isActive !== false,
+      categoryId: table.categoryId || table.category?.id || '',
     });
     setStatus({ type: 'info', message: '' });
   };
@@ -112,6 +135,7 @@ export default function Tables() {
       capacity: form.capacity ? Number(form.capacity) : undefined,
       status: form.status,
       isActive: form.isActive,
+      categoryId: form.categoryId || null,
     };
 
     try {
@@ -259,6 +283,23 @@ export default function Tables() {
                 </select>
               </div>
 
+              <div>
+                <label className="label">Floor / Dining Area</label>
+                <select
+                  name="categoryId"
+                  className="input mt-1"
+                  value={form.categoryId || ''}
+                  onChange={handleChange}
+                >
+                  <option value="">-- Unassigned / General --</option>
+                  {floors.map((floor) => (
+                    <option key={floor.id} value={floor.id}>
+                      {floor.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="flex items-center justify-between pt-2">
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                   {t('tables.active') || 'Active / Show in lists'}
@@ -296,22 +337,54 @@ export default function Tables() {
 
         {/* List Grid Column */}
         <div className="lg:col-span-2 space-y-4">
-          {/* Filters and search */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white/40 backdrop-blur p-4 rounded-2xl border border-slate-100">
-            <div className="relative flex-1">
-              <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
-                <Search size={16} />
-              </span>
-              <input
-                className="input pl-9 h-10 text-sm"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search tables by name..."
-              />
-            </div>
-            
-            <div className="flex items-center gap-2">
+          {/* Filters */}
+          <div className="flex flex-col gap-3 bg-white/40 backdrop-blur p-4 rounded-2xl border border-slate-100 shadow-sm">
+            {/* Floor Filters */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap shrink-0">Floor:</span>
               <button
+                type="button"
+                onClick={() => setFloorFilter('all')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                  floorFilter === 'all'
+                    ? 'bg-[#9c5f22] text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                }`}
+              >
+                All Floors
+              </button>
+              {floors.map((floor) => (
+                <button
+                  key={floor.id}
+                  type="button"
+                  onClick={() => setFloorFilter(floor.id)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                    floorFilter === floor.id
+                      ? 'bg-[#9c5f22] text-white shadow-sm'
+                      : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                  }`}
+                >
+                  {floor.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setFloorFilter('unassigned')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                  floorFilter === 'unassigned'
+                    ? 'bg-[#9c5f22] text-white shadow-sm'
+                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                }`}
+              >
+                Unassigned
+              </button>
+            </div>
+
+            {/* Status Filters */}
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100/60 pt-2.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap shrink-0">Status:</span>
+              <button
+                type="button"
                 onClick={() => setStatusFilter('')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   statusFilter === '' 
@@ -322,6 +395,7 @@ export default function Tables() {
                 {t('tables.all') || 'All'}
               </button>
               <button
+                type="button"
                 onClick={() => setStatusFilter('vacant')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   statusFilter === 'vacant' 
@@ -332,6 +406,7 @@ export default function Tables() {
                 {t('tables.vacant') || 'Vacant'}
               </button>
               <button
+                type="button"
                 onClick={() => setStatusFilter('occupied')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   statusFilter === 'occupied' 
@@ -372,14 +447,19 @@ export default function Tables() {
                           <h4 className="font-serif text-lg font-bold text-slate-800 dark:text-white truncate max-w-[130px]">
                             {table.name}
                           </h4>
-                          {table.capacity ? (
-                            <div className="flex items-center gap-1 mt-1 text-xs text-slate-400 font-semibold">
-                              <Users size={12} />
-                              <span>{table.capacity} seats</span>
-                            </div>
-                          ) : (
-                            <p className="text-xs text-slate-400 mt-1">No capacity set</p>
-                          )}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            {table.capacity ? (
+                              <div className="flex items-center gap-1 text-xs text-slate-400 font-semibold">
+                                <Users size={12} />
+                                <span>{table.capacity} seats</span>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-400">No capacity</p>
+                            )}
+                            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold border border-slate-200/40 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-800">
+                              {table.category?.name || floors.find(f => f.id === table.categoryId)?.name || 'No Floor'}
+                            </span>
+                          </div>
                         </div>
 
                         {/* Status Badge clickable to toggle occupancy */}

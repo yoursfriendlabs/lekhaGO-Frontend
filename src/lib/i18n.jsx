@@ -20,6 +20,7 @@ const dictionaries = {
       imageOnlyUploadError: 'Only image files can be uploaded.',
       cancel: 'Cancel',
       change: 'Change',
+      exact: 'Exact',
       clear: 'Clear',
       close: 'Close',
       confirmDelete: 'Are you sure?',
@@ -164,6 +165,7 @@ const dictionaries = {
         units: 'Units',
         banks: 'Banks',
         orderAttributes: 'Order Attributes',
+        tablesFloors: 'Tables & Floors',
       },
       descriptions: {
         general: 'Company details shown on invoices, receipts, and printed documents.',
@@ -177,6 +179,7 @@ const dictionaries = {
         units: 'Create and maintain the measuring units available while creating products.',
         banks: 'Manage bank accounts used for payments, receipts, and balance tracking.',
         orderAttributes: 'Create custom fields for sales and service orders.',
+        tablesFloors: 'Manage floors and seating categories for dining layout.',
       },
       general: {
         lockedEyebrow: 'Paid access required',
@@ -1196,6 +1199,7 @@ const dictionaries = {
       paid: 'Paid',
       due: 'Due',
       totalReceived: 'Total received',
+      changeToReturn: 'Change to Return',
       notes: 'Notes',
       items: 'Items',
       product: 'Product',
@@ -1935,6 +1939,7 @@ const dictionaries = {
       back: 'फिर्ता',
       cancel: 'रद्द गर्नुहोस्',
       change: 'परिवर्तन',
+      exact: 'बराबर',
       clear: 'साफ गर्नुहोस्',
       close: 'बन्द गर्नुहोस्',
       confirmDelete: 'के तपाईं निश्चित हुनुहुन्छ?',
@@ -2071,6 +2076,7 @@ const dictionaries = {
         units: 'एकाइहरू',
         banks: 'बैंक',
         orderAttributes: 'अर्डर विशेषता',
+        tablesFloors: 'टेबल र फ्लोरहरू',
       },
       descriptions: {
         general: 'इनभ्वाइस, रसिद, र प्रिन्ट कागजातमा देखिने व्यापार विवरणहरू व्यवस्थापन गर्नुहोस्।',
@@ -2084,6 +2090,7 @@ const dictionaries = {
         units: 'उत्पादन बनाउँदा उपलब्ध हुने मापन एकाइहरू व्यवस्थापन गर्नुहोस्।',
         banks: 'भुक्तानी, प्राप्ति, र ब्यालेन्स ट्र्याकिङका लागि प्रयोग हुने बैंक खाताहरू व्यवस्थापन गर्नुहोस्।',
         orderAttributes: 'बिक्री र सेवा अर्डरका लागि कस्टम फिल्डहरू तयार गर्नुहोस्।',
+        tablesFloors: 'डाइनिङ लेआउटका लागि फ्लोर र टेबल श्रेणीहरू व्यवस्थापन गर्नुहोस्।',
       },
       general: {
         lockedEyebrow: 'पेड पहुँच आवश्यक',
@@ -3101,6 +3108,7 @@ const dictionaries = {
       paid: 'भुक्तान भएको',
       due: 'बक्यौता',
       totalReceived: 'जम्मा प्राप्त',
+      changeToReturn: 'फिर्ता रकम',
       notes: 'टिप्पणी',
       items: 'आइटम',
       product: 'उत्पादन',
