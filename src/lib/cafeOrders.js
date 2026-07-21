@@ -9,7 +9,7 @@ export const CAFE_ORDER_STATUSES = [
   },
   {
     value: 'to_cook',
-    label: 'To Cook',
+    label: 'In Progress',
     tone: 'border-amber-200 bg-amber-50 text-amber-800',
     accent: 'bg-amber-500',
   },
@@ -42,6 +42,9 @@ function asString(value) {
 
 export function normalizeCafeOrderStatus(value) {
   const normalized = asString(value).toLowerCase().replace(/[\s-]+/g, '_');
+  if (normalized === 'in_progress' || normalized === 'progress' || normalized === 'preparing') {
+    return 'to_cook';
+  }
   return CAFE_ORDER_STATUS_SET.has(normalized) ? normalized : 'new';
 }
 
@@ -56,6 +59,7 @@ export function getCafeOrderTypeLabel(value) {
 
 export function getCafeOrderAttributes(sale = {}) {
   const attributes = sale?.attributes && typeof sale.attributes === 'object' ? sale.attributes : {};
+  const party = sale?.Party || sale?.Customer || null;
 
   return {
     orderStatus: normalizeCafeOrderStatus(attributes.order_status),
@@ -63,6 +67,10 @@ export function getCafeOrderAttributes(sale = {}) {
     tableNo: asString(attributes.table_no),
     waiterName: asString(attributes.waiter_name),
     guestCount: asString(attributes.guest_count),
+    partyId: sale?.partyId || sale?.customerId || party?.id || null,
+    partyName: party?.name || attributes.customer_name || sale?.partyName || sale?.customerName || '',
+    partyPhone: party?.phone || attributes.customer_phone || sale?.partyPhone || '',
+    partyAddress: party?.address || attributes.customer_address || sale?.partyAddress || '',
   };
 }
 

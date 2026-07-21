@@ -19,6 +19,7 @@ import {
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
@@ -646,7 +647,7 @@ export default function CashierBilling() {
         </div>
 
         {/* Right Side: Billing Checkout Panel */}
-        <div className="lg:col-span-1">
+        <div className="hidden lg:block lg:col-span-1">
           {successState ? (
             <div className="card bg-white p-6 shadow-md border border-emerald-100 space-y-6 text-center">
               <div className="h-16 w-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mx-auto">
@@ -916,6 +917,274 @@ export default function CashierBilling() {
               </div>
             </form>
           )}
+        </div>
+
+        {/* Mobile Billing Counter Popup Modal */}
+        <div className="lg:hidden">
+          <Dialog
+            isOpen={Boolean(selectedTable || successState)}
+            onClose={() => {
+              setSelectedTable(null);
+              setSuccessState(null);
+            }}
+            title={selectedTable ? `Billing - ${selectedTable.name}` : successState ? 'Receipt' : 'Checkout'}
+            size="lg"
+          >
+            {successState ? (
+              <div className="card bg-white p-6 shadow-md border border-emerald-100 space-y-6 text-center">
+                <div className="h-16 w-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mx-auto">
+                  <Check size={32} />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold text-slate-900">Checkout Complete!</h3>
+                  <p className="text-sm text-slate-500">
+                    Bill {successState.invoiceNo} has been marked as{' '}
+                    <span className="font-semibold text-emerald-600">Paid</span>.
+                  </p>
+                  <p className="text-2xl font-black text-slate-800">{formatMoney(successState.total)}</p>
+                </div>
+
+                <div className="flex flex-col gap-2.5 pt-4">
+                  <Link
+                    to={`/app/invoice/sales/${successState.id}?print=1`}
+                    className="btn-primary w-full justify-center gap-2 rounded-xl py-3 text-sm font-semibold"
+                  >
+                    <Printer size={16} />
+                    Print Receipt
+                  </Link>
+                  <button
+                    onClick={() => setSuccessState(null)}
+                    className="btn-ghost w-full justify-center rounded-xl py-3 text-sm font-semibold"
+                  >
+                    Clear & Close
+                  </button>
+                </div>
+              </div>
+            ) : !selectedTable ? null : loadingSaleDetails ? (
+              <div className="card bg-white p-8 border border-slate-100 flex flex-col items-center justify-center min-h-[300px]">
+                <span className="h-8 w-8 rounded-full border-2 border-[#9c5f22] border-t-transparent animate-spin mb-3" />
+                <p className="text-sm text-slate-500 font-semibold">Loading active table order...</p>
+              </div>
+            ) : !activeSale ? (
+              <div className="card bg-white p-6 shadow-sm border border-slate-100 space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <h3 className="text-lg font-bold text-slate-800">{selectedTable.name} Details</h3>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                    selectedTable.occupied
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  }`}>
+                    {selectedTable.occupied ? 'Occupied (Empty)' : 'Vacant Seating'}
+                  </span>
+                </div>
+
+                <div className="text-center py-6 text-slate-400 space-y-4">
+                  <Coffee size={36} className="mx-auto text-slate-300" />
+                  <div>
+                    <p className="text-sm font-bold text-slate-600">Table is empty</p>
+                    <p className="text-xs mt-1 text-slate-400/80">No active bill or draft order exists on this table.</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-2 border-t border-slate-50">
+                  <Link
+                    to={`/app/pos?tableId=${selectedTable.id}&ref=billing`}
+                    className="btn-primary w-full justify-center rounded-xl py-3 text-sm font-semibold"
+                  >
+                    Start New Order (POS)
+                  </Link>
+                  {selectedTable.occupied && (
+                    <button
+                      onClick={() => handleReleaseTable(selectedTable)}
+                      disabled={submitting}
+                      className="btn-ghost w-full justify-center gap-2 rounded-xl py-3 text-rose-600 border-rose-100 hover:bg-rose-50/50 text-sm font-semibold"
+                    >
+                      <Ban size={14} />
+                      Release Table (Vacate)
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleCheckout} className="space-y-5">
+                <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800">Checkout {selectedTable.name}</h3>
+                    <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                      Bill: {activeSale.invoiceNo || activeSale.id.slice(0, 8)}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                      Occupied
+                    </span>
+                  </div>
+                </div>
+
+                {/* Items List */}
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Order Summary</p>
+                  <div className="max-h-48 overflow-y-auto border border-slate-100 rounded-2xl divide-y divide-slate-50 bg-slate-50/30">
+                    {(() => {
+                      const rawItems = activeSale.SaleItems || [];
+                      const items = [];
+                      const seen = new Set();
+                      for (const item of rawItems) {
+                        if (!seen.has(item.productId)) {
+                          seen.add(item.productId);
+                          items.push(item);
+                        }
+                      }
+                      return items.map((item) => (
+                        <div key={item.id} className="p-3 flex items-center justify-between text-sm">
+                          <div className="min-w-0 pr-2">
+                            <p className="font-semibold text-slate-800 truncate">{item.productName || item.Product?.name || 'Unknown Item'}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {item.quantity} x {formatMoney(item.unitPrice)}
+                            </p>
+                          </div>
+                          <span className="font-bold text-slate-800 shrink-0">{formatMoney(item.lineTotal)}</span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+
+                {/* Discount and Taxes inputs */}
+                <div className="grid gap-3 sm:grid-cols-2 border-t border-slate-100 pt-3">
+                  <div>
+                    <label className="label">Discount (Rs)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className="input h-10 mt-1"
+                      value={checkoutForm.discount}
+                      onChange={(e) => handleDiscountChange(e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Tax Rate (%)</label>
+                    <select
+                      className="input h-10 mt-1"
+                      value={checkoutForm.taxRate}
+                      onChange={(e) => handleTaxRateChange(e.target.value)}
+                    >
+                      <option value="0">0% (No Tax)</option>
+                      <option value="5">5%</option>
+                      <option value="13">13% (VAT)</option>
+                      <option value="15">15%</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Recalculated Breakdowns */}
+                <div className="rounded-2xl bg-slate-50/80 p-4 space-y-2 border border-slate-100 text-sm">
+                  <div className="flex justify-between text-slate-500 font-medium">
+                    <span>Subtotal</span>
+                    <span>{formatMoney(computedTotals.subTotal)}</span>
+                  </div>
+                  {computedTotals.discountTotal > 0 && (
+                    <div className="flex justify-between text-amber-700 font-medium">
+                      <span>Discount</span>
+                      <span>-{formatMoney(computedTotals.discountTotal)}</span>
+                    </div>
+                  )}
+                  {computedTotals.taxTotal > 0 && (
+                    <div className="flex justify-between text-slate-500 font-medium">
+                      <span>Tax ({checkoutForm.taxRate}%)</span>
+                      <span>{formatMoney(computedTotals.taxTotal)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-black text-slate-900 border-t border-slate-200/60 pt-2 text-base">
+                    <span>Grand Total</span>
+                    <span className="text-primary">{formatMoney(computedTotals.grandTotal)}</span>
+                  </div>
+                </div>
+
+                {/* Financial Transaction Input */}
+                <div className="border-t border-slate-100 pt-3 space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Payment Collection</p>
+
+                  <div className="space-y-1.5">
+                    <label className="label">Amount Received</label>
+                    <div className="flex w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition">
+                      <span className="flex h-11 items-center bg-slate-100 px-3.5 text-sm font-semibold text-slate-500 border-r border-slate-200 shrink-0">
+                        {t("currency.symbol") || "Rs"}
+                      </span>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        step="any"
+                        className="h-11 w-full bg-transparent px-3 text-sm font-bold text-slate-900 focus:outline-none"
+                        value={checkoutForm.amountReceived}
+                        onChange={(e) => setCheckoutForm((prev) => ({ ...prev, amountReceived: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quick Cash Buttons */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {quickAmountOptions.map((opt, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setCheckoutForm((prev) => ({ ...prev, amountReceived: String(opt.value.toFixed(2)) }))}
+                        className="px-3 py-1.5 rounded-xl border border-slate-200 hover:border-[#9c5f22] text-xs font-bold text-slate-600 bg-white hover:bg-[#9c5f22]/5 transition shadow-sm"
+                      >
+                        {opt.label === 'Exact' ? `Exact (${opt.value.toFixed(0)})` : opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Change return section */}
+                  {changeAmount > 0 && (
+                    <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex justify-between items-center text-sm font-bold shadow-sm">
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles size={16} className="text-emerald-600" />
+                        Change to Return
+                      </span>
+                      <span className="text-base text-emerald-700">{formatMoney(changeAmount)}</span>
+                    </div>
+                  )}
+
+                  {/* Payment Method Fields */}
+                  <PaymentMethodFields
+                    value={checkoutForm}
+                    onChange={(patch) => setCheckoutForm((prev) => ({ ...prev, ...patch }))}
+                    showPaymentNote={false}
+                  />
+                </div>
+
+                {/* Final Actions */}
+                <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-3">
+                  <div className="flex gap-2.5">
+                    <Link
+                      to={`/app/pos?tableId=${selectedTable.id}&checkout=1&ref=billing`}
+                      className="btn-secondary flex-1 justify-center rounded-xl py-3 text-xs font-bold text-center gap-1.5 bg-amber-50/70 border-amber-200/80 text-amber-800 hover:bg-amber-100"
+                    >
+                      <Sparkles size={14} className="text-amber-600 shrink-0" />
+                      Review Bill (POS)
+                    </Link>
+                    <Link
+                      to={`/app/pos?tableId=${selectedTable.id}&ref=billing`}
+                      className="btn-secondary flex-1 justify-center rounded-xl py-3 text-xs font-bold text-center"
+                    >
+                      Edit Items (POS)
+                    </Link>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="btn-primary w-full justify-center rounded-xl py-3.5 text-sm font-black"
+                  >
+                    {submitting ? 'Processing...' : 'Complete Seating Bill'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </Dialog>
         </div>
       </div>
     </div>

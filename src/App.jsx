@@ -195,7 +195,7 @@ function AppShell() {
   const showVerificationBanner = hasUnverifiedEmail(user);
   const requiresActivation = isStaffActivationRequired(user, role);
   const servicesEnabled = businessProfile?.modules?.services !== false;
-  const cafeOrdersEnabled = businessProfile?.modules?.orders === true || businessProfile?.type === 'cafe';
+  const cafeOrdersEnabled = businessProfile?.modules?.orders === true || businessProfile?.type === 'cafe' || businessProfile?.settings?.enabledModules?.includes('tables');
   const salesRoute = businessProfile?.salesFlow?.route || '/app/pos';
   const posPageElement = <QuickPos />;
   const subscriptionGuard = getSubscriptionGuard(subscription);

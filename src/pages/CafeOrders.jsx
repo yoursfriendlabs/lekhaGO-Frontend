@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Clock, FileText, Pencil, Plus, ShoppingCart, Store, Trash2, Users } from 'lucide-react';
+import { ArrowRight, Clock, FileText, LayoutGrid, MapPin, Package2, Pencil, Phone, Plus, Search, ShoppingBag, ShoppingCart, Store, Table, Trash2, UserRound, Users } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import FormSectionCard from '../components/FormSectionCard.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import NoteTextarea from '../components/NoteTextarea.jsx';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
+import QuickPartySelector from '../components/QuickPartySelector.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
@@ -16,7 +17,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
 import { getCurrentCreatorValue } from '../lib/records';
-import { mergeLookupEntities, normalizeLookupProduct, toProductLookupOption } from '../lib/lookups.js';
+import { mergeLookupEntities, normalizeLookupParty, normalizeLookupProduct, toProductLookupOption } from '../lib/lookups.js';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useProductStore } from '../stores/products';
 import {
@@ -92,11 +93,16 @@ export default function CafeOrders() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [formMode, setFormMode] = useState('create');
+  const [selectedParty, setSelectedParty] = useState(null);
+  const [partySelectorOpen, setPartySelectorOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deletedItemIds, setDeletedItemIds] = useState([]);
   const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState('');
+  const [selectedOrderTypeFilter, setSelectedOrderTypeFilter] = useState('all');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedTableFilter, setSelectedTableFilter] = useState('');
+  const [viewMode, setViewMode] = useState('kanban'); // 'kanban', 'table', 'floor'
   const [dialogFloorFilter, setDialogFloorFilter] = useState('all');
   const [dialogStatusFilter, setDialogStatusFilter] = useState('all');
   const [productDirectory, setProductDirectory] = useState({});
@@ -197,7 +203,7 @@ export default function CafeOrders() {
       const data = await api.getTables(params);
       let items = data?.items || [];
       if (selectedFloorTab === 'unassigned') {
-        items = items.filter(t => !t.categoryId && !t.category);
+        items = items.filter((t) => !t.categoryId);
       }
       setBackendTables(items);
     } catch (err) {
@@ -219,31 +225,27 @@ export default function CafeOrders() {
     setActiveDialogStep('details');
   }, [dialogOpen]);
 
-  const totals = useMemo(() => {
-    const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
-    const taxTotal = items.reduce((sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate), 0);
-    return {
-      subTotal,
-      taxTotal,
-      grandTotal: subTotal + taxTotal,
-    };
-  }, [items]);
-
-  const receivedAmount = useMemo(() => (
-    isPaid
-      ? totals.grandTotal
-      : Math.min(Number(orderFields.amountReceived || 0), totals.grandTotal)
-  ), [isPaid, orderFields.amountReceived, totals.grandTotal]);
-  const dueAmount = Math.max(totals.grandTotal - receivedAmount, 0);
-
-  const cacheProducts = (entries) => {
-    setProductDirectory((previous) => mergeLookupEntities(previous, entries));
+  const cacheProducts = (productList = []) => {
+    if (!Array.isArray(productList) || !productList.length) return;
+    setProductDirectory((previous) => mergeLookupEntities(previous, productList));
   };
 
-  const getProductById = (id) => {
-    if (!id) return null;
-    return productDirectory[String(id)] || null;
-  };
+  const getProductById = (productId) => productDirectory[productId] || null;
+
+  const subTotalNumber = useMemo(() => items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0), [items]);
+  const taxTotalNumber = useMemo(() => items.reduce((sum, item) => sum + getVatAmount(item.lineTotal, item.taxRate), 0), [items]);
+  const grandTotalNumber = subTotalNumber + taxTotalNumber;
+  const receivedAmount = isPaid ? grandTotalNumber.toFixed(2) : String(orderFields.amountReceived ?? 0);
+  const dueAmountNumber = Math.max(0, grandTotalNumber - Number(receivedAmount || 0));
+
+  const totals = useMemo(() => ({
+    subTotal: subTotalNumber.toFixed(2),
+    taxTotal: taxTotalNumber.toFixed(2),
+    grandTotal: grandTotalNumber.toFixed(2),
+    dueAmount: dueAmountNumber.toFixed(2),
+  }), [subTotalNumber, taxTotalNumber, grandTotalNumber, dueAmountNumber]);
+
+  const dueAmount = Number(totals.dueAmount || 0);
 
   const loadProductOptions = async (search) => {
     const data = await api.lookupProducts({ search, limit: 20 });
@@ -324,6 +326,8 @@ export default function CafeOrders() {
     setProductDirectory({});
     setIsPaid(false);
     setAttributeSnapshot({});
+    setSelectedParty(null);
+    setPartySelectorOpen(false);
   };
 
   const openCreate = async (tableNo = '') => {
@@ -358,6 +362,10 @@ export default function CafeOrders() {
 
       cacheProducts(hydratedProducts);
       setAttributeSnapshot(order.attributes || {});
+
+      const partyObj = order.Party || order.Customer || (order.partyId ? { id: order.partyId, name: meta.partyName, phone: meta.partyPhone, address: meta.partyAddress } : null);
+      setSelectedParty(partyObj ? normalizeLookupParty(partyObj) : null);
+
       setOrderFields({
         saleDate: order.saleDate || todayISODate(),
         notes: order.notes || '',
@@ -427,12 +435,15 @@ export default function CafeOrders() {
         tableNo: resolvedTableNo,
         waiterName: orderFields.waiterName,
         guestCount: orderFields.guestCount,
+        customer_name: selectedParty?.name || '',
+        customer_phone: selectedParty?.phone || '',
+        customer_address: selectedParty?.address || '',
       });
 
       const payload = {
         ...headerFields,
         tableId: orderFields.orderType === 'dine_in' && matchedTable ? matchedTable.id : null,
-        partyId: null,
+        partyId: selectedParty?.id || null,
         amountReceived: receivedAmount,
         attributes,
         ...(Number(receivedAmount || 0) > 0 ? buildPaymentPayload({ paymentMethod, bankId, paymentNote }) : { paymentMethod: 'cash' }),
@@ -483,25 +494,46 @@ export default function CafeOrders() {
     if (!nextStatus) return;
 
     try {
-      await api.updateSale(order.id, {
-        attributes: buildCafeOrderAttributes(order.attributes || {}, {
-          ...currentMeta,
-          orderStatus: nextStatus.value,
-        }),
+      const nextAttributes = buildCafeOrderAttributes(order.attributes || {}, {
+        ...currentMeta,
+        orderStatus: nextStatus.value,
       });
-      setOrders((previous) => previous.map((entry) => (
-        entry.id === order.id
-          ? {
-              ...entry,
-              attributes: buildCafeOrderAttributes(entry.attributes || {}, {
-                ...currentMeta,
-                orderStatus: nextStatus.value,
-              }),
-            }
-          : entry
-      )));
+
+      const updatePayload = {
+        attributes: nextAttributes,
+      };
+
+      if (nextStatus.value === 'completed' && Number(order.dueAmount || order.grandTotal || 0) > 0) {
+        updatePayload.status = 'paid';
+        updatePayload.amountReceived = order.grandTotal;
+        updatePayload.paymentMethod = order.paymentMethod || 'cash';
+      }
+
+      await api.updateSale(order.id, updatePayload);
+      await loadOrders();
+      setStatus({ type: 'success', message: `Order moved to ${nextStatus.label}.` });
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Unable to update order status.' });
+    }
+  };
+
+  const handleCollectCashAndComplete = async (order) => {
+    const currentMeta = getCafeOrderAttributes(order);
+    try {
+      const updatePayload = {
+        status: 'paid',
+        amountReceived: order.grandTotal,
+        paymentMethod: order.paymentMethod || 'cash',
+        attributes: buildCafeOrderAttributes(order.attributes || {}, {
+          ...currentMeta,
+          orderStatus: 'completed',
+        }),
+      };
+      await api.updateSale(order.id, updatePayload);
+      await loadOrders();
+      setStatus({ type: 'success', message: 'Cash collected and order marked as completed!' });
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || 'Failed to complete order.' });
     }
   };
 
@@ -531,12 +563,39 @@ export default function CafeOrders() {
   const activeOrders = useMemo(() => orders.filter((order) => getCafeOrderAttributes(order).orderStatus !== 'completed'), [orders]);
   const tableMap = useMemo(() => buildCafeTableMap(activeOrders, cafeTables), [activeOrders, cafeTables]);
 
+  const typeCounts = useMemo(() => {
+    const counts = { all: orders.length, dine_in: 0, takeaway: 0, delivery: 0 };
+    orders.forEach((order) => {
+      const meta = getCafeOrderAttributes(order);
+      if (meta.orderType && counts[meta.orderType] !== undefined) {
+        counts[meta.orderType] += 1;
+      }
+    });
+    return counts;
+  }, [orders]);
+
   const filteredOrders = useMemo(() => orders.filter((order) => {
     const meta = getCafeOrderAttributes(order);
-    if (selectedStatusFilter !== 'all' && meta.orderStatus !== selectedStatusFilter) return false;
+    if (selectedOrderTypeFilter !== 'all' && selectedOrderTypeFilter !== 'seating_map' && meta.orderType !== selectedOrderTypeFilter) {
+      return false;
+    }
+    if (selectedStatusFilter !== 'all' && meta.orderStatus !== selectedStatusFilter) {
+      return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const nameMatch = meta.partyName?.toLowerCase().includes(q);
+      const phoneMatch = meta.partyPhone?.toLowerCase().includes(q);
+      const addressMatch = meta.partyAddress?.toLowerCase().includes(q);
+      const invoiceMatch = order.invoiceNo?.toLowerCase().includes(q);
+      const tableMatch = meta.tableNo?.toLowerCase().includes(q);
+      if (!nameMatch && !phoneMatch && !addressMatch && !invoiceMatch && !tableMatch) {
+        return false;
+      }
+    }
     if (!selectedTableFilter) return true;
     return meta.tableNo === selectedTableFilter || meta.tableNo === `T${selectedTableFilter}`;
-  }), [orders, selectedStatusFilter, selectedTableFilter]);
+  }), [orders, selectedOrderTypeFilter, selectedStatusFilter, searchQuery, selectedTableFilter]);
 
   const groupedOrders = useMemo(() => CAFE_ORDER_STATUSES.map((column) => ({
     ...column,
@@ -544,16 +603,14 @@ export default function CafeOrders() {
   })), [filteredOrders]);
 
   const orderCounts = useMemo(() => CAFE_ORDER_STATUSES.reduce((acc, column) => {
-    acc[column.value] = orders.filter((order) => getCafeOrderAttributes(order).orderStatus === column.value).length;
+    acc[column.value] = filteredOrders.filter((order) => getCafeOrderAttributes(order).orderStatus === column.value).length;
     return acc;
-  }, {}), [orders]);
+  }, {}), [filteredOrders]);
 
-  const completedCount = orderCounts.completed || 0;
-  const openCount = activeOrders.length;
-  const readyCount = orderCounts.ready || 0;
   const visibleBoardColumns = selectedStatusFilter === 'all'
     ? groupedOrders
     : groupedOrders.filter((column) => column.value === selectedStatusFilter);
+
   const dialogSteps = useMemo(() => ([
     { id: 'details', label: 'Details' },
     { id: 'items', label: 'Items' },
@@ -602,13 +659,177 @@ export default function CafeOrders() {
 
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
 
-      <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-6">
+
+
+      {/* Order Type & View Switcher Bar */}
+      <div className="flex flex-col gap-4 rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+          {/* Order Type Filter Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none max-w-full">
+            <button
+              type="button"
+              onClick={() => { setSelectedOrderTypeFilter('all'); if (viewMode === 'floor') setViewMode('kanban'); }}
+              className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                selectedOrderTypeFilter === 'all' && viewMode !== 'floor'
+                  ? 'bg-[#9c5f22] text-white shadow-md'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80'
+              }`}
+            >
+              📋 All Orders
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                selectedOrderTypeFilter === 'all' && viewMode !== 'floor' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
+                {typeCounts.all}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setSelectedOrderTypeFilter('dine_in'); if (viewMode === 'floor') setViewMode('kanban'); }}
+              className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                selectedOrderTypeFilter === 'dine_in' && viewMode !== 'floor'
+                  ? 'bg-[#9c5f22] text-white shadow-md'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80'
+              }`}
+            >
+              🍽️ Table / Dine In
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                selectedOrderTypeFilter === 'dine_in' && viewMode !== 'floor' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+              }`}>
+                {typeCounts.dine_in}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setSelectedOrderTypeFilter('takeaway'); if (viewMode === 'floor') setViewMode('kanban'); }}
+              className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                selectedOrderTypeFilter === 'takeaway' && viewMode !== 'floor'
+                  ? 'bg-[#9c5f22] text-white shadow-md'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80'
+              }`}
+            >
+              🛍️ Takeaway / Walk-in
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                selectedOrderTypeFilter === 'takeaway' && viewMode !== 'floor' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+              }`}>
+                {typeCounts.takeaway}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setSelectedOrderTypeFilter('delivery'); if (viewMode === 'floor') setViewMode('kanban'); }}
+              className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
+                selectedOrderTypeFilter === 'delivery' && viewMode !== 'floor'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80'
+              }`}
+            >
+              🚚 Home Delivery
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                selectedOrderTypeFilter === 'delivery' && viewMode !== 'floor' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-800'
+              }`}>
+                {typeCounts.delivery}
+              </span>
+            </button>
+          </div>
+
+          {/* View Mode Toggle Controls */}
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/60 shrink-0 self-start lg:self-auto">
+            <button
+              type="button"
+              onClick={() => setViewMode('kanban')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                viewMode === 'kanban'
+                  ? 'bg-white text-[#9c5f22] shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <LayoutGrid size={15} />
+              Kanban Board
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                viewMode === 'table'
+                  ? 'bg-white text-[#9c5f22] shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Table size={15} />
+              Table View
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode('floor')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                viewMode === 'floor'
+                  ? 'bg-slate-800 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              🗺️ Seating Map
+            </button>
+          </div>
+        </div>
+
+        {/* Stage Status Filters & Search */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {viewMode !== 'floor' ? (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 whitespace-nowrap">Stage:</span>
+              <button
+                type="button"
+                onClick={() => setSelectedStatusFilter('all')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
+                  selectedStatusFilter === 'all'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                All Stages ({filteredOrders.length})
+              </button>
+              {CAFE_ORDER_STATUSES.map((column) => (
+                <button
+                  key={column.value}
+                  type="button"
+                  onClick={() => setSelectedStatusFilter(column.value)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition whitespace-nowrap ${
+                    selectedStatusFilter === column.value
+                      ? `${column.tone} shadow-sm`
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  {column.label} ({orderCounts[column.value] || 0})
+                </button>
+              ))}
+            </div>
+          ) : <div />}
+
+          <div className="relative flex-1 sm:max-w-xs">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search party name, phone, address, invoice..."
+              className="w-full rounded-2xl border border-slate-200/80 bg-white py-2 pl-9 pr-3 text-xs font-medium text-slate-800 focus:border-[#9c5f22] focus:outline-none"
+            />
+            <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+          </div>
+        </div>
+      </div>
+
+      {/* View 1: Seating Map / Floor Plan */}
+      {viewMode === 'floor' ? (
+        <div className="rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9b6835]">Floor View</p>
-              <h2 className="mt-2 text-xl font-semibold text-slate-900 sm:text-2xl">Tables</h2>
-              <p className="mt-1 text-sm text-slate-500">Tap a table to focus the active orders for that seating area.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9b6835]">Floor Map</p>
+              <h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">Seating Tables</h2>
             </div>
             {selectedTableFilter ? (
               <button
@@ -621,15 +842,14 @@ export default function CafeOrders() {
             ) : null}
           </div>
 
-          {/* Floor Filter Bar */}
-          <div className="mt-4 flex flex-wrap gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
+          <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
             <button
               type="button"
               onClick={() => setSelectedFloorTab('all')}
               className={`px-3.5 py-1.5 text-xs font-bold rounded-full transition-all border ${
                 selectedFloorTab === 'all'
                   ? 'bg-[#9b6835] text-white border-[#9b6835] shadow-sm'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
               }`}
             >
               All Tables
@@ -642,29 +862,17 @@ export default function CafeOrders() {
                 className={`px-3.5 py-1.5 text-xs font-bold rounded-full transition-all border ${
                   selectedFloorTab === floor.id
                     ? 'bg-[#9b6835] text-white border-[#9b6835] shadow-sm'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                 }`}
               >
                 {floor.name}
               </button>
             ))}
-            <button
-              type="button"
-              onClick={() => setSelectedFloorTab('unassigned')}
-              className={`px-3.5 py-1.5 text-xs font-bold rounded-full transition-all border ${
-                selectedFloorTab === 'unassigned'
-                  ? 'bg-[#9b6835] text-white border-[#9b6835] shadow-sm'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-700'
-              }`}
-            >
-              Unassigned
-            </button>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {tableMap.map((table) => {
               const isOccupied = table.occupied || table.status === 'occupied';
-              const statusMeta = table.statusMeta;
 
               return (
                 <button
@@ -673,35 +881,35 @@ export default function CafeOrders() {
                   onClick={() => navigate(`/app/pos?tableId=${table.id}&ref=orders`)}
                   className={`group relative rounded-3xl border p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:shadow-md flex flex-col justify-between h-36 ${
                     isOccupied
-                      ? 'border-orange-200 bg-orange-50/40 hover:border-orange-300 dark:border-orange-500/20 dark:bg-orange-500/5'
-                      : 'border-emerald-200 bg-emerald-50/40 hover:border-emerald-300 dark:border-emerald-500/20 dark:bg-emerald-500/5'
+                      ? 'border-amber-200 bg-amber-50/40 hover:border-amber-300'
+                      : 'border-emerald-200 bg-emerald-50/40 hover:border-emerald-300'
                   }`}
                 >
                   <div className="w-full">
                     <div className="flex items-start justify-between gap-2">
-                      <span className="font-serif text-lg sm:text-xl font-bold text-slate-800 dark:text-white group-hover:text-primary transition-colors">
+                      <span className="font-serif text-lg sm:text-xl font-bold text-slate-800">
                         {table.label}
                       </span>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
                         isOccupied
-                          ? 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-500/20 dark:text-orange-300'
-                          : 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/20 dark:text-emerald-300'
+                          ? 'bg-amber-100 text-amber-700 border-amber-200'
+                          : 'bg-emerald-100 text-emerald-700 border-emerald-200'
                       }`}>
                         {isOccupied ? 'Occupied' : 'Vacant'}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1 mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
                       <Users size={12} className="text-slate-400" />
-                      <span>{table.capacity ? `${table.capacity} Seats` : 'No seats limit'}</span>
+                      <span>{table.capacity ? `${table.capacity} Seats` : 'No limit'}</span>
                     </div>
                   </div>
 
-                  <div className="w-full pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700">
+                  <div className="w-full pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
                       {table.category?.name || 'No Floor'}
                     </span>
-                    <span className="text-[11px] text-slate-500 truncate max-w-[90px]" title={table.orderMeta?.waiterName || (isOccupied ? 'Occupied' : 'Open for seating')}>
+                    <span className="text-[11px] text-slate-500 truncate max-w-[90px]">
                       {table.orderMeta?.waiterName || (isOccupied ? 'Dining' : 'Open')}
                     </span>
                   </div>
@@ -710,106 +918,177 @@ export default function CafeOrders() {
             })}
           </div>
         </div>
+      ) : viewMode === 'table' ? (
+        /* View 2: Data Table View */
+        <div className="rounded-[28px] border border-slate-200/80 bg-white/90 p-4 sm:p-6 shadow-sm overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                <th className="p-3">Order / Date</th>
+                <th className="p-3">Type</th>
+                <th className="p-3">Customer / Party</th>
+                <th className="p-3">Items</th>
+                <th className="p-3">Payment</th>
+                <th className="p-3">Stage</th>
+                <th className="p-3 text-right">Total</th>
+                <th className="p-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-400">
+                    No orders match your search or filters.
+                  </td>
+                </tr>
+              ) : (
+                filteredOrders.map((order) => {
+                  const meta = getCafeOrderAttributes(order);
+                  const paymentMeta = getCafePaymentMeta(order);
+                  const nextStatus = getNextCafeOrderStatus(meta.orderStatus);
+                  const statusMeta = getCafeOrderStatusMeta(meta.orderStatus);
 
-        <div className="rounded-[28px] border border-slate-200/80 bg-gradient-to-br from-[#fff8f1] via-white to-slate-50 p-4 shadow-sm sm:p-6">
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-1">
-            <div className="rounded-3xl border border-white/70 bg-white/80 p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-900">Open Orders</p>
-                <ShoppingCart size={18} className="text-[#9b6835]" />
-              </div>
-              <p className="mt-3 text-3xl font-semibold text-slate-900">{openCount}</p>
-              <p className="mt-1 text-sm text-slate-500">Orders still moving through the cafe workflow.</p>
-            </div>
-
-            <div className="rounded-3xl border border-white/70 bg-white/80 p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-900">Ready for Pickup</p>
-                <Store size={18} className="text-emerald-600" />
-              </div>
-              <p className="mt-3 text-3xl font-semibold text-slate-900">{readyCount}</p>
-              <p className="mt-1 text-sm text-slate-500">Orders that can be served, packed, or handed to the customer.</p>
-            </div>
-
-            <div className="rounded-3xl border border-white/70 bg-white/80 p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-900">Completed Today</p>
-                <Clock size={18} className="text-slate-500" />
-              </div>
-              <p className="mt-3 text-3xl font-semibold text-slate-900">{completedCount}</p>
-              <p className="mt-1 text-sm text-slate-500">Completed orders remain visible here for quick review.</p>
-            </div>
-          </div>
-
-          <div className="mt-5 rounded-3xl border border-slate-200/70 bg-white/80 p-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Board Filters</p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {selectedStatusFilter === 'all' ? 'Showing all kitchen stages.' : `Focused on ${CAFE_ORDER_STATUSES.find((column) => column.value === selectedStatusFilter)?.label || 'selected'} orders.`}
-                </p>
-              </div>
-              {selectedTableFilter ? (
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
-                  Table {selectedTableFilter}
-                </span>
-              ) : null}
-            </div>
-            <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar pb-1 sm:flex-wrap">
-              <button
-                type="button"
-                onClick={() => setSelectedStatusFilter('all')}
-                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition ${
-                  selectedStatusFilter === 'all'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                All
-              </button>
-              {CAFE_ORDER_STATUSES.map((column) => (
-                <button
-                  key={column.value}
-                  type="button"
-                  onClick={() => setSelectedStatusFilter(column.value)}
-                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                    selectedStatusFilter === column.value
-                      ? `${column.tone} shadow-sm`
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                  }`}
-                >
-                  {column.label} {orderCounts[column.value] ? `(${orderCounts[column.value]})` : ''}
-                </button>
-              ))}
-            </div>
-          </div>
+                  return (
+                    <tr key={order.id} className="hover:bg-slate-50/80 transition">
+                      <td className="p-3 font-semibold text-slate-800">
+                        <div>#{order.invoiceNo || order.id.slice(0, 8)}</div>
+                        <div className="text-[10px] text-slate-400 font-normal">{formatRelativeDate(order.createdAt || order.saleDate)}</div>
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        {meta.orderType === 'delivery' ? (
+                          <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                            🚚 Home Delivery
+                          </span>
+                        ) : meta.orderType === 'takeaway' ? (
+                          <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                            🛍️ Takeaway
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                            🍽️ Dine-in {meta.tableNo ? `(T${meta.tableNo})` : ''}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {meta.partyName ? (
+                          <div>
+                            <div className="font-bold text-slate-800">{meta.partyName}</div>
+                            {meta.partyPhone && (
+                              <a href={`tel:${meta.partyPhone}`} className="text-amber-800 text-[11px] hover:underline flex items-center gap-1">
+                                <Phone size={10} /> {meta.partyPhone}
+                              </a>
+                            )}
+                            {meta.partyAddress && (
+                              <div className="text-slate-500 text-[10px] truncate max-w-[160px]">{meta.partyAddress}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic">Walk-in</span>
+                        )}
+                      </td>
+                      <td className="p-3 max-w-[220px]">
+                        {Array.isArray(order.SaleItems) && order.SaleItems.length > 0 ? (
+                          <span className="truncate block font-medium" title={order.SaleItems.map(i => `${i.quantity}x ${i.Product?.name || i.name}`).join(', ')}>
+                            {order.SaleItems.slice(0, 2).map(i => `${i.quantity}x ${i.Product?.name || i.name}`).join(', ')}
+                            {order.SaleItems.length > 2 ? ` +${order.SaleItems.length - 2} more` : ''}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">No items</span>
+                        )}
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${paymentMeta.tone}`}>
+                          {paymentMeta.label}
+                        </span>
+                      </td>
+                      <td className="p-3 whitespace-nowrap">
+                        <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border ${statusMeta?.tone || 'bg-slate-100 text-slate-700'}`}>
+                          {statusMeta?.label || meta.orderStatus}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-bold text-slate-900 whitespace-nowrap">
+                        {formatMoney(order.grandTotal)}
+                      </td>
+                      <td className="p-3 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {nextStatus && (
+                            <button
+                              type="button"
+                              className="btn-primary py-1 px-2.5 text-[11px] font-bold"
+                              onClick={() => moveOrderToNextStage(order)}
+                            >
+                              → {nextStatus.label}
+                            </button>
+                          )}
+                          {meta.orderStatus !== 'completed' && Number(order.dueAmount || order.grandTotal || 0) > 0 && (
+                            <button
+                              type="button"
+                              className="py-1 px-2.5 rounded-xl border border-emerald-300 bg-emerald-50 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100"
+                              onClick={() => handleCollectCashAndComplete(order)}
+                              title="Collect Cash & Complete"
+                            >
+                              💵 Cash
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                            onClick={() => navigate(`/app/pos?tableId=${order.tableId || ''}&ref=orders`)}
+                            title="Edit"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <Link
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                            to={`/app/invoice/sales/${order.id}`}
+                            title="Invoice"
+                          >
+                            <FileText size={14} />
+                          </Link>
+                          <button
+                            type="button"
+                            className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50"
+                            onClick={() => setDeleteOrder(order)}
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
-        {visibleBoardColumns.map((column) => (
+      ) : (
+        /* View 3: Single Row Horizontal Kanban Order Board */
+        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin items-start">
+          {visibleBoardColumns.map((column) => (
             <section
               key={column.value}
-              className="rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-5"
+              className="w-80 sm:w-84 shrink-0 min-h-[550px] flex flex-col rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-5"
             >
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
                   <span className={`h-2.5 w-2.5 rounded-full ${column.accent}`} />
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">{column.label}</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-700">{column.label}</h3>
                 </div>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-extrabold text-slate-700">
                   {column.items.length}
                 </span>
               </div>
 
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 space-y-3 flex-1 overflow-y-auto pr-1">
                 {loading ? (
-                  <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                  <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500 text-center">
                     Loading orders...
                   </div>
                 ) : column.items.length === 0 ? (
-                  <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                    No orders in this column.
+                  <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-400 text-center flex flex-col items-center justify-center gap-2">
+                    <Package2 size={24} className="text-slate-300" />
+                    <span>No orders in this column.</span>
                   </div>
                 ) : (
                   column.items.map((order) => {
@@ -820,50 +1099,93 @@ export default function CafeOrders() {
                     return (
                       <article
                         key={order.id}
-                        className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                        className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:shadow-md space-y-3"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                              {order.invoiceNo || order.id.slice(0, 8)}
-                            </p>
-                            <h4 className="mt-2 text-lg font-semibold text-slate-900">
-                              {meta.tableNo ? `Table ${meta.tableNo}` : getCafeOrderTypeLabel(meta.orderType)}
-                            </h4>
-                            <p className="mt-1 text-sm text-slate-500">{getCafeOrderTypeLabel(meta.orderType)}</p>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {meta.orderType === 'delivery' ? (
+                              <span className="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1">
+                                🚚 Home Delivery
+                              </span>
+                            ) : meta.orderType === 'takeaway' ? (
+                              <span className="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
+                                🛍️ Takeaway
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-1">
+                                🍽️ Dine-in {meta.tableNo ? `(T${meta.tableNo})` : ''}
+                              </span>
+                            )}
+
+                            <span className="text-[11px] font-semibold text-slate-400">
+                              #{order.invoiceNo || order.id.slice(0, 8)}
+                            </span>
                           </div>
-                          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${paymentMeta.tone}`}>
+
+                          <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${paymentMeta.tone}`}>
                             {paymentMeta.label}
                           </span>
                         </div>
 
-                        <div className="mt-4 grid gap-2 text-sm text-slate-600">
-                          <div className="flex items-center gap-2">
-                            <Users size={14} className="text-slate-400" />
-                            <span>{meta.guestCount || '1'} guests</span>
+                        {/* Customer / Party Box */}
+                        {meta.partyName || meta.partyPhone || meta.partyAddress ? (
+                          <div className="flex items-start gap-2.5 rounded-2xl bg-amber-50/90 p-3 text-xs text-amber-900 border border-amber-200/80 shadow-2xs">
+                            <UserRound size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                            <div className="min-w-0 flex-1 space-y-1">
+                              {meta.partyName && (
+                                <p className="font-bold text-sm text-slate-800 truncate">{meta.partyName}</p>
+                              )}
+                              {meta.partyPhone && (
+                                <a href={`tel:${meta.partyPhone}`} className="text-amber-800 font-semibold hover:underline flex items-center gap-1.5">
+                                  <Phone size={12} className="text-amber-600" /> {meta.partyPhone}
+                                </a>
+                              )}
+                              {meta.partyAddress && (
+                                <p className="text-slate-600 flex items-center gap-1.5 text-xs">
+                                  <MapPin size={12} className="text-rose-500 shrink-0" />
+                                  <span className="truncate">{meta.partyAddress}</span>
+                                </p>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Clock size={14} className="text-slate-400" />
+                        ) : null}
+
+                        {/* Items Preview */}
+                        {Array.isArray(order.SaleItems) && order.SaleItems.length > 0 ? (
+                          <div className="rounded-2xl bg-slate-50 p-2.5 text-xs text-slate-700 space-y-1 border border-slate-100">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Items ({order.SaleItems.length}):</p>
+                            {order.SaleItems.slice(0, 4).map((si) => (
+                              <div key={si.id || si.productId} className="flex justify-between font-medium">
+                                <span className="truncate pr-2">{si.quantity}x {si.Product?.name || si.name || 'Item'}</span>
+                                <span className="text-slate-500 shrink-0">{formatMoney(si.lineTotal)}</span>
+                              </div>
+                            ))}
+                            {order.SaleItems.length > 4 && (
+                              <p className="text-[10px] font-bold text-slate-400 text-right pt-0.5">+ {order.SaleItems.length - 4} more items</p>
+                            )}
+                          </div>
+                        ) : null}
+
+                        <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                          <div className="flex items-center gap-1.5">
+                            <Clock size={13} className="text-slate-400" />
                             <span>{formatRelativeDate(order.createdAt || order.saleDate)}</span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Store size={14} className="text-slate-400" />
-                            <span>{meta.waiterName || 'No waiter assigned'}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <ShoppingCart size={14} className="text-slate-400" />
-                            <span>{Array.isArray(order.SaleItems) ? `${order.SaleItems.length} items` : 'Items loading from invoice'}</span>
-                          </div>
+                          {meta.waiterName && (
+                            <span className="text-[11px] bg-slate-100 px-2 py-0.5 rounded-full font-medium">
+                              {meta.waiterName}
+                            </span>
+                          )}
                         </div>
 
                         {order.notes ? (
-                          <p className="mt-4 rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-600">{order.notes}</p>
+                          <p className="rounded-2xl bg-amber-50/50 p-2.5 text-xs text-slate-600 border border-amber-100">{order.notes}</p>
                         ) : null}
 
-                        <div className="mt-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
                           <div>
-                            <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Total</p>
-                            <p className="text-lg font-semibold text-slate-900">{formatMoney(order.grandTotal)}</p>
+                            <p className="text-[10px] uppercase font-bold text-slate-400">Total</p>
+                            <p className="text-base font-bold text-slate-900">{formatMoney(order.grandTotal)}</p>
                           </div>
                           <div className="flex items-center gap-1">
                             <button
@@ -896,13 +1218,23 @@ export default function CafeOrders() {
                         {nextStatus ? (
                           <button
                             type="button"
-                            className="btn-primary mt-4 w-full justify-center"
+                            className="btn-primary w-full justify-center text-xs py-2.5 font-bold"
                             onClick={() => moveOrderToNextStage(order)}
                           >
                             Move to {nextStatus.label}
                             <ArrowRight size={14} className="ml-1.5" />
                           </button>
                         ) : null}
+
+                        {meta.orderStatus !== 'completed' && Number(order.dueAmount || order.grandTotal || 0) > 0 && (
+                          <button
+                            type="button"
+                            className="flex w-full items-center justify-center rounded-2xl border border-emerald-300 bg-emerald-50 py-2.5 px-3 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 transition"
+                            onClick={() => handleCollectCashAndComplete(order)}
+                          >
+                            💵 Collect Cash & Complete
+                          </button>
+                        )}
                       </article>
                     );
                   })
@@ -910,7 +1242,8 @@ export default function CafeOrders() {
               </div>
             </section>
           ))}
-      </div>
+        </div>
+      )}
 
       <Dialog
         isOpen={dialogOpen}
@@ -1051,6 +1384,41 @@ export default function CafeOrders() {
                     onChange={(event) => setOrderFields((prev) => ({ ...prev, waiterName: event.target.value }))}
                     placeholder="Staff name"
                   />
+                </div>
+
+                <div className="sm:col-span-2 xl:col-span-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <label className="label text-slate-900 font-bold">Customer / Party (Phone Orders)</label>
+                      <p className="mt-0.5 text-xs text-slate-500">Record customer name, phone number, and delivery address.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPartySelectorOpen(true)}
+                      className="btn-secondary text-xs shrink-0"
+                    >
+                      {selectedParty ? 'Change Customer' : '+ Select / Add Customer'}
+                    </button>
+                  </div>
+                  {selectedParty ? (
+                    <div className="mt-3 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/80 p-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-slate-900 text-sm">{selectedParty.name}</p>
+                        <p className="text-xs text-slate-600">
+                          {selectedParty.phone || 'No phone'} {selectedParty.address ? ` · ${selectedParty.address}` : ''}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedParty(null)}
+                        className="text-xs text-rose-600 hover:underline font-semibold"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs italic text-slate-400">No customer party attached (Walk-in Customer).</p>
+                  )}
                 </div>
 
                 <div className="sm:col-span-2 xl:col-span-4">
@@ -1451,6 +1819,15 @@ export default function CafeOrders() {
         onConfirm={handleDeleteOrder}
         description={deleteOrder ? t('sales.deleteConfirm', { name: deleteOrder.invoiceNo || deleteOrder.id.slice(0, 8) }) : t('common.confirmDelete')}
         confirming={Boolean(deleteOrder) && deletingOrderId === deleteOrder.id}
+      />
+
+      <QuickPartySelector
+        isOpen={partySelectorOpen}
+        onClose={() => setPartySelectorOpen(false)}
+        onSelect={(party) => setSelectedParty(party)}
+        selectedParty={selectedParty}
+        type="customer"
+        title="Select or Add Customer Party"
       />
     </div>
   );

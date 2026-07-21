@@ -27,6 +27,15 @@ export function getNavigationForBusinessType(navigation = [], businessProfile) {
 
   const tablesEnabled = businessProfile?.settings?.enabledModules?.includes("tables") || businessProfile?.type === "cafe";
   if (tablesEnabled) {
+    if (!normalized.some((item) => item?.key === 'orders')) {
+      const salesIndex = normalized.findIndex((item) => item?.key === 'sales');
+      const insertIndex = salesIndex >= 0 ? salesIndex : 1;
+      normalized = [
+        ...normalized.slice(0, insertIndex),
+        { key: 'orders', label: 'Cafe Orders', route: '/app/orders' },
+        ...normalized.slice(insertIndex),
+      ];
+    }
     if (!normalized.some((item) => item?.key === 'billing')) {
       const salesIndex = normalized.findIndex((item) => item?.key === 'sales' || item?.key === 'orders');
       const insertIndex = salesIndex >= 0 ? salesIndex + 1 : 1;
