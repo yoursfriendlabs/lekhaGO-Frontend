@@ -1385,7 +1385,7 @@ export default function QuickPos() {
           {submitting
             ? t("common.saving")
             : isTablesEnabled && !editingId
-            ? (t("quickPos.takeOrder") || "Take Order")
+            ? (t("quickPos.confirmOrder") || "Confirm Order")
             : t("quickPos.quickSave")}
         </button>
       </div>
@@ -2340,7 +2340,7 @@ export default function QuickPos() {
               {submitting
                 ? t("common.saving")
                 : isTablesEnabled && !editingId
-                ? (t("quickPos.takeOrder") || "Take Order")
+                ? (t("quickPos.confirmOrder") || "Confirm Order")
                 : t("quickPos.saveOnly")}
             </button>
           </div>
