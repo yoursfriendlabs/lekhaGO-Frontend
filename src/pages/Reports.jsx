@@ -14,7 +14,9 @@ import {
   TrendingUp,
   PieChart as PieIcon,
   BarChart2,
-  TableProperties
+  TableProperties,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import Notice from "../components/Notice";
@@ -1597,6 +1599,7 @@ export default function Reports() {
   const initialPartyId = searchParams.get('partyId') || '';
   const initialFrom = searchParams.get('from') || defaultFrom;
   const initialTo = searchParams.get('to') || defaultTo;
+  const initialOrder = searchParams.get('order') || 'desc';
 
   const [ledger, setLedger] = useState({ items: [], total: 0, limit: 25, offset: 0 });
   const [ledgerLoading, setLedgerLoading] = useState(false);
@@ -1605,6 +1608,7 @@ export default function Reports() {
   const [selectedPartyId, setSelectedPartyId] = useState(initialPartyId);
   const [selectedPartyOption, setSelectedPartyOption] = useState(null);
   const [ledgerFilters, setLedgerFilters] = useState(() => ({ from: initialFrom, to: initialTo }));
+  const [ledgerSortOrder, setLedgerSortOrder] = useState(initialOrder);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const printRef = useRef(null);
@@ -1803,6 +1807,7 @@ export default function Reports() {
         ...(selectedPartyId ? { partyId: selectedPartyId } : {}),
         ...(ledgerFilters.from ? { from: ledgerFilters.from } : {}),
         ...(ledgerFilters.to ? { to: ledgerFilters.to } : {}),
+        order: ledgerSortOrder,
       }, { force });
 
       if (requestId !== requestIdRef.current) return;
@@ -1824,7 +1829,7 @@ export default function Reports() {
       setLedgerLoading(false);
       setLedgerRefreshing(false);
     }
-  }, [canViewFeature, activeTab, ledgerFilters.from, ledgerFilters.to, page, pageSize, selectedPartyId, t]);
+  }, [canViewFeature, activeTab, ledgerFilters.from, ledgerFilters.to, page, pageSize, selectedPartyId, ledgerSortOrder, t]);
 
   useEffect(() => {
     fetchLedger();
@@ -1834,12 +1839,13 @@ export default function Reports() {
   useEffect(() => {
     if (activeTab !== 'party') return;
     setSelectedPartyId(initialPartyId);
+    setLedgerSortOrder(searchParams.get('order') || 'desc');
     setSelectedPartyOption((current) => (
       initialPartyId && String(current?.value || '') === String(initialPartyId)
         ? current
         : null
     ));
-  }, [initialPartyId, activeTab]);
+  }, [initialPartyId, activeTab, searchParams]);
 
   useEffect(() => {
     if (activeTab !== 'party' || !selectedPartyId) {
@@ -1876,6 +1882,7 @@ export default function Reports() {
     const nextPartyId = String(nextValues.partyId || '').trim();
     const nextFrom = String(nextValues.from || '').trim();
     const nextTo = String(nextValues.to || '').trim();
+    const nextOrder = String(nextValues.order || '').trim();
 
     if (nextPartyId) nextParams.set('partyId', nextPartyId);
     else nextParams.delete('partyId');
@@ -1885,6 +1892,9 @@ export default function Reports() {
 
     if (nextTo) nextParams.set('to', nextTo);
     else nextParams.delete('to');
+
+    if (nextOrder) nextParams.set('order', nextOrder);
+    else nextParams.delete('order');
 
     setSearchParams(nextParams, { replace: true });
   }, [searchParams, setSearchParams]);
@@ -2000,6 +2010,7 @@ export default function Reports() {
       partyId,
       from: ledgerFilters.from,
       to: ledgerFilters.to,
+      order: ledgerSortOrder,
     });
   };
 
@@ -2014,6 +2025,7 @@ export default function Reports() {
       partyId: selectedPartyId,
       from: nextFilters.from,
       to: nextFilters.to,
+      order: ledgerSortOrder,
     });
   };
 
@@ -2023,10 +2035,12 @@ export default function Reports() {
     setSelectedPartyOption(null);
     setLedgerFilters(nextFilters);
     setPage(1);
+    setLedgerSortOrder('desc');
     updateSearchState({
       partyId: '',
       from: nextFilters.from,
       to: nextFilters.to,
+      order: 'desc',
     });
   };
 
@@ -2805,7 +2819,26 @@ export default function Reports() {
                       <table className="w-full min-w-[980px] text-sm">
                         <thead className="text-xs uppercase text-slate-400">
                           <tr>
-                            <th className="py-2.5 pr-4 text-left">{t('common.date')}</th>
+                            <th className="py-2.5 pr-4 text-left">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const nextOrder = ledgerSortOrder === 'desc' ? 'asc' : 'desc';
+                                  setLedgerSortOrder(nextOrder);
+                                  setPage(1);
+                                  updateSearchState({
+                                    partyId: selectedPartyId,
+                                    from: ledgerFilters.from,
+                                    to: ledgerFilters.to,
+                                    order: nextOrder,
+                                  });
+                                }}
+                                className="inline-flex items-center gap-1 font-semibold hover:text-slate-600 dark:hover:text-slate-300"
+                              >
+                                {t('common.date')}
+                                {ledgerSortOrder === 'desc' ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+                              </button>
+                            </th>
                             <th className="py-2.5 pr-4 text-left">{t('ledger.referenceNo')}</th>
                             <th className="py-2.5 pr-4 text-left">{t('ledger.party')}</th>
                             <th className="py-2.5 pr-4 text-left">{t('ledger.type')}</th>

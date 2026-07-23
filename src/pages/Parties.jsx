@@ -37,6 +37,8 @@ import {
   Filter,
   ChevronDown,
   MessageCircle, Pencil,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { buildPaymentPayload, requiresBankSelection } from "../lib/payments";
 import { normalizePaymentType } from "../lib/paymentType";
@@ -304,6 +306,7 @@ export default function Parties() {
   const [listError, setListError] = useState("");
   const [partyReloadKey, setPartyReloadKey] = useState(0);
   const [refreshingParties, setRefreshingParties] = useState(false);
+  const [txSortOrder, setTxSortOrder] = useState("desc");
 
   const [statementData, setStatementData] = useState(() =>
     normalizePartyStatementResponse(),
@@ -552,6 +555,7 @@ export default function Parties() {
           partyId: selectedId,
           limit: TX_PAGE_SIZE,
           offset: (txPage - 1) * TX_PAGE_SIZE,
+          order: txSortOrder,
         });
         const normalized = normalizePartyStatementResponse(data);
 
@@ -581,7 +585,7 @@ export default function Parties() {
     return () => {
       isActive = false;
     };
-  }, [selectedId, statementReloadKey, txPage, upsertParty]);
+  }, [selectedId, statementReloadKey, txPage, txSortOrder, upsertParty]);
 
   const totalsummary = useMemo(() => {
     return parties.reduce(
@@ -1372,11 +1376,24 @@ export default function Parties() {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <h4 className="text-lg font-semibold text-slate-900">
-                  {t("parties.transactions", {
-                    count: statementData.summary.totalRows,
-                  })}
-                </h4>
+                <div className="flex items-center gap-3">
+                  <h4 className="text-lg font-semibold text-slate-900">
+                    {t("parties.transactions", {
+                      count: statementData.summary.totalRows,
+                    })}
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTxSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
+                      setTxPage(1);
+                    }}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 active:scale-95 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100"
+                    title={txSortOrder === "desc" ? "Newest First" : "Oldest First"}
+                  >
+                    {txSortOrder === "desc" ? <ArrowDown size={15} /> : <ArrowUp size={15} />}
+                  </button>
+                </div>
                 {canManageParties ? (
                   <button
                     className="btn-primary"
