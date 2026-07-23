@@ -82,7 +82,7 @@ export default function Settings() {
     canManageFeature,
     canViewFeature,
   } = useAuth();
-  const { settings, loading: settingsLoading, saveSettings, reloadSettings } = useBusinessSettings();
+  const { settings, businessProfile, loading: settingsLoading, saveSettings, reloadSettings } = useBusinessSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const [form, setForm] = useState({ ...EMPTY, ...settings });
   const [saving, setSaving] = useState(false);
@@ -144,13 +144,17 @@ export default function Settings() {
           key: EXPENSE_CATEGORIES_SETTINGS_TAB,
           label: t('settingsPage.tabs.expenseCategories'),
           description: t('settingsPage.descriptions.expenseCategories'),
-        },
-        {
+        }
+      );
+
+      const tablesEnabled = businessProfile?.settings?.enabledModules?.includes("tables") || businessProfile?.type === "cafe";
+      if (tablesEnabled) {
+        nextTabs.push({
           key: TABLES_FLOORS_SETTINGS_TAB,
           label: t('settingsPage.tabs.tablesFloors'),
           description: t('settingsPage.descriptions.tablesFloors'),
-        }
-      );
+        });
+      }
     }
 
     if (canManageFeature('units')) {
