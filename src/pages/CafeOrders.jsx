@@ -738,7 +738,7 @@ export default function CafeOrders() {
       <div className="flex flex-col gap-4 rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
           {/* Order Type Filter Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none max-w-full">
+          <div className="flex flex-wrap items-center gap-2 max-w-full">
             <button
               type="button"
               onClick={() => { setSelectedOrderTypeFilter('all'); if (viewMode === 'floor') setViewMode('kanban'); }}
@@ -866,7 +866,7 @@ export default function CafeOrders() {
         {/* Stage Status Filters & Search */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {viewMode !== 'floor' && viewMode !== 'kitchen' ? (
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 whitespace-nowrap">Stage:</span>
               <button
                 type="button"
