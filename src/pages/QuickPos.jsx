@@ -15,6 +15,7 @@ import {
   UserRound,
   Utensils,
   X,
+  Truck,
 } from "lucide-react";
 import PageHeader from "../components/PageHeader.jsx";
 import Notice from "../components/Notice.jsx";
@@ -37,6 +38,7 @@ import { buildPaymentPayload, requiresBankSelection } from "../lib/payments";
 import { getCurrentCreatorValue } from "../lib/records";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { useProductStore } from "../stores/products";
+import { checkNewAndReadyOrders } from "../lib/cafeOrders.js";
 
 function getProductCategoryName(product = {}) {
   if (typeof product.categoryName === "string" && product.categoryName.trim())
@@ -219,6 +221,13 @@ export default function QuickPos() {
     if (queryTableId) return "dine_in";
     return null;
   });
+  const [deliveryFormOpen, setDeliveryFormOpen] = useState(false);
+  const [deliveryFormState, setDeliveryFormState] = useState({
+    customerName: "",
+    customerPhone: "",
+    location: "",
+    notes: ""
+  });
 
   const vacantTables = useMemo(() => allTables.filter((t) => t.status === "vacant"), [allTables]);
 
@@ -343,6 +352,50 @@ export default function QuickPos() {
       isActive = false;
     };
   }, [businessId]);
+
+  // Polling for real-time table status and order ready notifications
+  useEffect(() => {
+    if (!businessId) return;
+
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    const interval = setInterval(async () => {
+      try {
+        const [salesResponse, tablesResponse] = await Promise.all([
+          api.listSales({ limit: 120 }).catch(() => ({ items: [] })),
+          isTablesEnabled ? api.getTables({ isActive: "true", limit: 100 }).catch(() => null) : null
+        ]);
+
+        if (salesResponse?.items) {
+          checkNewAndReadyOrders(salesResponse.items);
+        }
+
+        if (tablesResponse?.items) {
+          setAllTables(tablesResponse.items);
+        }
+      } catch (err) {
+        console.error("Failed to poll real-time updates:", err);
+      }
+    }, 12000);
+
+    return () => clearInterval(interval);
+  }, [businessId, isTablesEnabled]);
+
+  const handleSelectDelivery = () => {
+    setActiveSessionOption("delivery");
+    handleTableChange("");
+    setTableSelectorOpen(false);
+
+    setDeliveryFormState({
+      customerName: activeAttributes?.customer_name || selectedParty?.name || "",
+      customerPhone: activeAttributes?.customer_phone || selectedParty?.phone || "",
+      location: activeAttributes?.customer_address || selectedParty?.address || "",
+      notes: checkoutForm?.notes || ""
+    });
+    setDeliveryFormOpen(true);
+  };
 
   const handleTableChange = async (tableId) => {
     setActiveTableId(tableId);
@@ -1418,10 +1471,7 @@ export default function QuickPos() {
 
             <button
               type="button"
-              onClick={() => {
-                setActiveSessionOption("delivery");
-                setActiveTableId("");
-              }}
+              onClick={handleSelectDelivery}
               className="rounded-3xl border-2 border-slate-200 bg-white p-6 hover:border-[#9c5f22] hover:bg-[#9c5f22]/5 transition text-left space-y-2 flex flex-col justify-between"
             >
               <div>
@@ -1980,6 +2030,37 @@ export default function QuickPos() {
               </div>
             </div> */}
 
+            {activeSessionOption === "delivery" && (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
+                    <Truck size={14} className="text-[#9c5f22]" /> Delivery Details
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeliveryFormState({
+                        customerName: activeAttributes?.customer_name || selectedParty?.name || "",
+                        customerPhone: activeAttributes?.customer_phone || selectedParty?.phone || "",
+                        location: activeAttributes?.customer_address || selectedParty?.address || "",
+                        notes: checkoutForm?.notes || ""
+                      });
+                      setDeliveryFormOpen(true);
+                    }}
+                    className="text-xs font-semibold text-[#9c5f22] hover:underline"
+                  >
+                    Edit
+                  </button>
+                </div>
+                <div className="text-xs space-y-1 text-slate-700">
+                  <p><span className="font-semibold text-slate-900">Name:</span> {activeAttributes?.customer_name || "-"}</p>
+                  <p><span className="font-semibold text-slate-900">Phone:</span> {activeAttributes?.customer_phone || "-"}</p>
+                  <p><span className="font-semibold text-slate-900">Location:</span> {activeAttributes?.customer_address || "-"}</p>
+                  {checkoutForm?.notes && <p><span className="font-semibold text-slate-900">Notes:</span> {checkoutForm.notes}</p>}
+                </div>
+              </div>
+            )}
+
             <div className="mt-5 max-h-[340px] space-y-3 overflow-y-auto pr-1">
               {cart.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
@@ -2346,6 +2427,37 @@ export default function QuickPos() {
               </button>
             </div>
           </div>
+
+          {activeSessionOption === "delivery" && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                  <Truck size={12} className="text-[#9c5f22]" /> Delivery Details
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeliveryFormState({
+                      customerName: activeAttributes?.customer_name || selectedParty?.name || "",
+                      customerPhone: activeAttributes?.customer_phone || selectedParty?.phone || "",
+                      location: activeAttributes?.customer_address || selectedParty?.address || "",
+                      notes: checkoutForm?.notes || ""
+                    });
+                    setDeliveryFormOpen(true);
+                  }}
+                  className="text-[10px] font-bold text-[#9c5f22] hover:underline"
+                >
+                  Edit
+                </button>
+              </div>
+              <div className="text-xs space-y-0.5 text-slate-700">
+                <p><span className="font-semibold text-slate-900">Name:</span> {activeAttributes?.customer_name || "-"}</p>
+                <p><span className="font-semibold text-slate-900">Phone:</span> {activeAttributes?.customer_phone || "-"}</p>
+                <p><span className="font-semibold text-slate-900">Location:</span> {activeAttributes?.customer_address || "-"}</p>
+                {checkoutForm?.notes && <p><span className="font-semibold text-slate-900">Notes:</span> {checkoutForm.notes}</p>}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
             <div className="flex items-center justify-between gap-2">
@@ -2846,11 +2958,7 @@ export default function QuickPos() {
 
             <button
               type="button"
-              onClick={() => {
-                setActiveSessionOption("delivery");
-                handleTableChange("");
-                setTableSelectorOpen(false);
-              }}
+              onClick={handleSelectDelivery}
               className={`rounded-2xl border p-4 text-center transition flex flex-col justify-center items-center h-28 ${
                 activeSessionOption === "delivery" && !activeTableId
                   ? "border-[#9c5f22] bg-[#9c5f22]/5 font-bold text-[#9c5f22]"
@@ -2912,6 +3020,85 @@ export default function QuickPos() {
             </button>
           </div>
         </div>
+      </Dialog>
+
+      {/* Delivery Information Dialog */}
+      <Dialog
+        isOpen={deliveryFormOpen}
+        onClose={() => setDeliveryFormOpen(false)}
+        title="Delivery Information"
+        size="md"
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setCheckoutForm((prev) => ({ ...prev, notes: deliveryFormState.notes }));
+            setActiveAttributes((prev) => ({
+              ...prev,
+              customer_name: deliveryFormState.customerName,
+              customer_phone: deliveryFormState.customerPhone,
+              customer_address: deliveryFormState.location,
+            }));
+            setDeliveryFormOpen(false);
+          }}
+          className="space-y-4"
+        >
+          <div>
+            <label className="label text-slate-700 font-semibold text-xs">Customer Name</label>
+            <input
+              type="text"
+              required
+              className="input mt-1.5 w-full rounded-xl border border-slate-200 text-sm focus:border-primary"
+              placeholder="Enter customer name"
+              value={deliveryFormState.customerName}
+              onChange={(e) => setDeliveryFormState(prev => ({ ...prev, customerName: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="label text-slate-700 font-semibold text-xs">Phone Number (Optional)</label>
+            <input
+              type="tel"
+              className="input mt-1.5 w-full rounded-xl border border-slate-200 text-sm focus:border-primary"
+              placeholder="Enter phone number"
+              value={deliveryFormState.customerPhone}
+              onChange={(e) => setDeliveryFormState(prev => ({ ...prev, customerPhone: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="label text-slate-700 font-semibold text-xs">Location / Address</label>
+            <textarea
+              required
+              className="input mt-1.5 w-full rounded-xl border border-slate-200 text-sm min-h-[70px] resize-none focus:border-primary"
+              placeholder="Enter delivery address"
+              value={deliveryFormState.location}
+              onChange={(e) => setDeliveryFormState(prev => ({ ...prev, location: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="label text-slate-700 font-semibold text-xs">Notes / Special Instructions</label>
+            <textarea
+              className="input mt-1.5 w-full rounded-xl border border-slate-200 text-sm min-h-[70px] resize-none focus:border-primary"
+              placeholder="Special instructions for delivery"
+              value={deliveryFormState.notes}
+              onChange={(e) => setDeliveryFormState(prev => ({ ...prev, notes: e.target.value }))}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setDeliveryFormOpen(false)}
+              className="btn-secondary rounded-xl py-2 px-4 text-xs font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary rounded-xl py-2 px-4 text-xs font-semibold"
+            >
+              Save Delivery Info
+            </button>
+          </div>
+        </form>
       </Dialog>
     </div>
   );

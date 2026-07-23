@@ -143,3 +143,101 @@ export function getNextCafeOrderStatus(status) {
   if (currentIndex === -1) return null;
   return CAFE_ORDER_STATUSES[currentIndex + 1] || null;
 }
+
+export function playNotificationSound(type = 'chime') {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    
+    if (type === 'chime') {
+      const playTone = (time, freq) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc.frequency.setValueAtTime(freq, time);
+        gain.gain.setValueAtTime(0.3, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+        
+        osc.start(time);
+        osc.stop(time + 0.3);
+      };
+      
+      const now = ctx.currentTime;
+      playTone(now, 587.33); // D5
+      playTone(now + 0.12, 880); // A5
+    } else {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+    }
+  } catch (err) {
+    console.error('Audio playback failed', err);
+  }
+}
+
+export function checkNewAndReadyOrders(ordersList) {
+  let notified = [];
+  try {
+    const raw = sessionStorage.getItem('mms_notified_orders');
+    if (raw) notified = JSON.parse(raw);
+  } catch (e) {}
+
+  let newNotified = [...notified];
+  let triggerNotification = false;
+  const messages = [];
+
+  ordersList.forEach((order) => {
+    const meta = getCafeOrderAttributes(order);
+    const orderStatus = meta.orderStatus;
+    const tableNo = meta.tableNo || 'Counter';
+
+    // 1. Kitchen notification on NEW order:
+    if (orderStatus === 'new' && !notified.includes(`new-${order.id}`)) {
+      newNotified.push(`new-${order.id}`);
+      messages.push({
+        type: 'kitchen',
+        text: `New order placed for Table/Area: ${tableNo}`
+      });
+      triggerNotification = true;
+    }
+
+    // 2. Waiter notification on READY order:
+    if (orderStatus === 'ready' && !notified.includes(`ready-${order.id}`)) {
+      newNotified.push(`ready-${order.id}`);
+      messages.push({
+        type: 'waiter',
+        text: `Order for Table/Area: ${tableNo} is ready!`
+      });
+      triggerNotification = true;
+    }
+  });
+
+  if (triggerNotification) {
+    try {
+      sessionStorage.setItem('mms_notified_orders', JSON.stringify(newNotified));
+    } catch (e) {}
+
+    playNotificationSound('chime');
+
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      messages.forEach((msg) => {
+        new Notification(msg.type === 'kitchen' ? 'New Order' : 'Order Ready', {
+          body: msg.text
+        });
+      });
+    }
+  }
+
+  return messages;
+}

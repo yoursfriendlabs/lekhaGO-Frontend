@@ -30,6 +30,8 @@ import {
   getCafePaymentMeta,
   getDefaultCafeTables,
   getNextCafeOrderStatus,
+  checkNewAndReadyOrders,
+  playNotificationSound,
 } from '../lib/cafeOrders.js';
 
 const emptyItem = Object.freeze({
@@ -103,6 +105,7 @@ export default function CafeOrders() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTableFilter, setSelectedTableFilter] = useState('');
   const [viewMode, setViewMode] = useState('kanban'); // 'kanban', 'table', 'floor'
+  const [visibleCount, setVisibleCount] = useState(15);
   const [dialogFloorFilter, setDialogFloorFilter] = useState('all');
   const [dialogStatusFilter, setDialogStatusFilter] = useState('all');
   const [productDirectory, setProductDirectory] = useState({});
@@ -214,6 +217,24 @@ export default function CafeOrders() {
   useEffect(() => {
     loadOrders();
     loadFloors();
+
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    const interval = setInterval(async () => {
+      if (!businessId) return;
+      try {
+        const data = await api.listSales({ limit: 120 });
+        const items = data.items || [];
+        setOrders(items);
+        checkNewAndReadyOrders(items);
+      } catch (err) {
+        console.error("Failed to poll cafe orders:", err);
+      }
+    }, 12000);
+
+    return () => clearInterval(interval);
   }, [businessId]);
 
   useEffect(() => {
@@ -224,6 +245,28 @@ export default function CafeOrders() {
     if (!dialogOpen) return;
     setActiveDialogStep('details');
   }, [dialogOpen]);
+
+  useEffect(() => {
+    if (viewMode !== 'kitchen') return;
+    const sentinel = document.getElementById('kitchen-sentinel');
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      const [entry] = entries;
+      if (entry.isIntersecting) {
+        setVisibleCount((prev) => prev + 15);
+      }
+    }, {
+      rootMargin: '120px',
+    });
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [viewMode, kitchenItems.length]);
+
+  useEffect(() => {
+    setVisibleCount(15);
+  }, [viewMode, selectedOrderTypeFilter]);
 
   const cacheProducts = (productList = []) => {
     if (!Array.isArray(productList) || !productList.length) return;
@@ -561,6 +604,34 @@ export default function CafeOrders() {
   };
 
   const activeOrders = useMemo(() => orders.filter((order) => getCafeOrderAttributes(order).orderStatus !== 'completed'), [orders]);
+
+  const kitchenItems = useMemo(() => {
+    const itemsList = [];
+    orders.forEach((order) => {
+      const meta = getCafeOrderAttributes(order);
+      if (meta.orderStatus === 'completed' || meta.orderStatus === 'ready') return;
+      if (selectedOrderTypeFilter !== 'all' && meta.orderType !== selectedOrderTypeFilter) return;
+
+      if (Array.isArray(order.SaleItems)) {
+        order.SaleItems.forEach((si) => {
+          itemsList.push({
+            id: `${order.id}-${si.id}`,
+            orderId: order.id,
+            productName: si.Product?.name || si.name || 'Unnamed Item',
+            quantity: si.quantity,
+            note: order.notes,
+            createdAt: order.createdAt,
+            tableNo: meta.tableNo,
+            orderType: meta.orderType,
+            orderStatus: meta.orderStatus,
+            orderRaw: order
+          });
+        });
+      }
+    });
+
+    return itemsList.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }, [orders, selectedOrderTypeFilter]);
   const tableMap = useMemo(() => buildCafeTableMap(activeOrders, cafeTables), [activeOrders, cafeTables]);
 
   const typeCounts = useMemo(() => {
@@ -765,6 +836,19 @@ export default function CafeOrders() {
 
             <button
               type="button"
+              onClick={() => setViewMode('kitchen')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                viewMode === 'kitchen'
+                  ? 'bg-white text-[#9c5f22] shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <ShoppingCart size={15} />
+              Kitchen Items
+            </button>
+
+            <button
+              type="button"
               onClick={() => setViewMode('floor')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                 viewMode === 'floor'
@@ -779,7 +863,7 @@ export default function CafeOrders() {
 
         {/* Stage Status Filters & Search */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {viewMode !== 'floor' ? (
+          {viewMode !== 'floor' && viewMode !== 'kitchen' ? (
             <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 whitespace-nowrap">Stage:</span>
               <button
@@ -1061,6 +1145,104 @@ export default function CafeOrders() {
               )}
             </tbody>
           </table>
+        </div>
+      ) : viewMode === 'kitchen' ? (
+        /* View 4: Kitchen Items View (Infinite Scroll) */
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+              Preparation Queue ({kitchenItems.length} items)
+            </h3>
+            <span className="text-xs text-slate-500">
+              Showing {Math.min(visibleCount, kitchenItems.length)} of {kitchenItems.length}
+            </span>
+          </div>
+          
+          {kitchenItems.length === 0 ? (
+            <div className="rounded-[28px] border border-slate-200 border-dashed bg-white p-12 text-center">
+              <ShoppingBag className="mx-auto text-slate-300 mb-3" size={32} />
+              <p className="text-sm font-semibold text-slate-700">No active kitchen items</p>
+              <p className="text-xs text-slate-400 mt-1">New items will appear here when orders are placed.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {kitchenItems.slice(0, visibleCount).map((item) => {
+                const isNew = item.orderStatus === 'new';
+                const isCooking = item.orderStatus === 'to_cook';
+                
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-2xl border bg-white p-4 shadow-xs space-y-3 flex flex-col justify-between transition ${
+                      isNew ? 'border-blue-100 bg-blue-50/20' : 'border-slate-200'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                          item.orderType === 'dine_in' ? 'bg-amber-100 text-amber-800' :
+                          item.orderType === 'delivery' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'
+                        }`}>
+                          {item.orderType === 'dine_in' ? `Table ${item.tableNo || '?'}` : 
+                           item.orderType === 'delivery' ? 'Delivery' : 'Takeaway'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {formatRelativeDate(item.createdAt)}
+                        </span>
+                      </div>
+                      
+                      <h4 className="text-lg font-bold text-slate-900 mt-2 flex items-baseline gap-2">
+                        <span className="text-xl text-[#9c5f22] font-extrabold">{item.quantity}x</span>
+                        <span className="truncate">{item.productName}</span>
+                      </h4>
+                      
+                      {item.note && (
+                        <div className="mt-2.5 rounded-lg bg-amber-50 border border-amber-200/50 p-2 text-xs text-amber-900 font-medium flex items-start gap-1.5">
+                          <span className="mt-0.5">📝</span>
+                          <span className="italic">{item.note}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 mt-auto">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        isNew ? 'bg-slate-100 text-slate-700' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {isNew ? 'New Order' : 'Preparing'}
+                      </span>
+                      
+                      <div className="flex items-center gap-1.5">
+                        {isNew && (
+                          <button
+                            type="button"
+                            onClick={() => moveOrderToNextStage(item.orderRaw)}
+                            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-2xs transition active:scale-95"
+                          >
+                            Cook Item
+                          </button>
+                        )}
+                        {isCooking && (
+                          <button
+                            type="button"
+                            onClick={() => moveOrderToNextStage(item.orderRaw)}
+                            className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs transition active:scale-95"
+                          >
+                            Mark Ready
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          
+          {visibleCount < kitchenItems.length && (
+            <div id="kitchen-sentinel" className="py-6 text-center text-sm text-slate-400 font-medium animate-pulse">
+              Loading more items...
+            </div>
+          )}
         </div>
       ) : (
         /* View 3: Single Row Horizontal Kanban Order Board */
