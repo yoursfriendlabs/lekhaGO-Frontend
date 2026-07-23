@@ -1185,12 +1185,16 @@ export default function QuickPos() {
 
       invalidateProducts();
       setSuggestedInvoiceNo(nextSequences?.nextSaleInvoiceNo || "");
-      setSuccessState({
-        id: created?.id || "",
-        invoiceNo: created?.invoiceNo || manualInvoiceNo || suggestedInvoiceNo,
-        total: totals.grandTotal,
-        action: nextAction,
-      });
+      if (isTablesEnabled && !editingId && nextAction === "save") {
+        setSuccessState(null);
+      } else {
+        setSuccessState({
+          id: created?.id || "",
+          invoiceNo: created?.invoiceNo || manualInvoiceNo || suggestedInvoiceNo,
+          total: totals.grandTotal,
+          action: nextAction,
+        });
+      }
       resetSaleFlow();
     } catch (error) {
       setStatus({ type: "error", message: error.message });
@@ -1378,7 +1382,11 @@ export default function QuickPos() {
           onClick={() => handleSubmit("save")}
           disabled={!cart.length || submitting}
         >
-          {submitting ? t("common.saving") : t("quickPos.quickSave")}
+          {submitting
+            ? t("common.saving")
+            : isTablesEnabled && !editingId
+            ? (t("quickPos.takeOrder") || "Take Order")
+            : t("quickPos.quickSave")}
         </button>
       </div>
     </div>
@@ -2329,7 +2337,11 @@ export default function QuickPos() {
               onClick={() => handleSubmit("save")}
               disabled={!cart.length || submitting}
             >
-              {submitting ? t("common.saving") : t("quickPos.saveOnly")}
+              {submitting
+                ? t("common.saving")
+                : isTablesEnabled && !editingId
+                ? (t("quickPos.takeOrder") || "Take Order")
+                : t("quickPos.saveOnly")}
             </button>
           </div>
         }
