@@ -172,7 +172,7 @@ export default function CafeOrders() {
 
     setLoading(true);
     try {
-      const data = await api.listSales({ limit: 120 });
+      const data = await api.listSales({ limit: 120, includeItems: 'true' });
       setOrders(data.items || []);
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Unable to load cafe orders.' });
@@ -226,7 +226,7 @@ export default function CafeOrders() {
     const interval = setInterval(async () => {
       if (!businessId) return;
       try {
-        const data = await api.listSales({ limit: 120 });
+        const data = await api.listSales({ limit: 120, includeItems: 'true' });
         const items = data.items || [];
         setOrders(items);
         checkNewAndReadyOrders(items);
