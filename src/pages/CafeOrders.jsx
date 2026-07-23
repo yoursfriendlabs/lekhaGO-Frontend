@@ -106,6 +106,7 @@ export default function CafeOrders() {
   const [selectedTableFilter, setSelectedTableFilter] = useState('');
   const [viewMode, setViewMode] = useState('kanban'); // 'kanban', 'table', 'floor'
   const [visibleCount, setVisibleCount] = useState(15);
+  const [columnLimitMap, setColumnLimitMap] = useState({ new: 10, to_cook: 10, ready: 10, completed: 10 });
   const [dialogFloorFilter, setDialogFloorFilter] = useState('all');
   const [dialogStatusFilter, setDialogStatusFilter] = useState('all');
   const [productDirectory, setProductDirectory] = useState({});
@@ -635,6 +636,10 @@ export default function CafeOrders() {
   useEffect(() => {
     setVisibleCount(15);
   }, [viewMode, selectedOrderTypeFilter]);
+
+  useEffect(() => {
+    setColumnLimitMap({ new: 10, to_cook: 10, ready: 10, completed: 10 });
+  }, [selectedOrderTypeFilter, searchQuery, selectedTableFilter]);
   const tableMap = useMemo(() => buildCafeTableMap(activeOrders, cafeTables), [activeOrders, cafeTables]);
 
   const typeCounts = useMemo(() => {
@@ -671,10 +676,14 @@ export default function CafeOrders() {
     return meta.tableNo === selectedTableFilter || meta.tableNo === `T${selectedTableFilter}`;
   }), [orders, selectedOrderTypeFilter, selectedStatusFilter, searchQuery, selectedTableFilter]);
 
-  const groupedOrders = useMemo(() => CAFE_ORDER_STATUSES.map((column) => ({
-    ...column,
-    items: filteredOrders.filter((order) => getCafeOrderAttributes(order).orderStatus === column.value),
-  })), [filteredOrders]);
+  const groupedOrders = useMemo(() => CAFE_ORDER_STATUSES.map((column) => {
+    const colItems = filteredOrders.filter((order) => getCafeOrderAttributes(order).orderStatus === column.value);
+    const sorted = [...colItems].sort((a, b) => new Date(b.createdAt || b.saleDate) - new Date(a.createdAt || a.saleDate));
+    return {
+      ...column,
+      items: sorted,
+    };
+  }), [filteredOrders]);
 
   const orderCounts = useMemo(() => CAFE_ORDER_STATUSES.reduce((acc, column) => {
     acc[column.value] = filteredOrders.filter((order) => getCafeOrderAttributes(order).orderStatus === column.value).length;
@@ -1253,7 +1262,7 @@ export default function CafeOrders() {
           {visibleBoardColumns.map((column) => (
             <section
               key={column.value}
-              className="w-80 sm:w-84 shrink-0 min-h-[550px] flex flex-col rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-5"
+              className="w-80 sm:w-84 shrink-0 h-[calc(100vh-220px)] min-h-[600px] flex flex-col rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-5"
             >
               <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
                 <div className="flex items-center gap-2">
@@ -1276,7 +1285,7 @@ export default function CafeOrders() {
                     <span>No orders in this column.</span>
                   </div>
                 ) : (
-                  column.items.map((order) => {
+                  column.items.slice(0, columnLimitMap[column.value] || 10).map((order) => {
                     const meta = getCafeOrderAttributes(order);
                     const paymentMeta = getCafePaymentMeta(order);
                     const nextStatus = getNextCafeOrderStatus(meta.orderStatus);
@@ -1438,6 +1447,19 @@ export default function CafeOrders() {
                       </article>
                     );
                   })
+                )}
+                
+                {column.items.length > (columnLimitMap[column.value] || 10) && (
+                  <button
+                    type="button"
+                    onClick={() => setColumnLimitMap((prev) => ({
+                      ...prev,
+                      [column.value]: (prev[column.value] || 10) + 10,
+                    }))}
+                    className="w-full py-2.5 my-2 text-xs font-bold text-[#9c5f22] bg-[#9c5f22]/5 hover:bg-[#9c5f22]/10 rounded-2xl transition border border-dashed border-[#9c5f22]/20 flex items-center justify-center gap-1 active:scale-98"
+                  >
+                    🔄 Load More (+10)
+                  </button>
                 )}
               </div>
             </section>
