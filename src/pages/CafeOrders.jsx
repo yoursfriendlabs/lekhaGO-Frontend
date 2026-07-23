@@ -114,6 +114,7 @@ export default function CafeOrders() {
   const [activeDialogStep, setActiveDialogStep] = useState('details');
   const [deletingOrderId, setDeletingOrderId] = useState('');
   const [deleteOrder, setDeleteOrder] = useState(null);
+  const [selectedOrderForItemsDialog, setSelectedOrderForItemsDialog] = useState(null);
   const [orderFields, setOrderFields] = useState({
     saleDate: todayISODate(),
     notes: '',
@@ -1337,7 +1338,16 @@ export default function CafeOrders() {
                         {/* Items Preview */}
                         {Array.isArray(order.SaleItems) && order.SaleItems.length > 0 ? (
                           <div className="rounded-2xl bg-slate-50 p-2.5 text-xs text-slate-700 space-y-1 border border-slate-100">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Items ({order.SaleItems.length}):</p>
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Items ({order.SaleItems.length})</p>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOrderForItemsDialog(order)}
+                                className="text-[10px] font-bold text-[#9c5f22] hover:underline"
+                              >
+                                View All
+                              </button>
+                            </div>
                             {order.SaleItems.slice(0, 4).map((si) => (
                               <div key={si.id || si.productId} className="flex justify-between font-medium">
                                 <span className="truncate pr-2">{si.quantity}x {si.Product?.name || si.name || 'Item'}</span>
@@ -1345,7 +1355,13 @@ export default function CafeOrders() {
                               </div>
                             ))}
                             {order.SaleItems.length > 4 && (
-                              <p className="text-[10px] font-bold text-slate-400 text-right pt-0.5">+ {order.SaleItems.length - 4} more items</p>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOrderForItemsDialog(order)}
+                                className="w-full text-center text-[10px] font-bold text-[#9c5f22] hover:underline pt-1 border-t border-slate-200/50 mt-1 block"
+                              >
+                                + {order.SaleItems.length - 4} more items
+                              </button>
                             )}
                           </div>
                         ) : null}
@@ -2013,6 +2029,69 @@ export default function CafeOrders() {
         type="customer"
         title="Select or Add Customer Party"
       />
+
+      {/* Dialog for displaying all items of a selected order */}
+      <Dialog
+        isOpen={Boolean(selectedOrderForItemsDialog)}
+        onClose={() => setSelectedOrderForItemsDialog(null)}
+        title={`Order Items - #${selectedOrderForItemsDialog?.invoiceNo || selectedOrderForItemsDialog?.id?.slice(0, 8) || ''}`}
+        size="md"
+      >
+        {selectedOrderForItemsDialog && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
+              <span className={`px-2.5 py-1 rounded-xl text-xs font-extrabold border ${
+                getCafeOrderAttributes(selectedOrderForItemsDialog).orderType === 'delivery' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                getCafeOrderAttributes(selectedOrderForItemsDialog).orderType === 'takeaway' ? 'bg-amber-100 text-amber-800 border-amber-200' :
+                'bg-purple-100 text-purple-800 border-purple-200'
+              }`}>
+                {getCafeOrderAttributes(selectedOrderForItemsDialog).orderType === 'delivery' ? '🚚 Home Delivery' :
+                 getCafeOrderAttributes(selectedOrderForItemsDialog).orderType === 'takeaway' ? '🛍️ Takeaway' :
+                 `🍽️ Dine-in Table ${getCafeOrderAttributes(selectedOrderForItemsDialog).tableNo || '?'}`}
+              </span>
+              <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border ${
+                getCafeOrderStatusMeta(getCafeOrderAttributes(selectedOrderForItemsDialog).orderStatus).tone
+              }`}>
+                {getCafeOrderStatusMeta(getCafeOrderAttributes(selectedOrderForItemsDialog).orderStatus).label}
+              </span>
+            </div>
+
+            <div className="divide-y divide-slate-100 max-h-[350px] overflow-y-auto pr-1">
+              {Array.isArray(selectedOrderForItemsDialog.SaleItems) && selectedOrderForItemsDialog.SaleItems.map((si) => (
+                <div key={si.id} className="py-2.5 flex items-center justify-between text-sm">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-slate-800 flex items-center gap-2">
+                      <span className="text-[#9c5f22] font-extrabold text-base">{si.quantity}x</span>
+                      <span>{si.Product?.name || si.name || 'Unnamed Item'}</span>
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="font-semibold text-slate-900">{formatMoney(si.lineTotal)}</p>
+                    <p className="text-[10px] text-slate-400">@ {formatMoney(si.unitPrice)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {selectedOrderForItemsDialog.notes && (
+              <div className="rounded-2xl bg-amber-50/90 border border-amber-200/50 p-3 text-xs text-amber-900 font-medium">
+                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-1">Notes / Instructions:</p>
+                <p className="italic">{selectedOrderForItemsDialog.notes}</p>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-3 border-t border-[#f1f5f9] dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setSelectedOrderForItemsDialog(null)}
+                className="btn-secondary rounded-xl py-2 px-4 text-xs font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }
