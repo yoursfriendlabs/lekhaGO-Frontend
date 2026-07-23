@@ -1238,6 +1238,22 @@ export const api = {
         "banks",
       ]),
     ),
+  deletePartyTransaction: (id) =>
+    request(
+      `/api/party-transactions/${id}`,
+      { method: "DELETE" },
+      mutationConfig([
+        "party-transactions",
+        "parties",
+        "party-statements",
+        "purchases",
+        "sales",
+        "services",
+        "reports",
+        "analytics",
+        "banks",
+      ]),
+    ),
 
   listBanks: (params = {}) =>
     collectionRequest(

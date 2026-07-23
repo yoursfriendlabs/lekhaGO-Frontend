@@ -39,6 +39,7 @@ import {
   MessageCircle, Pencil,
   ArrowUp,
   ArrowDown,
+  Trash2,
 } from "lucide-react";
 import { buildPaymentPayload, requiresBankSelection } from "../lib/payments";
 import { normalizePaymentType } from "../lib/paymentType";
@@ -340,6 +341,8 @@ export default function Parties() {
   const [txPage, setTxPage] = useState(1);
   const [deleteParty, setDeleteParty] = useState(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [deleteTx, setDeleteTx] = useState(null);
+  const [deleteTxSubmitting, setDeleteTxSubmitting] = useState(false);
   const [partyTotal, setPartyTotal] = useState(0);
   const [loadingMoreParties, setLoadingMoreParties] = useState(false);
   const [partyHasMore, setPartyHasMore] = useState(false);
@@ -818,6 +821,31 @@ export default function Parties() {
     } finally {
       setDeleteSubmitting(false);
       setDeleteParty(null);
+    }
+  };
+
+  const closeDeleteTxDialog = () => {
+    if (deleteTxSubmitting) return;
+    setDeleteTx(null);
+  };
+
+  const handleDeleteTx = async () => {
+    if (!canManageParties) return;
+    if (!deleteTx) return;
+    if (deleteTxSubmitting) return;
+
+    setDeleteTxSubmitting(true);
+    try {
+      await api.deletePartyTransaction(deleteTx.id);
+      invalidateParties();
+      setPartyReloadKey((prev) => prev + 1);
+      setStatementReloadKey((prev) => prev + 1);
+      setStatus({ type: "success", message: t("parties.messages.transactionDeleted") });
+    } catch (err) {
+      setStatus({ type: "error", message: err.message });
+    } finally {
+      setDeleteTxSubmitting(false);
+      setDeleteTx(null);
     }
   };
 
@@ -1510,6 +1538,12 @@ export default function Parties() {
                                       icon: Pencil,
                                       onClick: () => openEditTxDialog(row),
                                     },
+                                    {
+                                      label: t('common.delete'),
+                                      icon: Trash2,
+                                      onClick: () => setDeleteTx(row),
+                                      tone: 'danger',
+                                    },
                                   ]}
                                 />
                               ) : null}
@@ -1860,6 +1894,14 @@ export default function Parties() {
         onConfirm={handleDelete}
         description={t("parties.confirmDelete")}
         confirming={deleteSubmitting}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteTx)}
+        onClose={closeDeleteTxDialog}
+        onConfirm={handleDeleteTx}
+        description={t("parties.messages.confirmDeleteTransaction")}
+        confirming={deleteTxSubmitting}
       />
     </div>
   );

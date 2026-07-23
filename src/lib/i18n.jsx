@@ -1418,6 +1418,8 @@ const dictionaries = {
         deleted: 'Party deleted successfully',
         transactionSaved: 'Transaction saved',
         transactionUpdated: 'Transaction updated',
+        transactionDeleted: 'Transaction deleted successfully',
+        confirmDeleteTransaction: 'Are you sure you want to delete this transaction?',
       },
     },
     banks: {
@@ -3327,6 +3329,8 @@ const dictionaries = {
         deleted: 'पार्टी सफलतापूर्वक हटाइयो',
         transactionSaved: 'लेनदेन सेभ भयो',
         transactionUpdated: 'लेनदेन अपडेट भयो',
+        transactionDeleted: 'लेनदेन सफलतापूर्वक हटाइयो',
+        confirmDeleteTransaction: 'के तपाईं पक्का यो लेनदेन हटाउन चाहनुहुन्छ?',
       },
     },
     banks: {
