@@ -32,7 +32,17 @@ import {
 } from '../lib/staff';
 
 const EMPTY_META = normalizeStaffMeta({});
-const STAFF_FORM_CATEGORY_KEYS = new Set(['general_staff', 'custom']);
+const STAFF_FORM_CATEGORY_KEYS = new Set([
+  'general_staff',
+  'custom',
+  'cashier',
+  'inventory_manager',
+  'service_manager',
+  'accountant',
+  'supervisor',
+  'waiter',
+  'chef',
+]);
 
 /* ── General staff permission restrictions ── */
 const GENERAL_STAFF_ALLOWED_FEATURE_KEYS = new Set(['attendance', 'tasks', 'staff']);

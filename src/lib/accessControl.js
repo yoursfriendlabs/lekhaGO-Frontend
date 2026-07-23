@@ -11,13 +11,16 @@ const PERMISSION_KEYS = [
   'settings',
   'staff',
   'banking',
+  'tables',  // Add tables
+  'orders',  // Add orders
+  'billing', // Add billing
 ];
 
 const ACCESS_LEVELS = ['none', 'view', 'manage'];
 
 const FEATURE_PERMISSION_MAP = {
   dashboard: 'dashboard',
-  orders: 'sales',
+  orders: 'orders',     // Change from 'sales' to 'orders'
   inventory: 'inventory',
   sales: 'sales',
   services: 'services',
@@ -36,6 +39,8 @@ const FEATURE_PERMISSION_MAP = {
   account: 'settings',
   staff: 'staff',
   banks: 'banking',
+  billing: 'billing',   // Change from 'sales' to 'billing'
+  tables: 'tables',     // Add tables map
 };
 
 function asObject(value) {

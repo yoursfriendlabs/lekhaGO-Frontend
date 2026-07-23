@@ -77,6 +77,7 @@ export default function Sidebar() {
     visibleNavItems = [
       { key: 'staff-salary', label: t('nav.staff'), route: salaryRoute },
       { key: 'attendance', label: t('nav.attendance'), route: '/app/attendance' },
+      { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
     ];
   } else {
     visibleNavItems = navigation

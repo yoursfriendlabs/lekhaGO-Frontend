@@ -364,7 +364,7 @@ function AppShell() {
                     path="order-attributes"
                     element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="order-attributes"><Navigate to={buildSettingsTabPath(ORDER_ATTRIBUTES_SETTINGS_TAB)} replace /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>}
                   />
-                  <Route path="settings" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="settings"><Settings /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="settings" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Settings /></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="invoice/:type/:id" element={<EmailActivationRequiredRoute><InvoiceAccessRoute><Invoice /></InvoiceAccessRoute></EmailActivationRequiredRoute>} />
                   <Route path="activate-account" element={<ActivationOnlyRoute><ActivateAccount /></ActivationOnlyRoute>} />
                 </Routes>
