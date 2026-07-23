@@ -845,31 +845,6 @@ export default function CafeOrders() {
               <Table size={15} />
               Table View
             </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode('kitchen')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                viewMode === 'kitchen'
-                  ? 'bg-white text-[#9c5f22] shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <ShoppingCart size={15} />
-              Kitchen Items
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode('floor')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                viewMode === 'floor'
-                  ? 'bg-slate-800 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              🗺️ Seating Map
-            </button>
           </div>
         </div>
 
