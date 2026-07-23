@@ -1185,7 +1185,7 @@ export default function QuickPos() {
 
       invalidateProducts();
       setSuggestedInvoiceNo(nextSequences?.nextSaleInvoiceNo || "");
-      if (isTablesEnabled && !editingId && nextAction === "save") {
+      if (isTablesEnabled && nextAction === "save") {
         setSuccessState(null);
       } else {
         setSuccessState({
@@ -1384,7 +1384,7 @@ export default function QuickPos() {
         >
           {submitting
             ? t("common.saving")
-            : isTablesEnabled && !editingId
+            : isTablesEnabled
             ? (t("quickPos.confirmOrder") || "Confirm Order")
             : t("quickPos.quickSave")}
         </button>
@@ -2339,7 +2339,7 @@ export default function QuickPos() {
             >
               {submitting
                 ? t("common.saving")
-                : isTablesEnabled && !editingId
+                : isTablesEnabled
                 ? (t("quickPos.confirmOrder") || "Confirm Order")
                 : t("quickPos.saveOnly")}
             </button>
