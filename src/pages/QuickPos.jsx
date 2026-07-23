@@ -1008,6 +1008,7 @@ export default function QuickPos() {
     setEditingId(null);
     setActiveAttributes({});
     setDeletedItemIds([]);
+    setActiveSessionOption(null);
   };
 
   const handleSuccessClose = () => {
