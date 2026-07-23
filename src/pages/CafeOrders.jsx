@@ -246,27 +246,7 @@ export default function CafeOrders() {
     setActiveDialogStep('details');
   }, [dialogOpen]);
 
-  useEffect(() => {
-    if (viewMode !== 'kitchen') return;
-    const sentinel = document.getElementById('kitchen-sentinel');
-    if (!sentinel) return;
 
-    const observer = new IntersectionObserver((entries) => {
-      const [entry] = entries;
-      if (entry.isIntersecting) {
-        setVisibleCount((prev) => prev + 15);
-      }
-    }, {
-      rootMargin: '120px',
-    });
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [viewMode, kitchenItems.length]);
-
-  useEffect(() => {
-    setVisibleCount(15);
-  }, [viewMode, selectedOrderTypeFilter]);
 
   const cacheProducts = (productList = []) => {
     if (!Array.isArray(productList) || !productList.length) return;
@@ -632,6 +612,28 @@ export default function CafeOrders() {
 
     return itemsList.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
   }, [orders, selectedOrderTypeFilter]);
+
+  useEffect(() => {
+    if (viewMode !== 'kitchen') return;
+    const sentinel = document.getElementById('kitchen-sentinel');
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      const [entry] = entries;
+      if (entry.isIntersecting) {
+        setVisibleCount((prev) => prev + 15);
+      }
+    }, {
+      rootMargin: '120px',
+    });
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [viewMode, kitchenItems.length]);
+
+  useEffect(() => {
+    setVisibleCount(15);
+  }, [viewMode, selectedOrderTypeFilter]);
   const tableMap = useMemo(() => buildCafeTableMap(activeOrders, cafeTables), [activeOrders, cafeTables]);
 
   const typeCounts = useMemo(() => {

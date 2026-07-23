@@ -196,6 +196,9 @@ export default function QuickPos() {
   const { showError } = useSnackbar();
   const { businessId, user } = useAuth();
   const { businessProfile } = useBusinessSettings();
+  const isTablesEnabled = useMemo(() => {
+    return businessProfile?.settings?.enabledModules?.includes("tables");
+  }, [businessProfile]);
   const navigate = useNavigate();
   const isMobile = useIsMobile("(max-width: 1023px)");
   const { invalidate: invalidateProducts } = useProductStore();
@@ -707,9 +710,7 @@ export default function QuickPos() {
     selectedPartyRef.current = selectedParty;
   });
 
-  const isTablesEnabled = useMemo(() => {
-    return businessProfile?.settings?.enabledModules?.includes("tables");
-  }, [businessProfile]);
+
 
   useEffect(() => {
     if (!isTablesEnabled || !activeTableId || loading) return;
