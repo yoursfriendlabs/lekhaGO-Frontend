@@ -172,8 +172,12 @@ function resolveGuardFeatureState(guard, featureKey) {
 function normalizePlan(plan) {
   if (!plan || typeof plan !== 'object') return null;
 
+  const key = String(plan.key || '').toLowerCase();
+  const isPaid = plan.isPaid !== undefined ? Boolean(plan.isPaid) : (key !== 'freemium' && key !== 'custom');
+
   return {
     ...plan,
+    isPaid,
     isTrial: Boolean(plan.isTrial),
     trial: normalizeTrial(plan.trial),
     subscriptionStatus: pickString(plan.subscriptionStatus, plan.billingStatus),

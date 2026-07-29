@@ -557,7 +557,7 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
                       >
                         Contact Us
                       </a>
-                    ) : plan.isPaid ? (
+                    ) : (plan.isPaid || plan.key === 'growth') ? (
                       <div className="space-y-2">
                         {/* We offer eSewa/Khalti direct checkout selectors */}
                         <button

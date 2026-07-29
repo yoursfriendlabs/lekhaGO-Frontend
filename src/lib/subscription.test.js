@@ -39,6 +39,7 @@ describe('subscription helpers', () => {
     expect(subscription?.currentPlan?.trial?.endsAt).toBe('2026-06-01T00:00:00.000Z');
     expect(subscription?.access?.planKey).toBe('growth');
     expect(subscription?.availablePlans).toHaveLength(1);
+    expect(subscription?.availablePlans[0]?.isPaid).toBe(true);
   });
 
   it('blocks freemium-only restricted features while keeping settings accessible', () => {
