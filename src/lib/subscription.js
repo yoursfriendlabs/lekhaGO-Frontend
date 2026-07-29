@@ -339,13 +339,17 @@ export function getPreferredBillingCycle(plan, currentPlan, pendingChange) {
     ? pendingChange?.billingCycle
     : currentPlan?.key === plan?.key
       ? currentPlan?.billingCycle
-      : availableCycles[0];
+      : availableCycles.includes('yearly') && plan?.key !== 'custom'
+        ? 'yearly'
+        : availableCycles[0];
 
   if (preferredCycle && availableCycles.includes(preferredCycle)) {
     return preferredCycle;
   }
 
-  return availableCycles[0] || '';
+  return availableCycles.includes('yearly') && plan?.key !== 'custom'
+    ? 'yearly'
+    : (availableCycles[0] || '');
 }
 
 export function getSubscriptionGuard(subscriptionOrAccess) {

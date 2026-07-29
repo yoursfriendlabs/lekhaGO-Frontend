@@ -44,6 +44,7 @@ const Landing = lazy(() => import('./pages/Landing'));
 const Invoice = lazy(() => import('./pages/Invoice'));
 const Tables = lazy(() => import('./pages/Tables'));
 const CashierBilling = lazy(() => import('./pages/CashierBilling'));
+const PaymentCallback = lazy(() => import('./pages/PaymentCallback'));
 
 const OWNER_AND_STAFF_ROLES = ['owner', 'staff'];
 
@@ -442,6 +443,14 @@ export default function App() {
                         <PublicOnlyRoute>
                           <ResetPassword />
                         </PublicOnlyRoute>
+                      )}
+                    />
+                    <Route
+                      path="/payment/:provider/:status"
+                      element={(
+                        <ProtectedRoute>
+                          <PaymentCallback />
+                        </ProtectedRoute>
                       )}
                     />
                     <Route

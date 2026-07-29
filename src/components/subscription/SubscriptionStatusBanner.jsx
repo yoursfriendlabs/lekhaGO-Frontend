@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { ArrowRight, CalendarDays, Clock3, Sparkles, TriangleAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatMaybeDate } from '../../lib/datetime';
 import { useI18n } from '../../lib/i18n.jsx';
 import { getSubscriptionStatusState } from '../../lib/subscription';
 import { buildSettingsTabPath, SUBSCRIPTION_SETTINGS_TAB } from '../../lib/settingsTabs';
+import { useAuth } from '../../lib/auth';
+import { api } from '../../lib/api';
 
 export function formatSubscriptionStatusDate(value, locale) {
   if (!value) return '—';
@@ -64,8 +67,58 @@ export function SubscriptionStatusBannerSkeleton() {
 export default function SubscriptionStatusBanner({ subscription }) {
   const { locale, t } = useI18n();
   const status = getSubscriptionStatusState(subscription);
+  const { businessId, role } = useAuth();
+  const isOwner = role === 'owner';
+  const [paymentLoading, setPaymentLoading] = useState(null);
 
   if (status.kind === 'none') return null;
+
+  const handleInitiatePayment = async (provider) => {
+    if (!businessId || !isOwner) return;
+    setPaymentLoading(provider);
+
+    try {
+      // 1. Force update to Growth plan yearly first to generate a fresh request and request.id
+      const payload = {
+        plan: 'growth',
+        billingCycle: 'yearly',
+      };
+      await api.updateSubscription(payload);
+
+      // 2. Retrieve payment params
+      const response = await api.getSubscriptionPaymentParams({ provider });
+      
+      if (provider === 'esewa') {
+        if (response.actionUrl && response.params) {
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = response.actionUrl;
+
+          Object.entries(response.params).forEach(([key, value]) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = value;
+            form.appendChild(input);
+          });
+
+          document.body.appendChild(form);
+          form.submit();
+        } else {
+          throw new Error('Invalid eSewa response received from server.');
+        }
+      } else if (provider === 'khalti') {
+        if (response.paymentUrl) {
+          window.location.href = response.paymentUrl;
+        } else {
+          throw new Error('Khalti payment URL not received from server.');
+        }
+      }
+    } catch (paymentError) {
+      alert(paymentError.message || 'Payment initiation failed. Please try again.');
+      setPaymentLoading(null);
+    }
+  };
 
   const hasTrialEndDate = Boolean(status.trial?.endsAt);
   const trialEndDate = formatSubscriptionStatusDate(status.trial?.endsAt, locale);
@@ -155,20 +208,51 @@ export default function SubscriptionStatusBanner({ subscription }) {
             ) : null}
           </div>
         </div>
-        <div className="flex shrink-0 items-center">
-          <Link
-            className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 ${
-              status.kind === 'expired'
-                ? 'bg-rose-600 text-white hover:bg-rose-500'
-                : status.kind === 'trial-expiring'
-                  ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                  : 'bg-primary text-white hover:bg-primary/90'
-            }`}
-            to={buildSettingsTabPath(SUBSCRIPTION_SETTINGS_TAB)}
-          >
-            {ctaLabel}
-            <ArrowRight size={16} aria-hidden />
-          </Link>
+        <div className="flex shrink-0 items-center gap-2.5 flex-wrap">
+          {isOwner && (status.kind === 'expired' || status.kind === 'trial-expiring') ? (
+            <>
+              <button
+                type="button"
+                onClick={() => handleInitiatePayment('esewa')}
+                disabled={Boolean(paymentLoading)}
+                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50"
+              >
+                {paymentLoading === 'esewa' ? (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-white text-[9px] font-bold text-emerald-600 font-serif">e</span>
+                )}
+                Pay with eSewa
+              </button>
+              <button
+                type="button"
+                onClick={() => handleInitiatePayment('khalti')}
+                disabled={Boolean(paymentLoading)}
+                className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:opacity-50"
+              >
+                {paymentLoading === 'khalti' ? (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-white text-[9px] font-bold text-violet-600 font-serif">K</span>
+                )}
+                Pay with Khalti
+              </button>
+            </>
+          ) : (
+            <Link
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 ${
+                status.kind === 'expired'
+                  ? 'bg-rose-600 text-white hover:bg-rose-500'
+                  : status.kind === 'trial-expiring'
+                    ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                    : 'bg-primary text-white hover:bg-primary/90'
+              }`}
+              to={buildSettingsTabPath(SUBSCRIPTION_SETTINGS_TAB)}
+            >
+              {ctaLabel}
+              <ArrowRight size={16} aria-hidden />
+            </Link>
+          )}
         </div>
       </div>
     </section>

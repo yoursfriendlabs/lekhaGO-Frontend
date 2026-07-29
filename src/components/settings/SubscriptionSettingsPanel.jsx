@@ -185,8 +185,10 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
 
         if (!availableCycles.length) return;
 
-        if (!nextSelections[plan.key] || !availableCycles.includes(nextSelections[plan.key])) {
-          nextSelections[plan.key] = preferredCycle || availableCycles[0];
+        const defaultToYearly = availableCycles.includes('yearly') && plan.key !== 'custom';
+        const targetCycle = defaultToYearly ? 'yearly' : (preferredCycle || availableCycles[0]);
+        if (nextSelections[plan.key] !== targetCycle) {
+          nextSelections[plan.key] = targetCycle;
           changed = true;
         }
       });
@@ -199,7 +201,7 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
   const currentPlan = subscriptionData?.currentPlan || null;
   const pendingChange = subscriptionData?.pendingChange || null;
   const orderedPlans = useMemo(
-    () => sortAvailablePlans(subscriptionData?.availablePlans || []),
+    () => sortAvailablePlans(subscriptionData?.availablePlans || []).filter(plan => plan.key !== 'freemium'),
     [subscriptionData?.availablePlans]
   );
   const guard = useMemo(() => getSubscriptionGuard(subscriptionData || access), [access, subscriptionData]);
@@ -248,151 +250,224 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
     }
   };
 
+  const [paymentLoading, setPaymentLoading] = useState(null);
+
+  const handleInitiatePayment = async (provider, targetPlan = null) => {
+    if (!businessId || !isOwner) return;
+
+    setPaymentLoading(provider);
+    setNotice({ type: 'info', message: '' });
+
+    try {
+      // ALWAYS request/refresh the plan change first to ensure we close old requests and generate a new UUID
+      const activePlan = targetPlan || pendingChange;
+      if (activePlan) {
+        const selectedCycle = planSelections[activePlan.key] || getPreferredBillingCycle(activePlan, currentPlan, pendingChange);
+        const selectedOption = Array.isArray(activePlan.billingOptions)
+          ? activePlan.billingOptions.find((option) => option.cycle === selectedCycle) || null
+          : null;
+        
+        const payload = {
+          plan: activePlan.key,
+          billingCycle: selectedCycle || 'monthly',
+          ...(selectedOption?.amountConfigured && selectedOption?.amount !== null
+            ? { billingAmount: selectedOption.amount }
+            : {}),
+        };
+        
+        const changeResponse = await api.updateSubscription(payload);
+        syncSubscription(changeResponse);
+      }
+
+      // 2. Fetch gateway checkout parameters
+      const response = await api.getSubscriptionPaymentParams({ provider });
+      if (provider === 'esewa') {
+        if (response.actionUrl && response.params) {
+          submitEsewaForm(response.actionUrl, response.params);
+        } else {
+          throw new Error('Invalid eSewa response received from server.');
+        }
+      } else if (provider === 'khalti') {
+        if (response.paymentUrl) {
+          window.location.href = response.paymentUrl;
+        } else {
+          throw new Error('Khalti payment URL not received from server.');
+        }
+      }
+    } catch (paymentError) {
+      setNotice({
+        type: 'error',
+        message: paymentError.message || t('auth.errors.generic'),
+      });
+      setPaymentLoading(null);
+    }
+  };
+
+  const submitEsewaForm = (actionUrl, params) => {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = actionUrl;
+
+    Object.entries(params).forEach(([key, value]) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = key;
+      input.value = value;
+      form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+  };
+
   return (
     <div className="space-y-6">
-      <div className="card space-y-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              {t('settingsPage.subscription.eyebrow')}
-            </p>
-            <h2 className="mt-2 font-serif text-xl text-slate-900 dark:text-white">
-              {t('settingsPage.tabs.subscription')}
-            </h2>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              {t('settingsPage.subscription.subtitle')}
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn-ghost gap-2"
-            onClick={handleRefresh}
-            disabled={loading || Boolean(activePlanKey)}
-          >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            {t('adminPage.plan.refreshCta')}
-          </button>
+      {/* Header Panel */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Subscription
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-450">
+            Billing overview and subscription plan upgrades.
+          </p>
         </div>
-
-        {!businessId ? <Notice title={t('adminPage.plan.noBusinessNotice')} tone="warn" /> : null}
-        {notice.message ? (
-          <Notice
-            title={notice.message}
-            tone={notice.type === 'error' ? 'error' : notice.type === 'success' ? 'success' : 'info'}
-          />
-        ) : null}
-        {error ? <Notice title={error} tone="error" /> : null}
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <MetricCard
-            label={t('adminPage.plan.metrics.currentPackage')}
-            value={currentPlan?.label || (access?.planKey ? humanizeKey(access.planKey) : t('adminPage.fallback.na'))}
-            description={currentPlan?.description || t('adminPage.plan.subscriptionSubtitle')}
-            icon={WalletCards}
-            tone={getStatusTone(access?.subscriptionStatus || currentPlan?.subscriptionStatus)}
-          />
-          <MetricCard
-            label={t('adminPage.plan.metrics.subscriptionStatus')}
-            value={resolveSubscriptionLabel(t, 'subscriptionStatusLabels', access?.subscriptionStatus || currentPlan?.subscriptionStatus)}
-            description={access?.canUseApplication ? t('settingsPage.subscription.accessReady') : t('settingsPage.subscription.accessLocked')}
-            icon={access?.canUseApplication ? ShieldCheck : ShieldAlert}
-            tone={access?.canUseApplication ? 'emerald' : 'amber'}
-          />
-          <MetricCard
-            label={t('adminPage.plan.metrics.pendingChange')}
-            value={access?.hasPendingChange ? t('common.yes') : t('common.no')}
-            description={pendingChange?.label || t('adminPage.plan.pendingClearCaption')}
-            icon={CalendarClock}
-            tone={access?.hasPendingChange ? 'amber' : 'slate'}
-          />
-        </div>
+        <button
+          type="button"
+          className="btn-ghost gap-2 btn-sm"
+          onClick={handleRefresh}
+          disabled={loading || Boolean(activePlanKey)}
+        >
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          {t('adminPage.plan.refreshCta')}
+        </button>
       </div>
 
-      {guard.description ? (
+      {/* Errors / Notices */}
+      {!businessId ? <Notice title={t('adminPage.plan.noBusinessNotice')} tone="warn" /> : null}
+      {notice.message ? (
         <Notice
-          title={guard.title || t('settingsPage.subscription.guardTitle')}
-          description={guard.description}
-          tone={access?.canUseApplication ? 'info' : 'warn'}
+          title={notice.message}
+          tone={notice.type === 'error' ? 'error' : notice.type === 'success' ? 'success' : 'info'}
         />
       ) : null}
+      {error ? <Notice title={error} tone="error" /> : null}
 
-      <div className="card space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* Active Subscription Billing Card */}
+      <div className="rounded-2xl border border-slate-200 bg-white/70 p-6 dark:border-slate-800/80 dark:bg-slate-900/50">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="font-serif text-lg text-slate-900 dark:text-white">
-              {t('settingsPage.subscription.currentPlanTitle')}
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Current Plan</span>
+            <h3 className="text-xl font-extrabold text-slate-950 dark:text-white mt-0.5">
+              {currentPlan?.label || humanizeKey(access?.planKey) || 'Freemium'}
             </h3>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              {t('adminPage.plan.subscriptionSubtitle')}
+            <p className="text-xs text-slate-550 dark:text-slate-400 mt-1">
+              {currentPlan?.key === 'freemium' ? 'Starter plan for getting a business up and running.' : currentPlan?.description}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="self-start sm:self-center">
             <StatusPill
               label={resolveSubscriptionLabel(t, 'subscriptionStatusLabels', access?.subscriptionStatus || currentPlan?.subscriptionStatus)}
               tone={getStatusTone(access?.subscriptionStatus || currentPlan?.subscriptionStatus)}
             />
-            {access?.hasPendingChange ? (
-              <StatusPill label={t('adminPage.plan.badges.pending')} tone="amber" />
-            ) : null}
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/60">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              {t('adminPage.plan.currentPlanFields.package')}
-            </p>
-            <p className="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {currentPlan?.label || (access?.planKey ? humanizeKey(access.planKey) : t('adminPage.fallback.na'))}
+        <div className="mt-6 grid gap-4 border-t border-slate-100 pt-5 dark:border-slate-800 sm:grid-cols-3 text-xs">
+          <div>
+            <span className="text-[11px] text-slate-400 dark:text-slate-505 uppercase tracking-wider font-semibold">Billing Cycle</span>
+            <p className="mt-1 font-semibold text-slate-800 dark:text-slate-200 capitalize">
+              {resolveSubscriptionLabel(t, 'billingCycleLabels', currentPlan?.billingCycle) || 'Free'}
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200/70 bg-slate-50/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/60">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              {t('adminPage.plan.currentPlanFields.billingCycle')}
+          <div>
+            <span className="text-[11px] text-slate-400 dark:text-slate-505 uppercase tracking-wider font-semibold">Billing Amount</span>
+            <p className="mt-1 font-semibold text-slate-800 dark:text-slate-200">
+              {currentPlan?.key === 'freemium' ? 'Free' : formatMoney(currentPlan?.billingAmount, t)}
             </p>
-            <p className="mt-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-              {resolveSubscriptionLabel(t, 'billingCycleLabels', currentPlan?.billingCycle)}
+          </div>
+          <div>
+            <span className="text-[11px] text-slate-400 dark:text-slate-555 uppercase tracking-wider font-semibold">End / Renewal Date</span>
+            <p className="mt-1 font-semibold text-slate-800 dark:text-slate-200">
+              {currentPlan?.subscriptionEndDate || 'Never'}
             </p>
           </div>
         </div>
-
-        {checkoutUrl ? (
-          <div className="flex justify-start">
-            <a
-              className="btn-primary inline-flex justify-center"
-              href={checkoutUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {t('settingsPage.subscription.checkoutCta')}
-            </a>
-          </div>
-        ) : null}
       </div>
 
-      {isOwner ? (
-        <TeamSeatUsagePanel
-          summary={staffSummary}
-          staffing={subscriptionData?.staffing || subscription?.staffing}
-          loading={loading}
-          t={t}
-        />
-      ) : null}
+      {/* Action Required: Payment Banner */}
+      {access?.requiresPaymentSetup && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-6 dark:border-amber-900/40 dark:bg-amber-950/10 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-amber-100 p-2 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+              <WalletCards size={20} />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-amber-900 dark:text-amber-300">Complete Upgrading to Growth Plan</h4>
+              <p className="text-xs text-amber-800/80 dark:text-amber-400/85 mt-0.5">
+                Your request is pending payment setup. Choose a provider below to securely finalize your upgrade.
+              </p>
+            </div>
+          </div>
 
-      <div className="card space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-amber-200/50 pt-4 dark:border-amber-900/30">
+            <div className="text-sm">
+              <span className="text-xs text-slate-450 dark:text-slate-500 block">Amount Due</span>
+              <strong className="text-base text-slate-850 dark:text-slate-200">
+                {pendingChange?.billingAmount !== undefined
+                  ? formatMoney(pendingChange.billingAmount, t)
+                  : 'Rs. 12,000.00'}
+              </strong>
+              <span className="text-xs text-slate-450 capitalize ml-1">({pendingChange?.billingCycle || 'yearly'})</span>
+            </div>
+
+            <div className="flex flex-wrap gap-2.5">
+              <button
+                type="button"
+                onClick={() => handleInitiatePayment('esewa')}
+                disabled={Boolean(paymentLoading)}
+                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50"
+              >
+                {paymentLoading === 'esewa' ? (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-white text-[9px] font-bold text-emerald-600 font-serif">e</span>
+                )}
+                Pay with eSewa
+              </button>
+              <button
+                type="button"
+                onClick={() => handleInitiatePayment('khalti')}
+                disabled={Boolean(paymentLoading)}
+                className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:opacity-50"
+              >
+                {paymentLoading === 'khalti' ? (
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-white text-[9px] font-bold text-violet-600 font-serif">K</span>
+                )}
+                Pay with Khalti
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Available Plans Selection */}
+      <div className="space-y-4">
         <div>
-          <h3 className="font-serif text-lg text-slate-900 dark:text-white">
-            {t('adminPage.plan.availablePlansTitle')}
+          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+            Available Packages
           </h3>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            {t('adminPage.plan.availablePlansSubtitle')}
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Select the right tier to fuel your business growth.
           </p>
         </div>
 
         {!orderedPlans.length ? (
           <Notice title={t('adminPage.plan.noPlans')} tone="info" />
         ) : (
-          <div className="grid gap-4 xl:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-3">
             {orderedPlans.map((plan) => {
               const selectedCycle = planSelections[plan.key] || getPreferredBillingCycle(plan, currentPlan, pendingChange);
               const billingOption = Array.isArray(plan.billingOptions)
@@ -401,112 +476,148 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
               const isCurrentPlan = currentPlan?.key === plan.key;
               const isPendingPlan = pendingChange?.key === plan.key;
               const isSubmitting = activePlanKey === plan.key;
-              const planCheckoutUrl = plan.checkoutUrl || billingOption?.checkoutUrl || checkoutUrl || '';
+
+              // Growth plan accent styles
+              const isGrowth = plan.key === 'growth';
 
               return (
                 <div
                   id={`subscription-plan-${plan.key}`}
                   key={plan.key}
-                  className={`rounded-3xl border p-5 shadow-sm ${
-                    isPendingPlan
-                      ? 'border-amber-200/80 bg-amber-50/80 dark:border-amber-500/30 dark:bg-amber-500/10'
-                      : isCurrentPlan
-                        ? 'border-primary/30 bg-primary/5 dark:border-primary/40 dark:bg-primary/10'
-                        : 'border-slate-200/70 bg-white/80 dark:border-slate-800/70 dark:bg-slate-900/60'
+                  className={`relative flex flex-col justify-between rounded-2xl border p-6 shadow-sm transition ${
+                    isGrowth
+                      ? 'border-indigo-500/80 bg-indigo-50/20 dark:border-indigo-500/50 dark:bg-indigo-950/15 ring-1 ring-indigo-500/20'
+                      : 'border-slate-200 bg-white dark:border-slate-800/80 dark:bg-slate-900/40'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h4 className="text-xl font-semibold text-slate-900 dark:text-white">{plan.label}</h4>
-                      <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  {isGrowth && (
+                    <span className="absolute -top-3 right-6 rounded-full bg-indigo-600 px-3 py-1 text-[10px] font-bold text-white shadow-sm">
+                      Recommended
+                    </span>
+                  )}
+
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-lg font-bold text-slate-900 dark:text-white">{plan.label}</h4>
+                      <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400 leading-relaxed min-h-[36px]">
                         {plan.description || t('adminPage.fallback.na')}
                       </p>
                     </div>
-                    {isPendingPlan ? <ShieldAlert className="shrink-0 text-amber-600 dark:text-amber-300" size={20} /> : null}
-                  </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {isCurrentPlan ? <StatusPill label={t('adminPage.plan.badges.current')} tone="emerald" /> : null}
-                    {isPendingPlan ? <StatusPill label={t('adminPage.plan.badges.pending')} tone="amber" /> : null}
-                    {plan.isPaid ? <StatusPill label={t('adminPage.plan.badges.paid')} tone="blue" /> : <StatusPill label={t('adminPage.plan.badges.free')} tone="emerald" />}
-                  </div>
-
-                  <div className="mt-6">
-                    <p className="text-3xl font-semibold text-slate-900 dark:text-white">
-                      {plan.key === 'freemium'
-                        ? t('adminPage.plan.priceLabels.freeForever')
-                        : billingOption?.amountConfigured && billingOption?.amount !== null
-                          ? formatMoney(billingOption.amount, t)
-                          : t('adminPage.plan.priceLabels.onRequest')}
-                    </p>
-                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                      {resolveSubscriptionLabel(t, 'billingCycleLabels', selectedCycle)}
-                    </p>
-                  </div>
-
-                  {(plan.billingOptions || []).length ? (
-                    <div className="mt-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        {t('adminPage.plan.chooseBillingLabel')}
+                    <div className="py-2">
+                      <p className="text-3xl font-extrabold text-slate-900 dark:text-white">
+                        {plan.key === 'freemium'
+                          ? 'Free'
+                          : billingOption?.amountConfigured && billingOption?.amount !== null
+                            ? formatMoney(billingOption.amount, t)
+                            : 'Quote'}
                       </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {(plan.billingOptions || []).map((option) => (
+                      <p className="text-xs text-slate-400 capitalize mt-1">
+                        {plan.key === 'freemium' ? 'Forever' : plan.key === 'custom' ? 'Custom terms' : `per ${selectedCycle}`}
+                      </p>
+                    </div>
+
+                    {/* Cycle Toggle Selector */}
+                    {plan.key !== 'custom' && plan.billingOptions && plan.billingOptions.length > 1 && (
+                      <div className="flex bg-slate-100/80 dark:bg-slate-800/60 p-0.5 rounded-lg text-[10px]">
+                        {plan.billingOptions.map((option) => (
                           <button
-                            key={`${plan.key}-${option.cycle}`}
+                            key={option.cycle}
                             type="button"
-                            onClick={() => setPlanSelections((currentSelections) => ({
-                              ...currentSelections,
+                            onClick={() => setPlanSelections((current) => ({
+                              ...current,
                               [plan.key]: option.cycle,
                             }))}
-                            disabled={!isOwner || Boolean(activePlanKey)}
-                            className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                            className={`flex-1 text-center py-1.5 rounded-md font-semibold transition ${
                               selectedCycle === option.cycle
-                                ? 'bg-primary text-white'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
-                            } ${!isOwner || activePlanKey ? 'cursor-not-allowed opacity-60' : ''}`}
+                                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-350'
+                            }`}
                           >
-                            {resolveSubscriptionLabel(t, 'billingCycleLabels', option.cycle)}
+                            {option.cycle === 'monthly' ? 'Monthly' : 'Yearly'}
                           </button>
                         ))}
                       </div>
-                    </div>
-                  ) : null}
+                    )}
+                  </div>
 
-                  <div className="mt-6 grid gap-3">
-                    <button
-                      type="button"
-                      className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
-                        isSubmitting || isCurrentPlan || !isOwner
-                          ? 'cursor-not-allowed bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                          : 'bg-primary text-white shadow-sm hover:bg-primary/90'
-                      }`}
-                      disabled={isSubmitting || isCurrentPlan || !isOwner}
-                      onClick={() => handlePlanChange(plan)}
-                    >
-                      {isSubmitting ? t('adminPage.plan.savingCta') : isCurrentPlan ? t('adminPage.plan.currentPlanCta') : t('settingsPage.subscription.requestPlanCta')}
-                    </button>
-
-                    {planCheckoutUrl ? (
-                      <a
-                        className="btn-secondary justify-center"
-                        href={planCheckoutUrl}
-                        target="_blank"
-                        rel="noreferrer"
+                  <div className="mt-8">
+                    {isCurrentPlan ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full rounded-xl bg-slate-100 py-2.5 text-xs font-bold text-slate-400 dark:bg-slate-800 dark:text-slate-500"
                       >
-                        {t('settingsPage.subscription.checkoutCta')}
+                        Active Plan
+                      </button>
+                    ) : plan.key === 'custom' ? (
+                      <a
+                        href="mailto:support@lekhago.com?subject=LekhaGO%20Custom%20Plan%20Inquiry"
+                        className="w-full text-center inline-flex items-center justify-center rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-slate-800"
+                      >
+                        Contact Us
                       </a>
-                    ) : null}
+                    ) : plan.isPaid ? (
+                      <div className="space-y-2">
+                        {/* We offer eSewa/Khalti direct checkout selectors */}
+                        <button
+                          type="button"
+                          onClick={() => handleInitiatePayment('esewa', plan)}
+                          disabled={Boolean(paymentLoading)}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/50 py-2.5 text-xs font-bold text-emerald-850 transition hover:bg-emerald-100/50 disabled:opacity-60"
+                        >
+                          {paymentLoading === 'esewa' ? (
+                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-850 border-t-transparent" />
+                          ) : (
+                            <span className="flex h-4 w-4 items-center justify-center rounded bg-emerald-600 text-[8px] font-bold text-white font-serif">e</span>
+                          )}
+                          Pay with eSewa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleInitiatePayment('khalti', plan)}
+                          disabled={Boolean(paymentLoading)}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50/50 py-2.5 text-xs font-bold text-violet-850 transition hover:bg-violet-100/50 disabled:opacity-60"
+                        >
+                          {paymentLoading === 'khalti' ? (
+                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-850 border-t-transparent" />
+                          ) : (
+                            <span className="flex h-4 w-4 items-center justify-center rounded bg-violet-650 text-[8px] font-bold text-white font-serif">K</span>
+                          )}
+                          Pay with Khalti
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handlePlanChange(plan)}
+                        disabled={isSubmitting || !isOwner}
+                        className="w-full rounded-xl bg-indigo-600 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50"
+                      >
+                        {isSubmitting ? 'Saving...' : 'Switch Plan'}
+                      </button>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
         )}
-
-        {!isOwner ? (
-          <Notice title={t('settingsPage.subscription.ownerOnlyNotice')} tone="info" />
-        ) : null}
       </div>
+
+      {/* Staff Capacity Panel */}
+      {isOwner ? (
+        <div className="border-t border-slate-100 pt-6 dark:border-slate-800">
+          <TeamSeatUsagePanel
+            summary={staffSummary}
+            staffing={subscriptionData?.staffing || subscription?.staffing}
+            loading={loading}
+            t={t}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
+
+

@@ -219,6 +219,7 @@ function toDateInputValue(value) {
 }
 
 function isEditableTransactionRow(row) {
+  if (row?.note === 'Opening Balance') return false;
   return row?.type === 'payment_in' || row?.type === 'payment_out';
 }
 
@@ -745,7 +746,7 @@ export default function Parties() {
   };
 
   const openEditTransaction = async (row) => {
-    if (!EDITABLE_TX_TYPES.has(row?.type)) return;
+    if (!EDITABLE_TX_TYPES.has(row?.type) || row?.note === 'Opening Balance') return;
 
     const nextParty = {
       id: row.partyId || selectedPartyView?.id || "",
@@ -831,7 +832,7 @@ export default function Parties() {
 
   const handleDeleteTx = async () => {
     if (!canManageParties) return;
-    if (!deleteTx) return;
+    if (!deleteTx || deleteTx.note === 'Opening Balance') return;
     if (deleteTxSubmitting) return;
 
     setDeleteTxSubmitting(true);
@@ -1479,7 +1480,14 @@ export default function Parties() {
                               </span>
                               {row.status ? <span>{row.status}</span> : null}
                               {row.note ? (
-                                <span className="italic">Note: {row.note}</span>
+                                <span className="italic">
+                                  Note: {row.note === 'Opening Balance' ? t('parties.openingBalanceNote') : row.note}
+                                  {row.note === 'Opening Balance' && (
+                                    <span className="ml-1 text-slate-500 font-normal block sm:inline">
+                                      ({t('parties.editProfileToChangeOpeningBalance')})
+                                    </span>
+                                  )}
+                                </span>
                               ) : null}
                             </div>
                             <PaymentTypeSummary
@@ -1491,7 +1499,8 @@ export default function Parties() {
                           </div>
                           {/* Edit only for sale/service/purchase — the only types with update APIs */}
                           {canManageParties &&
-                          EDITABLE_TX_TYPES.has(row.type) ? (
+                          EDITABLE_TX_TYPES.has(row.type) &&
+                          row.note !== 'Opening Balance' ? (
                             <button
                               type="button"
                               onClick={() => openEditTransaction(row)}

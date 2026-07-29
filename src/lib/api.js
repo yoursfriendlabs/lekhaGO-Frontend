@@ -560,6 +560,20 @@ export const api = {
       mutationConfig(["auth-me", "subscription", "subscription-payment-setup"]),
     ),
 
+  getSubscriptionPaymentParams: (data) =>
+    request(
+      "/api/subscription/payment-params",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["subscription", "subscription-payment-setup"]),
+    ),
+
+  verifySubscriptionPayment: (data) =>
+    request(
+      "/api/subscription/verify-payment",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["auth-me", "subscription", "subscription-payment-setup"]),
+    ),
+
   getStaffMeta: () =>
     request("/api/staff/meta", {}, listCache(["staff"], CACHE_TTL.short)).then(
       normalizeStaffMeta,
