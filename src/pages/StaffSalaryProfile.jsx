@@ -535,7 +535,7 @@ function InlineSalaryEditor({ value, onSave, membershipId }) {
               if (e.key === "Enter") handleSave();
               if (e.key === "Escape") handleCancel();
             }}
-            className="input w-28 pl-5 text-sm tabular-nums"
+            className="input w-28 !pl-6 text-sm tabular-nums"
             disabled={saving}
             aria-label="Base salary amount"
           />
@@ -1345,10 +1345,24 @@ export default function StaffSalaryProfile() {
                               {formatMaybeDate(record.date, "YYYY-MM-DD")}
                             </td>
                             <td className="p-3 tabular-nums text-slate-500 dark:text-slate-400">
-                              {formatMaybeDateTime(record.punchInTime, "hh:mm A") || "—"}
+                              <div className="flex flex-col items-start gap-1">
+                                <span>{formatMaybeDateTime(record.punchInTime, "hh:mm A") || "—"}</span>
+                                {record.isLatePunchIn && (
+                                  <span className="inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/20">
+                                    Late
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="p-3 tabular-nums text-slate-500 dark:text-slate-400">
-                              {formatMaybeDateTime(record.punchOutTime, "hh:mm A") || "—"}
+                              <div className="flex flex-col items-start gap-1">
+                                <span>{formatMaybeDateTime(record.punchOutTime, "hh:mm A") || "—"}</span>
+                                {record.isEarlyPunchOut && (
+                                  <span className="inline-flex items-center rounded-md bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-800 ring-1 ring-inset ring-rose-600/20 dark:bg-rose-900/20 dark:text-rose-300 dark:ring-rose-500/20">
+                                    Left Early
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="p-3">
                               <HoursBadge

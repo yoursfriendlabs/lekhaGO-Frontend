@@ -1106,8 +1106,9 @@ export default function StaffManagement({ businessId }) {
               <div>
                 <label className="label">{t('common.search')}</label>
                 <div className="relative mt-1">
+                  <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    className="input w-full pl-8"
+                    className="input w-full !pl-9"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder={t('staffManagement.searchPlaceholder')}

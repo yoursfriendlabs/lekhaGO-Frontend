@@ -15,10 +15,12 @@ import {
   DollarSign,
   ChevronRight,
   Sparkles,
+  XCircle,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
+import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -62,6 +64,10 @@ export default function CashierBilling() {
 
   // UI States
   const [successState, setSuccessState] = useState(null);
+
+  // Cancel Order States
+  const [cancelOrder, setCancelOrder] = useState(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState('');
 
   // Load Tables & Active Unpaid Sales
   const loadData = async () => {
@@ -404,6 +410,34 @@ export default function CashierBilling() {
       setStatus({ type: 'error', message: err.message || 'Checkout failed.' });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // Cancel Order — deletes the sale and releases the table
+  const handleCancelOrder = async () => {
+    if (!cancelOrder) return;
+
+    const saleId = cancelOrder.id;
+    const tableId = cancelOrder.tableId;
+    setCancellingOrderId(saleId);
+
+    try {
+      await api.deleteSale(saleId);
+
+      // Release the table back to vacant
+      if (tableId) {
+        await api.updateTable(tableId, { status: 'vacant' }).catch(() => null);
+      }
+
+      setSelectedTable(null);
+      setActiveSale(null);
+      await loadData();
+      showSuccess('Order cancelled successfully. Table has been released.');
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || 'Failed to cancel order.' });
+    } finally {
+      setCancellingOrderId('');
+      setCancelOrder(null);
     }
   };
 
@@ -914,6 +948,15 @@ export default function CashierBilling() {
                 >
                   {submitting ? 'Processing...' : 'Complete Seating Bill'}
                 </button>
+                <button
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setCancelOrder(activeSale)}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-rose-600 border border-rose-200 bg-rose-50/50 hover:bg-rose-100/70 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <XCircle size={15} />
+                  Cancel This Order
+                </button>
               </div>
             </form>
           )}
@@ -1181,12 +1224,40 @@ export default function CashierBilling() {
                   >
                     {submitting ? 'Processing...' : 'Complete Seating Bill'}
                   </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => setCancelOrder(activeSale)}
+                    className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-rose-600 border border-rose-200 bg-rose-50/50 hover:bg-rose-100/70 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <XCircle size={15} />
+                    Cancel This Order
+                  </button>
                 </div>
               </form>
             )}
           </Dialog>
         </div>
       </div>
+
+      {/* Cancel Order Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(cancelOrder)}
+        onClose={() => {
+          if (cancelOrder && cancellingOrderId === cancelOrder.id) return;
+          setCancelOrder(null);
+        }}
+        onConfirm={handleCancelOrder}
+        title="Cancel Order"
+        description={
+          cancelOrder
+            ? `Are you sure you want to cancel order "${cancelOrder.invoiceNo || cancelOrder.id?.slice(0, 8)}"? This will remove all items, release the table, and restore inventory. This action cannot be undone.`
+            : 'Cancel this order?'
+        }
+        confirmLabel="Yes, Cancel Order"
+        cancelLabel="Keep Order"
+        confirming={Boolean(cancelOrder) && cancellingOrderId === cancelOrder.id}
+      />
     </div>
   );
 }

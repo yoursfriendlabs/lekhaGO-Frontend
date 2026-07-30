@@ -157,7 +157,7 @@ export default function QuickPartySelector({
               <div className="relative mt-1">
                 <User size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  className="input h-10 w-full pl-9 text-sm"
+                  className="input h-10 w-full !pl-9 text-sm"
                   placeholder="Enter customer full name"
                   value={newPartyName}
                   onChange={(e) => setNewPartyName(e.target.value)}
@@ -171,7 +171,7 @@ export default function QuickPartySelector({
               <div className="relative mt-1">
                 <Phone size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  className="input h-10 w-full pl-9 text-sm"
+                  className="input h-10 w-full !pl-9 text-sm"
                   type="tel"
                   placeholder="e.g. 9801234567"
                   value={newPartyPhone}
@@ -185,7 +185,7 @@ export default function QuickPartySelector({
               <div className="relative mt-1">
                 <MapPin size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  className="input h-10 w-full pl-9 text-sm"
+                  className="input h-10 w-full !pl-9 text-sm"
                   placeholder="Delivery address / location details"
                   value={newPartyAddress}
                   onChange={(e) => setNewPartyAddress(e.target.value)}
@@ -223,7 +223,7 @@ export default function QuickPartySelector({
                 )}
                 <input
                   className={`input h-11 w-full rounded-[18px] bg-slate-50 text-sm focus:bg-white transition ${
-                    query ? "px-3.5 pr-9" : "pl-10 pr-4"
+                    query ? "px-3.5 pr-9" : "!pl-10 pr-4"
                   }`}
                   value={query}
                   autoFocus

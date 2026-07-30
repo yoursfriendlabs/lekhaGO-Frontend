@@ -1076,7 +1076,20 @@ export default function QuickPos() {
       const manualInvoiceNo = String(checkoutForm.invoiceNo || "").trim();
       const { paymentMethod, bankId, paymentNote, discount, ...headerFields } =
         checkoutForm;
-      const isPaidBill = dueAmount <= 0;
+
+      // Standard business (no tables): quick save = completed paid sale.
+      // Cafe/restaurant (tables enabled): quick save = confirm order (due).
+      // If the user explicitly entered an amount via the checkout dialog,
+      // always honour that value regardless of business type.
+      const isStandardQuickSave =
+        !isTablesEnabled && nextAction === "save" && receivedAmount === 0;
+      const resolvedReceivedAmount = isStandardQuickSave
+        ? totals.grandTotal
+        : receivedAmount;
+      const isPaidBill = isStandardQuickSave
+        ? true
+        : resolvedReceivedAmount >= totals.grandTotal;
+
       const currentOrderType = activeSessionOption || activeAttributes?.order_type || "dine_in";
       const orderStatus = activeAttributes?.order_status || "new";
       const matchedTable = allTables.find(
@@ -1089,8 +1102,8 @@ export default function QuickPos() {
         tableId: checkoutForm.tableId || null,
         status: isPaidBill ? "paid" : "due",
         partyId: selectedParty?.id || null,
-        amountReceived: receivedAmount,
-        ...(Number(receivedAmount || 0) > 0
+        amountReceived: resolvedReceivedAmount,
+        ...(Number(resolvedReceivedAmount || 0) > 0
           ? buildPaymentPayload({ paymentMethod, bankId, paymentNote })
           : { paymentMethod: "cash" }),
         subTotal: totals.subTotal,

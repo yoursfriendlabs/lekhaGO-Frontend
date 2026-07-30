@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -16,7 +16,9 @@ import {
   BarChart2,
   TableProperties,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Coffee,
+  BookOpen,
 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import Notice from "../components/Notice";
@@ -1525,14 +1527,17 @@ function downloadCsv(filename, rows) {
 // MAIN PAGE EXPORT
 export default function Reports() {
   const { t } = useI18n();
-  const { role, canViewFeature } = useAuth();
-  const { settings: biz } = useBusinessSettings();
+  const { role, canViewFeature, businessId } = useAuth();
+  const { settings: biz, businessProfile } = useBusinessSettings();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Unified Tab Resolution based on permissions
   const availableTabs = useMemo(() => {
     const list = [];
     if (canViewFeature('analytics')) {
+      if (businessProfile?.type === 'cafe') {
+        list.push({ key: 'cafe-insights', label: t('analytics.cafeInsights') || 'Cafe Sales Book', icon: Coffee });
+      }
       list.push({ key: 'overview', label: t('analytics.overallMix') || 'Overview', icon: PieIcon });
       list.push({ key: 'expense', label: t('analytics.expenses') || 'Expense Analytics', icon: BarChart2 });
     }
@@ -1543,7 +1548,7 @@ export default function Reports() {
       list.push({ key: 'timeline', label: t('analytics.timelineSummary') || 'Timeline', icon: TableProperties });
     }
     return list;
-  }, [canViewFeature, t]);
+  }, [canViewFeature, t, businessProfile]);
 
   const activeTab = useMemo(() => {
     const requested = searchParams.get('tab');
@@ -1613,6 +1618,172 @@ export default function Reports() {
   const [pageSize, setPageSize] = useState(25);
   const printRef = useRef(null);
   const requestIdRef = useRef(0);
+
+  // State 3: Cafe Seating & Detailed Order Book Data
+  const [cafeSalesList, setCafeSalesList] = useState([]);
+  const [cafeSalesLoading, setCafeSalesLoading] = useState(false);
+  const [cafeSalesError, setCafeSalesError] = useState("");
+  const [cafeSearchTerm, setCafeSearchTerm] = useState("");
+  const [cafeStatusFilter, setCafeStatusFilter] = useState("all");
+  const [cafeTypeFilter, setCafeTypeFilter] = useState("all");
+
+  useEffect(() => {
+    if (!canViewFeature("analytics") || activeTab !== "cafe-insights" || !businessId) return;
+
+    let isActive = true;
+    setCafeSalesLoading(true);
+    setCafeSalesError("");
+
+    api.listSales({
+      limit: 150,
+      includeItems: "true",
+      from: filters.fromDate || undefined,
+      to: filters.toDate || undefined,
+    })
+      .then((res) => {
+        if (!isActive) return;
+        const items = res?.items || res || [];
+        setCafeSalesList(Array.isArray(items) ? items : []);
+      })
+      .catch((err) => {
+        if (!isActive) return;
+        setCafeSalesError(err.message || "Failed to load detailed sales.");
+      })
+      .finally(() => {
+        if (!isActive) return;
+        setCafeSalesLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [canViewFeature, activeTab, businessId, filters.fromDate, filters.toDate]);
+
+  const cafeStats = useMemo(() => {
+    if (!cafeSalesList || cafeSalesList.length === 0) {
+      return {
+        totalSales: 0,
+        orderCount: 0,
+        avgOrderValue: 0,
+        paidSales: 0,
+        dueSales: 0,
+        paidCount: 0,
+        dueCount: 0,
+        tableRevenue: {},
+        orderTypeStats: {
+          dine_in: { total: 0, count: 0 },
+          takeaway: { total: 0, count: 0 },
+          delivery: { total: 0, count: 0 },
+        },
+      };
+    }
+
+    let totalSales = 0;
+    let paidSales = 0;
+    let dueSales = 0;
+    let paidCount = 0;
+    let dueCount = 0;
+    const tableRevenue = {};
+    const orderTypeStats = {
+      dine_in: { total: 0, count: 0 },
+      takeaway: { total: 0, count: 0 },
+      delivery: { total: 0, count: 0 },
+    };
+
+    cafeSalesList.forEach((sale) => {
+      const total = Number(sale.grandTotal || 0);
+      totalSales += total;
+      if (sale.status === "paid") {
+        paidSales += total;
+        paidCount += 1;
+      } else {
+        dueSales += total;
+        dueCount += 1;
+      }
+
+      // Seating/Table performance
+      const tableLabel =
+        sale.Table?.name ||
+        sale.table?.name ||
+        sale.attributes?.table_no ||
+        "Walk-in/Unknown";
+      tableRevenue[tableLabel] = (tableRevenue[tableLabel] || 0) + total;
+
+      // Order type performance
+      const type = sale.attributes?.order_type || "dine_in";
+      const typeKey = ["dine_in", "takeaway", "delivery"].includes(type) ? type : "dine_in";
+      orderTypeStats[typeKey].total += total;
+      orderTypeStats[typeKey].count += 1;
+    });
+
+    return {
+      totalSales,
+      orderCount: cafeSalesList.length,
+      avgOrderValue: cafeSalesList.length > 0 ? totalSales / cafeSalesList.length : 0,
+      paidSales,
+      dueSales,
+      paidCount,
+      dueCount,
+      tableRevenue,
+      orderTypeStats,
+    };
+  }, [cafeSalesList]);
+
+  const filteredCafeOrders = useMemo(() => {
+    return cafeSalesList.filter((sale) => {
+      // 1. Search term match
+      if (cafeSearchTerm.trim()) {
+        const query = cafeSearchTerm.toLowerCase();
+        const table = (
+          sale.Table?.name ||
+          sale.table?.name ||
+          sale.attributes?.table_no ||
+          ""
+        ).toLowerCase();
+        const waiter = (sale.attributes?.waiter_name || "").toLowerCase();
+        const invoice = (sale.invoiceNo || sale.id || "").toLowerCase();
+        if (
+          !table.includes(query) &&
+          !waiter.includes(query) &&
+          !invoice.includes(query)
+        ) {
+          return false;
+        }
+      }
+
+      // 2. Status filter
+      if (cafeStatusFilter !== "all" && sale.status !== cafeStatusFilter) {
+        return false;
+      }
+
+      // 3. Order type filter
+      if (cafeTypeFilter !== "all") {
+        const type = sale.attributes?.order_type || "dine_in";
+        if (type !== cafeTypeFilter) return false;
+      }
+
+      return true;
+    });
+  }, [cafeSalesList, cafeSearchTerm, cafeStatusFilter, cafeTypeFilter]);
+
+  const renderOrderItemsSummary = (saleItems) => {
+    if (!saleItems || !Array.isArray(saleItems) || saleItems.length === 0) return "—";
+    return (
+      <div className="flex flex-wrap gap-1 max-w-xs">
+        {saleItems.map((item, idx) => {
+          const name = item.productName || item.Product?.name || "Unknown Item";
+          return (
+            <span
+              key={idx}
+              className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200/50"
+            >
+              {name} <span className="text-[#9b6835] font-black">x{item.quantity}</span>
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
 
   // FETCH: Categories (on mount if analytics view is allowed)
   useEffect(() => {
@@ -3088,6 +3259,347 @@ export default function Reports() {
                         )}
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* RENDER VIEW: CAFE/RESTAURANT SALES BOOK & INSIGHTS */}
+      {activeTab === 'cafe-insights' && (
+        <div className="space-y-8 animate-fadeIn">
+          {/* Cafe Filter Box */}
+          <div className="card bg-white p-5 border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+            <div className="grid gap-4 sm:grid-cols-2 flex-1 max-w-2xl">
+              <div>
+                <label className="label text-slate-500 font-bold uppercase text-[10px] tracking-wider">{t("common.from") || "From Date"}</label>
+                <input
+                  type="date"
+                  className="input h-10 mt-1"
+                  name="fromDate"
+                  value={filters.fromDate}
+                  onChange={handleFilterChange}
+                />
+              </div>
+              <div>
+                <label className="label text-slate-500 font-bold uppercase text-[10px] tracking-wider">{t("common.to") || "To Date"}</label>
+                <input
+                  type="date"
+                  className="input h-10 mt-1"
+                  name="toDate"
+                  value={filters.toDate}
+                  onChange={handleFilterChange}
+                />
+              </div>
+            </div>
+            
+            <button
+              onClick={handleRefresh}
+              disabled={cafeSalesLoading || isBusy}
+              className="btn-secondary h-10 px-4 flex items-center justify-center gap-2 rounded-xl border border-slate-200 hover:border-[#9b6835] hover:bg-[#9b6835]/5 font-semibold text-slate-700"
+            >
+              <RefreshCw size={14} className={cafeSalesLoading || isBusy ? "animate-spin" : ""} />
+              {t("common.refresh") || "Refresh"}
+            </button>
+          </div>
+
+          {/* Cafe KPI Metrics Row */}
+          {cafeSalesLoading ? (
+            <div className="grid gap-4 md:grid-cols-4">
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="card h-28 bg-slate-50 animate-pulse border border-slate-100" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="card bg-gradient-to-br from-white to-primary-50/5 p-5 border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow transition">
+                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
+                  {t("analytics.totalSalesRevenue") || "Total Sales Revenue"}
+                </p>
+                <p className="mt-2 text-2xl font-black text-[#9b6835]">
+                  {formatMoney(cafeStats.totalSales)}
+                </p>
+                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-primary-50/20 text-[#9b6835] flex items-center justify-center">
+                  <TrendingUp size={16} />
+                </div>
+              </div>
+
+              <div className="card bg-white p-5 border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow transition">
+                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
+                  {t("analytics.totalOrders") || "Total Orders"}
+                </p>
+                <p className="mt-2 text-2xl font-black text-slate-800">
+                  {cafeStats.orderCount}
+                </p>
+                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center">
+                  <Users size={16} />
+                </div>
+              </div>
+
+              <div className="card bg-white p-5 border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow transition">
+                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
+                  {t("analytics.avgTicketSize") || "Average Ticket Size"}
+                </p>
+                <p className="mt-2 text-2xl font-black text-slate-800">
+                  {formatMoney(cafeStats.avgOrderValue)}
+                </p>
+                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center">
+                  <WalletCards size={16} />
+                </div>
+              </div>
+
+              <div className="card bg-white p-5 border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow transition">
+                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
+                  {t("analytics.openBills") || "Open Bills (Unpaid)"}
+                </p>
+                <p className="mt-2 text-2xl font-black text-rose-600">
+                  {formatMoney(cafeStats.dueSales)}
+                </p>
+                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center text-xs font-bold">
+                  {cafeStats.dueCount}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cafe Visual Insights Grid */}
+          <div className="grid gap-6 xl:grid-cols-2">
+            {/* Column 1: Best Sellers (Popular dishes/items) */}
+            <PopularRankingCard
+              title={t("analytics.topSellingDishes") || "Top Selling Dishes"}
+              subtitle={t("analytics.topSellingDishesSubtitle") || "Most popular items by quantity and revenue for the selected period."}
+              rows={popularItems.items}
+              loading={isBusy}
+              error={popularItemsError}
+              emptyLabel={t("analytics.noPopularItems") || "No popular items found for this date range."}
+              typeLabel={t("nav.items") || "Dish Name"}
+              t={t}
+              formatMoney={formatMoney}
+            />
+
+            {/* Column 2: Seating & Seating Type Performance */}
+            <div className="card bg-white p-5 border border-slate-100 shadow-sm space-y-6">
+              <div>
+                <h3 className="font-serif text-xl font-medium text-slate-900">
+                  {t("analytics.orderTypesPerf") || "Order Types Performance"}
+                </h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  {t("analytics.orderTypesPerfSubtitle") || "Revenue breakdown by Dine In, Takeaway, and Delivery."}
+                </p>
+              </div>
+
+              {cafeSalesLoading ? (
+                <div className="space-y-4 animate-pulse">
+                  {[1, 2, 3].map((n) => (
+                    <div key={n} className="h-10 bg-slate-50 rounded-xl" />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {Object.entries(cafeStats.orderTypeStats).map(([type, data]) => {
+                    const pct = cafeStats.totalSales > 0 ? (data.total / cafeStats.totalSales) * 100 : 0;
+                    const labels = {
+                      dine_in: t("analytics.dineIn") || "Dine In",
+                      takeaway: t("analytics.takeaway") || "Takeaway",
+                      delivery: t("analytics.delivery") || "Delivery",
+                    };
+                    const tones = {
+                      dine_in: "bg-[#9b6835]",
+                      takeaway: "bg-amber-500",
+                      delivery: "bg-emerald-500",
+                    };
+                    return (
+                      <div key={type} className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-bold text-slate-700">
+                          <span>{labels[type]} ({data.count} {t("analytics.orderCount") || "orders"})</span>
+                          <span>{formatMoney(data.total)} ({pct.toFixed(0)}%)</span>
+                        </div>
+                        <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${tones[type] || "bg-slate-400"} transition-all duration-500`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Seating / Table Performance */}
+              <div className="border-t border-slate-100 pt-5 space-y-3">
+                <h4 className="text-xs uppercase font-bold text-slate-400 tracking-wider">
+                  {t("analytics.seatingPerformance") || "Seating Section & Table Performance"}
+                </h4>
+                {cafeSalesLoading ? (
+                  <div className="h-28 bg-slate-50 rounded-xl animate-pulse" />
+                ) : Object.keys(cafeStats.tableRevenue).length === 0 ? (
+                  <p className="text-sm text-slate-500">{t("analytics.noTableSales") || "No table sales recorded."}</p>
+                ) : (
+                  <div className="max-h-56 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50">
+                    {Object.entries(cafeStats.tableRevenue)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([table, rev], idx) => (
+                        <div key={table} className="p-3 flex justify-between items-center text-xs font-semibold hover:bg-slate-50">
+                          <span className="flex items-center gap-2">
+                            <span className="h-5 w-5 bg-slate-100 rounded-md flex items-center justify-center text-[10px] text-slate-500">
+                              #{idx + 1}
+                            </span>
+                            {table}
+                          </span>
+                          <span className="font-bold text-slate-800">{formatMoney(rev)}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Cafe Detailed Orders log (The Order Book) */}
+          <div className="card bg-white p-5 border border-slate-100 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
+              <div>
+                <h3 className="font-serif text-xl font-medium text-slate-900 flex items-center gap-2">
+                  <BookOpen size={18} className="text-[#9b6835]" />
+                  {t("analytics.cafeDetailedOrdersBook") || "Cafe Detailed Orders Book"}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  {t("analytics.cafeDetailedOrdersSubtitle") || "Full list of guest orders with their waiter names, table numbers, and exact dishes ordered."}
+                </p>
+              </div>
+              <span className="text-xs font-bold text-slate-400 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-xl shrink-0">
+                {filteredCafeOrders.length} {t("analytics.orderCount") || "orders"}
+              </span>
+            </div>
+
+            {/* Controls */}
+            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-4">
+              <div>
+                <input
+                  type="text"
+                  placeholder="Search table, waiter, invoice..."
+                  className="input h-10 w-full"
+                  value={cafeSearchTerm}
+                  onChange={(e) => setCafeSearchTerm(e.target.value)}
+                />
+              </div>
+              <div>
+                <select
+                  className="input h-10 w-full"
+                  value={cafeTypeFilter}
+                  onChange={(e) => setCafeTypeFilter(e.target.value)}
+                >
+                  <option value="all">{t("analytics.allOrderTypes") || "All Order Types"}</option>
+                  <option value="dine_in">{t("analytics.dineIn") || "Dine In"}</option>
+                  <option value="takeaway">{t("analytics.takeaway") || "Takeaway"}</option>
+                  <option value="delivery">{t("analytics.delivery") || "Delivery"}</option>
+                </select>
+              </div>
+              <div>
+                <select
+                  className="input h-10 w-full"
+                  value={cafeStatusFilter}
+                  onChange={(e) => setCafeStatusFilter(e.target.value)}
+                >
+                  <option value="all">{t("analytics.allPaymentStatuses") || "All Payment Statuses"}</option>
+                  <option value="paid">{t("analytics.paid") || "Paid"}</option>
+                  <option value="due">{t("analytics.openBillsDue") || "Open Bills (Due)"}</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Log Table */}
+            {cafeSalesLoading ? (
+              <div className="py-12 flex flex-col items-center justify-center text-slate-500">
+                <span className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-sm font-semibold">{t("common.loading") || "Loading..."}</p>
+              </div>
+            ) : filteredCafeOrders.length === 0 ? (
+              <p className="py-8 text-center text-sm text-slate-400">{t("analytics.noSeries") || "No orders found."}</p>
+            ) : (
+              <div className="overflow-x-auto border border-slate-100 rounded-2xl bg-slate-50/20">
+                <table className="w-full min-w-[900px] text-xs">
+                  <thead className="text-[10px] uppercase font-bold text-slate-400 bg-slate-50 border-b border-slate-100">
+                    <tr>
+                      <th className="p-3 text-left">{t("analytics.invoiceDate") || "Invoice / Date"}</th>
+                      <th className="p-3 text-left">{t("analytics.tableWaiter") || "Table / Waiter"}</th>
+                      <th className="p-3 text-left">{t("analytics.groupBy") || "Type"}</th>
+                      <th className="p-3 text-left">{t("analytics.dishesDrinksOrdered") || "Dishes & Drinks Ordered"}</th>
+                      <th className="p-3 text-right">{t("analytics.revenue") || "Total"}</th>
+                      <th className="p-3 text-center">{t("common.status") || "Status"}</th>
+                      <th className="p-3 text-center">{t("common.actions") || "Action"}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {filteredCafeOrders.map((sale) => {
+                      const table = sale.Table?.name || sale.table?.name || sale.attributes?.table_no || "Walk-in";
+                      const waiter = sale.attributes?.waiter_name || "—";
+                      const dateText = new Date(sale.createdAt || sale.saleDate).toLocaleDateString([], {
+                        day: "2-digit",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
+                      const orderType = sale.attributes?.order_type || "dine_in";
+                      const typeLabels = {
+                        dine_in: t("analytics.dineIn") || "Dine In",
+                        takeaway: t("analytics.takeaway") || "Takeaway",
+                        delivery: t("analytics.delivery") || "Delivery",
+                      };
+                      
+                      return (
+                        <tr key={sale.id} className="hover:bg-slate-50/50 transition align-middle">
+                          <td className="p-3">
+                            <span className="font-bold text-slate-800 block">
+                              {sale.invoiceNo || sale.id?.slice(0, 8)}
+                            </span>
+                            <span className="text-[10px] text-slate-400">{dateText}</span>
+                          </td>
+                          <td className="p-3">
+                            <span className="font-bold text-slate-800 block">{table}</span>
+                            <span className="text-[10px] text-slate-400">{t("staff.waiter") || "Waiter"}: {waiter}</span>
+                          </td>
+                          <td className="p-3">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${
+                              orderType === "dine_in"
+                                ? "bg-amber-50 text-amber-800 border-amber-200"
+                                : orderType === "takeaway"
+                                ? "bg-indigo-50 text-indigo-800 border-indigo-200"
+                                : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            }`}>
+                              {typeLabels[orderType] || "Dine In"}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            {renderOrderItemsSummary(sale.SaleItems || sale.items)}
+                          </td>
+                          <td className="p-3 text-right font-bold text-slate-800">
+                            {formatMoney(sale.grandTotal)}
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                              sale.status === "paid"
+                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                : "bg-amber-50 text-amber-700 border-amber-200"
+                            }`}>
+                              {sale.status === "paid" ? t("analytics.paid") || "Paid" : t("analytics.openBill") || "Open Bill"}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <Link
+                              to={`/app/invoice/sales/${sale.id}?print=1`}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:text-[#9b6835] hover:border-[#9b6835] hover:bg-[#9b6835]/5 transition"
+                              title="Print Receipt"
+                            >
+                              <Printer size={12} />
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

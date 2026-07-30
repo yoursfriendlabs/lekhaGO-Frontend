@@ -164,6 +164,7 @@ export default function Attendance() {
         const coordinates = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
+          timezoneOffset: new Date().getTimezoneOffset(),
         };
 
         try {
@@ -471,8 +472,26 @@ export default function Attendance() {
                       </td>
                     )}
                     <td className="py-4 pr-4 font-medium">{formatMaybeDate(record.date, 'YYYY-MM-DD')}</td>
-                    <td className="py-4 pr-4">{formatMaybeDateTime(record.punchInTime, 'hh:mm A')}</td>
-                    <td className="py-4 pr-4">{formatMaybeDateTime(record.punchOutTime, 'hh:mm A')}</td>
+                    <td className="py-4 pr-4">
+                      <div className="space-y-1">
+                        <p>{formatMaybeDateTime(record.punchInTime, 'hh:mm A')}</p>
+                        {record.isLatePunchIn && (
+                          <span className="inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-2xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/20">
+                            Late
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 pr-4">
+                      <div className="space-y-1">
+                        <p>{formatMaybeDateTime(record.punchOutTime, 'hh:mm A')}</p>
+                        {record.isEarlyPunchOut && (
+                          <span className="inline-flex items-center rounded-md bg-rose-50 px-1.5 py-0.5 text-2xs font-medium text-rose-800 ring-1 ring-inset ring-rose-600/20 dark:bg-rose-900/20 dark:text-rose-300 dark:ring-rose-500/20">
+                            Left Early
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="py-4 pr-4 capitalize">
                       <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         record.status === 'present'
