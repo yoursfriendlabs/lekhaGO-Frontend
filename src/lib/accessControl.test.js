@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyPermissionChange,
+  enforcePermissionDependencies,
   getFeatureAccessLevel,
+  getStaffPermissionUiFeatures,
   normalizeAccessControl,
 } from './accessControl';
 import {
@@ -32,6 +35,91 @@ describe('access control helpers', () => {
     expect(getFeatureAccessLevel(accessControl, 'inventory', 'staff')).toBe('view');
     expect(getFeatureAccessLevel(accessControl, 'ledger', 'staff')).toBe('manage');
     expect(getFeatureAccessLevel(accessControl, 'sales', 'staff')).toBe('none');
+  });
+
+  it('auto-grants inventory view when sales, services, or purchases access is given', () => {
+    const withSales = applyPermissionChange({}, 'sales', 'manage');
+    expect(withSales.sales).toBe('manage');
+    expect(withSales.inventory).toBe('view');
+
+    const withServices = applyPermissionChange({}, 'services', 'view');
+    expect(withServices.services).toBe('view');
+    expect(withServices.inventory).toBe('view');
+
+    const withPurchases = applyPermissionChange({}, 'purchases', 'manage');
+    expect(withPurchases.purchases).toBe('manage');
+    expect(withPurchases.inventory).toBe('view');
+  });
+
+  it('clears sales/pos/services/purchases when inventory view is removed', () => {
+    const next = applyPermissionChange(
+      {
+        inventory: 'view',
+        sales: 'manage',
+        services: 'view',
+        purchases: 'manage',
+        orders: 'manage',
+        billing: 'view',
+      },
+      'inventory',
+      'none'
+    );
+
+    expect(next.inventory).toBe('none');
+    expect(next.sales).toBe('none');
+    expect(next.services).toBe('none');
+    expect(next.purchases).toBe('none');
+    expect(next.orders).toBe('none');
+    expect(next.billing).toBe('none');
+  });
+
+  it('shows standard permission rows with reports instead of analytics/tables', () => {
+    const features = getStaffPermissionUiFeatures([
+      { key: 'dashboard', label: 'Dashboard' },
+      { key: 'inventory', label: 'Inventory' },
+      { key: 'sales', label: 'Sales' },
+      { key: 'analytics', label: 'Analytics' },
+      { key: 'tables', label: 'Tables' },
+      { key: 'orders', label: 'Orders' },
+      { key: 'billing', label: 'Billing' },
+      { key: 'reports', label: 'Reports' },
+    ]);
+
+    const keys = features.map((feature) => feature.key);
+    expect(keys).toContain('reports');
+    expect(keys).toContain('sales');
+    expect(keys).not.toContain('analytics');
+    expect(keys).not.toContain('tables');
+    expect(keys).not.toContain('orders');
+    expect(keys).not.toContain('billing');
+    expect(keys.filter((key) => key === 'reports')).toHaveLength(1);
+  });
+
+  it('blocks sales and services access at runtime without inventory view', () => {
+    const accessControl = normalizeAccessControl({
+      role: 'staff',
+      permissions: {
+        sales: 'manage',
+        services: 'view',
+        inventory: 'none',
+      },
+    });
+
+    // normalizeAccessControl enforces inventory view when dependents exist
+    expect(accessControl.permissions.inventory).toBe('view');
+    expect(getFeatureAccessLevel(accessControl, 'sales', 'staff')).toBe('manage');
+
+    const rawBlocked = {
+      role: 'staff',
+      permissions: {
+        sales: 'manage',
+        services: 'view',
+        inventory: 'none',
+      },
+    };
+    expect(getFeatureAccessLevel(rawBlocked, 'sales', 'staff')).toBe('none');
+    expect(getFeatureAccessLevel(rawBlocked, 'services', 'staff')).toBe('none');
+    expect(enforcePermissionDependencies(rawBlocked.permissions).inventory).toBe('view');
   });
 
   it('normalizes staff meta and category default permissions from backend payloads', () => {

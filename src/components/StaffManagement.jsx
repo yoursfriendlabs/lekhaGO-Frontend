@@ -21,32 +21,24 @@ import ConfirmDialog from './ui/ConfirmDialog.jsx';
 import { Dialog } from './ui/Dialog.tsx';
 import TeamSeatUsagePanel from './subscription/TeamSeatUsagePanel.jsx';
 import { api, invalidateApiCache } from '../lib/api';
-import { getPermissionKeyForFeature, normalizePermissionMap } from '../lib/accessControl';
+import {
+  applyPermissionChange,
+  buildEmptyPermissionMap,
+  enforcePermissionDependencies,
+  getPermissionKeyForFeature,
+  getStaffPermissionUiFeatures,
+  hasInventoryDependentAccess,
+} from '../lib/accessControl';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 import {
   EMPTY_STAFF_SUMMARY,
-  getCategoryPermissions,
   normalizeStaffMeta,
 } from '../lib/staff';
 
 const EMPTY_META = normalizeStaffMeta({});
-const STAFF_FORM_CATEGORY_KEYS = new Set([
-  'general_staff',
-  'custom',
-  'cashier',
-  'inventory_manager',
-  'service_manager',
-  'accountant',
-  'supervisor',
-  'waiter',
-  'chef',
-]);
-
-/* ── General staff permission restrictions ── */
-const GENERAL_STAFF_ALLOWED_FEATURE_KEYS = new Set(['attendance', 'tasks', 'staff']);
-// const GENERAL_STAFF_DASHBOARD_LEVEL = 'view';
+const CUSTOM_STAFF_CATEGORY = 'custom';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -70,23 +62,11 @@ function toTimeInputValue(value) {
   return String(value).slice(0, 5);
 }
 
-function getStaffFormCategoryKey(categoryKey) {
-  if (categoryKey === 'owner') return 'owner';
-  return STAFF_FORM_CATEGORY_KEYS.has(categoryKey) ? categoryKey : 'custom';
+function resolveStaffCategoryForRole(role = 'staff') {
+  return role === 'owner' ? 'owner' : CUSTOM_STAFF_CATEGORY;
 }
 
-function getStaffFormCategories(meta, role) {
-  return meta.categories.filter((category) => (
-    STAFF_FORM_CATEGORY_KEYS.has(category.key) || (role === 'owner' && category.key === 'owner')
-  ));
-}
-
-function buildEmptyForm(meta, role = 'staff') {
-  const defaultCategory = meta.categories.find((category) => category.key === 'general_staff')?.key
-    || meta.categories.find((category) => category.key === 'custom')?.key
-    || meta.categories.find((category) => category.key !== 'owner')?.key
-    || meta.categories[0]?.key
-    || '';
+function buildEmptyForm(_meta, role = 'staff') {
   return {
     membershipId: '',
     name: '',
@@ -94,7 +74,7 @@ function buildEmptyForm(meta, role = 'staff') {
     phone: '',
     password: '',
     role,
-    staffCategory: defaultCategory,
+    staffCategory: resolveStaffCategoryForRole(role),
     jobTitle: '',
     joinedDate: todayISODate(),
     shift: '',
@@ -106,8 +86,7 @@ function buildEmptyForm(meta, role = 'staff') {
     hasLogin: true,
     totalReceived: '',
     isActive: true,
-    permissions: getCategoryPermissions(meta, defaultCategory),
-    permissionsDirty: false,
+    permissions: buildEmptyPermissionMap(),
   };
 }
 
@@ -226,16 +205,21 @@ function EmailVerificationBadge({ emailVerified, t }) {
   return null;
 }
 
-function PermissionSelector({ value, levels, disabled, onChange, t }) {
+function PermissionSelector({ value, levels, disabled, disabledLevels = [], hideLevels = [], onChange, t }) {
+  const disabledSet = new Set(disabledLevels);
+  const visibleLevels = levels.filter((level) => !hideLevels.includes(level.key));
+  const columnClass = visibleLevels.length <= 2 ? 'grid-cols-2' : 'grid-cols-3';
+
   return (
-    <div className="grid grid-cols-3 overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/80 dark:border-slate-800/70 dark:bg-slate-900/70">
-      {levels.map((level) => {
+    <div className={`grid ${columnClass} overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/80 dark:border-slate-800/70 dark:bg-slate-900/70`}>
+      {visibleLevels.map((level) => {
         const active = value === level.key;
+        const levelDisabled = disabled || disabledSet.has(level.key);
         return (
           <button
             key={level.key}
             type="button"
-            disabled={disabled}
+            disabled={levelDisabled}
             onClick={() => onChange(level.key)}
             className={`min-h-[2.9rem] px-3 py-2.5 text-[13px] font-semibold transition sm:text-sm ${
               active
@@ -263,24 +247,18 @@ function StaffFormDialog({
   onSubmit,
   onFieldChange,
   onPermissionChange,
-  onApplyPreset,
   t,
 }) {
   const [activeTab, setActiveTab] = useState('general');
   const isCreate = mode === 'create';
   const readOnly = mode === 'view';
   const levels = meta.accessLevels;
-  const selectedCategory = meta.categories.find((category) => category.key === form.staffCategory) || null;
-  const formCategories = getStaffFormCategories(meta, form.role);
-  const categoryDefaults = getCategoryPermissions(meta, form.staffCategory);
-  const permissionsCustomized = JSON.stringify(categoryDefaults) !== JSON.stringify(form.permissions);
-  const isGeneralStaff = form.staffCategory === 'general_staff';
-
-  /* ── Filter features for general_staff: only attendance, tasks, staff (salary) ── */
-  const visibleFeatures = useMemo(() => {
-    if (!isGeneralStaff) return meta.features;
-    return meta.features.filter((feature) => GENERAL_STAFF_ALLOWED_FEATURE_KEYS.has(feature.key));
-  }, [isGeneralStaff, meta.features]);
+  const visibleFeatures = useMemo(
+    () => getStaffPermissionUiFeatures(meta.features),
+    [meta.features]
+  );
+  const inventoryRequired = hasInventoryDependentAccess(form.permissions);
+  const isDetailsStep = activeTab === 'general';
 
   useEffect(() => {
     if (mode) setActiveTab('general');
@@ -293,6 +271,29 @@ function StaffFormDialog({
     : mode === 'edit'
       ? t('staffManagement.editTitle')
       : t('staffManagement.viewTitle');
+
+  const validateDetailsStep = () => {
+    const nameField = document.getElementById('staff-name');
+    if (nameField && typeof nameField.reportValidity === 'function' && !nameField.reportValidity()) {
+      return false;
+    }
+    return true;
+  };
+
+  const goToPermissionsStep = () => {
+    if (!validateDetailsStep()) return;
+    setActiveTab('permissions');
+  };
+
+  const handleFormSubmit = (event) => {
+    if (!readOnly && isDetailsStep) {
+      event.preventDefault();
+      goToPermissionsStep();
+      return;
+    }
+
+    onSubmit(event);
+  };
 
   return (
     <div
@@ -322,7 +323,7 @@ function StaffFormDialog({
             </button>
           </div>
 
-          <form id="staff-management-form" className="flex min-h-0 flex-1 flex-col" onSubmit={onSubmit}>
+          <form id="staff-management-form" className="flex min-h-0 flex-1 flex-col" onSubmit={handleFormSubmit}>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
               <div className="mx-auto w-full max-w-[920px] space-y-4">
                 <div className="flex gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
@@ -339,7 +340,9 @@ function StaffFormDialog({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('permissions')}
+                    onClick={() => {
+                      if (readOnly || validateDetailsStep()) setActiveTab('permissions');
+                    }}
                     className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
                       activeTab === 'permissions'
                         ? 'bg-primary-600 text-white'
@@ -350,8 +353,7 @@ function StaffFormDialog({
                   </button>
                 </div>
 
-                {activeTab === 'general' ? (
-                  <div className="space-y-4">
+                <div className={`space-y-4 ${isDetailsStep ? '' : 'hidden'}`}>
                     <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
                       <div className="flex flex-col gap-3 border-b border-slate-200/50 pb-4 lg:flex-row lg:items-start lg:justify-between dark:border-slate-800/50">
                         <div>
@@ -401,23 +403,6 @@ function StaffFormDialog({
                             {form.role === 'owner' ? <option value="owner">{t('staffManagement.roles.owner')}</option> : null}
                           </select>
                           <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.roleHelper')}</p>
-                        </div>
-                        <div>
-                          <label className="label" htmlFor="staff-category">{t('staffManagement.categoryLabel')}</label>
-                          <select
-                            id="staff-category"
-                            className="input mt-1"
-                            value={form.staffCategory}
-                            onChange={(event) => onFieldChange('staffCategory', event.target.value)}
-                            disabled={readOnly}
-                          >
-                            {formCategories.map((category) => (
-                              <option key={category.key} value={category.key}>{category.label}</option>
-                            ))}
-                          </select>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            {selectedCategory?.description || t('staffManagement.categoryHelper')}
-                          </p>
                         </div>
                         <div>
                           <label className="label" htmlFor="staff-job-title">{t('staffManagement.jobTitle')}</label>
@@ -543,8 +528,8 @@ function StaffFormDialog({
                       </div>
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-4">
+
+                <div className={`space-y-4 ${isDetailsStep ? 'hidden' : ''}`}>
                     <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
                       <div className="border-b border-slate-200/50 pb-4 dark:border-slate-800/50">
                         <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('staffManagement.loginAccess')}</h3>
@@ -619,48 +604,33 @@ function StaffFormDialog({
                     </div>
 
                     <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
-                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                        <div>
-                          <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('staffManagement.permissionsTitle')}</h3>
-                          <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.permissionsSubtitle')}</p>
-                        </div>
-                        {!readOnly ? (
-                          <button type="button" className="btn-secondary w-full justify-center sm:w-auto" onClick={onApplyPreset}>
-                            {t('staffManagement.resetToPreset')}
-                          </button>
-                        ) : null}
+                      <div>
+                        <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('staffManagement.permissionsTitle')}</h3>
+                        <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.permissionsSubtitle')}</p>
                       </div>
 
-                      <div
-                        className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${
-                          permissionsCustomized
-                            ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200'
-                            : 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-200'
-                        }`}
-                      >
-                        <p className="font-semibold">
-                          {permissionsCustomized
-                            ? t('staffManagement.permissionPresetCustomized')
-                            : t('staffManagement.permissionPresetApplied', { category: selectedCategory?.label || '-' })}
-                        </p>
-                        <p className="mt-1 text-xs opacity-80">
-                          {permissionsCustomized
-                            ? t('staffManagement.permissionPresetCustomizedHint')
-                            : t('staffManagement.permissionPresetAppliedHint')}
-                        </p>
+                      <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-800/50 dark:bg-sky-950/30 dark:text-sky-100">
+                        <p className="font-semibold">{t('staffManagement.permissionDependencyTitle')}</p>
+                        <p className="mt-1 text-xs opacity-80">{t('staffManagement.permissionDependencyHint')}</p>
                       </div>
 
                       <div className="mt-5 grid gap-4 xl:grid-cols-2">
                         {visibleFeatures.map((feature) => {
                           const permissionKey = getPermissionKeyForFeature(feature.key) || feature.key;
+                          const isInventory = permissionKey === 'inventory';
+                          const featureLabel = permissionKey === 'reports'
+                            ? t('staffManagement.permissionFeatures.reports')
+                            : feature.label;
 
                           return (
-                            <div key={feature.key} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
+                            <div key={permissionKey} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
                               <div className="flex h-full flex-col gap-4">
                                 <div className="min-w-0">
-                                  <p className="font-medium text-slate-900 dark:text-white">{feature.label}</p>
+                                  <p className="font-medium text-slate-900 dark:text-white">{featureLabel}</p>
                                   <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                                    {feature.description || t('staffManagement.permissionDescriptionFallback')}
+                                    {isInventory && inventoryRequired
+                                      ? t('staffManagement.permissionInventoryRequiredHint')
+                                      : feature.description || t('staffManagement.permissionDescriptionFallback')}
                                   </p>
                                 </div>
                                 <div className="w-full">
@@ -668,6 +638,7 @@ function StaffFormDialog({
                                     value={form.permissions[permissionKey] || 'none'}
                                     levels={levels}
                                     disabled={readOnly}
+                                    hideLevels={isInventory && inventoryRequired ? ['none'] : []}
                                     onChange={(value) => onPermissionChange(permissionKey, value)}
                                     t={t}
                                   />
@@ -679,7 +650,6 @@ function StaffFormDialog({
                       </div>
                     </div>
                   </div>
-                )}
               </div>
             </div>
 
@@ -689,9 +659,31 @@ function StaffFormDialog({
                   <button type="button" className="btn-secondary w-full sm:w-auto" onClick={onClose}>
                     {t('common.close')}
                   </button>
-                ) : (
+                ) : isDetailsStep ? (
                   <>
                     <button type="button" className="btn-ghost w-full sm:w-auto" onClick={onClose} disabled={saving}>
+                      {t('common.cancel')}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-primary w-full sm:w-auto"
+                      disabled={saving}
+                      onClick={goToPermissionsStep}
+                    >
+                      {t('common.continue')}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="btn-ghost w-full sm:w-auto"
+                      onClick={() => setActiveTab('general')}
+                      disabled={saving}
+                    >
+                      {t('common.back')}
+                    </button>
+                    <button type="button" className="btn-secondary w-full sm:w-auto" onClick={onClose} disabled={saving}>
                       {t('common.cancel')}
                     </button>
                     <button type="submit" className="btn-primary w-full sm:w-auto" disabled={saving}>
@@ -729,7 +721,7 @@ export default function StaffManagement({ businessId }) {
   const [notice, setNotice] = useState({ type: '', message: '' });
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [roleFilter, setRoleFilter] = useState('all');
   const [dialogMode, setDialogMode] = useState('');
   const [form, setForm] = useState(() => buildEmptyForm(EMPTY_META));
   const [saving, setSaving] = useState(false);
@@ -748,6 +740,8 @@ export default function StaffManagement({ businessId }) {
     const normalizedQuery = query.trim().toLowerCase();
 
     return members.filter((member) => {
+      const roleKey = member.role === 'owner' ? 'owner' : 'staff';
+      const roleLabel = t(`staffManagement.roles.${roleKey}`);
       const matchesQuery = !normalizedQuery
         || [
           member.user?.name,
@@ -758,15 +752,16 @@ export default function StaffManagement({ businessId }) {
           member.shiftStarted,
           member.shiftEnded,
           member.address,
-          member.category?.label,
+          member.role,
+          roleLabel,
         ].some((value) => String(value || '').toLowerCase().includes(normalizedQuery));
       const matchesStatus = statusFilter === 'all'
         || (statusFilter === 'active' ? member.user?.isActive : !member.user?.isActive);
-      const matchesCategory = categoryFilter === 'all' || member.staffCategory === categoryFilter;
+      const matchesRole = roleFilter === 'all' || member.role === roleFilter;
 
-      return matchesQuery && matchesStatus && matchesCategory;
+      return matchesQuery && matchesStatus && matchesRole;
     });
-  }, [categoryFilter, members, query, statusFilter]);
+  }, [members, query, roleFilter, statusFilter, t]);
 
   const staffOverview = useMemo(() => {
     const activeCount = members.filter((member) => member.user?.isActive !== false).length;
@@ -844,28 +839,30 @@ export default function StaffManagement({ businessId }) {
     setDialogMode('create');
   };
 
-  const buildFormFromMember = (member) => ({
-    membershipId: member.membershipId,
-    name: member.user?.name || '',
-    email: member.user?.email || '',
-    phone: member.user?.phone || '',
-    password: '',
-    role: member.role || 'staff',
-    staffCategory: getStaffFormCategoryKey(member.staffCategory || ''),
-    jobTitle: member.jobTitle || '',
-    joinedDate: toDateInputValue(member.joinedDate || member.joinedAt),
-    shift: member.shift || '',
-    shiftStarted: toTimeInputValue(member.shiftStarted),
-    shiftEnded: toTimeInputValue(member.shiftEnded),
-    address: member.address || '',
-    compensation: member.compensation ?? '',
-    salary: member.salary ?? member.compensation ?? '',
-    hasLogin: member.hasLogin !== false,
-    totalReceived: member.totalReceived ?? '',
-    isActive: member.user?.isActive !== false,
-    permissions: { ...member.permissions },
-    permissionsDirty: false,
-  });
+  const buildFormFromMember = (member) => {
+    const role = member.role || 'staff';
+    return {
+      membershipId: member.membershipId,
+      name: member.user?.name || '',
+      email: member.user?.email || '',
+      phone: member.user?.phone || '',
+      password: '',
+      role,
+      staffCategory: resolveStaffCategoryForRole(role),
+      jobTitle: member.jobTitle || '',
+      joinedDate: toDateInputValue(member.joinedDate || member.joinedAt),
+      shift: member.shift || '',
+      shiftStarted: toTimeInputValue(member.shiftStarted),
+      shiftEnded: toTimeInputValue(member.shiftEnded),
+      address: member.address || '',
+      compensation: member.compensation ?? '',
+      salary: member.salary ?? member.compensation ?? '',
+      hasLogin: member.hasLogin !== false,
+      totalReceived: member.totalReceived ?? '',
+      isActive: member.user?.isActive !== false,
+      permissions: enforcePermissionDependencies(member.permissions),
+    };
+  };
 
   const openView = (member) => {
     setForm(buildFormFromMember(member));
@@ -886,15 +883,11 @@ export default function StaffManagement({ businessId }) {
 
   const handleFieldChange = (field, value) => {
     setForm((current) => {
-      if (field === 'staffCategory') {
-        if (current.permissionsDirty) {
-          return { ...current, staffCategory: value };
-        }
-
+      if (field === 'role') {
         return {
           ...current,
-          staffCategory: value,
-          permissions: getCategoryPermissions(meta, value),
+          role: value,
+          staffCategory: resolveStaffCategoryForRole(value),
         };
       }
 
@@ -905,19 +898,7 @@ export default function StaffManagement({ businessId }) {
   const handlePermissionChange = (featureKey, level) => {
     setForm((current) => ({
       ...current,
-      permissionsDirty: true,
-      permissions: {
-        ...current.permissions,
-        [featureKey]: level,
-      },
-    }));
-  };
-
-  const applyPresetPermissions = () => {
-    setForm((current) => ({
-      ...current,
-      permissionsDirty: false,
-      permissions: getCategoryPermissions(meta, current.staffCategory),
+      permissions: applyPermissionChange(current.permissions, featureKey, level),
     }));
   };
 
@@ -926,19 +907,13 @@ export default function StaffManagement({ businessId }) {
 
     if (!canManageStaff) return;
 
-    const isGeneralStaffPayload = form.staffCategory === 'general_staff';
-
-    /* ── Enforce dashboard = 'view' for general_staff ── */
-    let finalPermissions = normalizePermissionMap(form.permissions);
-    if (isGeneralStaffPayload) {
-      finalPermissions = { ...finalPermissions, dashboard: 'view' };
-    }
+    const finalPermissions = enforcePermissionDependencies(form.permissions);
 
     const payload = {
       name: form.name.trim(),
       phone: form.phone.trim(),
       role: form.role,
-      staffCategory: form.staffCategory,
+      staffCategory: resolveStaffCategoryForRole(form.role),
       jobTitle: form.jobTitle.trim(),
       joinedDate: form.joinedDate || null,
       joinedAt: form.joinedDate || null,
@@ -1116,18 +1091,15 @@ export default function StaffManagement({ businessId }) {
                 </div>
               </div>
               <div>
-                <label className="label">{t('staffManagement.categoryLabel')}</label>
+                <label className="label">{t('staffManagement.roleLabel')}</label>
                 <select
                   className="input mt-1"
-                  value={categoryFilter}
-                  onChange={(event) => setCategoryFilter(event.target.value)}
+                  value={roleFilter}
+                  onChange={(event) => setRoleFilter(event.target.value)}
                 >
-                  <option value="all">{t('staffManagement.allCategories')}</option>
-                  {meta.categories.filter((category) => (
-                    STAFF_FORM_CATEGORY_KEYS.has(category.key)
-                  )).map((category) => (
-                    <option key={category.key} value={category.key}>{category.label}</option>
-                  ))}
+                  <option value="all">{t('staffManagement.allRoles')}</option>
+                  <option value="owner">{t('staffManagement.roles.owner')}</option>
+                  <option value="staff">{t('staffManagement.roles.staff')}</option>
                 </select>
               </div>
               <RefreshButton
@@ -1205,7 +1177,8 @@ export default function StaffManagement({ businessId }) {
                             </p>
                             <div className="mt-1 flex flex-wrap items-center gap-1.5">
                               <span className="text-xs text-slate-500 dark:text-slate-400">
-                                {member.category?.label || '-'}{member.jobTitle ? ` • ${member.jobTitle}` : ''}
+                                {t(`staffManagement.roles.${member.role === 'owner' ? 'owner' : 'staff'}`)}
+                                {member.jobTitle ? ` • ${member.jobTitle}` : ''}
                               </span>
                               <LoginBadge hasLogin={member.hasLogin} t={t} />
                             </div>
@@ -1307,7 +1280,8 @@ export default function StaffManagement({ businessId }) {
                                 </p>
                                 <div className="mt-1 flex flex-wrap items-center gap-2">
                                   <span className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
-                                    {member.category?.label || '-'} {member.jobTitle ? `• ${member.jobTitle}` : ''}
+                                    {t(`staffManagement.roles.${member.role === 'owner' ? 'owner' : 'staff'}`)}
+                                    {member.jobTitle ? ` • ${member.jobTitle}` : ''}
                                   </span>
                                   <LoginBadge hasLogin={member.hasLogin} t={t} />
                                 </div>
@@ -1378,7 +1352,6 @@ export default function StaffManagement({ businessId }) {
         onSubmit={handleSubmit}
         onFieldChange={handleFieldChange}
         onPermissionChange={handlePermissionChange}
-        onApplyPreset={applyPresetPermissions}
         t={t}
       />
 

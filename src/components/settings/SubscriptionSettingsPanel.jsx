@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CalendarClock, RefreshCw, ShieldAlert, ShieldCheck, WalletCards } from 'lucide-react';
+import { CalendarClock, RefreshCw, ShieldAlert, WalletCards } from 'lucide-react';
 import Notice from '../Notice.jsx';
+import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import TeamSeatUsagePanel from '../subscription/TeamSeatUsagePanel.jsx';
+import { formatSubscriptionStatusDate } from '../subscription/SubscriptionStatusBanner.jsx';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { todayISODate } from '../../lib/datetime';
@@ -48,6 +50,7 @@ function getStatusTone(status = '') {
       return 'emerald';
     case 'free':
       return 'blue';
+    case 'cancelling':
     case 'expiring-soon':
     case 'pending':
     case 'pending_setup':
@@ -61,6 +64,13 @@ function getStatusTone(status = '') {
     default:
       return 'slate';
   }
+}
+
+function getDisplayBillingStatus(currentPlan, cancellation) {
+  if (cancellation?.cancelAtPeriodEnd || currentPlan?.cancelAtPeriodEnd) {
+    return 'cancelling';
+  }
+  return currentPlan?.billingStatus || currentPlan?.subscriptionStatus || '';
 }
 
 function StatusPill({ label, tone = 'slate' }) {
@@ -105,8 +115,8 @@ function MetricCard({ label, value, description, icon: Icon, tone = 'slate' }) {
 }
 
 export default function SubscriptionSettingsPanel({ isOwner = false }) {
-  const { t } = useI18n();
-  const { businessId, subscription, updateSubscription } = useAuth();
+  const { locale, t } = useI18n();
+  const { businessId, subscription, updateSubscription, refreshSession } = useAuth();
   const [subscriptionData, setSubscriptionData] = useState(() => normalizeSubscriptionPayload(subscription));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -114,6 +124,9 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
   const [planSelections, setPlanSelections] = useState({});
   const [activePlanKey, setActivePlanKey] = useState('');
   const [staffSummary, setStaffSummary] = useState({ maxUsers: 0, totalUsers: 0, availableSlots: 0 });
+  const [confirmAction, setConfirmAction] = useState(null); // 'cancel' | 'reactivate' | 'clearPending'
+  const [actionLoading, setActionLoading] = useState('');
+  const [paymentLoading, setPaymentLoading] = useState(null);
 
   const syncSubscription = useCallback((payload) => {
     const normalized = normalizeSubscriptionPayload(payload);
@@ -141,6 +154,16 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
       if (showSpinner) setLoading(false);
     }
   }, [businessId, syncSubscription, t]);
+
+  const refreshAfterMutation = useCallback(async (response) => {
+    if (response) syncSubscription(response);
+    try {
+      await refreshSession?.();
+    } catch {
+      // Auth/me refresh is best-effort; subscription GET below is source of truth.
+    }
+    await loadSubscriptionSettings({ showSpinner: false });
+  }, [loadSubscriptionSettings, refreshSession, syncSubscription]);
 
   useEffect(() => {
     setSubscriptionData(normalizeSubscriptionPayload(subscription));
@@ -200,16 +223,105 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
   const access = subscriptionData?.access || null;
   const currentPlan = subscriptionData?.currentPlan || null;
   const pendingChange = subscriptionData?.pendingChange || null;
+  const cancellation = subscriptionData?.cancellation || null;
   const orderedPlans = useMemo(
     () => sortAvailablePlans(subscriptionData?.availablePlans || []).filter(plan => plan.key !== 'freemium'),
     [subscriptionData?.availablePlans]
   );
   const guard = useMemo(() => getSubscriptionGuard(subscriptionData || access), [access, subscriptionData]);
   const checkoutUrl = guard.checkoutUrl || '';
+  const displayBillingStatus = getDisplayBillingStatus(currentPlan, cancellation);
+  const effectiveUntilDate = formatSubscriptionStatusDate(
+    cancellation?.effectiveUntil || currentPlan?.subscriptionEndDate,
+    locale
+  );
+  const canCancelSubscription = Boolean(isOwner && (access?.canCancel || cancellation?.canCancel));
+  const canReactivateSubscription = Boolean(
+    isOwner
+    && (cancellation?.cancelAtPeriodEnd || access?.cancelAtPeriodEnd)
+    && (access?.canReactivate || cancellation?.canReactivate)
+  );
+  const showCancelledBanner = Boolean(
+    (cancellation?.cancelAtPeriodEnd || access?.cancelAtPeriodEnd)
+    && access?.canUseApplication !== false
+  );
+  const showExpiredRenewHint = Boolean(
+    isOwner
+    && access?.canUseApplication === false
+    && (access?.guard === 'subscription_expired' || currentPlan?.subscriptionStatus === 'expired')
+    && !canReactivateSubscription
+  );
+  const mutationBusy = Boolean(actionLoading || activePlanKey || paymentLoading);
 
   const handleRefresh = async () => {
     setNotice({ type: 'info', message: '' });
     await loadSubscriptionSettings();
+  };
+
+  const handleClearPendingChange = async () => {
+    if (!businessId || !isOwner) return;
+    setActionLoading('clearPending');
+    setNotice({ type: 'info', message: '' });
+    try {
+      const response = await api.updateSubscription({ clearPendingChange: true });
+      setConfirmAction(null);
+      setNotice({
+        type: 'success',
+        message: response?.message || t('adminPage.plan.pendingCancelled'),
+      });
+      await refreshAfterMutation(response);
+    } catch (clearError) {
+      setNotice({
+        type: 'error',
+        message: clearError?.payload?.message || clearError.message || t('auth.errors.generic'),
+      });
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!businessId || !isOwner) return;
+    setActionLoading('cancel');
+    setNotice({ type: 'info', message: '' });
+    try {
+      const response = await api.cancelSubscription();
+      setConfirmAction(null);
+      setNotice({
+        type: 'success',
+        message: response?.message || t('adminPage.plan.cancelledBannerTitle'),
+      });
+      await refreshAfterMutation(response);
+    } catch (cancelError) {
+      setNotice({
+        type: 'error',
+        message: cancelError?.payload?.message || cancelError.message || t('auth.errors.generic'),
+      });
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const handleReactivateSubscription = async () => {
+    if (!businessId || !isOwner) return;
+    setActionLoading('reactivate');
+    setNotice({ type: 'info', message: '' });
+    try {
+      const response = await api.reactivateSubscription();
+      setConfirmAction(null);
+      setNotice({
+        type: 'success',
+        message: response?.message || t('adminPage.plan.changeSaved'),
+      });
+      await refreshAfterMutation(response);
+    } catch (reactivateError) {
+      setNotice({
+        type: 'error',
+        message: reactivateError?.payload?.message || reactivateError.message || t('auth.errors.generic'),
+      });
+    } finally {
+      setActionLoading('');
+    }
   };
 
   const handlePlanChange = async (plan) => {
@@ -249,8 +361,6 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
       setActivePlanKey('');
     }
   };
-
-  const [paymentLoading, setPaymentLoading] = useState(null);
 
   const handleInitiatePayment = async (provider, targetPlan = null) => {
     if (!businessId || !isOwner) return;
@@ -336,7 +446,7 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
           type="button"
           className="btn-ghost gap-2 btn-sm"
           onClick={handleRefresh}
-          disabled={loading || Boolean(activePlanKey)}
+          disabled={loading || mutationBusy}
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           {t('adminPage.plan.refreshCta')}
@@ -367,33 +477,142 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
           </div>
           <div className="self-start sm:self-center">
             <StatusPill
-              label={resolveSubscriptionLabel(t, 'subscriptionStatusLabels', access?.subscriptionStatus || currentPlan?.subscriptionStatus)}
-              tone={getStatusTone(access?.subscriptionStatus || currentPlan?.subscriptionStatus)}
+              label={resolveSubscriptionLabel(
+                t,
+                displayBillingStatus === 'cancelling' ? 'billingStatusLabels' : 'subscriptionStatusLabels',
+                displayBillingStatus || access?.subscriptionStatus || currentPlan?.subscriptionStatus
+              )}
+              tone={getStatusTone(displayBillingStatus || access?.subscriptionStatus || currentPlan?.subscriptionStatus)}
             />
           </div>
         </div>
 
         <div className="mt-6 grid gap-4 border-t border-slate-100 pt-5 dark:border-slate-800 sm:grid-cols-3 text-xs">
           <div>
-            <span className="text-[11px] text-slate-400 dark:text-slate-505 uppercase tracking-wider font-semibold">Billing Cycle</span>
+            <span className="text-[11px] text-slate-400 dark:text-slate-505 uppercase tracking-wider font-semibold">
+              {t('adminPage.plan.currentPlanFields.billingCycle')}
+            </span>
             <p className="mt-1 font-semibold text-slate-800 dark:text-slate-200 capitalize">
               {resolveSubscriptionLabel(t, 'billingCycleLabels', currentPlan?.billingCycle) || 'Free'}
             </p>
           </div>
           <div>
-            <span className="text-[11px] text-slate-400 dark:text-slate-505 uppercase tracking-wider font-semibold">Billing Amount</span>
+            <span className="text-[11px] text-slate-400 dark:text-slate-505 uppercase tracking-wider font-semibold">
+              {t('adminPage.plan.currentPlanFields.billingAmount')}
+            </span>
             <p className="mt-1 font-semibold text-slate-800 dark:text-slate-200">
               {currentPlan?.key === 'freemium' ? 'Free' : formatMoney(currentPlan?.billingAmount, t)}
             </p>
           </div>
           <div>
-            <span className="text-[11px] text-slate-400 dark:text-slate-555 uppercase tracking-wider font-semibold">End / Renewal Date</span>
+            <span className="text-[11px] text-slate-400 dark:text-slate-555 uppercase tracking-wider font-semibold">
+              {showCancelledBanner
+                ? t('adminPage.plan.currentPlanFields.endDate')
+                : t('adminPage.plan.currentPlanFields.nextBillingDate')}
+            </span>
             <p className="mt-1 font-semibold text-slate-800 dark:text-slate-200">
-              {currentPlan?.subscriptionEndDate || 'Never'}
+              {formatSubscriptionStatusDate(
+                cancellation?.effectiveUntil || currentPlan?.nextBillingDate || currentPlan?.subscriptionEndDate,
+                locale
+              )}
             </p>
           </div>
         </div>
       </div>
+
+      {showCancelledBanner ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-6 dark:border-amber-900/40 dark:bg-amber-950/10">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-amber-100 p-2 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                <CalendarClock size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                  {t('adminPage.plan.cancelledBannerTitle')}
+                </h4>
+                <p className="mt-1 text-xs leading-5 text-amber-800/85 dark:text-amber-300/85">
+                  {t('adminPage.plan.cancelledBannerDescription', { date: effectiveUntilDate })}
+                </p>
+              </div>
+            </div>
+            {canReactivateSubscription ? (
+              <button
+                type="button"
+                className="btn-primary whitespace-nowrap"
+                disabled={mutationBusy}
+                onClick={() => setConfirmAction('reactivate')}
+              >
+                {actionLoading === 'reactivate'
+                  ? t('adminPage.plan.reactivatingCta')
+                  : t('adminPage.plan.reactivateSubscriptionCta')}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {showExpiredRenewHint ? (
+        <Notice title={t('adminPage.plan.expiredRenewHint')} tone="warn" />
+      ) : null}
+
+      {pendingChange && isOwner ? (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50/50 p-6 dark:border-sky-900/40 dark:bg-sky-950/10">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h4 className="text-sm font-bold text-sky-900 dark:text-sky-200">
+                {t('adminPage.plan.pendingTitle')}
+              </h4>
+              <p className="mt-1 text-xs text-sky-800/80 dark:text-sky-300/85">
+                {t('adminPage.plan.pendingDescription', {
+                  plan: pendingChange.label || humanizeKey(pendingChange.key),
+                  date: formatSubscriptionStatusDate(pendingChange.requestedAt || pendingChange.createdAt, locale),
+                })}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn-secondary whitespace-nowrap"
+              disabled={mutationBusy}
+              onClick={() => setConfirmAction('clearPending')}
+            >
+              {actionLoading === 'clearPending'
+                ? t('adminPage.plan.cancellingCta')
+                : t('adminPage.plan.cancelPendingCta')}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {canCancelSubscription ? (
+        <div className="rounded-2xl border border-slate-200 bg-white/70 p-6 dark:border-slate-800/80 dark:bg-slate-900/50">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-rose-100 p-2 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                <ShieldAlert size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                  {t('adminPage.plan.cancellationTitle')}
+                </h4>
+                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  {t('adminPage.plan.cancellationSubtitle')}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 transition hover:bg-rose-100 disabled:opacity-50 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200"
+              disabled={mutationBusy}
+              onClick={() => setConfirmAction('cancel')}
+            >
+              {actionLoading === 'cancel'
+                ? t('adminPage.plan.cancellingCta')
+                : t('adminPage.plan.cancelSubscriptionCta')}
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {/* Action Required: Payment Banner */}
       {access?.requiresPaymentSetup && (
@@ -616,6 +835,46 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
           />
         </div>
       ) : null}
+
+      <ConfirmDialog
+        isOpen={confirmAction === 'cancel'}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={handleCancelSubscription}
+        confirming={actionLoading === 'cancel'}
+        title={t('adminPage.plan.cancelSubscriptionConfirmTitle')}
+        confirmLabel={t('adminPage.plan.cancelSubscriptionCta')}
+        description={(
+          <div className="space-y-2">
+            <p>{t('adminPage.plan.cancelSubscriptionConfirmLead')}</p>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>{t('adminPage.plan.cancelSubscriptionNoRefund')}</li>
+              <li>{t('adminPage.plan.cancelSubscriptionAccessUntil', { date: effectiveUntilDate })}</li>
+              <li>{t('adminPage.plan.cancelSubscriptionStopsRenewal')}</li>
+            </ul>
+          </div>
+        )}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmAction === 'reactivate'}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={handleReactivateSubscription}
+        confirming={actionLoading === 'reactivate'}
+        variant="primary"
+        title={t('adminPage.plan.reactivateConfirmTitle')}
+        confirmLabel={t('adminPage.plan.reactivateSubscriptionCta')}
+        description={t('adminPage.plan.reactivateConfirmDescription')}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmAction === 'clearPending'}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={handleClearPendingChange}
+        confirming={actionLoading === 'clearPending'}
+        title={t('adminPage.plan.cancelPendingConfirmTitle')}
+        confirmLabel={t('adminPage.plan.cancelPendingCta')}
+        description={t('adminPage.plan.cancelPendingConfirmDescription')}
+      />
     </div>
   );
 }

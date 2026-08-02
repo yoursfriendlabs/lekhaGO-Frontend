@@ -507,6 +507,11 @@ export const api = {
         "business-settings",
       ]),
     ),
+  changePassword: (data) =>
+    request("/api/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
   requestEmailOtp: (data) =>
     request("/api/auth/request-email-otp", {
       method: "POST",
@@ -557,6 +562,20 @@ export const api = {
     request(
       "/api/subscription",
       { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig(["auth-me", "subscription", "subscription-payment-setup"]),
+    ),
+
+  cancelSubscription: (data = {}) =>
+    request(
+      "/api/subscription/cancel",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["auth-me", "subscription", "subscription-payment-setup"]),
+    ),
+
+  reactivateSubscription: (data = {}) =>
+    request(
+      "/api/subscription/reactivate",
+      { method: "POST", body: JSON.stringify(data) },
       mutationConfig(["auth-me", "subscription", "subscription-payment-setup"]),
     ),
 
@@ -1012,11 +1031,11 @@ export const api = {
         "banks",
       ]),
     ),
-  listSales: (params = {}) =>
+  listSales: (params = {}, options = {}) =>
     collectionRequest(
       "/api/sales",
       params,
-      listCache(["sales", "reports", "dashboard"]),
+      listCache(["sales", "reports", "dashboard"], options),
     ),
   getSale: (id) =>
     request(
@@ -1165,6 +1184,12 @@ export const api = {
       "/api/reports/purchase-report",
       params,
       listCache(["reports", "purchases"], CACHE_TTL.report),
+    ),
+  stockLedgerReport: (params = {}, options = {}) =>
+    listRequest(
+      "/api/reports/stock-ledger",
+      params,
+      listCache(["reports", "stock-ledger"], CACHE_TTL.short, options),
     ),
 
   listParties: (params = {}, options = {}) =>

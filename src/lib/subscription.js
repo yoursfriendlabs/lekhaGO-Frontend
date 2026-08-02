@@ -177,12 +177,46 @@ function normalizePlan(plan) {
 
   return {
     ...plan,
+    key,
     isPaid,
     isTrial: Boolean(plan.isTrial),
     trial: normalizeTrial(plan.trial),
-    subscriptionStatus: pickString(plan.subscriptionStatus, plan.billingStatus),
+    billingStatus: pickString(plan.billingStatus) || null,
+    billingCycle: pickString(plan.billingCycle) || null,
+    billingAmount: plan.billingAmount ?? null,
+    lastBillingDate: pickString(plan.lastBillingDate) || null,
+    nextBillingDate: pickString(plan.nextBillingDate) || null,
+    subscriptionStartDate: pickString(plan.subscriptionStartDate) || null,
+    subscriptionEndDate: pickString(plan.subscriptionEndDate) || null,
+    subscriptionStatus: pickString(plan.subscriptionStatus, plan.billingStatus) || null,
     daysUntilSubscriptionEnd: pickNumber(plan.daysUntilSubscriptionEnd),
+    cancelAtPeriodEnd: Boolean(plan.cancelAtPeriodEnd),
+    cancelledAt: pickString(plan.cancelledAt) || null,
+    hasEnded: Boolean(plan.hasEnded),
     billingOptions: Array.isArray(plan.billingOptions) ? plan.billingOptions : [],
+  };
+}
+
+function normalizeCancellation(cancellation, currentPlan = null, access = null) {
+  const source = asObject(cancellation);
+  const cancelAtPeriodEnd = pickBoolean(
+    source.cancelAtPeriodEnd,
+    currentPlan?.cancelAtPeriodEnd,
+    access?.cancelAtPeriodEnd
+  ) ?? false;
+
+  return {
+    cancelAtPeriodEnd,
+    cancelledAt: pickString(source.cancelledAt, currentPlan?.cancelledAt) || null,
+    effectiveUntil: pickString(
+      source.effectiveUntil,
+      currentPlan?.subscriptionEndDate,
+      currentPlan?.nextBillingDate
+    ) || null,
+    daysUntilEffective: pickNumber(source.daysUntilEffective, currentPlan?.daysUntilSubscriptionEnd),
+    refundable: pickBoolean(source.refundable) ?? false,
+    canCancel: pickBoolean(source.canCancel, access?.canCancel) ?? false,
+    canReactivate: pickBoolean(source.canReactivate, access?.canReactivate) ?? false,
   };
 }
 
@@ -222,6 +256,7 @@ export function normalizeSubscriptionAccess(access, subscription = null) {
   const source = asObject(access);
   const currentPlan = subscription?.currentPlan || null;
   const pendingChange = subscription?.pendingChange || null;
+  const cancellation = asObject(subscription?.cancellation);
   const guardDetails = asObject(source.guardDetails) || asObject(source.guard);
   const guard = pickString(source.guard, source.guardKey, guardDetails?.key, guardDetails?.code, guardDetails?.type);
   const planKey = pickString(source.planKey, currentPlan?.key, pendingChange?.key);
@@ -231,10 +266,23 @@ export function normalizeSubscriptionAccess(access, subscription = null) {
     currentPlan?.billingStatus,
     pendingChange?.paymentProviderStatus
   );
+  const cancelAtPeriodEnd = pickBoolean(
+    source.cancelAtPeriodEnd,
+    cancellation.cancelAtPeriodEnd,
+    currentPlan?.cancelAtPeriodEnd
+  ) ?? false;
+  const isPaidPlan = pickBoolean(source.isPaidPlan, currentPlan?.isPaid) ?? Boolean(currentPlan?.isPaid);
 
   return {
     canUseApplication: pickBoolean(source.canUseApplication, subscriptionStatus ? subscriptionStatus !== 'expired' : true) ?? true,
+    hasActiveSubscription: pickBoolean(source.hasActiveSubscription) ?? (
+      Boolean(subscriptionStatus) && subscriptionStatus !== 'expired' && subscriptionStatus !== 'inactive'
+    ),
     hasPendingChange: pickBoolean(source.hasPendingChange, Boolean(pendingChange)) ?? Boolean(pendingChange),
+    cancelAtPeriodEnd,
+    canCancel: pickBoolean(source.canCancel, cancellation.canCancel) ?? false,
+    canReactivate: pickBoolean(source.canReactivate, cancellation.canReactivate) ?? false,
+    isPaidPlan,
     requiresPaymentSetup:
       pickBoolean(source.requiresPaymentSetup, pendingChange?.paymentProviderStatus === 'pending_setup') ?? false,
     requiresManualReview:
@@ -266,6 +314,7 @@ function normalizeSubscriptionInput(subscriptionOrAccess) {
     access: normalizeSubscriptionAccess(source),
     currentPlan: null,
     pendingChange: null,
+    cancellation: normalizeCancellation(null),
     availablePlans: [],
     paymentIntegration: null,
     businessId: '',
@@ -294,17 +343,30 @@ export function normalizeSubscriptionPayload(payload, context = {}) {
       : [],
   };
 
-  const access = normalizeSubscriptionAccess(source.access, normalized);
+  const access = normalizeSubscriptionAccess(source.access, {
+    ...normalized,
+    cancellation: asObject(source.cancellation),
+  });
+  const cancellation = normalizeCancellation(source.cancellation, currentPlan, access);
   const recoveredBusinessContext = access.guard === 'business_missing' && Boolean(normalized.businessId);
 
   return {
     ...normalized,
+    cancellation,
     access: recoveredBusinessContext
       ? {
         ...access,
         canUseApplication: true,
+        cancelAtPeriodEnd: cancellation.cancelAtPeriodEnd,
+        canCancel: cancellation.canCancel,
+        canReactivate: cancellation.canReactivate,
       }
-      : access,
+      : {
+        ...access,
+        cancelAtPeriodEnd: pickBoolean(access.cancelAtPeriodEnd, cancellation.cancelAtPeriodEnd) ?? false,
+        canCancel: pickBoolean(access.canCancel, cancellation.canCancel) ?? false,
+        canReactivate: pickBoolean(access.canReactivate, cancellation.canReactivate) ?? false,
+      },
   };
 }
 

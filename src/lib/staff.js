@@ -1,4 +1,8 @@
-import { normalizeAccessLevel, normalizePermissionMap } from './accessControl';
+import {
+  enforcePermissionDependencies,
+  normalizeAccessLevel,
+  normalizePermissionMap,
+} from './accessControl';
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
@@ -113,7 +117,7 @@ export function normalizeStaffMember(member, meta) {
     salary: pickNumber(source.salary, source.compensation),
     hasLogin: source.hasLogin !== false,
     totalReceived: pickNumber(source.totalReceived),
-    permissions: normalizePermissionMap(source.permissions),
+    permissions: enforcePermissionDependencies(source.permissions),
     user: {
       id: pickString(user.id),
       name: pickString(user.name, source.name),

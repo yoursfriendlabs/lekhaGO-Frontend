@@ -174,4 +174,83 @@ describe('subscription helpers', () => {
     expect(subscription?.access?.canUseApplication).toBe(true);
     expect(canAccessFeature(subscription, 'inventory')).toBe(true);
   });
+
+  it('normalizes cancel-at-period-end fields without treating the plan as freemium', () => {
+    const subscription = normalizeSubscriptionPayload({
+      businessId: 'biz-456',
+      currentPlan: {
+        key: 'growth',
+        label: 'Growth',
+        isPaid: true,
+        billingStatus: 'cancelling',
+        billingCycle: 'yearly',
+        subscriptionStatus: 'active',
+        subscriptionEndDate: '2026-12-31',
+        nextBillingDate: '2026-12-31',
+        cancelAtPeriodEnd: true,
+        cancelledAt: '2026-08-02',
+      },
+      cancellation: {
+        cancelAtPeriodEnd: true,
+        cancelledAt: '2026-08-02',
+        effectiveUntil: '2026-12-31',
+        daysUntilEffective: 151,
+        refundable: false,
+        canCancel: false,
+        canReactivate: true,
+      },
+      access: {
+        canUseApplication: true,
+        hasActiveSubscription: true,
+        cancelAtPeriodEnd: true,
+        canCancel: false,
+        canReactivate: true,
+        isPaidPlan: true,
+        planKey: 'growth',
+        subscriptionStatus: 'active',
+      },
+    });
+
+    expect(subscription?.currentPlan?.key).toBe('growth');
+    expect(subscription?.currentPlan?.isPaid).toBe(true);
+    expect(subscription?.currentPlan?.cancelAtPeriodEnd).toBe(true);
+    expect(subscription?.cancellation?.effectiveUntil).toBe('2026-12-31');
+    expect(subscription?.cancellation?.canReactivate).toBe(true);
+    expect(subscription?.access?.canCancel).toBe(false);
+    expect(subscription?.access?.canReactivate).toBe(true);
+    expect(subscription?.access?.cancelAtPeriodEnd).toBe(true);
+    expect(canAccessFeature(subscription, 'inventory')).toBe(true);
+  });
+
+  it('hides cancel controls for freemium when canCancel is false', () => {
+    const subscription = normalizeSubscriptionPayload({
+      currentPlan: {
+        key: 'freemium',
+        label: 'Freemium',
+        isPaid: false,
+        billingStatus: 'free',
+        subscriptionStatus: 'active',
+        cancelAtPeriodEnd: false,
+      },
+      cancellation: {
+        cancelAtPeriodEnd: false,
+        canCancel: false,
+        canReactivate: false,
+        refundable: false,
+      },
+      access: {
+        canUseApplication: true,
+        canCancel: false,
+        canReactivate: false,
+        cancelAtPeriodEnd: false,
+        isPaidPlan: false,
+        planKey: 'freemium',
+        subscriptionStatus: 'active',
+      },
+    });
+
+    expect(subscription?.access?.canCancel).toBe(false);
+    expect(subscription?.access?.canReactivate).toBe(false);
+    expect(subscription?.cancellation?.cancelAtPeriodEnd).toBe(false);
+  });
 });

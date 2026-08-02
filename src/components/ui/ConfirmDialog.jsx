@@ -11,8 +11,10 @@ export default function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   confirming = false,
+  variant = 'danger',
 }) {
   const { t } = useI18n();
+  const isPrimary = variant === 'primary';
 
   const handleClose = () => {
     if (confirming) return;
@@ -42,7 +44,11 @@ export default function ConfirmDialog({
           </button>
           <button
             type="button"
-            className="w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            className={
+              isPrimary
+                ? 'btn-primary w-full sm:w-auto disabled:cursor-not-allowed disabled:opacity-60'
+                : 'w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto'
+            }
             onClick={handleConfirm}
             disabled={confirming}
           >
@@ -52,12 +58,18 @@ export default function ConfirmDialog({
       )}
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300">
+        <div
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
+            isPrimary
+              ? 'bg-primary/15 text-primary dark:bg-primary/20 dark:text-primary-100'
+              : 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-300'
+          }`}
+        >
           <AlertTriangle size={18} />
         </div>
-        <p className="pt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+        <div className="min-w-0 flex-1 pt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
           {description || t('common.confirmDelete')}
-        </p>
+        </div>
       </div>
     </Dialog>
   );

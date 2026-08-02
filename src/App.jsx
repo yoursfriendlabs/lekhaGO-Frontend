@@ -12,11 +12,12 @@ import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import Notice from './components/Notice';
 import RouteFallback from './components/RouteFallback';
 import PwaLifecycle from './components/PwaLifecycle';
-import SubscriptionStatusBanner from './components/subscription/SubscriptionStatusBanner.jsx';
+import SubscriptionStatusBanner, { formatSubscriptionStatusDate } from './components/subscription/SubscriptionStatusBanner.jsx';
 import { getFeatureAccessLevel as getPermissionAccessLevel } from './lib/accessControl';
 import { hasUnverifiedEmail, isStaffActivationRequired } from './lib/authFlow';
 import { getSubscriptionGuard, getSubscriptionStatusState, humanizeKey } from './lib/subscription';
 import { buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB } from './lib/settingsTabs';
+import { useSSE } from './hooks/useSSE';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Inventory = lazy(() => import('./pages/Inventory'));
@@ -30,6 +31,7 @@ const Banks = lazy(() => import('./pages/Banks'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Tasks = lazy(() => import('./pages/Tasks'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Profile = lazy(() => import('./pages/Profile'));
 const Attendance = lazy(() => import('./pages/Attendance'));
 const Staff = lazy(() => import('./pages/Staff'));
 const StaffSalaryProfile = lazy(() => import('./pages/StaffSalaryProfile'));
@@ -190,7 +192,8 @@ function ScopedRouteBoundary({ children, scope = 'page' }) {
 
 function AppShell() {
   const { businessId, role, user, subscription, subscriptionAccess } = useAuth();
-  const { t } = useI18n();
+  useSSE();
+  const { locale, t } = useI18n();
   const { businessProfile } = useBusinessSettings();
   const location = useLocation();
   const showVerificationBanner = hasUnverifiedEmail(user);
@@ -202,6 +205,17 @@ function AppShell() {
   const subscriptionGuard = getSubscriptionGuard(subscription);
   const subscriptionStatusState = getSubscriptionStatusState(subscription);
   const hasRecoverableBusinessMismatch = role === 'owner' && subscriptionAccess?.guard === 'business_missing';
+  const cancelAtPeriodEndActive = Boolean(
+    (subscriptionAccess?.cancelAtPeriodEnd || subscription?.cancellation?.cancelAtPeriodEnd)
+    && subscriptionAccess?.canUseApplication !== false
+    && !subscriptionStatusState.isExpired
+  );
+  const cancelEffectiveUntilLabel = formatSubscriptionStatusDate(
+    subscription?.cancellation?.effectiveUntil
+      || subscription?.currentPlan?.subscriptionEndDate
+      || subscription?.currentPlan?.nextBillingDate,
+    locale
+  );
   const subscriptionNotice = subscriptionStatusState.isExpired
     ? null
     : hasRecoverableBusinessMismatch
@@ -212,7 +226,16 @@ function AppShell() {
       description: subscriptionGuard.description || t('appAccess.lockedDescription'),
       tone: 'warn',
     }
-    : subscriptionAccess?.requiresPaymentSetup
+    : cancelAtPeriodEndActive
+      ? {
+        title: t('appAccess.cancelAtPeriodEndTitle'),
+        description: t('appAccess.cancelAtPeriodEndDescription', { date: cancelEffectiveUntilLabel }),
+        tone: 'warn',
+        ctaLabel: subscriptionAccess?.canReactivate || subscription?.cancellation?.canReactivate
+          ? t('appAccess.reactivateCta')
+          : t('appAccess.manageSubscriptionCta'),
+      }
+    : (subscriptionAccess?.requiresPaymentSetup && !subscriptionStatusState.isTrialActive)
       ? {
         title: t('appAccess.paymentSetupTitle'),
         description: subscriptionGuard.description || t('appAccess.paymentSetupDescription'),
@@ -290,7 +313,7 @@ function AppShell() {
                 />
                 <div className="mt-3">
                   <Link className="btn-secondary justify-center" to={buildSettingsTabPath(SUBSCRIPTION_SETTINGS_TAB)}>
-                    {t('appAccess.manageSubscriptionCta')}
+                    {subscriptionNotice.ctaLabel || t('appAccess.manageSubscriptionCta')}
                   </Link>
                 </div>
               </div>
@@ -366,6 +389,7 @@ function AppShell() {
                     element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="order-attributes"><Navigate to={buildSettingsTabPath(ORDER_ATTRIBUTES_SETTINGS_TAB)} replace /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>}
                   />
                   <Route path="settings" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Settings /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="profile" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Profile /></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="invoice/:type/:id" element={<EmailActivationRequiredRoute><InvoiceAccessRoute><Invoice /></InvoiceAccessRoute></EmailActivationRequiredRoute>} />
                   <Route path="activate-account" element={<ActivationOnlyRoute><ActivateAccount /></ActivationOnlyRoute>} />
                 </Routes>
