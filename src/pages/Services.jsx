@@ -23,9 +23,10 @@ import { useAuth } from "../lib/auth";
 import { useBusinessSettings } from "../lib/businessSettings";
 import { getServicesDisplayLabel } from "../lib/businessTypeConfig.js";
 import { useI18n } from "../lib/i18n.jsx";
-import { printElement } from "../lib/print.js";
+import { printElement, printThermalReceipt } from "../lib/print.js";
 import FileUpload from "../components/FileUpload";
 import DynamicAttributes from "../components/DynamicAttributes";
+import ThermalReceipt from "../components/ThermalReceipt";
 import {
   getJewelleryBreakdown,
   getPurityOptionsForMetal,
@@ -676,6 +677,8 @@ export default function Services() {
   // ── Invoice modal ──
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [isThermalInvoice, setIsThermalInvoice] = useState(false);
+  const thermalInvoicePrintRef = useRef(null);
 
   // ── Attribute definitions for invoice display ──
   const [attributeDefs, setAttributeDefs] = useState([]);
@@ -1727,7 +1730,8 @@ export default function Services() {
   };
   const closeStatusDialog = () => setStatusDialog(null);
 
-  const openInvoiceModal = async (order) => {
+  const openInvoiceModal = async (order, options = {}) => {
+    setIsThermalInvoice(options.thermal === true);
     setInvoiceOrder(normalizeServiceOrder(order));
     setInvoiceLoading(true);
     try {
@@ -1889,6 +1893,10 @@ export default function Services() {
 
   const handlePrint = () => {
     printElement(invoicePrintRef.current);
+  };
+
+  const handlePrintThermal = () => {
+    printThermalReceipt(thermalInvoicePrintRef.current);
   };
 
   const showDetailsStep = mobileStep === "details";
@@ -2238,6 +2246,12 @@ export default function Services() {
                             onClick: () =>
                               openInvoiceModal(order, { print: true }),
                           },
+                          {
+                            label: "Print Thermal",
+                            icon: Printer,
+                            onClick: () =>
+                              openInvoiceModal(order, { print: true, thermal: true }),
+                          },
                           ...(canManageServices
                             ? [
                                 {
@@ -2445,6 +2459,12 @@ export default function Services() {
                                 icon: Printer,
                                 onClick: () =>
                                   openInvoiceModal(order, { print: true }),
+                              },
+                              {
+                                label: "Print Thermal",
+                                icon: Printer,
+                                onClick: () =>
+                                  openInvoiceModal(order, { print: true, thermal: true }),
                               },
                               ...(canManageServices
                                 ? [
@@ -3843,25 +3863,85 @@ export default function Services() {
       {invoiceOrder && (
         <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/50 p-4 pb-10 backdrop-blur-sm print:relative print:inset-auto print:overflow-visible print:bg-transparent print:p-0">
           <div className="relative mt-4 w-full max-w-3xl md:mt-8">
-            <div className="mb-4 flex items-center justify-between print:hidden">
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => setInvoiceOrder(null)}
-              >
-                ← Close
-              </button>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setInvoiceOrder(null)}
+                >
+                  ← Close
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${!isThermalInvoice ? 'btn-primary bg-primary text-white hover:bg-primary-600' : 'btn-secondary'}`}
+                  onClick={() => setIsThermalInvoice(false)}
+                >
+                  Standard A4
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${isThermalInvoice ? 'btn-primary bg-primary text-white hover:bg-primary-600' : 'btn-secondary'}`}
+                  onClick={() => setIsThermalInvoice(true)}
+                >
+                  Thermal POS
+                </button>
+              </div>
               <button
                 type="button"
                 className="btn-primary"
-                onClick={handlePrint}
+                onClick={isThermalInvoice ? handlePrintThermal : handlePrint}
               >
-                Download PDF
+                {isThermalInvoice ? "Print Thermal" : "Download PDF"}
               </button>
             </div>
             {invoiceLoading ? (
               <div className="card flex items-center justify-center py-16">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
+              </div>
+            ) : isThermalInvoice ? (
+              <div className="mx-auto max-w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm">
+                <div ref={thermalInvoicePrintRef}>
+                  <ThermalReceipt
+                    biz={bizSettings}
+                    receiptType="Service Receipt"
+                    invoiceNo={invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)}
+                    date={
+                      invoiceOrder.status !== "closed" && invoiceOrder.deliveryDate
+                        ? (isGym ? "Expiry Date: " : "") + formatMaybeDate(invoiceOrder.deliveryDate, "MMMM D, YYYY")
+                        : formatMaybeDate(invoiceOrder.createdAt, "MMMM D, YYYY")
+                    }
+                    partyName={invoiceOrder.Party?.name || invoiceOrder.partyName || "—"}
+                    creatorName={getCreatorDisplayName(invoiceOrder)}
+                    items={invoiceItems.map(item => ({
+                      description: item.description || item.productName || "—",
+                      quantity: item.quantity,
+                      unitPrice: item.unitPrice,
+                      lineTotal: item.lineTotal,
+                    }))}
+                    totals={{
+                      subTotal: invoiceTotals.subTotal,
+                      taxTotal: invoiceTotals.taxTotal,
+                      discountTotal: invoiceTotals.discountTotal,
+                      grandTotal: invoiceTotals.grandTotal,
+                      amountReceived: invoiceOrder.receivedTotal,
+                      dueAmount: Math.max(Number(invoiceTotals.grandTotal || 0) - Number(invoiceOrder.receivedTotal || 0), 0),
+                    }}
+                    notes={invoiceOrder.notes}
+                    extraFields={[
+                      ...(invoiceJewellery.metalType ? [{ label: "Metal", value: invoiceJewellery.metalType }] : []),
+                      ...(invoiceJewellery.metalPurity ? [{ label: "Purity", value: invoiceJewellery.metalPurity }] : []),
+                      ...(invoiceJewellery.actualWeight ? [{ label: "Actual weight", value: invoiceJewellery.actualWeight }] : []),
+                      ...(invoiceJewellery.totalWeight ? [{ label: "Total weight", value: invoiceJewellery.totalWeight }] : []),
+                      ...(invoiceJewellery.diamondType ? [{ label: "Diamond", value: invoiceJewellery.diamondType }] : []),
+                      ...invoiceExtraAttributes.map(([key, val]) => {
+                        const def = safeAttributeDefs.find((d) => d.key === key);
+                        const attrLabel = def?.name || key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+                        return { label: attrLabel, value: String(val || "—") };
+                      }),
+                    ]}
+                  />
+                </div>
               </div>
             ) : (
               <div

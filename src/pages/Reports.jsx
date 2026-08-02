@@ -26,7 +26,6 @@ import BarGraph from "../components/BarGraph";
 import PieChart from "../components/PieChart";
 import Pagination from '../components/Pagination';
 import PartyFilterSelect from "../components/PartyFilterSelect.jsx";
-import CreatorFilterSelect from "../components/CreatorFilterSelect.jsx";
 import RefreshButton from "../components/RefreshButton.jsx";
 import { api, invalidateApiCache, API_BASE } from "../lib/api";
 import { formatCurrency } from "../lib/currency";
@@ -183,6 +182,79 @@ function formatSeriesLabel(rawLabel, fallbackLabel) {
     return parsedDate.isValid() ? parsedDate.format("D MMM") : label;
   }
   return label;
+}
+
+function DatePresetSelect({ fromValue, toValue, onChange }) {
+  const today = dayjs();
+  
+  const getPreset = () => {
+    if (!fromValue || !toValue) return "";
+    
+    const todayStr = today.format("YYYY-MM-DD");
+    if (fromValue === todayStr && toValue === todayStr) return "today";
+    
+    const startOfWeek = today.startOf("week").format("YYYY-MM-DD");
+    const endOfWeek = today.endOf("week").format("YYYY-MM-DD");
+    if (fromValue === startOfWeek && toValue === endOfWeek) return "week";
+    
+    const startOfMonth = today.startOf("month").format("YYYY-MM-DD");
+    const endOfMonth = today.endOf("month").format("YYYY-MM-DD");
+    if (fromValue === startOfMonth && toValue === endOfMonth) return "month";
+    
+    const startOfYear = today.startOf("year").format("YYYY-MM-DD");
+    const endOfYear = today.endOf("year").format("YYYY-MM-DD");
+    if (fromValue === startOfYear && toValue === endOfYear) return "year";
+    
+    const startOfPrevYear = today.subtract(1, "year").startOf("year").format("YYYY-MM-DD");
+    const endOfPrevYear = today.subtract(1, "year").endOf("year").format("YYYY-MM-DD");
+    if (fromValue === startOfPrevYear && toValue === endOfPrevYear) return "prev_year";
+    
+    return "custom";
+  };
+
+  const handleSelect = (e) => {
+    const val = e.target.value;
+    let from = "";
+    let to = "";
+    if (val === "today") {
+      from = today.format("YYYY-MM-DD");
+      to = today.format("YYYY-MM-DD");
+    } else if (val === "week") {
+      from = today.startOf("week").format("YYYY-MM-DD");
+      to = today.endOf("week").format("YYYY-MM-DD");
+    } else if (val === "month") {
+      from = today.startOf("month").format("YYYY-MM-DD");
+      to = today.endOf("month").format("YYYY-MM-DD");
+    } else if (val === "year") {
+      from = today.startOf("year").format("YYYY-MM-DD");
+      to = today.endOf("year").format("YYYY-MM-DD");
+    } else if (val === "prev_year") {
+      from = today.subtract(1, "year").startOf("year").format("YYYY-MM-DD");
+      to = today.subtract(1, "year").endOf("year").format("YYYY-MM-DD");
+    }
+    if (from && to) {
+      onChange(from, to);
+    }
+  };
+
+  return (
+    <div className="w-full">
+      <label className="label">Date Preset</label>
+      <select
+        className="input mt-1 w-full"
+        value={getPreset()}
+        onChange={handleSelect}
+      >
+        <option value="" disabled>Select Range...</option>
+        <option value="today">Today</option>
+        <option value="week">This Week</option>
+        <option value="month">This Month</option>
+        <option value="year">This Year</option>
+        <option value="prev_year">Previous Year</option>
+        <option value="custom" disabled>Custom Range</option>
+      </select>
+    </div>
+  );
 }
 
 function getGroupByDateRange(groupBy) {
@@ -1097,7 +1169,17 @@ function ExpenseCategoryAnalyticsSection({
   return (
     <div className="space-y-6">
       <div className="card">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
+          <div>
+            <DatePresetSelect
+              fromValue={filters.fromDate}
+              toValue={filters.toDate}
+              onChange={(from, to) => {
+                onFilterChange({ target: { name: 'fromDate', value: from } });
+                onFilterChange({ target: { name: 'toDate', value: to } });
+              }}
+            />
+          </div>
           <div>
             <label className="label">{t("common.from")}</label>
             <input
@@ -1669,6 +1751,7 @@ export default function Reports() {
         dueSales: 0,
         paidCount: 0,
         dueCount: 0,
+        totalDiscount: 0,
         tableRevenue: {},
         orderTypeStats: {
           dine_in: { total: 0, count: 0 },
@@ -1683,6 +1766,7 @@ export default function Reports() {
     let dueSales = 0;
     let paidCount = 0;
     let dueCount = 0;
+    let totalDiscount = 0;
     const tableRevenue = {};
     const orderTypeStats = {
       dine_in: { total: 0, count: 0 },
@@ -1693,6 +1777,7 @@ export default function Reports() {
     cafeSalesList.forEach((sale) => {
       const total = Number(sale.grandTotal || 0);
       totalSales += total;
+      totalDiscount += Number(sale.discountTotal || sale.discount || 0);
       if (sale.status === "paid") {
         paidSales += total;
         paidCount += 1;
@@ -1724,6 +1809,7 @@ export default function Reports() {
       dueSales,
       paidCount,
       dueCount,
+      totalDiscount,
       tableRevenue,
       orderTypeStats,
     };
@@ -2511,7 +2597,16 @@ export default function Reports() {
         <div className="space-y-8 animate-fadeIn">
           {/* Overview Filter box */}
           <div className="card">
-            <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+            <div className="grid gap-4 md:grid-cols-3 max-w-3xl">
+              <div>
+                <DatePresetSelect
+                  fromValue={filters.fromDate}
+                  toValue={filters.toDate}
+                  onChange={(from, to) => {
+                    setFilters((prev) => ({ ...prev, fromDate: from, toDate: to }));
+                  }}
+                />
+              </div>
               <div>
                 <label className="label">{t("common.from")}</label>
                 <input
@@ -2530,55 +2625,6 @@ export default function Reports() {
                   name="toDate"
                   value={filters.toDate}
                   onChange={handleFilterChange}
-                />
-              </div>
-              <div>
-                <label className="label">{t("analytics.filters.groupBy")}</label>
-                <select
-                  className="input mt-1"
-                  name="groupBy"
-                  value={filters.groupBy}
-                  onChange={handleFilterChange}
-                >
-                  <option value="auto">{t("analytics.filters.auto")}</option>
-                  <option value="day">{t("analytics.filters.day")}</option>
-                  <option value="week">{t("analytics.filters.week")}</option>
-                  <option value="month">{t("analytics.filters.month")}</option>
-                </select>
-              </div>
-              <div>
-                <label className="label">{t("services.filterByParty")}</label>
-                <PartyFilterSelect
-                  className="mt-1"
-                  value={filters.partyId}
-                  selectedOption={selectedPartyFilterOption}
-                  onChange={handlePartyFilterChange}
-                  placeholder={t("services.allParties")}
-                  searchPlaceholder={t("parties.searchPlaceholder")}
-                  showPhone={false}
-                />
-              </div>
-              <div>
-                <label className="label">{t("purchases.supplier")}</label>
-                <PartyFilterSelect
-                  className="mt-1"
-                  type="supplier"
-                  value={filters.supplierId}
-                  selectedOption={selectedSupplierFilterOption}
-                  onChange={handleSupplierFilterChange}
-                  placeholder={t("purchases.selectSupplier")}
-                  searchPlaceholder={t("parties.searchPlaceholder")}
-                  showPhone={false}
-                />
-              </div>
-              <div>
-                <label className="label">{t("filters.createdBy")}</label>
-                <CreatorFilterSelect
-                  className="mt-1"
-                  value={filters.createdBy}
-                  onChange={(val) =>
-                    setFilters((prev) => ({ ...prev, createdBy: val }))
-                  }
                 />
               </div>
             </div>
@@ -2901,7 +2947,7 @@ export default function Reports() {
                     </p>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-3">
                     <div>
                       <label className="label">{t('ledger.party')}</label>
                       <PartyFilterSelect
@@ -2912,6 +2958,16 @@ export default function Reports() {
                         placeholder={t('ledger.allParties')}
                         searchPlaceholder={t('ledger.searchPlaceholder')}
                         showPhone={false}
+                      />
+                    </div>
+                    <div>
+                      <DatePresetSelect
+                        fromValue={ledgerFilters.from}
+                        toValue={ledgerFilters.to}
+                        onChange={(from, to) => {
+                          handleLedgerDateChange('from', from);
+                          handleLedgerDateChange('to', to);
+                        }}
                       />
                     </div>
                     <div className="grid gap-2 grid-cols-2">
@@ -3086,7 +3142,16 @@ export default function Reports() {
         <div className="space-y-6 animate-fadeIn">
           {/* Filters for Timeline */}
           <div className="card">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-3 max-w-3xl">
+              <div>
+                <DatePresetSelect
+                  fromValue={filters.fromDate}
+                  toValue={filters.toDate}
+                  onChange={(from, to) => {
+                    setFilters((prev) => ({ ...prev, fromDate: from, toDate: to }));
+                  }}
+                />
+              </div>
               <div>
                 <label className="label">{t("common.from")}</label>
                 <input
@@ -3106,20 +3171,6 @@ export default function Reports() {
                   value={filters.toDate}
                   onChange={handleFilterChange}
                 />
-              </div>
-              <div>
-                <label className="label">{t("analytics.filters.groupBy")}</label>
-                <select
-                  className="input mt-1"
-                  name="groupBy"
-                  value={filters.groupBy}
-                  onChange={handleFilterChange}
-                >
-                  <option value="auto">{t("analytics.filters.auto")}</option>
-                  <option value="day">{t("analytics.filters.day")}</option>
-                  <option value="week">{t("analytics.filters.week")}</option>
-                  <option value="month">{t("analytics.filters.month")}</option>
-                </select>
               </div>
             </div>
             <p className="mt-3 text-xs text-slate-500">
@@ -3272,7 +3323,16 @@ export default function Reports() {
         <div className="space-y-8 animate-fadeIn">
           {/* Cafe Filter Box */}
           <div className="card bg-white p-5 border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-            <div className="grid gap-4 sm:grid-cols-2 flex-1 max-w-2xl">
+            <div className="grid gap-4 sm:grid-cols-3 flex-1 max-w-3xl">
+              <div>
+                <DatePresetSelect
+                  fromValue={filters.fromDate}
+                  toValue={filters.toDate}
+                  onChange={(from, to) => {
+                    setFilters((prev) => ({ ...prev, fromDate: from, toDate: to }));
+                  }}
+                />
+              </div>
               <div>
                 <label className="label text-slate-500 font-bold uppercase text-[10px] tracking-wider">{t("common.from") || "From Date"}</label>
                 <input
@@ -3307,13 +3367,13 @@ export default function Reports() {
 
           {/* Cafe KPI Metrics Row */}
           {cafeSalesLoading ? (
-            <div className="grid gap-4 md:grid-cols-4">
-              {[1, 2, 3, 4].map((n) => (
+            <div className="grid gap-4 md:grid-cols-5">
+              {[1, 2, 3, 4, 5].map((n) => (
                 <div key={n} className="card h-28 bg-slate-50 animate-pulse border border-slate-100" />
               ))}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-5">
               <div className="card bg-gradient-to-br from-white to-primary-50/5 p-5 border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow transition">
                 <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
                   {t("analytics.totalSalesRevenue") || "Total Sales Revenue"}
@@ -3359,6 +3419,18 @@ export default function Reports() {
                 </p>
                 <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center text-xs font-bold">
                   {cafeStats.dueCount}
+                </div>
+              </div>
+
+              <div className="card bg-white p-5 border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow transition">
+                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
+                  {t("analytics.totalDiscount") || "Total Discount"}
+                </p>
+                <p className="mt-2 text-2xl font-black text-rose-600">
+                  {formatMoney(cafeStats.totalDiscount)}
+                </p>
+                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
+                  <TrendingUp size={16} className="rotate-180" />
                 </div>
               </div>
             </div>
@@ -3528,6 +3600,7 @@ export default function Reports() {
                       <th className="p-3 text-left">{t("analytics.tableWaiter") || "Table / Waiter"}</th>
                       <th className="p-3 text-left">{t("analytics.groupBy") || "Type"}</th>
                       <th className="p-3 text-left">{t("analytics.dishesDrinksOrdered") || "Dishes & Drinks Ordered"}</th>
+                      <th className="p-3 text-right">{t("analytics.discount") || "Discount"}</th>
                       <th className="p-3 text-right">{t("analytics.revenue") || "Total"}</th>
                       <th className="p-3 text-center">{t("common.status") || "Status"}</th>
                       <th className="p-3 text-center">{t("common.actions") || "Action"}</th>
@@ -3575,6 +3648,9 @@ export default function Reports() {
                           </td>
                           <td className="p-3">
                             {renderOrderItemsSummary(sale.SaleItems || sale.items)}
+                          </td>
+                          <td className="p-3 text-right text-rose-600 font-medium">
+                            {Number(sale.discountTotal || sale.discount || 0) > 0 ? `-${formatMoney(sale.discountTotal || sale.discount)}` : "—"}
                           </td>
                           <td className="p-3 text-right font-bold text-slate-800">
                             {formatMoney(sale.grandTotal)}

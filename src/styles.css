@@ -211,7 +211,39 @@ body {
     margin: 1.5cm;
     size: A4 portrait;
   }
+
+  /* Thermal receipt print overrides */
+  body > .thermal-print-clone {
+    display: block !important;
+    position: static !important;
+    box-sizing: border-box !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 4mm !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    overflow: visible !important;
+    background: white !important;
+    color: black !important;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+  }
+  
+  .thermal-print-clone * {
+    visibility: visible !important;
+    color: black !important;
+  }
 }
+
+@media print {
+  body.thermal-printing > * {
+    display: none !important;
+  }
+  body.thermal-printing > .thermal-print-clone {
+    display: block !important;
+  }
+}
+
 
 /* Custom Scrollbar Utilities */
 .scrollbar-hide::-webkit-scrollbar {

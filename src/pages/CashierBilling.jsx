@@ -702,7 +702,14 @@ export default function CashierBilling() {
                   className="btn-primary w-full justify-center gap-2 rounded-xl py-3 text-sm font-semibold"
                 >
                   <Printer size={16} />
-                  Print Receipt
+                  Print A4 Receipt
+                </Link>
+                <Link
+                  to={`/app/invoice/sales/${successState.id}?thermal=1`}
+                  className="btn-secondary w-full justify-center gap-2 rounded-xl py-3 text-sm font-semibold bg-secondary-100 text-secondary-900 hover:bg-secondary-200"
+                >
+                  <Printer size={16} />
+                  Print Thermal Receipt
                 </Link>
                 <button
                   onClick={() => setSuccessState(null)}
@@ -993,7 +1000,14 @@ export default function CashierBilling() {
                     className="btn-primary w-full justify-center gap-2 rounded-xl py-3 text-sm font-semibold"
                   >
                     <Printer size={16} />
-                    Print Receipt
+                    Print A4 Receipt
+                  </Link>
+                  <Link
+                    to={`/app/invoice/sales/${successState.id}?thermal=1`}
+                    className="btn-secondary w-full justify-center gap-2 rounded-xl py-3 text-sm font-semibold bg-secondary-100 text-secondary-900 hover:bg-secondary-200"
+                  >
+                    <Printer size={16} />
+                    Print Thermal Receipt
                   </Link>
                   <button
                     onClick={() => setSuccessState(null)}

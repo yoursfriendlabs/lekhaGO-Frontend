@@ -6,8 +6,9 @@ import InvoiceHeader from '../components/InvoiceHeader';
 import Notice from '../components/Notice';
 import { formatCurrency } from '../lib/currency';
 import { getCreatorDisplayName } from '../lib/records';
-import { printElement } from '../lib/print';
+import { printElement, printThermalReceipt } from '../lib/print';
 import dayjs, { formatMaybeDate } from '../lib/datetime';
+import ThermalReceipt from '../components/ThermalReceipt';
 
 function fmt(dateStr) {
   return formatMaybeDate(dateStr, 'MMMM D, YYYY');
@@ -24,6 +25,7 @@ export default function Invoice() {
   const [status, setStatus] = useState('');
   const { settings: biz } = useBusinessSettings();
   const printRef = useRef(null);
+  const thermalPrintRef = useRef(null);
 
   useEffect(() => {
     const loader = type === 'sales' ? api.getSale : api.getPurchase;
@@ -34,8 +36,13 @@ export default function Invoice() {
     printElement(printRef.current);
   };
 
+  const handlePrintThermal = () => {
+    printThermalReceipt(thermalPrintRef.current);
+  };
+
   const isSale = type === 'sales';
   const isPrintBillView = searchParams.get('print') === '1';
+  const isThermalView = searchParams.get('thermal') === '1';
   const dateValue = isSale ? record?.saleDate : record?.purchaseDate;
   const items = record?.PurchaseItems || record?.SaleItems || [];
 
@@ -67,15 +74,30 @@ export default function Invoice() {
           ← Back
         </Link>
         <div className="flex flex-wrap gap-2">
-          <Link
-            className="btn-secondary"
-            to={`/app/invoice/${type}/${id}${isPrintBillView ? '' : '?print=1'}`}
-          >
-            {isPrintBillView ? 'View Bill' : 'Print Preview'}
-          </Link>
-          <button className="btn-primary" type="button" onClick={handlePrint}>
-            Print Bill
-          </button>
+          {!isPrintBillView && !isThermalView && (
+            <>
+              <Link className="btn-secondary" to={`/app/invoice/${type}/${id}?print=1`}>
+                Print Preview
+              </Link>
+              <Link className="btn-secondary" to={`/app/invoice/${type}/${id}?thermal=1`}>
+                Thermal Preview
+              </Link>
+            </>
+          )}
+          {(isPrintBillView || isThermalView) && (
+            <Link className="btn-secondary" to={`/app/invoice/${type}/${id}`}>
+              View Bill
+            </Link>
+          )}
+          {isThermalView ? (
+            <button className="btn-primary" type="button" onClick={handlePrintThermal}>
+              Print Thermal
+            </button>
+          ) : (
+            <button className="btn-primary" type="button" onClick={handlePrint}>
+              Print Bill
+            </button>
+          )}
         </div>
       </div>
 
@@ -83,7 +105,7 @@ export default function Invoice() {
 
       {record ? (
         <>
-        <div className={`${isPrintBillView ? 'hidden' : ''} overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950`}>
+        <div className={`${(isPrintBillView || isThermalView) ? 'hidden' : ''} overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950`}>
           {/* ── Header ── */}
           <div className="px-8 pt-0">
             <InvoiceHeader
@@ -211,99 +233,136 @@ export default function Invoice() {
           </div>
         </div>
 
-        <div
-          ref={printRef}
-          className={`${isPrintBillView ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm sm:p-8' : 'print-template bg-white p-6 text-black sm:p-8'}`}
-        >
-          <div className="border-b-2 border-black pb-4">
-            <InvoiceHeader
-              biz={biz}
-              invoiceType={isSale ? 'Sales Bill' : 'Purchase Bill'}
-              invoiceNo={record.invoiceNo || record.id.slice(0, 8)}
-              date={fmt(dateValue)}
-              // status={record.status}
-              // statusColor="border border-black text-black"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-6 border-b border-slate-300 py-4 text-sm">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                {isSale ? 'Bill To' : 'Supplier'}
-              </p>
-              <p className="mt-1 font-semibold">{partyName}</p>
-              {record.partyPhone ? <p className="mt-0.5">{record.partyPhone}</p> : null}
+        {isThermalView ? (
+          <div className="mx-auto max-w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm">
+            <div ref={thermalPrintRef}>
+              <ThermalReceipt
+                biz={biz}
+                receiptType={isSale ? 'Sales Receipt' : 'Purchase Receipt'}
+                invoiceNo={record.invoiceNo || record.id.slice(0, 8)}
+                date={fmt(dateValue)}
+                partyName={partyName}
+                creatorName={creatorName}
+                tableName={record.Table?.name || record.table?.name || record.attributes?.table_no}
+                items={items.map((item) => ({
+                  description: item.Product?.name || item.description || '—',
+                  quantity: item.quantity,
+                  unitPrice: item.unitPrice,
+                  lineTotal: item.lineTotal,
+                }))}
+                totals={{
+                  subTotal: record.subTotal,
+                  taxTotal: record.taxTotal,
+                  discountTotal: record.discountTotal,
+                  grandTotal: record.grandTotal,
+                  amountReceived: totalReceived,
+                  dueAmount: dueAmount,
+                }}
+                notes={record.notes}
+              />
             </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Details</p>
-              <p className="mt-1">Created By: {creatorName}</p>
-              {(record.Table || record.table || record.tableId || record.attributes?.table_no) && (
-                <p className="mt-1">
-                  Table: {record.Table?.name || record.table?.name || record.attributes?.table_no}
+          </div>
+        ) : (
+          <div
+            ref={printRef}
+            className={`${isPrintBillView ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm sm:p-8' : 'print-template bg-white p-6 text-black sm:p-8'}`}
+          >
+            <div className="border-b-2 border-black pb-4">
+              <InvoiceHeader
+                biz={biz}
+                invoiceType={isSale ? 'Sales Bill' : 'Purchase Bill'}
+                invoiceNo={record.invoiceNo || record.id.slice(0, 8)}
+                date={fmt(dateValue)}
+                // status={record.status}
+                // statusColor="border border-black text-black"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-6 border-b border-slate-300 py-4 text-sm">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                  {isSale ? 'Bill To' : 'Supplier'}
                 </p>
-              )}
-              {/* {record.notes ? <p className="mt-1 whitespace-pre-wrap">Notes: {record.notes}</p> : null} */}
-            </div>
-          </div>
-
-          <table className="mt-5 w-full text-sm">
-            <thead>
-              <tr className="border-b border-black">
-                <th className="py-2 text-left text-[10px] font-bold uppercase">Product</th>
-                <th className="py-2 text-right text-[10px] font-bold uppercase">Qty</th>
-                <th className="py-2 text-right text-[10px] font-bold uppercase">Unit Price</th>
-                <th className="py-2 text-right text-[10px] font-bold uppercase">Tax</th>
-                <th className="py-2 text-right text-[10px] font-bold uppercase">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-4 text-slate-500">No line items.</td>
-                </tr>
-              ) : (
-                items.map((item, idx) => (
-                  <tr key={item.id || idx} className="border-b border-slate-200">
-                    <td className="py-2 pr-4 font-medium">
-                      {item.Product?.name || item.description || '—'}
-                      {item.Product?.companyName ? <span className="ml-2 text-xs">({item.Product.companyName})</span> : null}
-                    </td>
-                    <td className="py-2 text-right">{Number(item.quantity || 0).toFixed(2)}</td>
-                    <td className="py-2 text-right">{money(item.unitPrice)}</td>
-                    <td className="py-2 text-right">{Number(item.taxRate || 0) > 0 ? `${Number(item.taxRate).toFixed(1)}%` : '—'}</td>
-                    <td className="py-2 text-right font-semibold">{money(item.lineTotal)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-
-          <div className="mt-6 ml-auto max-w-xs space-y-2 text-sm">
-            {Number(record.subTotal || 0) > 0 ? (
-              <div className="flex justify-between"><span>Subtotal</span><span>{money(record.subTotal)}</span></div>
-            ) : null}
-            {Number(record.taxTotal || 0) > 0 ? (
-              <div className="flex justify-between"><span>Tax</span><span>{money(record.taxTotal)}</span></div>
-            ) : null}
-            <div className="flex justify-between border-t border-black pt-2 text-base font-bold">
-              <span>Grand Total</span><span>{money(record.grandTotal)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>{isSale ? 'Amount Received' : 'Amount Paid'}</span>
-              <span>{money(isSale ? totalReceived : totalPaid)}</span>
-            </div>
-            {dueAmount > 0 ? (
-              <div className="flex justify-between font-bold">
-                <span>Due Amount</span><span>{money(dueAmount)}</span>
+                <p className="mt-1 font-semibold">{partyName}</p>
+                {record.partyPhone ? <p className="mt-0.5">{record.partyPhone}</p> : null}
               </div>
-            ) : null}
-          </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Details</p>
+                <p className="mt-1">Created By: {creatorName}</p>
+                {(record.Table || record.table || record.tableId || record.attributes?.table_no) && (
+                  <p className="mt-1">
+                    Table: {record.Table?.name || record.table?.name || record.attributes?.table_no}
+                  </p>
+                )}
+                {/* {record.notes ? <p className="mt-1 whitespace-pre-wrap">Notes: {record.notes}</p> : null} */}
+              </div>
+            </div>
 
-          <div className="mt-8 flex items-center justify-between border-t border-slate-300 pt-3 text-xs">
-            <span>Thank you for your business!</span>
-            <span>Printed {dayjs().format('D MMM YYYY')}</span>
+            <table className="mt-5 w-full text-sm">
+              <thead>
+                <tr className="border-b border-black">
+                  <th className="py-2 text-left text-[10px] font-bold uppercase">Product</th>
+                  <th className="py-2 text-right text-[10px] font-bold uppercase">Qty</th>
+                  <th className="py-2 text-right text-[10px] font-bold uppercase">Unit Price</th>
+                  <th className="py-2 text-right text-[10px] font-bold uppercase">Tax</th>
+                  <th className="py-2 text-right text-[10px] font-bold uppercase">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-4 text-slate-500">No line items.</td>
+                  </tr>
+                ) : (
+                  items.map((item, idx) => (
+                    <tr key={item.id || idx} className="border-b border-slate-200">
+                      <td className="py-2 pr-4 font-medium">
+                        {item.Product?.name || item.description || '—'}
+                        {item.Product?.companyName ? <span className="ml-2 text-xs">({item.Product.companyName})</span> : null}
+                      </td>
+                      <td className="py-2 text-right">{Number(item.quantity || 0).toFixed(2)}</td>
+                      <td className="py-2 text-right">{money(item.unitPrice)}</td>
+                      <td className="py-2 text-right">{Number(item.taxRate || 0) > 0 ? `${Number(item.taxRate).toFixed(1)}%` : '—'}</td>
+                      <td className="py-2 text-right font-semibold">{money(item.lineTotal)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+
+            <div className="mt-6 ml-auto max-w-xs space-y-2 text-sm">
+              {Number(record.subTotal || 0) > 0 ? (
+                <div className="flex justify-between"><span>Subtotal</span><span>{money(record.subTotal)}</span></div>
+              ) : null}
+              {Number(record.taxTotal || 0) > 0 ? (
+                <div className="flex justify-between"><span>Tax</span><span>{money(record.taxTotal)}</span></div>
+              ) : null}
+              {Number(record.discountTotal || record.discount || 0) > 0 ? (
+                <div className="flex justify-between text-rose-600 font-medium">
+                  <span>Discount</span>
+                  <span>-{money(record.discountTotal || record.discount)}</span>
+                </div>
+              ) : null}
+              <div className="flex justify-between border-t border-black pt-2 text-base font-bold">
+                <span>Grand Total</span><span>{money(record.grandTotal)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>{isSale ? 'Amount Received' : 'Amount Paid'}</span>
+                <span>{money(isSale ? totalReceived : totalPaid)}</span>
+              </div>
+              {dueAmount > 0 ? (
+                <div className="flex justify-between font-bold">
+                  <span>Due Amount</span><span>{money(dueAmount)}</span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-8 flex items-center justify-between border-t border-slate-300 pt-3 text-xs">
+              <span>Thank you for your business!</span>
+              <span>Printed {dayjs().format('D MMM YYYY')}</span>
+            </div>
           </div>
-        </div>
+        )}
         </>
       ) : null}
     </div>

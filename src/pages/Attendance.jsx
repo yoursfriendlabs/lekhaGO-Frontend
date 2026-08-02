@@ -10,6 +10,79 @@ import { useSnackbar } from '../lib/snackbar.jsx';
 import { formatMaybeDate, formatMaybeDateTime } from '../lib/datetime';
 import dayjs from '../lib/datetime';
 
+function DatePresetSelect({ fromValue, toValue, onChange }) {
+  const today = dayjs();
+  
+  const getPreset = () => {
+    if (!fromValue || !toValue) return "";
+    
+    const todayStr = today.format("YYYY-MM-DD");
+    if (fromValue === todayStr && toValue === todayStr) return "today";
+    
+    const startOfWeek = today.startOf("week").format("YYYY-MM-DD");
+    const endOfWeek = today.endOf("week").format("YYYY-MM-DD");
+    if (fromValue === startOfWeek && toValue === endOfWeek) return "week";
+    
+    const startOfMonth = today.startOf("month").format("YYYY-MM-DD");
+    const endOfMonth = today.endOf("month").format("YYYY-MM-DD");
+    if (fromValue === startOfMonth && toValue === endOfMonth) return "month";
+    
+    const startOfYear = today.startOf("year").format("YYYY-MM-DD");
+    const endOfYear = today.endOf("year").format("YYYY-MM-DD");
+    if (fromValue === startOfYear && toValue === endOfYear) return "year";
+    
+    const startOfPrevYear = today.subtract(1, "year").startOf("year").format("YYYY-MM-DD");
+    const endOfPrevYear = today.subtract(1, "year").endOf("year").format("YYYY-MM-DD");
+    if (fromValue === startOfPrevYear && toValue === endOfPrevYear) return "prev_year";
+    
+    return "custom";
+  };
+
+  const handleSelect = (e) => {
+    const val = e.target.value;
+    let from = "";
+    let to = "";
+    if (val === "today") {
+      from = today.format("YYYY-MM-DD");
+      to = today.format("YYYY-MM-DD");
+    } else if (val === "week") {
+      from = today.startOf("week").format("YYYY-MM-DD");
+      to = today.endOf("week").format("YYYY-MM-DD");
+    } else if (val === "month") {
+      from = today.startOf("month").format("YYYY-MM-DD");
+      to = today.endOf("month").format("YYYY-MM-DD");
+    } else if (val === "year") {
+      from = today.startOf("year").format("YYYY-MM-DD");
+      to = today.endOf("year").format("YYYY-MM-DD");
+    } else if (val === "prev_year") {
+      from = today.subtract(1, "year").startOf("year").format("YYYY-MM-DD");
+      to = today.subtract(1, "year").endOf("year").format("YYYY-MM-DD");
+    }
+    if (from && to) {
+      onChange(from, to);
+    }
+  };
+
+  return (
+    <div className="w-full">
+      <label className="label">Date Preset</label>
+      <select
+        className="input mt-1 w-full"
+        value={getPreset()}
+        onChange={handleSelect}
+      >
+        <option value="" disabled>Select Range...</option>
+        <option value="today">Today</option>
+        <option value="week">This Week</option>
+        <option value="month">This Month</option>
+        <option value="year">This Year</option>
+        <option value="prev_year">Previous Year</option>
+        <option value="custom" disabled>Custom Range</option>
+      </select>
+    </div>
+  );
+}
+
 export default function Attendance() {
   const { t } = useI18n();
   const { showError, showSuccess } = useSnackbar();
@@ -389,7 +462,7 @@ export default function Attendance() {
         </div>
 
         {/* Filter Controls */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 dark:bg-slate-900/40 dark:border-slate-800/60">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 dark:bg-slate-900/40 dark:border-slate-800/60">
           {isOwner && (
             <div>
               <label className="label" htmlFor="attendance-staff-filter">{t('attendance.filterStaff')}</label>
@@ -415,6 +488,17 @@ export default function Attendance() {
               </select>
             </div>
           )}
+
+          <div>
+            <DatePresetSelect
+              fromValue={dateFrom}
+              toValue={dateTo}
+              onChange={(from, to) => {
+                setDateFrom(from);
+                setDateTo(to);
+              }}
+            />
+          </div>
 
           <div>
             <label className="label" htmlFor="attendance-date-from">{t('attendance.dateFrom')}</label>
@@ -474,7 +558,9 @@ export default function Attendance() {
                     <td className="py-4 pr-4 font-medium">{formatMaybeDate(record.date, 'YYYY-MM-DD')}</td>
                     <td className="py-4 pr-4">
                       <div className="space-y-1">
-                        <p>{formatMaybeDateTime(record.punchInTime, 'hh:mm A')}</p>
+                        <p className={record.shiftStarted || record.shift ? (record.isLatePunchIn ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-slate-900 dark:text-white'}>
+                          {formatMaybeDateTime(record.punchInTime, 'hh:mm A')}
+                        </p>
                         {record.isLatePunchIn && (
                           <span className="inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-2xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/20">
                             Late
@@ -484,7 +570,9 @@ export default function Attendance() {
                     </td>
                     <td className="py-4 pr-4">
                       <div className="space-y-1">
-                        <p>{formatMaybeDateTime(record.punchOutTime, 'hh:mm A')}</p>
+                        <p className={record.punchOutTime ? (record.shiftEnded || record.shift ? (record.isEarlyPunchOut ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-slate-900 dark:text-white') : 'text-slate-500 dark:text-slate-400'}>
+                          {formatMaybeDateTime(record.punchOutTime, 'hh:mm A') || '—'}
+                        </p>
                         {record.isEarlyPunchOut && (
                           <span className="inline-flex items-center rounded-md bg-rose-50 px-1.5 py-0.5 text-2xs font-medium text-rose-800 ring-1 ring-inset ring-rose-600/20 dark:bg-rose-900/20 dark:text-rose-300 dark:ring-rose-500/20">
                             Left Early

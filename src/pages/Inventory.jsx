@@ -13,7 +13,7 @@ import { getPurityOptionsForMetal, METAL_TYPE_OPTIONS } from '../lib/jewellery.j
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { buildSettingsTabPath, UNITS_SETTINGS_TAB } from '../lib/settingsTabs.js';
 import { useProductStore } from '../stores/products';
-import { ArrowUpDown, Pencil, Plus } from 'lucide-react';
+import { ArrowUpDown, Pencil, Plus, History } from 'lucide-react';
 
 const makeEmptyItem = () => ({
   name: '',
@@ -189,6 +189,14 @@ export default function Inventory() {
   const [restockProduct, setRestockProduct] = useState(null);
   const [restockQuantity, setRestockQuantity] = useState('');
   const [restockSaving, setRestockSaving] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyProduct, setHistoryProduct] = useState(null);
+  const [historyItems, setHistoryItems] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const historyPageSize = 10;
   const [categoryOptions, setCategoryOptions] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoriesError, setCategoriesError] = useState('');
@@ -556,6 +564,52 @@ export default function Inventory() {
     setRestockQuantity('');
   };
 
+  const loadHistory = useCallback(async (productId, pageNum = 1) => {
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const response = await api.stockLedgerReport({
+        productId,
+        limit: historyPageSize,
+        offset: (pageNum - 1) * historyPageSize,
+      });
+      setHistoryItems(response.items || []);
+      setHistoryTotal(response.total || 0);
+    } catch (err) {
+      setHistoryError(err.message || 'Failed to load stock history');
+      setHistoryItems([]);
+      setHistoryTotal(0);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  const openHistoryDialog = (itemId) => {
+    const product = products.find((entry) => String(entry.id) === String(itemId));
+    if (!product) {
+      setStatus({ type: 'error', message: t('common.noData') });
+      return;
+    }
+    setHistoryProduct(product);
+    setHistoryPage(1);
+    setIsHistoryOpen(true);
+    loadHistory(product.id, 1);
+  };
+
+  const closeHistoryDialog = () => {
+    setIsHistoryOpen(false);
+    setHistoryProduct(null);
+    setHistoryItems([]);
+    setHistoryTotal(0);
+  };
+
+  const handleHistoryPageChange = (newPage) => {
+    setHistoryPage(newPage);
+    if (historyProduct) {
+      loadHistory(historyProduct.id, newPage);
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!canManageInventory) {
@@ -804,28 +858,35 @@ export default function Inventory() {
                   <span>{t('products.salePrice')}: <strong className="text-slate-700 dark:text-slate-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.salePrice.toFixed(2) })}</strong></span>
                   <span>{t('products.purchasePrice')}: <strong className="text-slate-700 dark:text-slate-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.purchasePrice.toFixed(2) })}</strong></span>
                 </div>
-                {canManageInventory ? (
-                  <div className="mt-3 flex gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
-                    {isRestockableProduct(item) ? (
-                      <button
-                        id={getInventoryItemActionId('restock', item.id)}
-                        className="btn-secondary flex-1 justify-center sm:w-auto"
-                        type="button"
-                        onClick={() => openRestockDialog(item.id)}
-                      >
-                        <Plus size={16} /> {t('inventory.restock')}
-                      </button>
-                    ) : null}
+                <div className="mt-3 flex gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                  {canManageInventory && isRestockableProduct(item) ? (
+                    <button
+                      id={getInventoryItemActionId('restock', item.id)}
+                      className="btn-secondary flex-1 justify-center sm:w-auto"
+                      type="button"
+                      onClick={() => openRestockDialog(item.id)}
+                    >
+                      <Plus size={16} /> {t('inventory.restock')}
+                    </button>
+                  ) : null}
+                  {canManageInventory ? (
                     <button
                       id={getInventoryItemActionId('edit', item.id)}
-                      className={`${isRestockableProduct(item) ? 'btn-ghost flex-1' : 'btn-ghost w-full'} justify-center sm:w-auto`}
+                      className="btn-ghost flex-1 justify-center sm:w-auto"
                       type="button"
                       onClick={() => openEditDialog(item.id)}
                     >
                       <Pencil size={16} /> {t('common.edit')}
                     </button>
-                  </div>
-                ) : null}
+                  ) : null}
+                  <button
+                    className="btn-ghost flex-1 justify-center sm:w-auto text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                    type="button"
+                    onClick={() => openHistoryDialog(item.id)}
+                  >
+                    <History size={16} /> History
+                  </button>
+                </div>
               </div>
             ))
           )}
@@ -887,18 +948,18 @@ export default function Inventory() {
                       {item.quantity.toFixed(2)} {item.unit || ''}
                     </td>
                     <td className="py-3 text-right">
-                      {canManageInventory ? (
-                        <div className="flex justify-end gap-2">
-                          {isRestockableProduct(item) ? (
-                            <button
-                              id={getInventoryItemActionId('restock', item.id)}
-                              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
-                              type="button"
-                              onClick={() => openRestockDialog(item.id)}
-                            >
-                              <Plus size={14} /> {t('inventory.restock')}
-                            </button>
-                          ) : null}
+                      <div className="flex justify-end gap-2">
+                        {canManageInventory && isRestockableProduct(item) ? (
+                          <button
+                            id={getInventoryItemActionId('restock', item.id)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
+                            type="button"
+                            onClick={() => openRestockDialog(item.id)}
+                          >
+                            <Plus size={14} /> {t('inventory.restock')}
+                          </button>
+                        ) : null}
+                        {canManageInventory ? (
                           <button
                             id={getInventoryItemActionId('edit', item.id)}
                             className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
@@ -907,10 +968,15 @@ export default function Inventory() {
                           >
                             <Pencil size={14} /> {t('common.edit')}
                           </button>
-                        </div>
-                      ) : (
-                        <span className="text-xs font-medium text-slate-400">{t('common.view')}</span>
-                      )}
+                        ) : null}
+                        <button
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                          type="button"
+                          onClick={() => openHistoryDialog(item.id)}
+                        >
+                          <History size={14} /> History
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -1257,6 +1323,95 @@ export default function Inventory() {
             </button>
           </div>
         </form>
+      </Dialog>
+
+      <Dialog
+        isOpen={isHistoryOpen}
+        onClose={closeHistoryDialog}
+        title="Stock History Audit Log"
+        size="lg"
+      >
+        <div className="space-y-4">
+          <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50">
+            <h3 className="font-semibold text-slate-900 dark:text-white">{historyProduct?.name || '-'}</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              SKU/Barcode: <span className="font-mono">{historyProduct?.sku || historyProduct?.itemCode || '-'}</span> | Unit: {historyProduct?.unit || historyProduct?.primaryUnit || 'pcs'}
+            </p>
+          </div>
+
+          {historyLoading ? (
+            <div className="py-10 text-center text-slate-500">Loading history logs...</div>
+          ) : historyError ? (
+            <div className="py-10 text-center text-rose-600">{historyError}</div>
+          ) : historyItems.length === 0 ? (
+            <div className="py-10 text-center text-slate-500">No stock history entries found for this product.</div>
+          ) : (
+            <div className="space-y-3">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-slate-600 dark:text-slate-300">
+                  <thead className="text-xs uppercase text-slate-400">
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className="py-2 text-left font-medium">Date</th>
+                      <th className="py-2 text-left font-medium">Action</th>
+                      <th className="py-2 text-right font-medium">Qty Change</th>
+                      <th className="py-2 text-left font-medium pl-4">Note / Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyItems.map((log) => {
+                      const qty = Number(log.quantityChange || 0);
+                      const isAddition = qty > 0;
+                      return (
+                        <tr key={log.id} className="border-b border-slate-100/75 dark:border-slate-850">
+                          <td className="py-3 text-xs text-slate-500">
+                            {new Date(log.createdAt).toLocaleString()}
+                          </td>
+                          <td className="py-3 capitalize font-medium text-slate-700 dark:text-slate-300">
+                            {log.refType.replace('_', ' ')}
+                          </td>
+                          <td className={`py-3 text-right font-semibold ${isAddition ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {isAddition ? '+' : ''}{qty.toFixed(2)}
+                          </td>
+                          <td className="py-3 text-xs text-slate-500 pl-4 max-w-xs truncate" title={log.note}>
+                            {log.note || '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
+                <button
+                  type="button"
+                  disabled={historyPage === 1}
+                  onClick={() => handleHistoryPageChange(historyPage - 1)}
+                  className="btn-secondary py-1 px-3 text-xs disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-slate-500">
+                  Page {historyPage} of {Math.ceil(historyTotal / historyPageSize) || 1} ({historyTotal} items)
+                </span>
+                <button
+                  type="button"
+                  disabled={historyPage >= Math.ceil(historyTotal / historyPageSize)}
+                  onClick={() => handleHistoryPageChange(historyPage + 1)}
+                  className="btn-secondary py-1 px-3 text-xs disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end pt-2">
+            <button className="btn-secondary w-full sm:w-auto" type="button" onClick={closeHistoryDialog}>
+              {t('common.close')}
+            </button>
+          </div>
+        </div>
       </Dialog>
     </div>
   );

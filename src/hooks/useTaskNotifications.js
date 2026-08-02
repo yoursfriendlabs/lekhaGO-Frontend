@@ -6,6 +6,7 @@ import {
   emitTasksSync,
   subscribeToTasksSync,
 } from '../lib/tasks';
+import { useSSEEvent, SSE_EVENTS } from './useSSE';
 
 export function useTaskNotifications({ enabled = true } = {}) {
   const { businessId, canViewFeature } = useAuth();
@@ -47,6 +48,10 @@ export function useTaskNotifications({ enabled = true } = {}) {
     emitTasksSync({ type: 'notifications-read' });
     return payload;
   }, [isEnabled, refresh]);
+
+  useSSEEvent(SSE_EVENTS.TASKS_CHANGED, () => {
+    refresh({ silent: true, force: true }).catch(() => {});
+  });
 
   useEffect(() => {
     refresh().catch(() => {});

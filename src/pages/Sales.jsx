@@ -1376,6 +1376,7 @@ export default function Sales() {
                         ...(canManageSales ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) }] : []),
                         { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
                         { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
+                        { label: 'Print Thermal', icon: Printer, to: `/app/invoice/sales/${sale.id}?thermal=1` },
                         ...(canManageSales
                           ? [{
                             label: t('common.delete'),
@@ -1482,6 +1483,7 @@ export default function Sales() {
                             ...(canManageSales ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) }] : []),
                             { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
                             { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
+                            { label: 'Print Thermal', icon: Printer, to: `/app/invoice/sales/${sale.id}?thermal=1` },
                             ...(canManageSales
                               ? [{
                                 label: t('common.delete'),

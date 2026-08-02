@@ -37,6 +37,7 @@ import { normalizeLookupProduct } from "../lib/lookups.js";
 import { buildPaymentPayload, requiresBankSelection } from "../lib/payments";
 import { getCurrentCreatorValue } from "../lib/records";
 import { useIsMobile } from "../hooks/useIsMobile.js";
+import { useSSEEvent, SSE_EVENTS } from "../hooks/useSSE.js";
 import { useProductStore } from "../stores/products";
 import { checkNewAndReadyOrders } from "../lib/cafeOrders.js";
 
@@ -356,7 +357,34 @@ export default function QuickPos() {
     };
   }, [businessId]);
 
-  // Polling for real-time table status and order ready notifications
+  const refreshRealtimeData = async () => {
+    try {
+      const [salesResponse, tablesResponse] = await Promise.all([
+        api.listSales({ limit: 120 }).catch(() => ({ items: [] })),
+        isTablesEnabled ? api.getTables({ isActive: "true", limit: 100 }).catch(() => null) : null
+      ]);
+
+      if (salesResponse?.items) {
+        checkNewAndReadyOrders(salesResponse.items);
+      }
+
+      if (tablesResponse?.items) {
+        setAllTables(tablesResponse.items);
+      }
+    } catch (err) {
+      console.error("Failed to refresh real-time updates:", err);
+    }
+  };
+
+  useSSEEvent(SSE_EVENTS.SALES_CHANGED, () => {
+    refreshRealtimeData().catch(() => {});
+  });
+
+  useSSEEvent(SSE_EVENTS.TABLES_CHANGED, () => {
+    refreshRealtimeData().catch(() => {});
+  });
+
+  // Polling for real-time table status and order ready notifications as fallback
   useEffect(() => {
     if (!businessId) return;
 
@@ -365,23 +393,8 @@ export default function QuickPos() {
     }
 
     const interval = setInterval(async () => {
-      try {
-        const [salesResponse, tablesResponse] = await Promise.all([
-          api.listSales({ limit: 120 }).catch(() => ({ items: [] })),
-          isTablesEnabled ? api.getTables({ isActive: "true", limit: 100 }).catch(() => null) : null
-        ]);
-
-        if (salesResponse?.items) {
-          checkNewAndReadyOrders(salesResponse.items);
-        }
-
-        if (tablesResponse?.items) {
-          setAllTables(tablesResponse.items);
-        }
-      } catch (err) {
-        console.error("Failed to poll real-time updates:", err);
-      }
-    }, 12000);
+      await refreshRealtimeData();
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [businessId, isTablesEnabled]);
@@ -2848,13 +2861,35 @@ export default function QuickPos() {
           ) : null
         }
         secondaryAction={
-          <button
-            type="button"
-            className="btn-ghost h-14 w-full justify-center rounded-[22px] text-base"
-            onClick={handleSuccessClose}
-          >
-            {t("quickPos.newSale")}
-          </button>
+          successState?.id ? (
+            <div className="flex flex-col gap-2.5 w-full">
+              <button
+                type="button"
+                className="btn-secondary h-14 w-full justify-center rounded-[22px] text-base bg-secondary-100 text-secondary-900 hover:bg-secondary-200"
+                onClick={() => {
+                  setSuccessState(null);
+                  navigate(`/app/invoice/sales/${successState.id}?thermal=1`);
+                }}
+              >
+                Print Thermal Receipt
+              </button>
+              <button
+                type="button"
+                className="btn-ghost h-14 w-full justify-center rounded-[22px] text-base"
+                onClick={handleSuccessClose}
+              >
+                {t("quickPos.newSale")}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="btn-ghost h-14 w-full justify-center rounded-[22px] text-base"
+              onClick={handleSuccessClose}
+            >
+              {t("quickPos.newSale")}
+            </button>
+          )
         }
       />
 

@@ -36,6 +36,79 @@ import { Badge } from "../components/Badge";
 import { useLoadingState } from "../hooks/useLoadingState";
 
 
+function DatePresetSelect({ fromValue, toValue, onChange }) {
+  const today = dayjs();
+  
+  const getPreset = () => {
+    if (!fromValue || !toValue) return "";
+    
+    const todayStr = today.format("YYYY-MM-DD");
+    if (fromValue === todayStr && toValue === todayStr) return "today";
+    
+    const startOfWeek = today.startOf("week").format("YYYY-MM-DD");
+    const endOfWeek = today.endOf("week").format("YYYY-MM-DD");
+    if (fromValue === startOfWeek && toValue === endOfWeek) return "week";
+    
+    const startOfMonth = today.startOf("month").format("YYYY-MM-DD");
+    const endOfMonth = today.endOf("month").format("YYYY-MM-DD");
+    if (fromValue === startOfMonth && toValue === endOfMonth) return "month";
+    
+    const startOfYear = today.startOf("year").format("YYYY-MM-DD");
+    const endOfYear = today.endOf("year").format("YYYY-MM-DD");
+    if (fromValue === startOfYear && toValue === endOfYear) return "year";
+    
+    const startOfPrevYear = today.subtract(1, "year").startOf("year").format("YYYY-MM-DD");
+    const endOfPrevYear = today.subtract(1, "year").endOf("year").format("YYYY-MM-DD");
+    if (fromValue === startOfPrevYear && toValue === endOfPrevYear) return "prev_year";
+    
+    return "custom";
+  };
+
+  const handleSelect = (e) => {
+    const val = e.target.value;
+    let from = "";
+    let to = "";
+    if (val === "today") {
+      from = today.format("YYYY-MM-DD");
+      to = today.format("YYYY-MM-DD");
+    } else if (val === "week") {
+      from = today.startOf("week").format("YYYY-MM-DD");
+      to = today.endOf("week").format("YYYY-MM-DD");
+    } else if (val === "month") {
+      from = today.startOf("month").format("YYYY-MM-DD");
+      to = today.endOf("month").format("YYYY-MM-DD");
+    } else if (val === "year") {
+      from = today.startOf("year").format("YYYY-MM-DD");
+      to = today.endOf("year").format("YYYY-MM-DD");
+    } else if (val === "prev_year") {
+      from = today.subtract(1, "year").startOf("year").format("YYYY-MM-DD");
+      to = today.subtract(1, "year").endOf("year").format("YYYY-MM-DD");
+    }
+    if (from && to) {
+      onChange(from, to);
+    }
+  };
+
+  return (
+    <div className="w-full">
+      <label className="label">Date Preset</label>
+      <select
+        className="input mt-1 w-full text-sm"
+        value={getPreset()}
+        onChange={handleSelect}
+      >
+        <option value="" disabled>Select Range...</option>
+        <option value="today">Today</option>
+        <option value="week">This Week</option>
+        <option value="month">This Month</option>
+        <option value="year">This Year</option>
+        <option value="prev_year">Previous Year</option>
+        <option value="custom" disabled>Custom Range</option>
+      </select>
+    </div>
+  );
+}
+
 function Skeleton({ className = "", lines = 1 }) {
   return (
     <div className="animate-pulse space-y-2">
@@ -1257,6 +1330,16 @@ export default function StaffSalaryProfile() {
                 <div className="flex flex-wrap items-end gap-3">
                   <div className="flex flex-wrap gap-3 flex-1">
                     <div>
+                      <DatePresetSelect
+                        fromValue={attendanceDateFrom}
+                        toValue={attendanceDateTo}
+                        onChange={(from, to) => {
+                          setAttendanceDateFrom(from);
+                          setAttendanceDateTo(to);
+                        }}
+                      />
+                    </div>
+                    <div>
                       <label
                         className="text-[10px] font-semibold uppercase tracking-widest text-slate-400"
                         htmlFor="att-from"
@@ -1344,9 +1427,11 @@ export default function StaffSalaryProfile() {
                             <td className="p-3 font-medium text-slate-800 dark:text-slate-200">
                               {formatMaybeDate(record.date, "YYYY-MM-DD")}
                             </td>
-                            <td className="p-3 tabular-nums text-slate-500 dark:text-slate-400">
+                            <td className="p-3 tabular-nums">
                               <div className="flex flex-col items-start gap-1">
-                                <span>{formatMaybeDateTime(record.punchInTime, "hh:mm A") || "—"}</span>
+                                <span className={record.shiftStarted || record.shift ? (record.isLatePunchIn ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-slate-800 dark:text-slate-200'}>
+                                  {formatMaybeDateTime(record.punchInTime, "hh:mm A") || "—"}
+                                </span>
                                 {record.isLatePunchIn && (
                                   <span className="inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/20">
                                     Late
@@ -1354,9 +1439,11 @@ export default function StaffSalaryProfile() {
                                 )}
                               </div>
                             </td>
-                            <td className="p-3 tabular-nums text-slate-500 dark:text-slate-400">
+                            <td className="p-3 tabular-nums">
                               <div className="flex flex-col items-start gap-1">
-                                <span>{formatMaybeDateTime(record.punchOutTime, "hh:mm A") || "—"}</span>
+                                <span className={record.punchOutTime ? (record.shiftEnded || record.shift ? (record.isEarlyPunchOut ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-slate-800 dark:text-slate-200') : 'text-slate-500 dark:text-slate-400'}>
+                                  {formatMaybeDateTime(record.punchOutTime, "hh:mm A") || "—"}
+                                </span>
                                 {record.isEarlyPunchOut && (
                                   <span className="inline-flex items-center rounded-md bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-800 ring-1 ring-inset ring-rose-600/20 dark:bg-rose-900/20 dark:text-rose-300 dark:ring-rose-500/20">
                                     Left Early

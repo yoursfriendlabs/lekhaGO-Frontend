@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Clock, FileText, LayoutGrid, MapPin, Package2, Pencil, Phone, Plus, Search, ShoppingBag, ShoppingCart, Store, Table, Trash2, UserRound, Users } from 'lucide-react';
+import { ArrowRight, Clock, FileText, LayoutGrid, MapPin, Package2, Pencil, Phone, Plus, Printer, Search, ShoppingBag, ShoppingCart, Store, Table, Trash2, UserRound, Users } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import FormSectionCard from '../components/FormSectionCard.jsx';
@@ -15,11 +15,13 @@ import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import { useIsMobile } from '../hooks/useIsMobile.js';
+import { useSSEEvent, SSE_EVENTS } from '../hooks/useSSE.js';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
 import { getCurrentCreatorValue } from '../lib/records';
 import { mergeLookupEntities, normalizeLookupParty, normalizeLookupProduct, toProductLookupOption } from '../lib/lookups.js';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useProductStore } from '../stores/products';
+import StatCard from '../components/StatCard';
 import {
   buildCafeOrderAttributes,
   buildCafeTableMap,
@@ -216,6 +218,10 @@ export default function CafeOrders() {
     }
   };
 
+  useSSEEvent(SSE_EVENTS.SALES_CHANGED, () => {
+    loadOrders().catch(() => {});
+  });
+
   useEffect(() => {
     loadOrders();
     loadFloors();
@@ -234,7 +240,7 @@ export default function CafeOrders() {
       } catch (err) {
         console.error("Failed to poll cafe orders:", err);
       }
-    }, 12000);
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [businessId]);
@@ -690,6 +696,32 @@ export default function CafeOrders() {
     return acc;
   }, {}), [filteredOrders]);
 
+  const statsSummary = useMemo(() => {
+    let totalSales = 0;
+    let totalDiscount = 0;
+    let activeCount = 0;
+    let completedCount = 0;
+
+    orders.forEach((order) => {
+      const meta = getCafeOrderAttributes(order);
+      totalSales += Number(order.grandTotal || 0);
+      totalDiscount += Number(order.discountTotal ?? order.discount ?? 0);
+      if (meta.orderStatus === 'completed') {
+        completedCount += 1;
+      } else {
+        activeCount += 1;
+      }
+    });
+
+    return {
+      totalSales,
+      totalDiscount,
+      activeCount,
+      completedCount,
+      totalOrders: orders.length,
+    };
+  }, [orders]);
+
   const visibleBoardColumns = selectedStatusFilter === 'all'
     ? groupedOrders
     : groupedOrders.filter((column) => column.value === selectedStatusFilter);
@@ -741,6 +773,30 @@ export default function CafeOrders() {
       />
 
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
+
+      {/* Stats Cards Overview */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Total Orders"
+          value={statsSummary.totalOrders}
+          hint="All loaded orders"
+        />
+        <StatCard
+          label="Active Orders"
+          value={statsSummary.activeCount}
+          hint="Dine-in / Prep queue"
+        />
+        <StatCard
+          label="Total Discount"
+          value={formatMoney(statsSummary.totalDiscount)}
+          hint="Given to customers"
+        />
+        <StatCard
+          label="Total Sales"
+          value={formatMoney(statsSummary.totalSales)}
+          hint="Total revenue"
+        />
+      </div>
 
 
 
@@ -1001,6 +1057,7 @@ export default function CafeOrders() {
                 <th className="p-3">Items</th>
                 <th className="p-3">Payment</th>
                 <th className="p-3">Stage</th>
+                <th className="p-3 text-right">Discount</th>
                 <th className="p-3 text-right">Total</th>
                 <th className="p-3 text-center">Actions</th>
               </tr>
@@ -1008,7 +1065,7 @@ export default function CafeOrders() {
             <tbody className="divide-y divide-slate-100">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-slate-400">
+                  <td colSpan={9} className="p-8 text-center text-slate-400">
                     No orders match your search or filters.
                   </td>
                 </tr>
@@ -1077,6 +1134,13 @@ export default function CafeOrders() {
                           {statusMeta?.label || meta.orderStatus}
                         </span>
                       </td>
+                      <td className="p-3 text-right text-slate-500 whitespace-nowrap">
+                        {Number(order.discountTotal || order.discount || 0) > 0 ? (
+                          <span className="text-rose-600 font-medium">-{formatMoney(order.discountTotal || order.discount)}</span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
                       <td className="p-3 text-right font-bold text-slate-900 whitespace-nowrap">
                         {formatMoney(order.grandTotal)}
                       </td>
@@ -1109,12 +1173,19 @@ export default function CafeOrders() {
                           >
                             <Pencil size={14} />
                           </button>
-                          <Link
+                           <Link
                             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
                             to={`/app/invoice/sales/${order.id}`}
                             title="Invoice"
                           >
                             <FileText size={14} />
+                          </Link>
+                          <Link
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                            to={`/app/invoice/sales/${order.id}?thermal=1`}
+                            title="Print Thermal Receipt"
+                          >
+                            <Printer size={14} />
                           </Link>
                           <button
                             type="button"
@@ -1369,7 +1440,14 @@ export default function CafeOrders() {
                         <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
                           <div>
                             <p className="text-[10px] uppercase font-bold text-slate-400">Total</p>
-                            <p className="text-base font-bold text-slate-900">{formatMoney(order.grandTotal)}</p>
+                            <p className="text-base font-bold text-slate-900">
+                              {formatMoney(order.grandTotal)}
+                              {Number(order.discountTotal || order.discount || 0) > 0 && (
+                                <span className="text-[10px] text-rose-600 font-medium block">
+                                  Disc: -{formatMoney(order.discountTotal || order.discount)}
+                                </span>
+                              )}
+                            </p>
                           </div>
                           <div className="flex items-center gap-1">
                             <button
@@ -1386,6 +1464,13 @@ export default function CafeOrders() {
                               to={`/app/invoice/sales/${order.id}`}
                             >
                               <FileText size={15} />
+                            </Link>
+                            <Link
+                              title="Print Thermal Receipt"
+                              className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                              to={`/app/invoice/sales/${order.id}?thermal=1`}
+                            >
+                              <Printer size={15} />
                             </Link>
                             <button
                               type="button"
