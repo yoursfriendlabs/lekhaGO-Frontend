@@ -26,6 +26,7 @@ import QuickPartySelector from "../components/QuickPartySelector.jsx";
 import QuickActionSuccessDialog from "../components/QuickActionSuccessDialog.jsx";
 import { Dialog } from "../components/ui/Dialog.tsx";
 import MobileFormStepper from "../components/MobileFormStepper.jsx";
+import * as Sentry from "@sentry/react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useBusinessSettings } from "../lib/businessSettings.jsx";
@@ -1393,6 +1394,27 @@ export default function QuickPos() {
     </div>
   );
 
+  // Development-only button to test Sentry's error tracking
+  function ErrorButton() {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          try {
+            throw new Error('This is your first error!');
+          } catch (error) {
+            Sentry.captureException(error);
+            // Re-throw so it also shows up in console
+            console.error('Sentry test error:', error);
+          }
+        }}
+        className="btn-ghost h-11 justify-center rounded-[18px] text-red-500 border border-red-200 hover:bg-red-50 px-3 text-xs font-bold"
+      >
+        Break the world
+      </button>
+    );
+  }
+
   if (loading && !products.length && !allTables.length) {
     return (
       <div className="min-w-0 space-y-5 pb-28 md:pb-0">
@@ -1430,15 +1452,16 @@ export default function QuickPos() {
                   ← {queryRef === "orders" ? "Seating Map" : "Billing Counter"}
                 </button>
               )}
-              <Link
-                className="btn-ghost h-11 justify-center rounded-[18px]"
-                to="/app/sales"
-              >
-                {t("quickPos.detailedSales")}
-              </Link>
-            </div>
-          }
-        />
+            <ErrorButton />
+            <Link
+              className="btn-ghost h-11 justify-center rounded-[18px]"
+              to="/app/sales"
+            >
+              {t("quickPos.detailedSales")}
+            </Link>
+          </div>
+        }
+      />
 
         {status.message ? (
           <Notice title={status.message} tone={status.type} />
@@ -3012,7 +3035,7 @@ export default function QuickPos() {
                       {isOccupied ? "Occupied" : "Vacant"}
                     </span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-slate-100 dark:border-slate-800 mt-2">
                     <span className="text-[10px] text-slate-400">{table.capacity ? `${table.capacity} seats` : "No limit"}</span>
                     <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium border border-slate-200/50 truncate max-w-[70px]">

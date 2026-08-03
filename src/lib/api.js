@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import {
   clearSession,
   getBusinessId,
@@ -332,6 +333,17 @@ async function request(path, options = {}, config = {}) {
         status: error?.status || "network",
         durationMs: Date.now() - startedAt,
       });
+
+      // Report all API errors to Sentry
+      Sentry.captureException(error, {
+        tags: { api_method: method, api_path: path },
+        extra: {
+          apiStatus: error?.status || "network_error",
+          businessId,
+          durationMs: Date.now() - startedAt,
+        },
+      });
+
       throw error;
     })
     .finally(() => {
