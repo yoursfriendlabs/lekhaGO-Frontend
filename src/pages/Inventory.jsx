@@ -105,7 +105,11 @@ function getCurrentStock(product = {}) {
 }
 
 function getUnitText(unit = {}) {
-  return String(unit?.symbol || unit?.name || '').trim();
+  if (typeof unit === 'string' || typeof unit === 'number') {
+    return String(unit).trim();
+  }
+  if (!unit || typeof unit !== 'object') return '';
+  return String(unit.displayName || unit.symbol || unit.name || '').trim();
 }
 
 function getUnitOptionLabel(unit = {}) {
@@ -1335,7 +1339,7 @@ export default function Inventory() {
           <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50">
             <h3 className="font-semibold text-slate-900 dark:text-white">{historyProduct?.name || '-'}</h3>
             <p className="text-xs text-slate-500 mt-1">
-              SKU/Barcode: <span className="font-mono">{historyProduct?.sku || historyProduct?.itemCode || '-'}</span> | Unit: {historyProduct?.unit || historyProduct?.primaryUnit || 'pcs'}
+              SKU/Barcode: <span className="font-mono">{historyProduct?.sku || historyProduct?.itemCode || '-'}</span> | Unit: {historyProduct?.primaryUnit || getUnitText(historyProduct?.unit) || 'pcs'}
             </p>
           </div>
 
