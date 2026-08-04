@@ -96,7 +96,7 @@ function formatStockLabel(product, unitType = "primary") {
       maximumFractionDigits: 2,
     },
   );
-  const unitLabel = getProductUnitLabel(product, unitType);
+  const unitLabel = getUnitShortcut(getProductUnitLabel(product, unitType));
 
   return `${quantity} ${unitLabel}`.trim();
 }
@@ -136,6 +136,13 @@ function getProductUnitLabel(product, unitType) {
   if (unitType === "secondary")
     return product.secondaryUnit || product.primaryUnit || "";
   return product.primaryUnit || product.secondaryUnit || "";
+}
+
+function getUnitShortcut(unit) {
+  const value = String(unit || "").trim();
+  if (!value) return "";
+  const match = value.match(/\(([^)]+)\)/);
+  return (match && match[1] ? match[1] : value).trim();
 }
 
 function deriveUnitPrice(product, unitType = "primary") {
@@ -1256,10 +1263,10 @@ export default function QuickPos() {
                 ? "text-green-600"
                 : "text-slate-500 hover:text-slate-800"
             } disabled:cursor-not-allowed disabled:text-slate-300`}
-            onClick={() => onChange(option.value)}
+onClick={() => onChange(option.value)}
             disabled={option.disabled}
           >
-            {option.unit}
+            {getUnitShortcut(option.unit)}
           </button>
         );
       })}
@@ -1268,10 +1275,11 @@ export default function QuickPos() {
 
   const renderUnitSwitcher = (item) => {
     if (!item.secondaryUnit) {
-      return (
+return (
         <span className="text-xs text-slate-500">
           /{" "}
-          {getProductUnitLabel(item, item.unitType) || t("products.units.unit")}
+          {getUnitShortcut(getProductUnitLabel(item, item.unitType)) ||
+            t("products.units.unit")}
         </span>
       );
     }
@@ -2164,7 +2172,9 @@ export default function QuickPos() {
                             }
                           />
                           <span className="text-xs text-slate-500">
-                            {getProductUnitLabel(item, item.unitType)}
+                            {getUnitShortcut(
+                              getProductUnitLabel(item, item.unitType),
+                            )}
                           </span>
                         </div>
                         <button
@@ -3060,7 +3070,6 @@ export default function QuickPos() {
                       {isOccupied ? "Occupied" : "Vacant"}
                     </span>
                   </div>
-                  
                   <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-slate-100 dark:border-slate-800 mt-2">
                     <span className="text-[10px] text-slate-400">{table.capacity ? `${table.capacity} seats` : "No limit"}</span>
                     <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium border border-slate-200/50 truncate max-w-[70px]">
