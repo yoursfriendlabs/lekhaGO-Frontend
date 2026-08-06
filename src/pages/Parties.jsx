@@ -336,7 +336,6 @@ export default function Parties() {
   const debouncedQuery = useDebouncedValue(query, 300);
   const [selectedId, setSelectedId] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('credit');
   const [txState, dispatchTx] = useReducer(txReducer, txInitialState);
   const [selectedTxPartyOption, setSelectedTxPartyOption] = useState(null);
   const [txPage, setTxPage] = useState(1);
@@ -665,7 +664,6 @@ export default function Parties() {
     if (!canManageParties) return;
     setEditingId(null);
     setForm(emptyForm);
-    setActiveTab("credit");
     setIsOpen(true);
   };
 
@@ -682,7 +680,6 @@ export default function Parties() {
       asOfDate: party.asOfDate || "",
       balanceType: party.balanceType || "receive",
     });
-    setActiveTab("credit");
     setIsOpen(true);
   };
 
@@ -1655,99 +1652,26 @@ export default function Parties() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 border-b border-slate-200 pb-2 text-sm text-slate-500">
-            <button
-              type="button"
-              onClick={() => setActiveTab("credit")}
-              className={
-                activeTab === "credit"
-                  ? "border-b-2 border-emerald-500 pb-1 font-semibold text-emerald-600"
-                  : ""
-              }
-            >
-              {t("parties.creditInfo")}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("additional")}
-              className={
-                activeTab === "additional"
-                  ? "border-b-2 border-emerald-500 pb-1 font-semibold text-emerald-600"
-                  : ""
-              }
-            >
-              {t("parties.additionalInfo")}
-            </button>
+          <div className="grid gap-3 md:grid-cols-2 border-t border-slate-100 pt-3">
+            <div>
+              <label className="label">{t("parties.email")}</label>
+              <input
+                className="input mt-1"
+                name="email"
+                value={form.email}
+                onChange={handleChange}
+              />
+            </div>
+            <div>
+              <label className="label">{t("parties.address")}</label>
+              <input
+                className="input mt-1"
+                name="address"
+                value={form.address}
+                onChange={handleChange}
+              />
+            </div>
           </div>
-
-          {activeTab === "credit" ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="label">{t("parties.openingBalance")}</label>
-                <input
-                  className="input mt-1"
-                  name="openingBalance"
-                  type="number"
-                  step="1"
-                  defaultValue={0}
-                  min={0}
-                  value={form.openingBalance}
-                  onChange={handleChange}
-                />
-              </div>
-              <div>
-                <label className="label">{t("parties.asOfDate")}</label>
-                <input
-                  className="input mt-1"
-                  name="asOfDate"
-                  type="date"
-                  value={
-                    form.asOfDate || new Date().toISOString().split("T")[0]
-                  }
-                  onChange={handleChange}
-                />
-              </div>
-              <div className="flex gap-2">
-                {["receive", "give"].map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() =>
-                      setForm((prev) => ({ ...prev, balanceType: type }))
-                    }
-                    className={
-                      form.balanceType === type ? "btn-primary" : "btn-ghost"
-                    }
-                  >
-                    {type === "receive"
-                      ? t("parties.toReceive")
-                      : t("parties.toGive")}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="label">{t("parties.email")}</label>
-                <input
-                  className="input mt-1"
-                  name="email"
-                  value={form.email}
-                  onChange={handleChange}
-                />
-              </div>
-              <div>
-                <label className="label">{t("parties.address")}</label>
-                <input
-                  className="input mt-1"
-                  name="address"
-                  value={form.address}
-                  onChange={handleChange}
-                />
-              </div>
-            </div>
-          )}
 
           <div className="flex flex-wrap justify-end gap-2">
             <button
