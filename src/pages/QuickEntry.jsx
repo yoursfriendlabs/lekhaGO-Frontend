@@ -52,6 +52,7 @@ export default function QuickEntry() {
   const [submitting, setSubmitting] = useState(false);
   const [successState, setSuccessState] = useState(null);
   const canManagePurchases = canManageFeature('purchases');
+  const canManageQuickExpenses = canManageFeature('quickExpenses') || canManagePurchases;
   const canViewParties = canViewFeature('parties');
   const canManageParties = canManageFeature('parties');
   const { categories: expenseCategories } = useExpenseCategories({ businessId, includeCustom: true });
@@ -117,7 +118,7 @@ export default function QuickEntry() {
       setStatus({ type: 'error', message: t('errors.businessIdRequired') });
       return;
     }
-    if (activeTab === 'expense' && !canManagePurchases) {
+    if (activeTab === 'expense' && !canManageQuickExpenses) {
       setStatus({ type: 'error', message: t('staffManagement.permissionError') });
       return;
     }

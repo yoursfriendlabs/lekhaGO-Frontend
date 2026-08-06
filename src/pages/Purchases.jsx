@@ -122,6 +122,7 @@ export default function Purchases() {
   const { t } = useI18n();
   const { businessId, canManageFeature } = useAuth();
   const canManagePurchases = canManageFeature("purchases");
+  const canManageQuickExpenses = canManageFeature("quickExpenses") || canManagePurchases;
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const createIntentHandledRef = useRef(false);
@@ -1078,28 +1079,32 @@ export default function Purchases() {
         title={t("purchases.title")}
         subtitle={t("purchases.subtitle")}
         action={
-          canManagePurchases ? (
+          canManageQuickExpenses || canManagePurchases ? (
             <div className="flex flex-col gap-2 sm:flex-row">
-              <button
-                className="btn-secondary w-full sm:w-auto"
-                type="button"
-                onClick={() => setQuickExpenseOpen(true)}
-                disabled={openingPurchaseForm}
-              >
-                <Wallet size={15} className="mr-1.5 inline" />
-                {t("purchases.quickExpense")}
-              </button>
+              {canManageQuickExpenses && (
+                <button
+                  className="btn-secondary w-full sm:w-auto"
+                  type="button"
+                  onClick={() => setQuickExpenseOpen(true)}
+                  disabled={openingPurchaseForm}
+                >
+                  <Wallet size={15} className="mr-1.5 inline" />
+                  {t("purchases.quickExpense")}
+                </button>
+              )}
 
-              <button
-                className="btn-primary w-full sm:w-auto"
-                type="button"
-                onClick={openCreate}
-                disabled={openingPurchaseForm}
-              >
-                {openingPurchaseForm
-                  ? t("common.loading")
-                  : t("purchases.newPurchase")}
-              </button>
+              {canManagePurchases && (
+                <button
+                  className="btn-primary w-full sm:w-auto"
+                  type="button"
+                  onClick={openCreate}
+                  disabled={openingPurchaseForm}
+                >
+                  {openingPurchaseForm
+                    ? t("common.loading")
+                    : t("purchases.newPurchase")}
+                </button>
+              )}
             </div>
           ) : null
         }

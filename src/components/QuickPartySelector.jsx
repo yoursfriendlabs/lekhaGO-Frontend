@@ -7,6 +7,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useI18n } from '../lib/i18n.jsx';
 import { getPartyBalanceMeta } from '../lib/partyBalances.js';
 import { normalizeLookupParty } from '../lib/lookups.js';
+import { useBusinessSettings } from '../lib/businessSettings.jsx';
 
 function getInitials(name = '') {
   const trimmed = String(name || '').trim();
@@ -32,6 +33,8 @@ export default function QuickPartySelector({
   walkInDescription = '',
 }) {
   const { t } = useI18n();
+  const { businessProfile } = useBusinessSettings();
+  const isCafe = businessProfile?.type === 'cafe';
   const [query, setQuery] = useState('');
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -181,12 +184,12 @@ export default function QuickPartySelector({
             </div>
 
             <div>
-              <label className="label text-xs">Delivery Address</label>
+              <label className="label text-xs">{isCafe ? 'Delivery Address' : 'Address'}</label>
               <div className="relative mt-1">
                 <MapPin size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   className="input h-10 w-full !pl-9 text-sm"
-                  placeholder="Delivery address / location details"
+                  placeholder={isCafe ? 'Delivery address / location details' : 'Address / location details'}
                   value={newPartyAddress}
                   onChange={(e) => setNewPartyAddress(e.target.value)}
                 />

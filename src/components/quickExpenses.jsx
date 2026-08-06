@@ -40,6 +40,7 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
   const { t } = useI18n();
   const { businessId, canManageFeature, canViewFeature } = useAuth();
   const canManagePurchases = canManageFeature('purchases');
+  const canManageQuickExpenses = canManageFeature('quickExpenses') || canManagePurchases;
   const canViewParties = canViewFeature('parties');
   const { invalidate: invalidatePurchases, fetch: fetchPurchases } = usePurchaseStore();
   const { categories } = useExpenseCategories({ businessId, includeCustom: true });
@@ -93,7 +94,7 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
   const handleQuickExpenseSubmit = async (event) => {
     event.preventDefault();
 
-    if (!canManagePurchases) {
+    if (!canManageQuickExpenses) {
       setQuickStatus({ type: 'error', message: t('staffManagement.permissionError') });
       return;
     }
