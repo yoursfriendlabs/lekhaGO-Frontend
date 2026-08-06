@@ -1544,16 +1544,16 @@ function getStatusToneClass(status) {
 function getBalanceToneClass(value) {
   if (!Number.isFinite(Number(value))) return 'text-slate-700 dark:text-slate-300';
   const amount = Number(value);
-  if (amount > 0) return 'text-rose-700 dark:text-rose-300';
-  if (amount < 0) return 'text-emerald-700 dark:text-emerald-300';
+  if (amount > 0) return 'text-emerald-700 dark:text-emerald-300';
+  if (amount < 0) return 'text-rose-700 dark:text-rose-300';
   return 'text-slate-700 dark:text-slate-300';
 }
 
 function getBalanceLabel(value, t) {
   if (!Number.isFinite(Number(value))) return t('ledger.currentBalance');
   const amount = Number(value);
-  if (amount > 0) return t('parties.toGive');
-  if (amount < 0) return t('parties.toReceive');
+  if (amount > 0) return t('parties.toReceive');
+  if (amount < 0) return t('parties.toGive');
   return t('parties.settled');
 }
 
@@ -2196,7 +2196,9 @@ export default function Reports() {
     const totalDebit = statementRows.reduce((sum, row) => sum + Number(row.debit || 0), 0);
     const totalCredit = statementRows.reduce((sum, row) => sum + Number(row.credit || 0), 0);
     const currentBalance = statementRows.length
-      ? statementRows[statementRows.length - 1].runningBalance
+      ? (ledgerSortOrder === 'asc'
+          ? statementRows[statementRows.length - 1].runningBalance
+          : statementRows[0].runningBalance)
       : null;
 
     return {
@@ -2205,7 +2207,7 @@ export default function Reports() {
       currentBalance,
       entries: ledger.total || statementRows.length,
     };
-  }, [ledger.total, statementRows]);
+  }, [ledger.total, statementRows, ledgerSortOrder]);
 
   const selectedPartyLabel = selectedPartyId
     ? selectedPartyOption?.entity?.name || selectedPartyOption?.label || t('ledger.party')
@@ -2227,7 +2229,7 @@ export default function Reports() {
     {
       key: 'balance',
       label: balanceLabel,
-      value: formatCurrency(ledgerSummary.currentBalance, { symbol: t('currency.symbol') }),
+      value: formatCurrency(Math.abs(ledgerSummary.currentBalance), { symbol: t('currency.symbol') }),
       icon: WalletCards,
       valueClassName: balanceToneClass,
       accentClassName: 'bg-white/80 text-primary-700 ring-1 ring-primary-100',
@@ -2308,7 +2310,7 @@ export default function Reports() {
       [t('common.date'), timeSpanLabel],
       ['Exported', dayjs().format('D MMM YYYY, HH:mm')],
       [],
-      [balanceLabel, formatCurrency(ledgerSummary.currentBalance, { symbol: t('currency.symbol') })],
+      [balanceLabel, formatCurrency(Math.abs(ledgerSummary.currentBalance), { symbol: t('currency.symbol') })],
       [t('ledger.totalDebit'), formatCurrency(ledgerSummary.totalDebit, { symbol: t('currency.symbol') })],
       [t('ledger.totalCredit'), formatCurrency(ledgerSummary.totalCredit, { symbol: t('currency.symbol') })],
       [t('ledger.totalEntries'), ledgerSummary.entries],
@@ -2856,7 +2858,7 @@ export default function Reports() {
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{balanceLabel}</p>
                       <p className={`mt-1.5 text-sm font-semibold ${balanceToneClass}`}>
-                        {formatMoney(ledgerSummary.currentBalance)}
+                        {formatMoney(Math.abs(ledgerSummary.currentBalance))}
                       </p>
                     </div>
                     <div>

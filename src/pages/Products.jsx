@@ -24,6 +24,7 @@ const makeEmptyProduct = () => ({
   minWholesaleQuantity: '',
   lowStockAlert: false,
   taxRate: '0',
+  imageUrl: '',
 });
 
 const HEADER_MAP = {
@@ -198,7 +199,9 @@ export default function Products() {
   const unitListId = 'product-unit-options';
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(makeEmptyProduct());
+  const [imageUploading, setImageUploading] = useState(false);
   const [status, setStatus] = useState({ type: 'info', message: '' });
+  const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
     if (status.type !== 'success' && status.type !== 'error') return;
@@ -251,6 +254,41 @@ export default function Products() {
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
     setForm((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  };
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setStatus({ type: 'error', message: 'Only image files are allowed.' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setStatus({ type: 'error', message: 'Image size must be less than 5MB.' });
+      return;
+    }
+
+    setImageUploading(true);
+    setStatus({ type: 'info', message: '' });
+    try {
+      const response = await api.uploadAttachment(file);
+      if (response && response.url) {
+        setForm((prev) => ({ ...prev, imageUrl: response.url }));
+        setStatus({ type: 'success', message: 'Image uploaded successfully.' });
+      } else {
+        throw new Error('No URL returned from server.');
+      }
+    } catch (err) {
+      console.error('Failed to upload image', err);
+      setStatus({ type: 'error', message: err.message || 'Failed to upload image.' });
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setForm((prev) => ({ ...prev, imageUrl: '' }));
   };
 
   const handleSubmit = async (event) => {
@@ -636,7 +674,18 @@ export default function Products() {
               ) : (
                 pagedProducts.map((product) => (
                   <tr key={product.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                    <td className="py-2 font-medium text-slate-900 dark:text-white">{product.name}</td>
+                    <td className="py-2 font-medium text-slate-900 dark:text-white">
+                      <div className="flex items-center gap-2">
+                        {product.imageUrl ? (
+                          <img src={product.imageUrl} alt={product.name} className="h-8 w-8 rounded-lg object-cover border border-slate-200 dark:border-slate-800 cursor-zoom-in" onClick={() => setPreviewImage(product.imageUrl)} />
+                        ) : (
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 font-bold text-[10px]">
+                            {product.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                        <span className="truncate max-w-[150px]">{product.name}</span>
+                      </div>
+                    </td>
                     <td className="py-2">{product.companyName || '—'}</td>
                     <td className="py-2">{product.sku || '—'}</td>
                     <td className="py-2 capitalize">
@@ -765,6 +814,12 @@ export default function Products() {
         </form>
       </Dialog>
 
+      <Dialog isOpen={previewImage !== null} onClose={() => setPreviewImage(null)} title={t('common.preview') || 'Image Preview'} size="lg">
+        <div className="flex justify-center items-center p-2 bg-slate-50 dark:bg-slate-900 rounded-2xl overflow-hidden">
+          <img src={previewImage} alt="Preview" className="max-w-full max-h-[70vh] rounded-xl object-contain" />
+        </div>
+      </Dialog>
+
       <Dialog isOpen={isOpen} onClose={closeDialog} title={t('products.dialogTitle')} size="xl">
         <div className="mb-4 flex flex-wrap gap-2">
           <button
@@ -790,14 +845,73 @@ export default function Products() {
 
         {dialogMode === 'single' ? (
           <form className="space-y-4" onSubmit={handleSubmit}>
-            <div>
-              <label className="label">{t('products.name')}</label>
-              <input className="input mt-1" name="name" value={form.name} onChange={handleChange} required />
-            </div>
-            <div>
-              <label className="label">{t('products.company')}</label>
-              <input className="input mt-1" name="companyName" value={form.companyName} onChange={handleChange} />
-              <p className="mt-1 text-xs text-slate-500">{t('products.useBrand')}</p>
+            <div className="flex flex-col gap-4 md:flex-row md:items-start">
+              {/* Image Upload Zone */}
+              <div className="w-full md:w-1/3">
+                <label className="label mb-1.5 block">Product Image</label>
+                {form.imageUrl ? (
+                  <div className="relative group rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 aspect-square w-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+                    <img src={form.imageUrl} alt="Product" className="object-cover w-full h-full cursor-zoom-in" onClick={() => setPreviewImage(form.imageUrl)} />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        className="bg-white/90 hover:bg-white text-slate-800 hover:text-slate-900 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm transition"
+                        onClick={() => document.getElementById('product-image-input').click()}
+                      >
+                        Change
+                      </button>
+                      <button
+                        type="button"
+                        className="bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm transition"
+                        onClick={handleRemoveImage}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-primary-500 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer aspect-square bg-slate-50/50 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-900/40 transition group"
+                    onClick={() => document.getElementById('product-image-input').click()}
+                  >
+                    {imageUploading ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-xs text-slate-500">Uploading...</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 group-hover:scale-105 transition-transform">
+                          <Plus className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                        </div>
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Upload image</span>
+                        <span className="text-[10px] text-slate-400">JPG, PNG, WEBP (Max 5MB)</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <input
+                  id="product-image-input"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                  disabled={imageUploading}
+                />
+              </div>
+
+              {/* Name and Company fields */}
+              <div className="flex-1 space-y-4">
+                <div>
+                  <label className="label">{t('products.name')}</label>
+                  <input className="input mt-1" name="name" value={form.name} onChange={handleChange} required />
+                </div>
+                <div>
+                  <label className="label">{t('products.company')}</label>
+                  <input className="input mt-1" name="companyName" value={form.companyName} onChange={handleChange} />
+                  <p className="mt-1 text-xs text-slate-500">{t('products.useBrand')}</p>
+                </div>
+              </div>
             </div>
             <div>
               <label className="label">{t('products.sku')}</label>

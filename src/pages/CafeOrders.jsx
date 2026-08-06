@@ -1917,7 +1917,6 @@ export default function CafeOrders() {
                           </button>
                         ) : null}
                       </div>
-
                       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                         <div className="sm:col-span-2 xl:col-span-2">
                           <label className="label">Menu Item</label>
@@ -1931,6 +1930,18 @@ export default function CafeOrders() {
                             searchPlaceholder="Search menu items"
                             noResultsLabel="No menu items found"
                             loadingLabel="Loading menu items..."
+                            renderOption={(option) => (
+                              <div className="flex items-center gap-2">
+                                {option.entity?.imageUrl ? (
+                                  <img src={option.entity.imageUrl} alt={option.label} className="h-6 w-6 rounded object-cover border border-slate-200 dark:border-slate-800" />
+                                ) : (
+                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-400 dark:bg-slate-800">
+                                    {option.entity?.name?.charAt(0).toUpperCase() || 'P'}
+                                  </div>
+                                )}
+                                <span>{option.label}</span>
+                              </div>
+                            )}
                           />
                         </div>
                         <div>

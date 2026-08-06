@@ -34,6 +34,7 @@ const makeEmptyItem = () => ({
   wholesalePrice: '0',
   minWholesaleQuantity: '',
   lowStockAlert: true,
+  imageUrl: '',
 });
 
 const parseNumber = (value) => {
@@ -65,6 +66,7 @@ const buildProductPayload = (form) => ({
   minWholesaleQuantity: parseNumber(form.minWholesaleQuantity),
   openingStock: parseNumber(form.openingStock),
   lowStockAlert: form.lowStockAlert,
+  imageUrl: form.imageUrl || null,
 });
 
 function getProductCategoryName(product = {}) {
@@ -97,6 +99,7 @@ function productToForm(product = {}) {
     wholesalePrice: String(product.wholesalePrice ?? '0'),
     minWholesaleQuantity: String(product.minWholesaleQuantity ?? ''),
     lowStockAlert: Boolean(product.lowStockAlert),
+    imageUrl: product.imageUrl || '',
   };
 }
 
@@ -169,6 +172,7 @@ export default function Inventory() {
   const inventorySubtitle = inventoryProfile.subtitle || t('inventory.itemsSubtitle');
 
   const [status, setStatus] = useState({ type: 'info', message: '' });
+  const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
     if (status.type !== 'success' && status.type !== 'error') return;
@@ -188,6 +192,7 @@ export default function Inventory() {
   const [activeTab, setActiveTab] = useState('stock');
   const [form, setForm] = useState(makeEmptyItem());
   const [saving, setSaving] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [restockProduct, setRestockProduct] = useState(null);
@@ -290,6 +295,7 @@ export default function Inventory() {
     return products.map((product) => ({
       id: product.id,
       name: product.name,
+      imageUrl: product.imageUrl || '',
       itemType: product.itemType || 'goods',
       metalType: product.metalType || '',
       purity: product.purity || '',
@@ -428,6 +434,41 @@ export default function Inventory() {
         purity: nextPurityOptions.length > 0 && !nextPurityOptions.includes(prev.purity) ? '' : prev.purity,
       };
     });
+  };
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setStatus({ type: 'error', message: 'Only image files are allowed.' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setStatus({ type: 'error', message: 'Image size must be less than 5MB.' });
+      return;
+    }
+
+    setImageUploading(true);
+    setStatus({ type: 'info', message: '' });
+    try {
+      const response = await api.uploadAttachment(file);
+      if (response && response.url) {
+        setForm((prev) => ({ ...prev, imageUrl: response.url }));
+        setStatus({ type: 'success', message: 'Image uploaded successfully.' });
+      } else {
+        throw new Error('No URL returned from server.');
+      }
+    } catch (err) {
+      console.error('Failed to upload image', err);
+      setStatus({ type: 'error', message: err.message || 'Failed to upload image.' });
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setForm((prev) => ({ ...prev, imageUrl: '' }));
   };
 
   const handlePrimaryUnitChange = (event) => {
@@ -841,9 +882,13 @@ export default function Inventory() {
                 className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                    {item.name?.slice(0, 1) || 'I'}
-                  </div>
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt={item.name} className="h-10 w-10 shrink-0 rounded-xl object-cover border border-slate-200 dark:border-slate-800 cursor-zoom-in" onClick={() => setPreviewImage(item.imageUrl)} />
+                  ) : (
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                      {item.name?.slice(0, 1) || 'I'}
+                    </div>
+                  )}
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-slate-900 dark:text-white truncate">{item.name}</p>
                     <p className="text-xs text-slate-500">
@@ -924,9 +969,13 @@ export default function Inventory() {
                   <tr key={item.id} id={getInventoryItemRowId(item.id)} className="border-t border-slate-200/70 dark:border-slate-800/70">
                     <td className="py-3">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700">
-                          {item.name?.slice(0, 1) || 'I'}
-                        </div>
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="h-10 w-10 shrink-0 rounded-xl object-cover border border-slate-200 dark:border-slate-800 cursor-zoom-in" onClick={() => setPreviewImage(item.imageUrl)} />
+                        ) : (
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                            {item.name?.slice(0, 1) || 'I'}
+                          </div>
+                        )}
                         <div>
                           <p className="font-semibold text-slate-900 dark:text-white">{item.name}</p>
                           <p className="text-xs text-slate-500">
@@ -1063,6 +1112,12 @@ export default function Inventory() {
         </form>
       </Dialog>
 
+      <Dialog isOpen={previewImage !== null} onClose={() => setPreviewImage(null)} title={t('common.preview') || 'Image Preview'} size="lg">
+        <div className="flex justify-center items-center p-2 bg-slate-50 dark:bg-slate-900 rounded-2xl overflow-hidden">
+          <img src={previewImage} alt="Preview" className="max-w-full max-h-[70vh] rounded-xl object-contain" />
+        </div>
+      </Dialog>
+
       <Dialog
         isOpen={isOpen}
         onClose={closeDialog}
@@ -1072,58 +1127,123 @@ export default function Inventory() {
         <form id="inventory-item-form" className="space-y-5" onSubmit={handleSubmit}>
           <FormSectionCard hint={t('inventory.help')}>
             <div className="space-y-4">
-              <div>
-                <label className="label">{t('inventory.itemName')}</label>
-                <input
-                  id="inventory-item-name"
-                  className="input mt-1"
-                  name="name"
-                  value={form.name}
-                  onChange={handleFormChange}
-                  placeholder={t('inventory.itemNamePlaceholder')}
-                  required
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <label className="label">{t('inventory.itemCategory')}</label>
-                  <div className="mt-1">
-                    <CategorySearchCreateField
-                      id="inventory-item-category"
-                      inputId="inventory-item-category-search"
-                      clearButtonId="inventory-item-category-clear"
-                      searchClearButtonId="inventory-item-category-search-clear"
-                      createButtonId="inventory-item-category-create"
-                      selectedCategory={selectedCategory}
-                      options={categoryOptions}
-                      onSelect={handleCategorySelect}
-                      onCreated={handleCategoryCreated}
-                      placeholder={t('categories.selectCategory')}
-                      searchPlaceholder={t('categories.searchPlaceholder')}
-                    />
-                  </div>
-                  {categoriesError ? (
-                    <p className="mt-2 text-xs text-rose-600">{categoriesError}</p>
-                  ) : categoriesLoading && !selectedCategory ? (
-                    <p className="mt-2 text-xs text-slate-500">{t('common.loading')}</p>
-                  ) : selectedCategory?.name ? (
-                    <p className="mt-2 text-xs text-slate-500">{selectedCategory.name}</p>
-                  ) : null}
-                </div>
-                <div>
-                  <label className="label">
-                    {t('inventory.itemCode')}
-                    <span className="ml-1 text-[10px] text-slate-400 font-normal">(barcode ready)</span>
-                  </label>
+              <div className="flex flex-col gap-4 md:flex-row md:items-start">
+                {/* Image Upload Zone */}
+                <div className="w-full md:w-1/3">
+                  <label className="label mb-1.5 block">Product Image</label>
+                  {form.imageUrl ? (
+                    <div className="relative group rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 aspect-square w-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+                      <img src={form.imageUrl} alt="Product" className="object-cover w-full h-full cursor-zoom-in" onClick={() => setPreviewImage(form.imageUrl)} />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          className="bg-white/90 hover:bg-white text-slate-800 hover:text-slate-900 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm transition"
+                          onClick={() => document.getElementById('inventory-image-input').click()}
+                        >
+                          Change
+                        </button>
+                        <button
+                          type="button"
+                          className="bg-rose-600/90 hover:bg-rose-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm transition"
+                          onClick={handleRemoveImage}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-primary-500 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer aspect-square bg-slate-50/50 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-900/40 transition group"
+                      onClick={() => document.getElementById('inventory-image-input').click()}
+                    >
+                      {imageUploading ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                          <span className="text-xs text-slate-500">Uploading...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 group-hover:scale-105 transition-transform">
+                            <Plus className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                          </div>
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Upload image</span>
+                          <span className="text-[10px] text-slate-400">JPG, PNG, WEBP (Max 5MB)</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <input
-                    id="inventory-item-code"
-                    className="input mt-1"
-                    name="itemCode"
-                    value={form.itemCode}
-                    onChange={handleFormChange}
-                    placeholder={t('inventory.itemCodePlaceholder')}
+                    id="inventory-image-input"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                    disabled={imageUploading}
                   />
                 </div>
+
+                {/* Name and other primary fields */}
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <label className="label">{t('inventory.itemName')}</label>
+                    <input
+                      id="inventory-item-name"
+                      className="input mt-1"
+                      name="name"
+                      value={form.name}
+                      onChange={handleFormChange}
+                      placeholder={t('inventory.itemNamePlaceholder')}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="label">{t('inventory.itemCategory')}</label>
+                      <div className="mt-1">
+                        <CategorySearchCreateField
+                          id="inventory-item-category"
+                          inputId="inventory-item-category-search"
+                          clearButtonId="inventory-item-category-clear"
+                          searchClearButtonId="inventory-item-category-search-clear"
+                          createButtonId="inventory-item-category-create"
+                          selectedCategory={selectedCategory}
+                          options={categoryOptions}
+                          onSelect={handleCategorySelect}
+                          onCreated={handleCategoryCreated}
+                          placeholder={t('categories.selectCategory')}
+                          searchPlaceholder={t('categories.searchPlaceholder')}
+                        />
+                      </div>
+                      {categoriesError ? (
+                        <p className="mt-2 text-xs text-rose-600">{categoriesError}</p>
+                      ) : categoriesLoading && !selectedCategory ? (
+                        <p className="mt-2 text-xs text-slate-500">{t('common.loading')}</p>
+                      ) : selectedCategory?.name ? (
+                        <p className="mt-2 text-xs text-slate-500">{selectedCategory.name}</p>
+                      ) : null}
+                    </div>
+
+                    <div>
+                      <label className="label">
+                        {t('inventory.itemCode')}
+                        <span className="ml-1 text-[10px] text-slate-400 font-normal">(barcode ready)</span>
+                      </label>
+                      <input
+                        id="inventory-item-code"
+                        className="input mt-1"
+                        name="itemCode"
+                        value={form.itemCode}
+                        onChange={handleFormChange}
+                        placeholder={t('inventory.itemCodePlaceholder')}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Item Type & Metal Type Fields */}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                   <label className="label">{t('inventory.itemType')}</label>
                   <div className="mt-1 grid grid-cols-2 gap-2">
@@ -1336,11 +1456,20 @@ export default function Inventory() {
         size="lg"
       >
         <div className="space-y-4">
-          <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50">
-            <h3 className="font-semibold text-slate-900 dark:text-white">{historyProduct?.name || '-'}</h3>
-            <p className="text-xs text-slate-500 mt-1">
-              SKU/Barcode: <span className="font-mono">{historyProduct?.sku || historyProduct?.itemCode || '-'}</span> | Unit: {historyProduct?.primaryUnit || getUnitText(historyProduct?.unit) || 'pcs'}
-            </p>
+          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/50">
+            {historyProduct?.imageUrl ? (
+              <img src={historyProduct.imageUrl} alt={historyProduct.name} className="h-12 w-12 shrink-0 rounded-xl object-cover border border-slate-200 dark:border-slate-800 cursor-zoom-in" onClick={() => setPreviewImage(historyProduct.imageUrl)} />
+            ) : (
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                {(historyProduct?.name || 'P').slice(0, 1).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <h3 className="font-semibold text-slate-900 dark:text-white">{historyProduct?.name || '-'}</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                SKU/Barcode: <span className="font-mono">{historyProduct?.sku || historyProduct?.itemCode || '-'}</span> | Unit: {historyProduct?.primaryUnit || getUnitText(historyProduct?.unit) || 'pcs'}
+              </p>
+            </div>
           </div>
 
           {historyLoading ? (

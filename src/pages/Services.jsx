@@ -3359,6 +3359,18 @@ export default function Services() {
                                     )}
                                     noResultsLabel={t("common.noData")}
                                     loadingLabel={t("common.loading")}
+                                    renderOption={(option) => (
+                                      <div className="flex items-center gap-2">
+                                        {option.entity?.imageUrl ? (
+                                          <img src={option.entity.imageUrl} alt={option.label} className="h-6 w-6 rounded object-cover border border-slate-200 dark:border-slate-800" />
+                                        ) : (
+                                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-400 dark:bg-slate-800">
+                                            {option.entity?.name?.charAt(0).toUpperCase() || 'P'}
+                                          </div>
+                                        )}
+                                        <span>{option.label}</span>
+                                      </div>
+                                    )}
                                   />
                                 </div>
                               ) : null}

@@ -56,6 +56,7 @@ export function normalizeLookupProduct(raw = {}) {
   return {
     id,
     name,
+    imageUrl: String(pickFirstDefined(raw.imageUrl, product.imageUrl)).trim(),
     companyName: String(pickFirstDefined(raw.companyName, product.companyName)).trim(),
     metalType: String(pickFirstDefined(raw.metalType, product.metalType)).trim(),
     purity: String(pickFirstDefined(raw.purity, product.purity)).trim(),

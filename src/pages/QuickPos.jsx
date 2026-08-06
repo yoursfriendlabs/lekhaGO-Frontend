@@ -270,6 +270,7 @@ export default function QuickPos() {
   const [activeAttributes, setActiveAttributes] = useState({});
   const [mobileStep, setMobileStep] = useState("items");
   const [productUnitTypes, setProductUnitTypes] = useState({});
+  const [previewImage, setPreviewImage] = useState(null);
   const [visibleProductCount, setVisibleProductCount] = useState(
     MOBILE_PRODUCT_PAGE_SIZE,
   );
@@ -1916,7 +1917,7 @@ return (
                   return (
                     <article
                       key={product.id}
-                      className={`flex flex-col overflow-hidden rounded-[24px] border bg-white shadow-sm transition-all hover:shadow-md ${
+                      className={`flex flex-col overflow-hidden rounded-[20px] border bg-white shadow-sm transition-all hover:shadow-md ${
                         isOutOfStock
                           ? "opacity-75 bg-red-50 border-red-200"
                           : inCart
@@ -1925,7 +1926,18 @@ return (
                       }`}
                     >
                       <div className="flex flex-1 flex-col p-2.5">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="flex items-start gap-2.5">
+                          {product.imageUrl ? (
+                            <img
+                              src={product.imageUrl}
+                              alt={product.name}
+                              className="h-10 w-10 shrink-0 rounded-lg object-cover border border-slate-100 dark:border-slate-800 cursor-zoom-in"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewImage(product.imageUrl);
+                              }}
+                            />
+                          ) : null}
                           <div className="min-w-0 flex-1">
                             <p
                               className={`truncate text-xs font-bold text-slate-900 ${isOutOfStock ? "text-red-900" : ""}`}
@@ -1933,17 +1945,20 @@ return (
                               {product.name}
                             </p>
                             <p
-                              className={`mt-0.5 truncate text-[12px] text-slate-500 ${isOutOfStock ? "text-red-600" : ""}`}
+                              className={`mt-0.5 truncate text-[11px] text-slate-500 ${isOutOfStock ? "text-red-600" : ""}`}
                             >
                               {product.categoryName ||
                                 product.companyName ||
                                 t("general")}
                             </p>
                           </div>
-                          <div className="shrink-0 w-full max-w-full sm:w-auto">
+                        </div>
+
+                        {product.secondaryUnit && (
+                          <div className="mt-2.5">
                             {renderProductUnitSelect(product, inCart)}
                           </div>
-                        </div>
+                        )}
 
                         <div className="mt-auto pt-2">
                           <div className="flex items-end justify-between gap-1">
@@ -3090,6 +3105,13 @@ return (
               Cancel
             </button>
           </div>
+        </div>
+      </Dialog>
+
+      {/* Image Preview Dialog */}
+      <Dialog isOpen={previewImage !== null} onClose={() => setPreviewImage(null)} title={t('common.preview') || 'Image Preview'} size="lg">
+        <div className="flex justify-center items-center p-2 bg-slate-50 dark:bg-slate-900 rounded-2xl overflow-hidden">
+          <img src={previewImage} alt="Preview" className="max-w-full max-h-[70vh] rounded-xl object-contain" />
         </div>
       </Dialog>
 
