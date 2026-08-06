@@ -657,7 +657,8 @@ export default function Parties() {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const nextValue = name === "phone" ? value.replace(/\D/g, "") : value;
+    setForm((prev) => ({ ...prev, [name]: nextValue }));
   };
 
   const openCreate = () => {
