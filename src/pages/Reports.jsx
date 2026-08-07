@@ -1550,11 +1550,7 @@ function getBalanceToneClass(value) {
 }
 
 function getBalanceLabel(value, t) {
-  if (!Number.isFinite(Number(value))) return t('ledger.currentBalance');
-  const amount = Number(value);
-  if (amount > 0) return t('parties.toReceive');
-  if (amount < 0) return t('parties.toGive');
-  return t('parties.settled');
+  return t('ledger.currentBalance');
 }
 
 function toResolvedPartyOption(raw) {

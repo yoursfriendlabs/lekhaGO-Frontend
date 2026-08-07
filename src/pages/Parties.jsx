@@ -590,17 +590,6 @@ export default function Parties() {
     };
   }, [selectedId, statementReloadKey, txPage, txSortOrder, upsertParty]);
 
-  const totalsummary = useMemo(() => {
-    return parties.reduce(
-      (totals, party) => {
-        const amount = toAmount(party.currentAmount);
-        if (amount < 0) totals.totalReceive += Math.abs(amount);
-        else if (amount > 0) totals.totalGive += amount;
-        return totals;
-      },
-      { totalReceive: 0, totalGive: 0 },
-    );
-  }, [parties]);
 
   const selectedParty = useMemo(
     () => parties.find((party) => party.id === selectedId) || null,
@@ -1030,64 +1019,6 @@ export default function Parties() {
       ) : null}
       {listError ? <Notice title={listError} tone="error" /> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex items-center gap-4 rounded-2xl border border-emerald-200/70 bg-emerald-50/60 px-5 py-4 dark:border-emerald-800/40 dark:bg-emerald-900/10">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-xs uppercase text-emerald-600 dark:text-emerald-400">
-              {t("parties.totalToReceive")}
-            </p>
-            <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
-              {t("currency.formatted", {
-                symbol: t("currency.symbol"),
-                amount: totalsummary.totalReceive.toFixed(2),
-              })}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 rounded-2xl border border-rose-200/70 bg-rose-50/60 px-5 py-4 dark:border-rose-800/40 dark:bg-rose-900/10">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-900/40">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-xs uppercase text-rose-600 dark:text-rose-400">
-              {t("parties.totalToGive")}
-            </p>
-            <p className="text-xl font-bold text-rose-700 dark:text-rose-300">
-              {t("currency.formatted", {
-                symbol: t("currency.symbol"),
-                amount: totalsummary.totalGive.toFixed(2),
-              })}
-            </p>
-          </div>
-        </div>
-      </div>
 
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="card flex flex-col gap-4 lg:sticky lg:top-6 lg:self-start">

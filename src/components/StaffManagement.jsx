@@ -495,7 +495,7 @@ function StaffFormDialog({
                       </div>
 
                       <div className="mt-5 grid gap-4 md:grid-cols-2">
-                        <div>
+                        <div className={isCreate ? 'md:col-span-2' : ''}>
                           <label className="label" htmlFor="staff-salary">{t('staffManagement.salary')}</label>
                           <input
                             id="staff-salary"
@@ -510,21 +510,23 @@ function StaffFormDialog({
                             placeholder={t('staffManagement.compensationPlaceholder')}
                           />
                         </div>
-                        <div>
-                          <label className="label" htmlFor="staff-total-received">{t('staffManagement.totalReceived')}</label>
-                          <input
-                            id="staff-total-received"
-                            className="input mt-1"
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="0.01"
-                            value={form.totalReceived}
-                            onChange={(event) => onFieldChange('totalReceived', event.target.value)}
-                            disabled={readOnly}
-                            placeholder={t('staffManagement.totalReceivedPlaceholder')}
-                          />
-                        </div>
+                        {!isCreate ? (
+                          <div>
+                            <label className="label" htmlFor="staff-total-received">{t('staffManagement.totalReceived')}</label>
+                            <input
+                              id="staff-total-received"
+                              className="input mt-1"
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.01"
+                              value={form.totalReceived}
+                              onChange={(event) => onFieldChange('totalReceived', event.target.value)}
+                              disabled={readOnly}
+                              placeholder={t('staffManagement.totalReceivedPlaceholder')}
+                            />
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>
