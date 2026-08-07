@@ -841,6 +841,12 @@ export const api = {
       { limit: 500, ...params },
       listCache(["products", "reports", "dashboard"]),
     ),
+  getProductStats: () =>
+    request(
+      "/api/products/stats",
+      { method: "GET" },
+      listCache(["products", "reports", "dashboard"], CACHE_TTL.short),
+    ),
   lookupProducts: (params = {}) =>
     collectionRequest(
       "/api/products/lookup",
@@ -857,6 +863,17 @@ export const api = {
     request(
       `/api/products/${id}`,
       { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("product", id),
+        "products",
+        "reports",
+        "dashboard",
+      ]),
+    ),
+  deleteProduct: (id) =>
+    request(
+      `/api/products/${id}`,
+      { method: "DELETE" },
       mutationConfig([
         detailTags("product", id),
         "products",
@@ -1037,6 +1054,12 @@ export const api = {
       params,
       listCache(["sales", "reports", "dashboard"], options),
     ),
+  getSaleStats: () =>
+    request(
+      "/api/sales/stats",
+      { method: "GET" },
+      listCache(["sales", "reports", "dashboard"], CACHE_TTL.short),
+    ),
   getSale: (id) =>
     request(
       `/api/sales/${id}`,
@@ -1129,6 +1152,12 @@ export const api = {
       "/api/services",
       params,
       listCache(["services", "reports", "dashboard"], options),
+    ),
+  getServiceStats: () =>
+    request(
+      "/api/services/stats",
+      { method: "GET" },
+      listCache(["services", "reports", "dashboard"], CACHE_TTL.short),
     ),
 
   lowStock: (params = {}) =>

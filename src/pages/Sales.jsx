@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Pencil, FileText, Package, Plus, Printer, Trash2, TrendingUp, DollarSign, CheckCircle2, Clock, Calendar } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
@@ -27,6 +27,7 @@ import dayjs, { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useSaleStore } from '../stores/sales';
 import { useProductStore } from '../stores/products';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
+import StatsCard from '../components/StatsCard.jsx';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import {
@@ -102,6 +103,27 @@ export default function Sales() {
   // ── Stores ──
   const { sales: salesList, loading: salesLoading, fetch: fetchSales, invalidate: invalidateSales } = useSaleStore();
   const [suggestedInvoiceNo, setSuggestedInvoiceNo] = useState('');
+
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      setStatsLoading(true);
+      const res = await api.getSaleStats();
+      setStats(res);
+    } catch (err) {
+      console.error('Failed to fetch sale stats', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (businessProfile?.id) {
+      fetchStats();
+    }
+  }, [businessProfile?.id, salesList, fetchStats]);
   const [productDirectory, setProductDirectory] = useState({});
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [partyFilterId, setPartyFilterId] = useState('');
@@ -432,19 +454,7 @@ export default function Sales() {
     });
   }, [salesList, dateFilter]);
 
-  const salesStats = useMemo(() => {
-    const totalCount = filteredSalesByDate.length;
-    const totalAmount = filteredSalesByDate.reduce((sum, s) => sum + Number(s.grandTotal || 0), 0);
-    const paidAmount = filteredSalesByDate.reduce((sum, s) => {
-      const due = Number(s.dueAmount || 0);
-      const total = Number(s.grandTotal || 0);
-      return sum + Math.max(total - due, 0);
-    }, 0);
-    const dueAmount = filteredSalesByDate.reduce((sum, s) => sum + Number(s.dueAmount || 0), 0);
-    const avgOrderValue = totalCount > 0 ? totalAmount / totalCount : 0;
-
-    return { totalCount, totalAmount, paidAmount, dueAmount, avgOrderValue };
-  }, [filteredSalesByDate]);
+  // Sales stats are now fetched directly from the backend API stats endpoint
 
   const exportCsv = () => {
     const rows = [
@@ -805,58 +815,39 @@ export default function Sales() {
             ))}
           </div>
           <div className="text-xs font-semibold text-slate-500">
-            Showing <strong className="text-slate-900">{salesStats.totalCount}</strong> order{salesStats.totalCount === 1 ? '' : 's'}
+            Showing <strong className="text-slate-900">{stats?.totalCount ?? 0}</strong> order{(stats?.totalCount ?? 0) === 1 ? '' : 's'}
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-2xl border border-slate-100 bg-white/90 p-4 shadow-sm space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Total Revenue</span>
-              <span className="rounded-full bg-[#9c5f22]/10 px-2 py-0.5 text-[10px] font-bold text-[#9c5f22]">
-                {salesStats.totalCount} orders
-              </span>
-            </div>
-            <p className="text-2xl font-extrabold text-slate-900">
-              {t('currency.formatted', { symbol: t('currency.symbol'), amount: salesStats.totalAmount.toFixed(2) })}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 shadow-sm space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">Total Collected</span>
-              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                Paid
-              </span>
-            </div>
-            <p className="text-2xl font-extrabold text-emerald-800">
-              {t('currency.formatted', { symbol: t('currency.symbol'), amount: salesStats.paidAmount.toFixed(2) })}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-4 shadow-sm space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-500">Pending Due</span>
-              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">
-                Outstanding
-              </span>
-            </div>
-            <p className="text-2xl font-extrabold text-rose-800">
-              {t('currency.formatted', { symbol: t('currency.symbol'), amount: salesStats.dueAmount.toFixed(2) })}
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-100 bg-white/90 p-4 shadow-sm space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Avg Order Value</span>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
-                Average
-              </span>
-            </div>
-            <p className="text-2xl font-extrabold text-slate-900">
-              {t('currency.formatted', { symbol: t('currency.symbol'), amount: salesStats.avgOrderValue.toFixed(2) })}
-            </p>
-          </div>
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <StatsCard
+            title={t('sales.totalRevenue') || 'Total Revenue'}
+            value={money(stats?.totalAmount ?? 0)}
+            icon={TrendingUp}
+            tone="default"
+            loading={statsLoading}
+          />
+          <StatsCard
+            title={t('sales.totalCollected') || 'Total Collected'}
+            value={money(stats?.paidAmount ?? 0)}
+            icon={DollarSign}
+            tone="success"
+            loading={statsLoading}
+          />
+          <StatsCard
+            title={t('sales.pendingDue') || 'Pending Due'}
+            value={money(stats?.dueAmount ?? 0)}
+            icon={Clock}
+            tone="danger"
+            loading={statsLoading}
+          />
+          <StatsCard
+            title={t('sales.avgOrderValue') || 'Avg Order Value'}
+            value={money(stats?.avgOrderValue ?? 0)}
+            icon={Package}
+            tone="info"
+            loading={statsLoading}
+          />
         </div>
       </div>
 

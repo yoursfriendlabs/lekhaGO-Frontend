@@ -25,6 +25,7 @@ const EMPTY_SUMMARY = Object.freeze({
   profitOrLossStatus: 'break_even',
   productCount: 0,
   lowStockCount: 0,
+  nearExpiryCount: 0,
   lowStockItems: [],
   recentSales: [],
   recentPurchases: [],
@@ -99,6 +100,7 @@ function normalizeDashboardSummary(payload = {}) {
     profitOrLossStatus: summary.profitOrLossStatus || (profitOrLoss > 0 ? 'profit' : profitOrLoss < 0 ? 'loss' : 'break_even'),
     productCount: asNumber(summary.productCount),
     lowStockCount: asNumber(summary.lowStockCount ?? lowStockItems.length),
+    nearExpiryCount: asNumber(summary.nearExpiryCount),
     lowStockItems,
     recentSales: asArray(summary.recentSales),
     recentPurchases: asArray(summary.recentPurchases),
@@ -364,7 +366,11 @@ export default function Dashboard() {
               </div>
               <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
                 <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><Package size={14} /> {t('dashboard.lowStockAlerts')}</div>
-                <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{summary.lowStockCount}</p>
+                <p className={`mt-2 text-lg font-semibold ${summary.lowStockCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>{summary.lowStockCount}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
+                <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><Clock size={14} /> {t('inventory.nearExpiryItems') || 'Near Expiry'}</div>
+                <p className={`mt-2 text-lg font-semibold ${summary.nearExpiryCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>{summary.nearExpiryCount || 0}</p>
               </div>
               <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
                 <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><UserCheck size={14} /> {t('dashboard.pendingReceivable')}</div>

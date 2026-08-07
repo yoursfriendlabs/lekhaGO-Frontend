@@ -12,6 +12,7 @@ import PaymentTypeSummary from "../components/PaymentTypeSummary.jsx";
 import QuickPaymentButtons from "../components/QuickPaymentButtons.jsx";
 import AsyncSearchableSelect from "../components/AsyncSearchableSelect.jsx";
 import InvoiceHeader from "../components/InvoiceHeader";
+import PageHeader from "../components/PageHeader";
 import MobileFormStepper from "../components/MobileFormStepper.jsx";
 import PartyFilterSelect from "../components/PartyFilterSelect.jsx";
 import CreatorFilterSelect from "../components/CreatorFilterSelect.jsx";
@@ -27,6 +28,7 @@ import { printElement, printThermalReceipt } from "../lib/print.js";
 import FileUpload from "../components/FileUpload";
 import DynamicAttributes from "../components/DynamicAttributes";
 import ThermalReceipt from "../components/ThermalReceipt";
+import StatsCard from "../components/StatsCard.jsx";
 import {
   getJewelleryBreakdown,
   getPurityOptionsForMetal,
@@ -411,54 +413,7 @@ function normalizeServiceOrder(record) {
   };
 }
 
-function OverviewMetric({ icon: Icon, label, value, tone = "slate" }) {
-  const styles = {
-    slate: {
-      wrapper:
-        "border-slate-200/70 bg-white/80 dark:border-slate-800/60 dark:bg-slate-950/40",
-      icon: "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900",
-    },
-    blue: {
-      wrapper:
-        "border-blue-200/70 bg-blue-50/70 dark:border-blue-900/40 dark:bg-blue-900/20",
-      icon: "bg-blue-600 text-white",
-    },
-    amber: {
-      wrapper:
-        "border-amber-200/70 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-900/20",
-      icon: "bg-amber-500 text-white",
-    },
-    rose: {
-      wrapper:
-        "border-rose-200/70 bg-rose-50/80 dark:border-rose-900/40 dark:bg-rose-900/20",
-      icon: "bg-rose-500 text-white",
-    },
-  };
-
-  const palette = styles[tone] || styles.slate;
-
-  return (
-    <div
-      className={`rounded-2xl border px-3 py-2.5 shadow-sm shadow-slate-200/20 ${palette.wrapper}`}
-    >
-      <div className="flex items-center justify-between gap-2.5">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-            {label}
-          </p>
-          <p className="mt-1 whitespace-nowrap text-base font-semibold leading-tight text-slate-900 dark:text-white">
-            {value}
-          </p>
-        </div>
-        <div
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${palette.icon}`}
-        >
-          <Icon size={15} />
-        </div>
-      </div>
-    </div>
-  );
-}
+// Centralized StatsCard component is used instead of local OverviewMetric helper
 
 function FilterChip({ label, active, onClick }) {
   return (
@@ -568,6 +523,27 @@ export default function Services() {
     patch: patchService,
   } = useServiceStore();
   const [suggestedOrderNo, setSuggestedOrderNo] = useState("");
+
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      setStatsLoading(true);
+      const res = await api.getServiceStats();
+      setStats(res);
+    } catch (err) {
+      console.error("Failed to fetch service stats", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (businessProfile?.id) {
+      fetchStats();
+    }
+  }, [businessProfile?.id, serviceList, fetchStats]);
   const [productDirectory, setProductDirectory] = useState({});
   const [storeType, setStoreType] = useState("physical");
   const [storeDropdownOpen, setStoreDropdownOpen] = useState(false);
@@ -1682,34 +1658,7 @@ export default function Services() {
   const filteredServiceList = safeServiceList;
   const pagedServices = filteredServiceList;
 
-  const serviceOverview = useMemo(() => {
-    const openCount = safeServiceList.filter(
-      (order) => order.status === "open",
-    ).length;
-    const closedCount = safeServiceList.filter(
-      (order) => order.status === "closed",
-    ).length;
-    const inProgressCount = safeServiceList.filter(
-      (order) => order.status === "in_progress",
-    ).length;
-    const pendingCollection = safeServiceList.reduce(
-      (sum, order) =>
-        sum +
-        Math.max(
-          Number(order.grandTotal || 0) - Number(order.receivedTotal || 0),
-          0,
-        ),
-      0,
-    );
-
-    return {
-      totalOrders: safeServiceList.length,
-      openCount,
-      closedCount,
-      inProgressCount,
-      pendingCollection,
-    };
-  }, [safeServiceList]);
+  // Service stats are now loaded directly from the backend API stats endpoint
 
   const statusFilterOptions = useMemo(
     () => [
@@ -1981,57 +1930,53 @@ export default function Services() {
   // ── Render ──
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-[32px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.22),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(249,245,239,0.96))] shadow-sm shadow-primary-950/10 dark:border-primary-900/40 dark:bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.18),transparent_42%),linear-gradient(135deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))]">
-        <div className="p-5 md:p-8">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-3xl">
-              <h1 className="mt-0 font-serif text-3xl text-slate-900 dark:text-white md:text-3xl">
-                {servicesTitle}
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 md:text-base">
-                {servicesSubtitle}
-              </p>
-            </div>
+      <PageHeader
+        title={servicesTitle}
+        subtitle={servicesSubtitle}
+        action={
+          canManageServices ? (
+            <button
+              className="btn-primary w-full sm:w-auto"
+              type="button"
+              onClick={openDialog}
+            >
+              <Plus size={16} className="mr-1.5 inline" />
+              {newOrderLabel}
+            </button>
+          ) : null
+        }
+      />
 
-            {canManageServices ? (
-              <button
-                className="btn-primary w-full sm:w-auto"
-                type="button"
-                onClick={openDialog}
-              >
-                <Plus size={16} className="mr-1.5 inline" />
-                {newOrderLabel}
-              </button>
-            ) : null}
-          </div>
-
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-hide sm:grid sm:grid-cols-2 xl:grid-cols-4">
-            <OverviewMetric
-              icon={LayoutList}
-              label={t("services.totalOrders")}
-              value={serviceOverview.totalOrders}
-            />
-            <OverviewMetric
-              icon={Check}
-              label={t("services.closed")}
-              value={serviceOverview.closedCount}
-              tone="emerald"
-            />
-            <OverviewMetric
-              icon={CalendarDays}
-              label={t("services.activeJobs")}
-              value={serviceOverview.inProgressCount}
-              tone="amber"
-            />
-            <OverviewMetric
-              icon={Wallet}
-              label={t("services.pendingCollection")}
-              value={money(serviceOverview.pendingCollection)}
-              tone="rose"
-            />
-          </div>
-        </div>
-      </section>
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <StatsCard
+          title={t("services.totalOrders")}
+          value={stats?.totalOrders ?? 0}
+          icon={LayoutList}
+          tone="default"
+          loading={statsLoading}
+        />
+        <StatsCard
+          title={t("services.closed")}
+          value={stats?.closedCount ?? 0}
+          icon={Check}
+          tone="success"
+          loading={statsLoading}
+        />
+        <StatsCard
+          title={t("services.activeJobs")}
+          value={stats?.inProgressCount ?? 0}
+          icon={CalendarDays}
+          tone="warning"
+          loading={statsLoading}
+        />
+        <StatsCard
+          title={t("services.pendingCollection")}
+          value={money(stats?.pendingCollection ?? 0)}
+          icon={Wallet}
+          tone="danger"
+          loading={statsLoading}
+        />
+      </div>
 
       {listNotice.message ? (
         <Notice title={listNotice.message} tone={listNotice.type} />
