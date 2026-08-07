@@ -387,48 +387,28 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
         
         const changeResponse = await api.updateSubscription(payload);
         syncSubscription(changeResponse);
-      }
-
-      // 2. Fetch gateway checkout parameters
-      const response = await api.getSubscriptionPaymentParams({ provider });
-      if (provider === 'esewa') {
-        if (response.actionUrl && response.params) {
-          submitEsewaForm(response.actionUrl, response.params);
-        } else {
-          throw new Error('Invalid eSewa response received from server.');
+        try {
+          await refreshSession?.();
+        } catch {
+          // ignore
         }
-      } else if (provider === 'khalti') {
-        if (response.paymentUrl) {
-          window.location.href = response.paymentUrl;
-        } else {
-          throw new Error('Khalti payment URL not received from server.');
-        }
+        await loadSubscriptionSettings({ showSpinner: false });
+        
+        setNotice({
+          type: 'success',
+          message: t('settingsPage.subscription.planSaved') || 'Your upgrade request has been submitted to the admin for approval.',
+        });
       }
     } catch (paymentError) {
       setNotice({
         type: 'error',
         message: paymentError.message || t('auth.errors.generic'),
       });
+    } finally {
       setPaymentLoading(null);
     }
   };
 
-  const submitEsewaForm = (actionUrl, params) => {
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = actionUrl;
-
-    Object.entries(params).forEach(([key, value]) => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = key;
-      input.value = value;
-      form.appendChild(input);
-    });
-
-    document.body.appendChild(form);
-    form.submit();
-  };
 
   return (
     <div className="space-y-6">
@@ -643,29 +623,14 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
             <div className="flex flex-wrap gap-2.5">
               <button
                 type="button"
-                onClick={() => handleInitiatePayment('esewa')}
+                onClick={() => handleInitiatePayment('manual')}
                 disabled={Boolean(paymentLoading)}
-                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50"
               >
-                {paymentLoading === 'esewa' ? (
+                {paymentLoading ? (
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                ) : (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-white text-[9px] font-bold text-emerald-600 font-serif">e</span>
-                )}
-                Pay with eSewa
-              </button>
-              <button
-                type="button"
-                onClick={() => handleInitiatePayment('khalti')}
-                disabled={Boolean(paymentLoading)}
-                className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:opacity-50"
-              >
-                {paymentLoading === 'khalti' ? (
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                ) : (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-white text-[9px] font-bold text-violet-600 font-serif">K</span>
-                )}
-                Pay with Khalti
+                ) : null}
+                Send Payment Request
               </button>
             </div>
           </div>
@@ -777,35 +742,17 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
                         Contact Us
                       </a>
                     ) : (plan.isPaid || plan.key === 'growth') ? (
-                      <div className="space-y-2">
-                        {/* We offer eSewa/Khalti direct checkout selectors */}
-                        <button
-                          type="button"
-                          onClick={() => handleInitiatePayment('esewa', plan)}
-                          disabled={Boolean(paymentLoading)}
-                          className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/50 py-2.5 text-xs font-bold text-emerald-850 transition hover:bg-emerald-100/50 disabled:opacity-60"
-                        >
-                          {paymentLoading === 'esewa' ? (
-                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-emerald-850 border-t-transparent" />
-                          ) : (
-                            <span className="flex h-4 w-4 items-center justify-center rounded bg-emerald-600 text-[8px] font-bold text-white font-serif">e</span>
-                          )}
-                          Pay with eSewa
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleInitiatePayment('khalti', plan)}
-                          disabled={Boolean(paymentLoading)}
-                          className="flex w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50/50 py-2.5 text-xs font-bold text-violet-850 transition hover:bg-violet-100/50 disabled:opacity-60"
-                        >
-                          {paymentLoading === 'khalti' ? (
-                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-850 border-t-transparent" />
-                          ) : (
-                            <span className="flex h-4 w-4 items-center justify-center rounded bg-violet-650 text-[8px] font-bold text-white font-serif">K</span>
-                          )}
-                          Pay with Khalti
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleInitiatePayment('manual', plan)}
+                        disabled={Boolean(paymentLoading)}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/50 py-2.5 text-xs font-bold text-indigo-900 transition hover:bg-indigo-100/50 disabled:opacity-60"
+                      >
+                        {paymentLoading ? (
+                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-900 border-t-transparent" />
+                        ) : null}
+                        Send Payment Request
+                      </button>
                     ) : (
                       <button
                         type="button"
