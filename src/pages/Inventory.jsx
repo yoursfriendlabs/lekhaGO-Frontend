@@ -13,7 +13,11 @@ import { getPurityOptionsForMetal, METAL_TYPE_OPTIONS } from '../lib/jewellery.j
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { buildSettingsTabPath, UNITS_SETTINGS_TAB } from '../lib/settingsTabs.js';
 import { useProductStore } from '../stores/products';
-import { ArrowUpDown, Pencil, Plus, History } from 'lucide-react';
+import { ArrowUpDown, Pencil, Plus, History, AlertTriangle, Clock, TrendingUp, TrendingDown, Trash2 } from 'lucide-react';
+import ImageCropperModal from '../components/ImageCropperModal.jsx';
+import StatsCard from '../components/StatsCard.jsx';
+import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
+import ActionMenu from '../components/ActionMenu.jsx';
 
 const makeEmptyItem = () => ({
   name: '',
@@ -35,6 +39,7 @@ const makeEmptyItem = () => ({
   minWholesaleQuantity: '',
   lowStockAlert: true,
   imageUrl: '',
+  expiryDate: '',
 });
 
 const parseNumber = (value) => {
@@ -67,6 +72,7 @@ const buildProductPayload = (form) => ({
   openingStock: parseNumber(form.openingStock),
   lowStockAlert: form.lowStockAlert,
   imageUrl: form.imageUrl || null,
+  expiryDate: form.expiryDate || null,
 });
 
 function getProductCategoryName(product = {}) {
@@ -100,6 +106,7 @@ function productToForm(product = {}) {
     minWholesaleQuantity: String(product.minWholesaleQuantity ?? ''),
     lowStockAlert: Boolean(product.lowStockAlert),
     imageUrl: product.imageUrl || '',
+    expiryDate: product.expiryDate || '',
   };
 }
 
@@ -122,6 +129,46 @@ function getUnitOptionLabel(unit = {}) {
     return `${name} (${symbol})`;
   }
   return name || symbol;
+}
+
+function getExpiryDateColorClass(expiryDateStr) {
+  if (!expiryDateStr) return '';
+  const expiryDate = new Date(expiryDateStr);
+  const today = new Date();
+  
+  expiryDate.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  
+  const diffTime = expiryDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays <= 10) {
+    return 'text-rose-600 dark:text-rose-450 font-semibold';
+  } else if (diffDays <= 25) {
+    return 'text-amber-600 dark:text-amber-450 font-semibold';
+  } else {
+    return 'text-emerald-600 dark:text-emerald-450 font-semibold';
+  }
+}
+
+function getExpiryRemainingDaysText(expiryDateStr, t) {
+  if (!expiryDateStr) return '';
+  const expiryDate = new Date(expiryDateStr);
+  const today = new Date();
+  
+  expiryDate.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  
+  const diffTime = expiryDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return t('inventory.expired') || 'Expired';
+  } else if (diffDays === 0) {
+    return t('inventory.expiresToday') || 'Expires today';
+  } else {
+    return t('inventory.daysRemaining', { count: diffDays }) || `${diffDays} days remaining`;
+  }
 }
 
 function isRestockableProduct(product = {}) {
@@ -193,7 +240,32 @@ export default function Inventory() {
   const [form, setForm] = useState(makeEmptyItem());
   const [saving, setSaving] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState(null);
+
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      setStatsLoading(true);
+      const res = await api.getProductStats();
+      setStats(res);
+    } catch (err) {
+      console.error('Failed to fetch product stats', err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (businessProfile?.id) {
+      fetchStats();
+    }
+  }, [businessProfile?.id, products, fetchStats]);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [deleteProduct, setDeleteProduct] = useState(null);
+  const [deletingProductId, setDeletingProductId] = useState('');
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [restockProduct, setRestockProduct] = useState(null);
   const [restockQuantity, setRestockQuantity] = useState('');
@@ -213,9 +285,35 @@ export default function Inventory() {
   const [unitsLoading, setUnitsLoading] = useState(false);
   const [unitsError, setUnitsError] = useState('');
 
+  const closeDeleteDialog = () => {
+    if (deleteProduct && deletingProductId === deleteProduct.id) return;
+    setDeleteProduct(null);
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!deleteProduct) return;
+    if (deletingProductId === deleteProduct.id) return;
+
+    setDeletingProductId(deleteProduct.id);
+    setStatus({ type: 'info', message: '' });
+
+    try {
+      await api.deleteProduct(deleteProduct.id);
+      setStatus({ type: 'success', message: t('inventory.messages.deleted') || 'Product deleted successfully' });
+      useProductStore.getState().invalidate();
+      await fetchProducts();
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || t('inventory.messages.deleteFailed') || 'Failed to delete product' });
+    } finally {
+      setDeletingProductId('');
+      setDeleteProduct(null);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
-  }, []);
+    fetchStats();
+  }, [fetchProducts, fetchStats]);
 
   const loadCategories = useCallback(async () => {
     setCategoriesLoading(true);
@@ -305,8 +403,11 @@ export default function Inventory() {
       purchasePrice: Number(product.purchasePrice ?? 0),
       quantity: Number(product.stockOnHand ?? product.openingStock ?? 0),
       unit: product.primaryUnit || getUnitText(product.unit) || '',
+      expiryDate: product.expiryDate || '',
     }));
   }, [products]);
+
+  // Stats are now fetched directly from the backend API (stats.lowStockCount, stats.nearExpiryCount, etc.)
 
   const categories = useMemo(() => {
     const unique = new Set([
@@ -404,6 +505,11 @@ export default function Inventory() {
       if (sortKey === 'quantity') return b.quantity - a.quantity;
       if (sortKey === 'salePrice') return b.salePrice - a.salePrice;
       if (sortKey === 'purchasePrice') return b.purchasePrice - a.purchasePrice;
+      if (sortKey === 'expiryDate') {
+        if (!a.expiryDate) return 1;
+        if (!b.expiryDate) return -1;
+        return new Date(a.expiryDate) - new Date(b.expiryDate);
+      }
       return a.name.localeCompare(b.name);
     });
     return sorted;
@@ -436,7 +542,7 @@ export default function Inventory() {
     });
   };
 
-  const handleImageUpload = async (event) => {
+  const handleImageUpload = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -444,15 +550,28 @@ export default function Inventory() {
       setStatus({ type: 'error', message: 'Only image files are allowed.' });
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setStatus({ type: 'error', message: 'Image size must be less than 5MB.' });
+    if (file.size > 10 * 1024 * 1024) {
+      setStatus({ type: 'error', message: 'Image size must be less than 10MB.' });
       return;
     }
 
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropperImageSrc(reader.result);
+      setIsCropperOpen(true);
+    };
+    reader.readAsDataURL(file);
+    
+    // Clear input value to allow uploading the same file again
+    event.target.value = '';
+  };
+
+  const handleCropComplete = async (croppedFile) => {
+    setIsCropperOpen(false);
     setImageUploading(true);
     setStatus({ type: 'info', message: '' });
     try {
-      const response = await api.uploadAttachment(file);
+      const response = await api.uploadAttachment(croppedFile);
       if (response && response.url) {
         setForm((prev) => ({ ...prev, imageUrl: response.url }));
         setStatus({ type: 'success', message: 'Image uploaded successfully.' });
@@ -804,6 +923,38 @@ export default function Inventory() {
         )}
       />
 
+      {/* Inventory Stats Cards */}
+      <div id="inventory-stats-grid" className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <StatsCard
+          title={t('inventory.lowStockItems') || 'Low Stock Items'}
+          value={stats?.lowStockCount ?? 0}
+          icon={AlertTriangle}
+          tone="danger"
+          loading={statsLoading}
+        />
+        <StatsCard
+          title={t('inventory.nearExpiryItems') || 'Near Expiry'}
+          value={stats?.nearExpiryCount ?? 0}
+          icon={Clock}
+          tone="warning"
+          loading={statsLoading}
+        />
+        <StatsCard
+          title={t('inventory.popularItems') || 'Popular (Selling)'}
+          value={stats?.popularCount ?? 0}
+          icon={TrendingUp}
+          tone="success"
+          loading={statsLoading}
+        />
+        <StatsCard
+          title={t('inventory.leastPopularItems') || 'Least Popular (Unsold)'}
+          value={stats?.leastPopularCount ?? 0}
+          icon={TrendingDown}
+          tone="default"
+          loading={statsLoading}
+        />
+      </div>
+
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
 
       <div id="inventory-items-card" className="card">
@@ -858,14 +1009,18 @@ export default function Inventory() {
               <option key={type.value} value={type.value}>{type.label}</option>
             ))}
           </select>
-          <button
-            id="inventory-sort-button"
-            className="btn-ghost w-full justify-center xl:w-auto"
-            type="button"
-            onClick={() => setSortKey((prev) => (prev === 'name' ? 'quantity' : 'name'))}
+          <select
+            id="inventory-sort-filter"
+            className="input min-w-[140px]"
+            value={sortKey}
+            onChange={(event) => setSortKey(event.target.value)}
           >
-            <ArrowUpDown size={16} /> {t('inventory.sortBy')}
-          </button>
+            <option value="name">{t('inventory.sortByName') || 'Sort by Name'}</option>
+            <option value="quantity">{t('inventory.sortByQuantity') || 'Sort by Stock'}</option>
+            <option value="salePrice">{t('inventory.sortBySalePrice') || 'Sort by Sale Price'}</option>
+            <option value="purchasePrice">{t('inventory.sortByPurchasePrice') || 'Sort by Purchase Price'}</option>
+            <option value="expiryDate">{t('inventory.sortByExpiryDate') || 'Sort by Expiry Date'}</option>
+          </select>
         </div>
 
         {/* Mobile card view */}
@@ -903,6 +1058,14 @@ export default function Inventory() {
                     </p>
                   </div>
                 </div>
+                {item.expiryDate && (
+                  <div className="mt-2 text-xs text-slate-500 px-1">
+                    <span>{t('inventory.expiryDate') || 'Expiry Date'}:</span>
+                    <div className={`mt-0.5 text-sm font-extrabold tracking-wide ${getExpiryDateColorClass(item.expiryDate)}`}>
+                      {item.expiryDate} ({getExpiryRemainingDaysText(item.expiryDate, t)})
+                    </div>
+                  </div>
+                )}
                 <div className="mt-3 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 pt-2.5 dark:border-slate-800">
                   <span>{t('products.salePrice')}: <strong className="text-slate-700 dark:text-slate-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.salePrice.toFixed(2) })}</strong></span>
                   <span>{t('products.purchasePrice')}: <strong className="text-slate-700 dark:text-slate-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.purchasePrice.toFixed(2) })}</strong></span>
@@ -949,6 +1112,7 @@ export default function Inventory() {
                 <th className="py-2 text-left">{t('inventory.itemType')}</th>
                 <th className="py-2 text-left">{t('inventory.itemCategory')}</th>
                 <th className="py-2 text-left">{t('inventory.itemCode')}</th>
+                <th className="py-2 text-left">{t('inventory.expiryDate') || 'Expiry Date'}</th>
                 <th className="py-2 text-right">{t('products.salePrice')}</th>
                 <th className="py-2 text-right">{t('products.purchasePrice')}</th>
                 <th className="py-2 text-right">{t('inventory.quantity')}</th>
@@ -958,11 +1122,11 @@ export default function Inventory() {
             <tbody>
               {productsLoading && products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-3 text-slate-500">{t('common.loading')}</td>
+                  <td colSpan={9} className="py-3 text-slate-500">{t('common.loading')}</td>
                 </tr>
               ) : pagedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-3 text-slate-500">{t('inventory.noItems')}</td>
+                  <td colSpan={9} className="py-3 text-slate-500">{t('inventory.noItems')}</td>
                 </tr>
               ) : (
                 pagedItems.map((item) => (
@@ -991,6 +1155,16 @@ export default function Inventory() {
                     </td>
                     <td className="py-3">{item.category}</td>
                     <td className="py-3">{item.itemCode}</td>
+                    <td className="py-3 text-left">
+                      {item.expiryDate ? (
+                        <div className={`leading-snug ${getExpiryDateColorClass(item.expiryDate) || 'text-slate-500'}`}>
+                          <div className="text-sm font-extrabold tracking-wide">{item.expiryDate}</div>
+                          <div className="text-xs font-bold mt-0.5">{getExpiryRemainingDaysText(item.expiryDate, t)}</div>
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
                     <td className="py-3 text-right">
                       {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.salePrice.toFixed(2) })}
                     </td>
@@ -1002,33 +1176,44 @@ export default function Inventory() {
                     </td>
                     <td className="py-3 text-right">
                       <div className="flex justify-end gap-2">
-                        {canManageInventory && isRestockableProduct(item) ? (
-                          <button
-                            id={getInventoryItemActionId('restock', item.id)}
-                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/20 dark:hover:text-emerald-300"
-                            type="button"
-                            onClick={() => openRestockDialog(item.id)}
-                          >
-                            <Plus size={14} /> {t('inventory.restock')}
-                          </button>
-                        ) : null}
-                        {canManageInventory ? (
-                          <button
-                            id={getInventoryItemActionId('edit', item.id)}
-                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                            type="button"
-                            onClick={() => openEditDialog(item.id)}
-                          >
-                            <Pencil size={14} /> {t('common.edit')}
-                          </button>
-                        ) : null}
-                        <button
-                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                          type="button"
-                          onClick={() => openHistoryDialog(item.id)}
-                        >
-                          <History size={14} /> History
-                        </button>
+                        <ActionMenu
+                          actions={[
+                            ...(canManageInventory && isRestockableProduct(item)
+                              ? [
+                                  {
+                                    label: t('inventory.restock'),
+                                    icon: Plus,
+                                    onClick: () => openRestockDialog(item.id),
+                                  },
+                                ]
+                              : []),
+                            ...(canManageInventory
+                              ? [
+                                  {
+                                    label: t('common.edit'),
+                                    icon: Pencil,
+                                    onClick: () => openEditDialog(item.id),
+                                  },
+                                ]
+                              : []),
+                            {
+                              label: 'History',
+                              icon: History,
+                              onClick: () => openHistoryDialog(item.id),
+                            },
+                            ...(canManageInventory
+                              ? [
+                                  {
+                                    label: t('common.delete'),
+                                    icon: Trash2,
+                                    tone: 'danger',
+                                    disabled: deletingProductId === item.id,
+                                    onClick: () => setDeleteProduct(item),
+                                  },
+                                ]
+                              : []),
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -1198,7 +1383,7 @@ export default function Inventory() {
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
+                    <div className="sm:col-span-2">
                       <label className="label">{t('inventory.itemCategory')}</label>
                       <div className="mt-1">
                         <CategorySearchCreateField
@@ -1236,6 +1421,18 @@ export default function Inventory() {
                         value={form.itemCode}
                         onChange={handleFormChange}
                         placeholder={t('inventory.itemCodePlaceholder')}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="label">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
+                      <input
+                        id="inventory-expiry-date"
+                        className="input mt-1"
+                        name="expiryDate"
+                        type="date"
+                        value={form.expiryDate}
+                        onChange={handleFormChange}
                       />
                     </div>
                   </div>
@@ -1546,6 +1743,21 @@ export default function Inventory() {
           </div>
         </div>
       </Dialog>
+
+      <ImageCropperModal
+        isOpen={isCropperOpen}
+        imageSrc={cropperImageSrc}
+        onClose={() => setIsCropperOpen(false)}
+        onCrop={handleCropComplete}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(deleteProduct)}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteProduct}
+        description={deleteProduct ? `Are you sure you want to delete "${deleteProduct.name}"?` : t('common.confirmDelete')}
+        confirming={Boolean(deleteProduct) && deletingProductId === deleteProduct.id}
+      />
     </div>
   );
 }

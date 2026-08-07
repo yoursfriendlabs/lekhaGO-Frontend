@@ -21,6 +21,8 @@ import ConfirmDialog from './ui/ConfirmDialog.jsx';
 import { Dialog } from './ui/Dialog.tsx';
 import TeamSeatUsagePanel from './subscription/TeamSeatUsagePanel.jsx';
 import { api, invalidateApiCache } from '../lib/api';
+import StatsCard from './StatsCard.jsx';
+import PageHeader from './PageHeader';
 import {
   applyPermissionChange,
   buildEmptyPermissionMap,
@@ -96,50 +98,7 @@ function normalizeErrorMessage(error, fallback) {
 
 /* ── Shared visual primitives, mirrored from the Services page ── */
 
-function OverviewMetric({ icon: Icon, label, value, tone = 'slate' }) {
-  const styles = {
-    slate: {
-      wrapper: 'border-slate-200/70 bg-white/80 dark:border-slate-800/60 dark:bg-slate-950/40',
-      icon: 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900',
-    },
-    blue: {
-      wrapper: 'border-blue-200/70 bg-blue-50/70 dark:border-blue-900/40 dark:bg-blue-900/20',
-      icon: 'bg-blue-600 text-white',
-    },
-    amber: {
-      wrapper: 'border-amber-200/70 bg-amber-50/80 dark:border-amber-900/40 dark:bg-amber-900/20',
-      icon: 'bg-amber-500 text-white',
-    },
-    rose: {
-      wrapper: 'border-rose-200/70 bg-rose-50/80 dark:border-rose-900/40 dark:bg-rose-900/20',
-      icon: 'bg-rose-500 text-white',
-    },
-    emerald: {
-      wrapper: 'border-emerald-200/70 bg-emerald-50/80 dark:border-emerald-900/40 dark:bg-emerald-900/20',
-      icon: 'bg-emerald-500 text-white',
-    },
-  };
-
-  const palette = styles[tone] || styles.slate;
-
-  return (
-    <div className={`rounded-2xl border px-3 py-2.5 shadow-sm shadow-slate-200/20 ${palette.wrapper}`}>
-      <div className="flex items-center justify-between gap-2.5">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-            {label}
-          </p>
-          <p className="mt-1 whitespace-nowrap text-base font-semibold leading-tight text-slate-900 dark:text-white">
-            {value}
-          </p>
-        </div>
-        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${palette.icon}`}>
-          <Icon size={15} />
-        </div>
-      </div>
-    </div>
-  );
-}
+// Centralized StatsCard component is used instead of local OverviewMetric helper
 
 function FilterChip({ label, active, onClick }) {
   return (
@@ -1000,59 +959,50 @@ export default function StaffManagement({ businessId }) {
 
   return (
     <div className="space-y-6">
-      {/* ── Hero ── */}
-      <section className="overflow-hidden rounded-[32px] border border-primary-100/80 bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.22),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(249,245,239,0.96))] shadow-sm shadow-primary-950/10 dark:border-primary-900/40 dark:bg-[radial-gradient(circle_at_top_left,rgba(155,104,53,0.18),transparent_42%),linear-gradient(135deg,rgba(15,23,42,0.95),rgba(2,6,23,0.98))]">
-        <div className="p-5 md:p-8">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-3xl">
-              <h1 className="mt-0 font-serif text-3xl text-slate-900 dark:text-white md:text-3xl">
-                {t('staffManagement.title')}
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 md:text-base">
-                {t('staffManagement.subtitle')}
-              </p>
-            </div>
+      <PageHeader
+        title={t('staffManagement.title')}
+        subtitle={t('staffManagement.subtitle')}
+        action={
+          canManageStaff ? (
+            <button
+              className="btn-primary w-full sm:w-auto"
+              type="button"
+              onClick={openCreate}
+              disabled={!businessId || summary.availableSlots <= 0}
+            >
+              <Plus size={16} className="mr-1.5 inline" />
+              {t('staffManagement.addStaff')}
+            </button>
+          ) : null
+        }
+      />
 
-            {canManageStaff ? (
-              <button
-                className="btn-primary w-full sm:w-auto"
-                type="button"
-                onClick={openCreate}
-                disabled={!businessId || summary.availableSlots <= 0}
-              >
-                <Plus size={16} className="mr-1.5 inline" />
-                {t('staffManagement.addStaff')}
-              </button>
-            ) : null}
-          </div>
-
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-hide sm:grid sm:grid-cols-2 xl:grid-cols-4">
-            <OverviewMetric
-              icon={Users}
-              label={t('staffManagement.summary.totalUsers')}
-              value={staffOverview.totalUsers}
-            />
-            <OverviewMetric
-              icon={UserCheck}
-              label={t('staffManagement.status.active')}
-              value={staffOverview.activeCount}
-              tone="emerald"
-            />
-            <OverviewMetric
-              icon={UserX}
-              label={t('staffManagement.status.inactive')}
-              value={staffOverview.inactiveCount}
-              tone="amber"
-            />
-            <OverviewMetric
-              icon={ShieldCheck}
-              label={t('staffManagement.summary.availableSlots')}
-              value={staffOverview.availableSlots}
-              tone="rose"
-            />
-          </div>
-        </div>
-      </section>
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <StatsCard
+          title={t('staffManagement.summary.totalUsers')}
+          value={staffOverview.totalUsers}
+          icon={Users}
+          tone="default"
+        />
+        <StatsCard
+          title={t('staffManagement.status.active')}
+          value={staffOverview.activeCount}
+          icon={UserCheck}
+          tone="success"
+        />
+        <StatsCard
+          title={t('staffManagement.status.inactive')}
+          value={staffOverview.inactiveCount}
+          icon={UserX}
+          tone="warning"
+        />
+        <StatsCard
+          title={t('staffManagement.summary.availableSlots')}
+          value={staffOverview.availableSlots}
+          icon={ShieldCheck}
+          tone="danger"
+        />
+      </div>
 
       {notice.message ? <Notice title={notice.message} tone={notice.type || 'info'} /> : null}
       {loadError ? <Notice title={loadError} tone="error" /> : null}
@@ -1491,29 +1441,30 @@ function SalaryAdvanceDialog({ isOpen, member, t, onClose }) {
       <div className="space-y-6">
         {error ? <Notice title={error} tone="error" /> : null}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <OverviewMetric
-            icon={DollarSign}
-            label={t('staffManagement.salaryRecords.totalSalary')}
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <StatsCard
+            title={t('staffManagement.salaryRecords.totalSalary')}
             value={t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.monthlySalary.toFixed(2) })}
-          />
-          <OverviewMetric
             icon={DollarSign}
-            label={t('staffManagement.salaryRecords.totalAdvance')}
+            tone="default"
+          />
+          <StatsCard
+            title={t('staffManagement.salaryRecords.totalAdvance')}
             value={t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.totalAdvanceThisMonth.toFixed(2) })}
-            tone="amber"
+            icon={DollarSign}
+            tone="warning"
           />
-          <OverviewMetric
-            icon={Check}
-            label={t('staffManagement.salaryRecords.totalPaid')}
+          <StatsCard
+            title={t('staffManagement.salaryRecords.totalPaid')}
             value={t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.totalPaidThisMonth.toFixed(2) })}
-            tone="emerald"
+            icon={Check}
+            tone="success"
           />
-          <OverviewMetric
-            icon={ShieldCheck}
-            label={t('staffManagement.salaryRecords.netBalance')}
+          <StatsCard
+            title={t('staffManagement.salaryRecords.netBalance')}
             value={t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.netRemaining.toFixed(2) })}
-            tone={stats.netRemaining < 0 ? 'rose' : 'blue'}
+            icon={ShieldCheck}
+            tone={stats.netRemaining < 0 ? 'danger' : 'info'}
           />
         </div>
 
