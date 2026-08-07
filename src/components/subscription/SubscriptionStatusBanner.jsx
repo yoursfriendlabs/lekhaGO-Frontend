@@ -3,7 +3,7 @@ import { ArrowRight, CalendarDays, Clock3, Sparkles, TriangleAlert } from 'lucid
 import { Link } from 'react-router-dom';
 import { formatMaybeDate } from '../../lib/datetime';
 import { useI18n } from '../../lib/i18n.jsx';
-import { getSubscriptionStatusState } from '../../lib/subscription';
+import { getSubscriptionStatusState, normalizeSubscriptionPayload } from '../../lib/subscription';
 import { buildSettingsTabPath, SUBSCRIPTION_SETTINGS_TAB } from '../../lib/settingsTabs';
 import { useAuth } from '../../lib/auth';
 import { api } from '../../lib/api';
@@ -67,7 +67,7 @@ export function SubscriptionStatusBannerSkeleton() {
 export default function SubscriptionStatusBanner({ subscription }) {
   const { locale, t } = useI18n();
   const status = getSubscriptionStatusState(subscription);
-  const { businessId, role } = useAuth();
+  const { businessId, role, updateSubscription, refreshSession } = useAuth();
   const isOwner = role === 'owner';
   const [paymentLoading, setPaymentLoading] = useState(null);
 
@@ -83,39 +83,20 @@ export default function SubscriptionStatusBanner({ subscription }) {
         plan: 'growth',
         billingCycle: 'yearly',
       };
-      await api.updateSubscription(payload);
-
-      // 2. Retrieve payment params
-      const response = await api.getSubscriptionPaymentParams({ provider });
+      const response = await api.updateSubscription(payload);
       
-      if (provider === 'esewa') {
-        if (response.actionUrl && response.params) {
-          const form = document.createElement('form');
-          form.method = 'POST';
-          form.action = response.actionUrl;
-
-          Object.entries(response.params).forEach(([key, value]) => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = key;
-            input.value = value;
-            form.appendChild(input);
-          });
-
-          document.body.appendChild(form);
-          form.submit();
-        } else {
-          throw new Error('Invalid eSewa response received from server.');
-        }
-      } else if (provider === 'khalti') {
-        if (response.paymentUrl) {
-          window.location.href = response.paymentUrl;
-        } else {
-          throw new Error('Khalti payment URL not received from server.');
-        }
+      const normalized = normalizeSubscriptionPayload(response);
+      updateSubscription(normalized);
+      try {
+        await refreshSession?.();
+      } catch (err) {
+        // ignore
       }
+
+      alert(t('settingsPage.subscription.planSaved') || 'Your upgrade request for the Growth Plan has been submitted to the admin for approval.');
     } catch (paymentError) {
       alert(paymentError.message || 'Payment initiation failed. Please try again.');
+    } finally {
       setPaymentLoading(null);
     }
   };
@@ -210,34 +191,17 @@ export default function SubscriptionStatusBanner({ subscription }) {
         </div>
         <div className="flex shrink-0 items-center gap-2.5 flex-wrap">
           {isOwner && (status.kind === 'expired' || status.kind === 'trial-expiring') ? (
-            <>
               <button
                 type="button"
-                onClick={() => handleInitiatePayment('esewa')}
+                onClick={() => handleInitiatePayment('manual')}
                 disabled={Boolean(paymentLoading)}
-                className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-50"
               >
-                {paymentLoading === 'esewa' ? (
+                {paymentLoading ? (
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                ) : (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-white text-[9px] font-bold text-emerald-600 font-serif">e</span>
-                )}
-                Pay with eSewa
+                ) : null}
+                Send Payment Request
               </button>
-              <button
-                type="button"
-                onClick={() => handleInitiatePayment('khalti')}
-                disabled={Boolean(paymentLoading)}
-                className="flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98] disabled:opacity-50"
-              >
-                {paymentLoading === 'khalti' ? (
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                ) : (
-                  <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-white text-[9px] font-bold text-violet-600 font-serif">K</span>
-                )}
-                Pay with Khalti
-              </button>
-            </>
           ) : (
             <Link
               className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm transition hover:-translate-y-0.5 ${
