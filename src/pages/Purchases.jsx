@@ -7,7 +7,7 @@ import {
   Plus,
   Wallet,
   Wrench,
-  X,
+X,
   Trash2,
   Printer,
 } from "lucide-react";
@@ -32,6 +32,12 @@ import AsyncSearchableSelect from "../components/AsyncSearchableSelect.jsx";
 import { formatMaybeDate, todayISODate } from "../lib/datetime";
 import { usePurchaseStore } from "../stores/purchases";
 import { useProductStore } from "../stores/products";
+import { useBusinessSettings } from "../lib/businessSettings";
+import { getCreatorDisplayName } from "../lib/records";
+import InvoiceHeader from "../components/InvoiceHeader";
+import ThermalReceipt from "../components/ThermalReceipt";
+import { printElement, printThermalReceipt } from "../lib/print";
+import dayjs from "../lib/datetime";
 import {
   buildPaymentPayload,
   normalizePaymentFields,
@@ -192,9 +198,17 @@ export default function Purchases() {
   const [page, setPage] = useState(1);
   const [refreshingPurchases, setRefreshingPurchases] = useState(false);
   const [pageSize, setPageSize] = useState(10);
-  const [mobileStep, setMobileStep] = useState("details");
+const [mobileStep, setMobileStep] = useState("details");
   const manualStatusRef = useRef(false);
   const [quickExpenseOpen, setQuickExpenseOpen] = useState(false);
+
+  // ── Invoice / Bill modal ──
+  const { settings: bizSettings } = useBusinessSettings();
+  const [invoiceOrder, setInvoiceOrder] = useState(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [isThermalInvoice, setIsThermalInvoice] = useState(false);
+  const invoicePrintRef = useRef(null);
+  const thermalInvoicePrintRef = useRef(null);
 
   const isExpense = header.entryType === "expense";
   const money = (v) =>
@@ -908,10 +922,32 @@ export default function Purchases() {
     setPayDialog(null);
     setPayError("");
   };
-  const closeQuickExpense = () => setQuickExpenseOpen(false);
+const closeQuickExpense = () => setQuickExpenseOpen(false);
   const handleQuickExpenseSaved = async () => {
     invalidatePurchases(listParams);
     await fetchPurchases(listParams, true);
+  };
+
+  // ── Invoice / Bill modal handlers ──
+  const openInvoiceModal = async (purchase, options = {}) => {
+    setIsThermalInvoice(options.thermal === true);
+setInvoiceOrder(purchase);
+    setInvoiceLoading(true);
+    try {
+      const full = await api.getPurchase(purchase.id);
+      setInvoiceOrder(full);
+    } catch (_) {
+      // use list data if full fetch fails
+    } finally {
+      setInvoiceLoading(false);
+    }
+  };
+
+  const handlePrint = () => {
+    printElement(invoicePrintRef.current);
+  };
+  const handlePrintThermal = () => {
+    printThermalReceipt(thermalInvoicePrintRef.current);
   };
 
   const handleRecordPayment = async (event) => {
@@ -1463,33 +1499,26 @@ export default function Purchases() {
                   <Notice title={itemStatus.message} tone={itemStatus.type} />
                 )}
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {isExpense ? (
-                    <div>
-                      <label className="label">{t("purchases.lineType")}</label>
-                      <select
-                        className="input mt-1"
-                        value={itemDraft.itemType}
-                        onChange={(e) =>
-                          handleDraftChange("itemType", e.target.value)
-                        }
-                      >
-                        <option value="expense">
-                          {t("purchases.normalExpense")}
-                        </option>
-                        <option value="labor">{t("purchases.labor")}</option>
-                        <option value="part">{t("purchases.part")}</option>
-                      </select>
-                    </div>
-                  ) : (
-                    <div className="rounded-[22px] border border-slate-200/80 bg-slate-50/70 px-4 py-3 dark:border-slate-800/60 dark:bg-slate-900/30">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                        {t("purchases.lineType")}
-                      </p>
-                      <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
-                        {t("purchases.purchaseLine")}
-                      </p>
-                    </div>
-                  )}
+<div>
+                    <label className="label">{t("purchases.lineType")}</label>
+                    <select
+                      className="input mt-1"
+                      value={isExpense ? itemDraft.itemType : "part"}
+                      onChange={(e) =>
+                        handleDraftChange("itemType", e.target.value)
+                      }
+                    >
+                      {isExpense ? (
+                        <>
+                          <option value="expense">
+                            {t("purchases.normalExpense")}
+                          </option>
+                          <option value="labor">{t("purchases.labor")}</option>
+                        </>
+                      ) : null}
+                      <option value="part">{t("purchases.part")}</option>
+                    </select>
+                  </div>
                   <div>
                     <label className="label">
                       {t("purchases.expenseDescription")}
@@ -1567,11 +1596,13 @@ export default function Purchases() {
                           handleDraftChange("unitType", e.target.value)
                         }
                       >
-                        <option value="primary">
-                          {t("products.primaryUnit")}
+<option value="primary">
+                          {itemDraftProduct?.primaryUnit ||
+                            t("products.primaryUnit")}
                         </option>
                         <option value="secondary">
-                          {t("products.secondaryUnit")}
+                          {itemDraftProduct?.secondaryUnit ||
+                            t("products.secondaryUnit")}
                         </option>
                       </select>
                     </div>
@@ -2065,15 +2096,21 @@ export default function Purchases() {
                               },
                             ]
                           : []),
-                        {
+{
                           label: "View Bill",
                           icon: FileText,
-                          to: `/app/invoice/purchases/${purchase.id}`,
+                          onClick: () => openInvoiceModal(purchase),
                         },
                         {
                           label: "Print Bill",
                           icon: Printer,
-                          to: `/app/invoice/purchases/${purchase.id}?print=1`,
+                          onClick: () => openInvoiceModal(purchase),
+                        },
+                        {
+                          label: "Print Thermal",
+                          icon: Printer,
+                          onClick: () =>
+                            openInvoiceModal(purchase, { thermal: true }),
                         },
                         ...(canManagePurchases
                           ? [
@@ -2200,15 +2237,21 @@ export default function Purchases() {
                                   },
                                 ]
                               : []),
-                            {
+{
                               label: "View Bill",
                               icon: FileText,
-                              to: `/app/invoice/purchases/${purchase.id}`,
+                              onClick: () => openInvoiceModal(purchase),
                             },
                             {
                               label: "Print Bill",
                               icon: Printer,
-                              to: `/app/invoice/purchases/${purchase.id}?print=1`,
+                              onClick: () => openInvoiceModal(purchase),
+                            },
+                            {
+                              label: "Print Thermal",
+                              icon: Printer,
+                              onClick: () =>
+                                openInvoiceModal(purchase, { thermal: true }),
                             },
                             ...(canManagePurchases
                               ? [
@@ -2246,6 +2289,227 @@ export default function Purchases() {
           pageSizeOptions={TABLE_ROW_OPTIONS}
         />
       </div>
+
+{/* ══════════════════════════════════════════
+          INVOICE / BILL MODAL (View / Print / Thermal)
+      ══════════════════════════════════════════ */}
+      {invoiceOrder && (
+        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/50 p-4 pb-10 backdrop-blur-sm print:relative print:inset-auto print:overflow-visible print:bg-transparent print:p-0">
+          <div className="relative mt-4 w-full max-w-3xl md:mt-8">
+<div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    onClick={() => setInvoiceOrder(null)}
+                  >
+                    ← Close
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${!isThermalInvoice ? "btn-primary bg-primary text-white hover:bg-primary-600" : "btn-secondary"}`}
+                    onClick={() => setIsThermalInvoice(false)}
+                  >
+                    Standard A4
+                  </button>
+                  <button
+                    type="button"
+                    className={`btn ${isThermalInvoice ? "btn-primary bg-primary text-white hover:bg-primary-600" : "btn-secondary"}`}
+                    onClick={() => setIsThermalInvoice(true)}
+                  >
+                    Thermal POS
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={isThermalInvoice ? handlePrintThermal : handlePrint}
+                >
+{isThermalInvoice ? "Print Thermal" : "Download PDF"}
+                </button>
+              </div>
+{!invoiceOrder || invoiceLoading ? (
+              <div className="card flex items-center justify-center py-16">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
+              </div>
+            ) : isThermalInvoice ? (
+              <div className="mx-auto max-w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm">
+                <div ref={thermalInvoicePrintRef}>
+                  <ThermalReceipt
+                    biz={bizSettings}
+                    receiptType="Expense Receipt"
+                    invoiceNo={invoiceOrder.invoiceNo || invoiceOrder.id?.slice(0, 8)}
+                    date={formatMaybeDate(invoiceOrder.purchaseDate, "MMMM D, YYYY")}
+                    partyName={getSupplierName(invoiceOrder) || "—"}
+                    creatorName={getCreatorDisplayName(invoiceOrder)}
+                    items={(invoiceOrder.PurchaseItems || []).map((item) => ({
+                      description: item.Product?.name || item.description || "—",
+                      quantity: item.quantity,
+                      unitPrice: item.unitPrice,
+                      lineTotal: item.lineTotal,
+                    }))}
+                    totals={{
+                      subTotal: invoiceOrder.subTotal,
+                      taxTotal: invoiceOrder.taxTotal,
+                      discountTotal: invoiceOrder.discountTotal,
+                      grandTotal: invoiceOrder.grandTotal,
+                      amountReceived: invoiceOrder.amountReceived,
+                      dueAmount: getPurchaseDueAmount(invoiceOrder),
+                    }}
+                    notes={invoiceOrder.notes}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div
+                ref={invoicePrintRef}
+                className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950"
+              >
+                {/* ── Header ── */}
+                <div className="px-4 pt-0 sm:px-8">
+                  <InvoiceHeader
+                    biz={bizSettings}
+                    invoiceType="Expense Bill"
+                    invoiceNo={invoiceOrder.invoiceNo || invoiceOrder.id?.slice(0, 8)}
+                    date={formatMaybeDate(invoiceOrder.purchaseDate, "MMMM D, YYYY")}
+                    status={invoiceOrder.status}
+                    statusColor="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                  />
+                </div>
+
+                {/* ── Supplier + Notes ── */}
+                <div className="border-b border-slate-200/70 bg-slate-50/60 px-4 py-5 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    <div>
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">
+                        Supplier / Payee
+                      </p>
+                      <p className="font-semibold text-slate-900 dark:text-white">
+                        {getSupplierName(invoiceOrder) || "—"}
+                      </p>
+                      {invoiceOrder.partyPhone && (
+                        <p className="mt-0.5 text-sm text-slate-500">
+                          {invoiceOrder.partyPhone}
+                        </p>
+                      )}
+                      <p className="mt-2 text-sm text-slate-500">
+                        Created By:{" "}
+                        <span className="font-medium text-slate-900 dark:text-white">
+                          {getCreatorDisplayName(invoiceOrder)}
+                        </span>
+                      </p>
+                    </div>
+                    {invoiceOrder.notes && (
+                      <div>
+                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">
+                          Notes
+                        </p>
+                        <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-400">
+                          {invoiceOrder.notes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Line Items ── */}
+                <div className="overflow-x-auto px-4 py-6 sm:px-8">
+                  <table className="w-full min-w-[540px] text-sm">
+                    <thead>
+                      <tr className="border-b-2 border-slate-200/70 dark:border-slate-700/70">
+                        <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">
+                          Item
+                        </th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">
+                          Qty
+                        </th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">
+                          Rate
+                        </th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">
+                          Tax
+                        </th>
+                        <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-black">
+                          Amount
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                      {(invoiceOrder.PurchaseItems || []).map((item, idx) => (
+                        <tr key={item.id || idx}>
+                          <td className="py-3 pr-4 font-medium text-black">
+                            {item.Product?.name || item.description || "—"}
+                          </td>
+                          <td className="py-3 text-right text-slate-900">
+                            {Number(item.quantity || 0).toFixed(2)}
+                          </td>
+                          <td className="py-3 text-right text-black">
+                            {money(item.unitPrice)}
+                          </td>
+                          <td className="py-3 text-right text-black">
+                            {Number(item.taxRate || 0) > 0
+                              ? `${Number(item.taxRate).toFixed(1)}%`
+                              : "—"}
+                          </td>
+                          <td className="py-3 text-right font-semibold text-black">
+                            {money(item.lineTotal)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* ── Totals ── */}
+                <div className="border-t border-slate-200/70 px-4 py-6 dark:border-slate-800/70 sm:px-8">
+                  <div className="ml-auto max-w-xs space-y-2 text-sm">
+                    {Number(invoiceOrder.subTotal || 0) > 0 && (
+                      <div className="flex justify-between text-black">
+                        <span>Subtotal</span>
+                        <span>{money(invoiceOrder.subTotal)}</span>
+                      </div>
+                    )}
+                    {Number(invoiceOrder.taxTotal || 0) > 0 && (
+                      <div className="flex justify-between text-black">
+                        <span>Tax</span>
+                        <span>{money(invoiceOrder.taxTotal)}</span>
+                      </div>
+                    )}
+                    {Number(invoiceOrder.discountTotal || invoiceOrder.discount || 0) > 0 && (
+                      <div className="flex justify-between text-rose-600 dark:text-rose-300">
+                        <span>Discount</span>
+                        <span>-{money(invoiceOrder.discountTotal || invoiceOrder.discount)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-t border-slate-200/70 pt-3 font-bold text-black dark:border-slate-700 dark:text-white">
+                      <span className="text-base">Grand Total</span>
+                      <span className="text-lg">{money(invoiceOrder.grandTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                      <span>Amount Paid</span>
+                      <span className="font-semibold">{money(invoiceOrder.amountReceived)}</span>
+                    </div>
+                    {getPurchaseDueAmount(invoiceOrder) > 0 && (
+                      <div className="flex justify-between rounded-xl bg-rose-50 px-4 py-2.5 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300">
+                        <span className="font-semibold">Due Amount</span>
+                        <span className="font-bold">{money(getPurchaseDueAmount(invoiceOrder))}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Footer ── */}
+                <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-4 py-4 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
+                  <p className="text-xs text-black">Thank you for your business!</p>
+                  <p className="text-xs text-black">
+                    Printed {dayjs().format("D MMM YYYY")}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <ConfirmDialog
         isOpen={Boolean(deletePurchase)}

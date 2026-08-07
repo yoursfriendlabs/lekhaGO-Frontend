@@ -1244,8 +1244,8 @@ export default function QuickPos() {
     onChange,
     stopPropagation = false,
   }) => (
-    <div
-      className="inline-grid w-auto grid-cols-2 gap-0.5 rounded-full border border-slate-200 bg-white px-0.5 py-0.5 text-[9px] font-semibold shadow-sm sm:flex sm:flex-wrap sm:items-center sm:gap-0.5 sm:px-0.5"
+<div
+      className="ml-auto inline-grid w-auto grid-cols-2 gap-0.5 rounded-full border border-slate-200 bg-white px-0.5 py-0.5 text-[9px] font-semibold shadow-sm"
       onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
       onPointerDown={
         stopPropagation ? (event) => event.stopPropagation() : undefined
@@ -1259,12 +1259,12 @@ export default function QuickPos() {
           <button
             type="button"
             key={option.value}
-            className={`min-w-0 rounded-full px-1 py-0.5 text-center text-[9px] transition sm:min-w-[3rem] ${
+            className={`min-w-[2.5rem] rounded-full px-1.5 py-0.5 text-center text-[9px] font-bold transition ${
               isSelected
-                ? "text-green-600"
+                ? "bg-[#9c5f22] text-white shadow-sm"
                 : "text-slate-500 hover:text-slate-800"
             } disabled:cursor-not-allowed disabled:text-slate-300`}
-onClick={() => onChange(option.value)}
+            onClick={() => onChange(option.value)}
             disabled={option.disabled}
           >
             {getUnitShortcut(option.unit)}

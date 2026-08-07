@@ -61,8 +61,12 @@ export default function Invoice() {
     ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
     : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
 
-  const partyName = isSale
-    ? record?.partyName || record?.customerName || record?.Customer?.name || 'Walk-in Customer'
+const partyName = isSale
+    ? record?.partyName ||
+      record?.customerName ||
+      record?.Customer?.name ||
+      record?.attributes?.customer_name ||
+      'Walk-in Customer'
     : record?.partyName || record?.supplierName || record?.Party?.name || '—';
   const creatorName = getCreatorDisplayName(record);
 
@@ -124,8 +128,12 @@ export default function Invoice() {
               <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 {isSale ? 'Bill To' : 'Supplier'}
               </p>
-              <p className="font-semibold text-slate-800 dark:text-slate-200">{partyName}</p>
-              {record.partyPhone && <p className="mt-0.5 text-sm text-slate-500">{record.partyPhone}</p>}
+<p className="font-semibold text-slate-800 dark:text-slate-200">{partyName}</p>
+              {(record.partyPhone || record.attributes?.customer_phone) && (
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {record.partyPhone || record.attributes?.customer_phone}
+                </p>
+              )}
               <p className="mt-2 text-sm text-slate-500">
                 Created By:{' '}
                 <span className="font-medium text-slate-700 dark:text-slate-300">{creatorName}</span>
