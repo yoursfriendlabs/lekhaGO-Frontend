@@ -5,8 +5,8 @@ import { createScopedListStoreSlice } from './createScopedListStore';
 export const useProductStore = create((set, get) => ({
   ...createScopedListStoreSlice(set, get, {
     resourceKey: 'products',
-    allowParams: false,
-    fetcher: () => api.listProducts(),
+    allowParams: true,
+    fetcher: (params = {}) => api.listProducts(params),
   }),
 
   /** Prepend a newly created product without re-fetching. */

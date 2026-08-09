@@ -333,7 +333,7 @@ export default function QuickPos() {
     setStatus({ type: "info", message: "" });
 
     Promise.all([
-      api.listProducts({ limit: 500 }),
+      api.listProducts({ limit: 1000 }),
       api.getNextSequences().catch(() => null),
       api.getTables({ isActive: "true", limit: 100 }).catch(() => null),
       api.listCategories({ type: "table", limit: 100 }).catch(() => null),

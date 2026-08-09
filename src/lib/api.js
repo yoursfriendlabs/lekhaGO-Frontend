@@ -838,7 +838,7 @@ export const api = {
   listProducts: (params = {}) =>
     collectionRequest(
       "/api/products",
-      { limit: 1000000, ...params },
+      { limit: 50, ...params },
       listCache(["products", "reports", "dashboard"]),
     ),
   getProductStats: () =>

@@ -201,10 +201,11 @@ export default function Inventory() {
   const canManageInventory = canManageFeature('inventory');
   const {
     products,
+    total: productsTotal,
     loading: productsLoading,
     error: productsError,
     fetch: fetchProducts,
-    addProduct,
+    invalidate: invalidateProducts,
     patchProduct,
   } = useProductStore();
   const inventoryProfile = businessProfile?.inventory || {};
@@ -229,12 +230,28 @@ export default function Inventory() {
 
   const [toast, setToast] = useState({ type: '', message: '' });
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [sortKey, setSortKey] = useState('name');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  const listParams = useMemo(() => ({
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+    sort: sortKey,
+    ...(debouncedQuery ? { search: debouncedQuery } : {}),
+    ...(typeFilter !== 'all' ? { itemType: typeFilter } : {}),
+    ...(categoryFilter !== 'all' ? { category: categoryFilter } : {}),
+    ...(stockFilter !== 'all' ? { stock: stockFilter } : {}),
+  }), [page, pageSize, sortKey, debouncedQuery, typeFilter, categoryFilter, stockFilter]);
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('stock');
   const [form, setForm] = useState(makeEmptyItem());
@@ -300,8 +317,9 @@ export default function Inventory() {
     try {
       await api.deleteProduct(deleteProduct.id);
       setStatus({ type: 'success', message: t('inventory.messages.deleted') || 'Product deleted successfully' });
-      useProductStore.getState().invalidate();
-      await fetchProducts();
+      invalidateProducts(listParams);
+      await fetchProducts(listParams, true);
+      fetchStats();
     } catch (err) {
       setStatus({ type: 'error', message: err.message || t('inventory.messages.deleteFailed') || 'Failed to delete product' });
     } finally {
@@ -311,9 +329,8 @@ export default function Inventory() {
   };
 
   useEffect(() => {
-    fetchProducts();
-    fetchStats();
-  }, [fetchProducts, fetchStats]);
+    fetchProducts(listParams).catch(() => {});
+  }, [fetchProducts, listParams]);
 
   const loadCategories = useCallback(async () => {
     setCategoriesLoading(true);
@@ -486,44 +503,18 @@ export default function Inventory() {
   }, [form.secondaryUnit, unitOptions]);
   const hasPrimaryUnitSelected = Boolean(String(form.primaryUnit || '').trim() || form.unitId);
 
-  const filteredItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const filtered = items.filter((item) => {
-      if (typeFilter !== 'all' && item.itemType !== typeFilter) return false;
-      if (categoryFilter !== 'all' && item.category !== categoryFilter) return false;
-      if (stockFilter === 'in' && item.quantity <= 0) return false;
-      if (stockFilter === 'out' && item.quantity > 0) return false;
-      if (stockFilter === 'low' && item.quantity > 5) return false;
-      if (!normalizedQuery) return true;
-      return [item.name, item.itemCode, item.category, item.metalType, item.purity]
-        .filter(Boolean)
-        .some((field) => String(field).toLowerCase().includes(normalizedQuery));
-    });
-
-    const sorted = [...filtered];
-    sorted.sort((a, b) => {
-      if (sortKey === 'quantity') return b.quantity - a.quantity;
-      if (sortKey === 'salePrice') return b.salePrice - a.salePrice;
-      if (sortKey === 'purchasePrice') return b.purchasePrice - a.purchasePrice;
-      if (sortKey === 'expiryDate') {
-        if (!a.expiryDate) return 1;
-        if (!b.expiryDate) return -1;
-        return new Date(a.expiryDate) - new Date(b.expiryDate);
-      }
-      return a.name.localeCompare(b.name);
-    });
-    return sorted;
-  }, [items, query, categoryFilter, stockFilter, typeFilter, sortKey]);
-
   useEffect(() => {
     setPage(1);
-  }, [query, categoryFilter, stockFilter, typeFilter, sortKey]);
+  }, [debouncedQuery, categoryFilter, stockFilter, typeFilter, sortKey]);
 
-  const totalItems = filteredItems.length;
-  const pagedItems = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredItems.slice(start, start + pageSize);
-  }, [filteredItems, page, pageSize]);
+  // Server already filters/sorts/paginates; items is the current page.
+  const totalItems = Number(productsTotal || 0);
+  const pagedItems = items;
+
+  useEffect(() => {
+    const totalPages = Math.max(Math.ceil(totalItems / pageSize) || 1, 1);
+    if (page > totalPages) setPage(totalPages);
+  }, [totalItems, pageSize, page]);
 
   const handleFormChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -805,8 +796,10 @@ export default function Inventory() {
         patchProduct(editingId, updatedProduct || optimisticProduct);
         setStatus({ type: 'success', message: t('inventory.messages.itemUpdated') });
       } else {
-        const product = await api.createProduct(payload);
-        addProduct(product || optimisticProduct);
+        await api.createProduct(payload);
+        invalidateProducts(listParams);
+        await fetchProducts(listParams, true);
+        fetchStats();
         setStatus({ type: 'success', message: t('inventory.messages.itemCreated') });
       }
 

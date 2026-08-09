@@ -223,14 +223,30 @@ export default function Products() {
   const [restockQuantity, setRestockQuantity] = useState('');
   const [restockSaving, setRestockSaving] = useState(false);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [totalProducts, setTotalProducts] = useState(0);
 
-  const loadProducts = async () => {
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  const listParams = useMemo(() => ({
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+    sort: 'name',
+    ...(debouncedQuery ? { search: debouncedQuery } : {}),
+    ...(typeFilter !== 'all' ? { itemType: typeFilter } : {}),
+  }), [page, pageSize, debouncedQuery, typeFilter]);
+
+  const loadProducts = async (params = listParams) => {
     try {
-      const data = await api.listProducts();
+      const data = await api.listProducts(params);
       setProducts(data?.items || []);
+      setTotalProducts(Number(data?.total || 0));
       setListStatus({ type: 'info', message: '' });
     } catch (err) {
       setListStatus({ type: 'error', message: err.message });
@@ -238,12 +254,12 @@ export default function Products() {
   };
 
   useEffect(() => {
-    loadProducts();
-  }, []);
+    loadProducts(listParams);
+  }, [listParams]);
 
   useEffect(() => {
     setPage(1);
-  }, [query, typeFilter]);
+  }, [debouncedQuery, typeFilter]);
 
   useEffect(() => {
     if (!toast.message) return undefined;
@@ -352,24 +368,8 @@ export default function Products() {
     setRestockQuantity('');
   };
 
-  const filteredProducts = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    return products.filter((product) => {
-      if (typeFilter !== 'all' && product.itemType !== typeFilter) {
-        return false;
-      }
-      if (!normalizedQuery) return true;
-      return [product.name, product.companyName, product.sku, product.primaryUnit, product.secondaryUnit]
-        .filter(Boolean)
-        .some((field) => String(field).toLowerCase().includes(normalizedQuery));
-    });
-  }, [products, query, typeFilter]);
-
-  const totalProducts = filteredProducts.length;
-  const pagedProducts = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return filteredProducts.slice(start, start + pageSize);
-  }, [filteredProducts, page, pageSize]);
+  // Server already filters/sorts/paginates.
+  const pagedProducts = products;
 
   const currentRestockStock = restockProduct ? getCurrentStock(restockProduct) : 0;
   const nextRestockStock = currentRestockStock + parseNumber(restockQuantity);
