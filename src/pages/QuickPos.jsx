@@ -54,8 +54,6 @@ function getProductCategoryName(product = {}) {
   }
   if (typeof product.category === "string" && product.category.trim())
     return product.category.trim();
-  if (typeof product.companyName === "string" && product.companyName.trim())
-    return product.companyName.trim();
   return "";
 }
 

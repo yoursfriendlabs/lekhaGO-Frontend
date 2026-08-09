@@ -21,6 +21,7 @@ import ActionMenu from '../components/ActionMenu.jsx';
 
 const makeEmptyItem = () => ({
   name: '',
+  companyName: '',
   categoryId: '',
   unitId: '',
   itemCode: '',
@@ -54,6 +55,7 @@ const parseNumber = (value) => {
 
 const buildProductPayload = (form) => ({
   name: form.name,
+  companyName: String(form.companyName || '').trim() || null,
   sku: form.itemCode.trim(),
   itemType: form.itemType,
   metalType: form.metalType,
@@ -81,13 +83,19 @@ function getProductCategoryName(product = {}) {
     return product.category.name.trim();
   }
   if (typeof product.category === 'string' && product.category.trim()) return product.category.trim();
+  return '';
+}
+
+function getProductBrandName(product = {}) {
   if (typeof product.companyName === 'string' && product.companyName.trim()) return product.companyName.trim();
+  if (typeof product.brand === 'string' && product.brand.trim()) return product.brand.trim();
   return '';
 }
 
 function productToForm(product = {}) {
   return {
     name: product.name || '',
+    companyName: getProductBrandName(product),
     categoryId: String(product.categoryId ?? product.category?.id ?? ''),
     unitId: String(product.unitId ?? product.unit?.id ?? ''),
     itemCode: product.sku || '',
@@ -286,6 +294,7 @@ export default function Inventory() {
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [restockProduct, setRestockProduct] = useState(null);
   const [restockQuantity, setRestockQuantity] = useState('');
+  const [restockAction, setRestockAction] = useState('add'); // 'add' | 'remove'
   const [restockSaving, setRestockSaving] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyProduct, setHistoryProduct] = useState(null);
@@ -410,6 +419,8 @@ export default function Inventory() {
     return products.map((product) => ({
       id: product.id,
       name: product.name,
+      brand: getProductBrandName(product),
+      companyName: getProductBrandName(product),
       imageUrl: product.imageUrl || '',
       itemType: product.itemType || 'goods',
       metalType: product.metalType || '',
@@ -703,6 +714,7 @@ export default function Inventory() {
 
     setRestockProduct(product);
     setRestockQuantity('');
+    setRestockAction('add');
     setIsRestockOpen(true);
   };
 
@@ -717,6 +729,7 @@ export default function Inventory() {
     setIsRestockOpen(false);
     setRestockProduct(null);
     setRestockQuantity('');
+    setRestockAction('add');
   };
 
   const loadHistory = useCallback(async (productId, pageNum = 1) => {
@@ -827,33 +840,53 @@ export default function Inventory() {
 
     if (!restockProduct) return;
 
-    const quantityToAdd = parseNumber(restockQuantity);
-    if (quantityToAdd <= 0) {
+    const quantityValue = parseNumber(restockQuantity);
+    if (quantityValue <= 0) {
       setStatus({ type: 'error', message: t('inventory.messages.restockQuantityRequired') });
       return;
     }
+
+    const isRemove = restockAction === 'remove';
+    const currentStock = getCurrentStock(restockProduct);
+    if (isRemove && quantityValue > currentStock) {
+      setStatus({
+        type: 'error',
+        message: t('inventory.messages.restockExceedsStock', {
+          stock: `${formatQuantity(currentStock)}${restockProduct.primaryUnit ? ` ${restockProduct.primaryUnit}` : ''}`,
+        }),
+      });
+      return;
+    }
+
+    const quantityChange = isRemove ? -quantityValue : quantityValue;
 
     setRestockSaving(true);
     setStatus({ type: 'info', message: '' });
 
     try {
-      const response = await api.restockProduct(restockProduct.id, { quantity: quantityToAdd });
+      const response = await api.restockProduct(restockProduct.id, {
+        quantity: quantityValue,
+        action: isRemove ? 'remove' : 'add',
+      });
       const updatedProduct = response?.product || response;
-      const fallbackStock = getCurrentStock(restockProduct) + quantityToAdd;
+      const fallbackStock = currentStock + quantityChange;
 
       patchProduct(restockProduct.id, updatedProduct || {
         ...restockProduct,
         stockOnHand: fallbackStock,
       });
 
-      const quantityLabel = `${formatQuantity(quantityToAdd)}${restockProduct.primaryUnit ? ` ${restockProduct.primaryUnit}` : ''}`;
+      const quantityLabel = `${formatQuantity(quantityValue)}${restockProduct.primaryUnit ? ` ${restockProduct.primaryUnit}` : ''}`;
       closeRestockDialog();
       setToast({
         type: 'success',
-        message: response?.message || t('inventory.messages.itemRestocked', {
-          name: restockProduct.name,
-          quantity: quantityLabel,
-        }),
+        message: response?.message || t(
+          isRemove ? 'inventory.messages.itemStockReduced' : 'inventory.messages.itemRestocked',
+          {
+            name: restockProduct.name,
+            quantity: quantityLabel,
+          },
+        ),
       });
     } catch (err) {
       setStatus({ type: 'error', message: err.message });
@@ -883,8 +916,11 @@ export default function Inventory() {
   }, []);
 
   const currentRestockStock = restockProduct ? getCurrentStock(restockProduct) : 0;
-  const nextRestockStock = currentRestockStock + parseNumber(restockQuantity);
+  const restockQuantityValue = parseNumber(restockQuantity);
+  const restockSignedDelta = restockAction === 'remove' ? -restockQuantityValue : restockQuantityValue;
+  const nextRestockStock = currentRestockStock + restockSignedDelta;
   const restockUnitSuffix = restockProduct?.primaryUnit ? ` ${restockProduct.primaryUnit}` : '';
+  const isRestockRemove = restockAction === 'remove';
   useEffect(() => {
     if (status.type !== 'success' && status.type !== 'error') return;
     const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 3000);
@@ -1040,7 +1076,7 @@ export default function Inventory() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-slate-900 dark:text-white truncate">{item.name}</p>
                     <p className="text-xs text-slate-500">
-                      {[item.category, showJewelleryFields ? (item.metalType && item.purity ? `${item.metalType} ${item.purity}` : item.metalType || item.purity) : null, item.unit || t('inventory.noUnit')]
+                      {[item.brand, item.category !== '-' ? item.category : null, showJewelleryFields ? (item.metalType && item.purity ? `${item.metalType} ${item.purity}` : item.metalType || item.purity) : null, item.unit || t('inventory.noUnit')]
                         .filter(Boolean)
                         .join(' · ')}
                     </p>
@@ -1102,6 +1138,7 @@ export default function Inventory() {
             <thead className="text-xs uppercase text-slate-400">
               <tr>
                 <th className="py-2 text-left">{t('inventory.itemName')}</th>
+                <th className="py-2 text-left">{t('inventory.brand')}</th>
                 <th className="py-2 text-left">{t('inventory.itemType')}</th>
                 <th className="py-2 text-left">{t('inventory.itemCategory')}</th>
                 <th className="py-2 text-left">{t('inventory.itemCode')}</th>
@@ -1115,11 +1152,11 @@ export default function Inventory() {
             <tbody>
               {productsLoading && products.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-3 text-slate-500">{t('common.loading')}</td>
+                  <td colSpan={10} className="py-3 text-slate-500">{t('common.loading')}</td>
                 </tr>
               ) : pagedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-3 text-slate-500">{t('inventory.noItems')}</td>
+                  <td colSpan={10} className="py-3 text-slate-500">{t('inventory.noItems')}</td>
                 </tr>
               ) : (
                 pagedItems.map((item) => (
@@ -1143,6 +1180,7 @@ export default function Inventory() {
                         </div>
                       </div>
                     </td>
+                    <td className="py-3">{item.brand || '—'}</td>
                     <td className="py-3 capitalize">
                       {getItemTypeLabel(item.itemType, itemTypeOptions, t)}
                     </td>
@@ -1245,6 +1283,33 @@ export default function Inventory() {
                 <p id="inventory-restock-item-unit" className="text-sm text-slate-500">{restockProduct?.primaryUnit || t('inventory.noUnit')}</p>
               </div>
 
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  id="inventory-restock-action-add"
+                  type="button"
+                  className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                    !isRestockRemove
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-200'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
+                  }`}
+                  onClick={() => setRestockAction('add')}
+                >
+                  {t('inventory.restockAdd')}
+                </button>
+                <button
+                  id="inventory-restock-action-remove"
+                  type="button"
+                  className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                    isRestockRemove
+                      ? 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
+                  }`}
+                  onClick={() => setRestockAction('remove')}
+                >
+                  {t('inventory.restockRemove')}
+                </button>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="label">{t('inventory.quantityOnHand')}</label>
@@ -1253,13 +1318,16 @@ export default function Inventory() {
                   </div>
                 </div>
                 <div>
-                  <label className="label">{t('inventory.restockQuantity')}</label>
+                  <label className="label">
+                    {isRestockRemove ? t('inventory.restockQuantityRemove') : t('inventory.restockQuantityAdd')}
+                  </label>
                   <input
                     id="inventory-restock-quantity"
                     className="input mt-1"
                     type="number"
                     min="0"
                     step="0.01"
+                    max={isRestockRemove ? currentRestockStock : undefined}
                     value={restockQuantity}
                     onChange={(event) => setRestockQuantity(event.target.value)}
                     placeholder="0"
@@ -1269,13 +1337,31 @@ export default function Inventory() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
-                <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">{t('inventory.newStockLevel')}</p>
-                <p id="inventory-restock-new-stock" className="mt-1 text-lg font-semibold text-emerald-900 dark:text-emerald-200">
-                  {formatQuantity(nextRestockStock)}{restockUnitSuffix}
+              <div className={`rounded-2xl border px-4 py-3 ${
+                isRestockRemove
+                  ? 'border-rose-200 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/20'
+                  : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20'
+              }`}>
+                <p className={`text-xs uppercase tracking-[0.2em] ${
+                  isRestockRemove
+                    ? 'text-rose-700 dark:text-rose-300'
+                    : 'text-emerald-700 dark:text-emerald-300'
+                }`}>{t('inventory.newStockLevel')}</p>
+                <p id="inventory-restock-new-stock" className={`mt-1 text-lg font-semibold ${
+                  isRestockRemove
+                    ? 'text-rose-900 dark:text-rose-200'
+                    : 'text-emerald-900 dark:text-emerald-200'
+                }`}>
+                  {formatQuantity(Math.max(nextRestockStock, 0))}{restockUnitSuffix}
                 </p>
-                <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">{t('inventory.restockEditHint')}</p>
+                <p className={`mt-2 text-xs ${
+                  isRestockRemove
+                    ? 'text-rose-700 dark:text-rose-300'
+                    : 'text-emerald-700 dark:text-emerald-300'
+                }`}>{t('inventory.restockEditHint')}</p>
               </div>
+
+              {status.message ? <Notice title={status.message} tone={status.type} /> : null}
             </div>
           </FormSectionCard>
 
@@ -1284,7 +1370,9 @@ export default function Inventory() {
               {t('common.close')}
             </button>
             <button id="inventory-restock-submit" className="btn-primary w-full sm:w-auto" type="submit" disabled={restockSaving}>
-              {restockSaving ? t('common.loading') : t('inventory.restock')}
+              {restockSaving
+                ? t('common.loading')
+                : (isRestockRemove ? t('inventory.restockRemove') : t('inventory.restockAdd'))}
             </button>
           </div>
         </form>
@@ -1373,6 +1461,19 @@ export default function Inventory() {
                       placeholder={t('inventory.itemNamePlaceholder')}
                       required
                     />
+                  </div>
+
+                  <div>
+                    <label className="label">{t('inventory.brand')}</label>
+                    <input
+                      id="inventory-item-brand"
+                      className="input mt-1"
+                      name="companyName"
+                      value={form.companyName}
+                      onChange={handleFormChange}
+                      placeholder={t('inventory.brandPlaceholder')}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">{t('inventory.brandHint')}</p>
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">

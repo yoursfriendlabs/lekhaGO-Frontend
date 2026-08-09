@@ -221,6 +221,7 @@ export default function Products() {
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [restockProduct, setRestockProduct] = useState(null);
   const [restockQuantity, setRestockQuantity] = useState('');
+  const [restockAction, setRestockAction] = useState('add');
   const [restockSaving, setRestockSaving] = useState(false);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -358,6 +359,7 @@ export default function Products() {
 
     setRestockProduct(product);
     setRestockQuantity('');
+    setRestockAction('add');
     setListStatus({ type: 'info', message: '' });
     setIsRestockOpen(true);
   };
@@ -366,13 +368,16 @@ export default function Products() {
     setIsRestockOpen(false);
     setRestockProduct(null);
     setRestockQuantity('');
+    setRestockAction('add');
   };
 
   // Server already filters/sorts/paginates.
   const pagedProducts = products;
 
   const currentRestockStock = restockProduct ? getCurrentStock(restockProduct) : 0;
-  const nextRestockStock = currentRestockStock + parseNumber(restockQuantity);
+  const restockQuantityValue = parseNumber(restockQuantity);
+  const isRestockRemove = restockAction === 'remove';
+  const nextRestockStock = currentRestockStock + (isRestockRemove ? -restockQuantityValue : restockQuantityValue);
   const restockUnitSuffix = restockProduct?.primaryUnit ? ` ${restockProduct.primaryUnit}` : '';
 
   const handleRestockSubmit = async (event) => {
@@ -380,19 +385,34 @@ export default function Products() {
 
     if (!restockProduct) return;
 
-    const quantityToAdd = parseNumber(restockQuantity);
-    if (quantityToAdd <= 0) {
+    const quantityValue = parseNumber(restockQuantity);
+    if (quantityValue <= 0) {
       setListStatus({ type: 'error', message: t('inventory.messages.restockQuantityRequired') });
       return;
     }
+
+    if (isRestockRemove && quantityValue > currentRestockStock) {
+      setListStatus({
+        type: 'error',
+        message: t('inventory.messages.restockExceedsStock', {
+          stock: `${formatQuantity(currentRestockStock)}${restockUnitSuffix}`,
+        }),
+      });
+      return;
+    }
+
+    const quantityChange = isRestockRemove ? -quantityValue : quantityValue;
 
     setRestockSaving(true);
     setListStatus({ type: 'info', message: '' });
 
     try {
-      const response = await api.restockProduct(restockProduct.id, { quantity: quantityToAdd });
+      const response = await api.restockProduct(restockProduct.id, {
+        quantity: quantityValue,
+        action: isRestockRemove ? 'remove' : 'add',
+      });
       const updatedProduct = response?.product || response;
-      const fallbackStock = getCurrentStock(restockProduct) + quantityToAdd;
+      const fallbackStock = currentRestockStock + quantityChange;
 
       setProducts((previous) =>
         previous.map((product) => (
@@ -405,14 +425,17 @@ export default function Products() {
         ))
       );
 
-      const quantityLabel = `${formatQuantity(quantityToAdd)}${restockProduct.primaryUnit ? ` ${restockProduct.primaryUnit}` : ''}`;
+      const quantityLabel = `${formatQuantity(quantityValue)}${restockProduct.primaryUnit ? ` ${restockProduct.primaryUnit}` : ''}`;
       closeRestockDialog();
       setToast({
         type: 'success',
-        message: response?.message || t('inventory.messages.itemRestocked', {
-          name: restockProduct.name,
-          quantity: quantityLabel,
-        }),
+        message: response?.message || t(
+          isRestockRemove ? 'inventory.messages.itemStockReduced' : 'inventory.messages.itemRestocked',
+          {
+            name: restockProduct.name,
+            quantity: quantityLabel,
+          },
+        ),
       });
     } catch (err) {
       setListStatus({ type: 'error', message: err.message });
@@ -770,6 +793,31 @@ export default function Products() {
                 <p className="text-sm text-slate-500">{restockProduct?.primaryUnit || t('inventory.noUnit')}</p>
               </div>
 
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                    !isRestockRemove
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-200'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
+                  }`}
+                  onClick={() => setRestockAction('add')}
+                >
+                  {t('inventory.restockAdd')}
+                </button>
+                <button
+                  type="button"
+                  className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                    isRestockRemove
+                      ? 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
+                  }`}
+                  onClick={() => setRestockAction('remove')}
+                >
+                  {t('inventory.restockRemove')}
+                </button>
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="label">{t('inventory.quantityOnHand')}</label>
@@ -778,12 +826,15 @@ export default function Products() {
                   </div>
                 </div>
                 <div>
-                  <label className="label">{t('inventory.restockQuantity')}</label>
+                  <label className="label">
+                    {isRestockRemove ? t('inventory.restockQuantityRemove') : t('inventory.restockQuantityAdd')}
+                  </label>
                   <input
                     className="input mt-1"
                     type="number"
                     min="0"
                     step="0.01"
+                    max={isRestockRemove ? currentRestockStock : undefined}
                     value={restockQuantity}
                     onChange={(event) => setRestockQuantity(event.target.value)}
                     placeholder="0"
@@ -793,12 +844,22 @@ export default function Products() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/40 dark:bg-emerald-950/20">
-                <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">{t('inventory.newStockLevel')}</p>
-                <p className="mt-1 text-lg font-semibold text-emerald-900 dark:text-emerald-200">
-                  {formatQuantity(nextRestockStock)}{restockUnitSuffix}
+              <div className={`rounded-2xl border px-4 py-3 ${
+                isRestockRemove
+                  ? 'border-rose-200 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/20'
+                  : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20'
+              }`}>
+                <p className={`text-xs uppercase tracking-[0.2em] ${
+                  isRestockRemove ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'
+                }`}>{t('inventory.newStockLevel')}</p>
+                <p className={`mt-1 text-lg font-semibold ${
+                  isRestockRemove ? 'text-rose-900 dark:text-rose-200' : 'text-emerald-900 dark:text-emerald-200'
+                }`}>
+                  {formatQuantity(Math.max(nextRestockStock, 0))}{restockUnitSuffix}
                 </p>
-                <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">{t('inventory.restockEditHint')}</p>
+                <p className={`mt-2 text-xs ${
+                  isRestockRemove ? 'text-rose-700 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'
+                }`}>{t('inventory.restockEditHint')}</p>
               </div>
             </div>
           </FormSectionCard>
@@ -808,7 +869,9 @@ export default function Products() {
               {t('common.close')}
             </button>
             <button className="btn-primary w-full sm:w-auto" type="submit" disabled={restockSaving}>
-              {restockSaving ? t('common.loading') : t('inventory.restock')}
+              {restockSaving
+                ? t('common.loading')
+                : (isRestockRemove ? t('inventory.restockRemove') : t('inventory.restockAdd'))}
             </button>
           </div>
         </form>
