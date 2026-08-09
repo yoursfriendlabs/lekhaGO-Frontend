@@ -18,6 +18,8 @@ import ImageCropperModal from '../components/ImageCropperModal.jsx';
 import StatsCard from '../components/StatsCard.jsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import ActionMenu from '../components/ActionMenu.jsx';
+import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
+import { formatDateBoth } from '../lib/nepaliDate.js';
 
 const makeEmptyItem = () => ({
   name: '',
@@ -1091,8 +1093,9 @@ export default function Inventory() {
                   <div className="mt-2 text-xs text-slate-500 px-1">
                     <span>{t('inventory.expiryDate') || 'Expiry Date'}:</span>
                     <div className={`mt-0.5 text-sm font-extrabold tracking-wide ${getExpiryDateColorClass(item.expiryDate)}`}>
-                      {item.expiryDate} ({getExpiryRemainingDaysText(item.expiryDate, t)})
+                      {formatDateBoth(item.expiryDate)}
                     </div>
+                    <div className="text-xs font-bold mt-0.5">{getExpiryRemainingDaysText(item.expiryDate, t)}</div>
                   </div>
                 )}
                 <div className="mt-3 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 pt-2.5 dark:border-slate-800">
@@ -1189,7 +1192,7 @@ export default function Inventory() {
                     <td className="py-3 text-left">
                       {item.expiryDate ? (
                         <div className={`leading-snug ${getExpiryDateColorClass(item.expiryDate) || 'text-slate-500'}`}>
-                          <div className="text-sm font-extrabold tracking-wide">{item.expiryDate}</div>
+                          <div className="text-sm font-extrabold tracking-wide">{formatDateBoth(item.expiryDate)}</div>
                           <div className="text-xs font-bold mt-0.5">{getExpiryRemainingDaysText(item.expiryDate, t)}</div>
                         </div>
                       ) : (
@@ -1449,34 +1452,48 @@ export default function Inventory() {
                 </div>
 
                 {/* Name and other primary fields */}
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <label className="label">{t('inventory.itemName')}</label>
-                    <input
-                      id="inventory-item-name"
-                      className="input mt-1"
-                      name="name"
-                      value={form.name}
-                      onChange={handleFormChange}
-                      placeholder={t('inventory.itemNamePlaceholder')}
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="label">{t('inventory.brand')}</label>
-                    <input
-                      id="inventory-item-brand"
-                      className="input mt-1"
-                      name="companyName"
-                      value={form.companyName}
-                      onChange={handleFormChange}
-                      placeholder={t('inventory.brandPlaceholder')}
-                    />
-                    <p className="mt-1 text-xs text-slate-500">{t('inventory.brandHint')}</p>
-                  </div>
-
+                <div className="flex-1 space-y-4 min-w-0">
                   <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label className="label">{t('inventory.itemName')}</label>
+                      <input
+                        id="inventory-item-name"
+                        className="input mt-1"
+                        name="name"
+                        value={form.name}
+                        onChange={handleFormChange}
+                        placeholder={t('inventory.itemNamePlaceholder')}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="label">{t('inventory.brand')}</label>
+                      <input
+                        id="inventory-item-brand"
+                        className="input mt-1"
+                        name="companyName"
+                        value={form.companyName}
+                        onChange={handleFormChange}
+                        placeholder={t('inventory.brandPlaceholder')}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="label">
+                        {t('inventory.itemCode')}
+                        <span className="ml-1 text-[10px] text-slate-400 font-normal">(barcode)</span>
+                      </label>
+                      <input
+                        id="inventory-item-code"
+                        className="input mt-1"
+                        name="itemCode"
+                        value={form.itemCode}
+                        onChange={handleFormChange}
+                        placeholder={t('inventory.itemCodePlaceholder')}
+                      />
+                    </div>
+
                     <div className="sm:col-span-2">
                       <label className="label">{t('inventory.itemCategory')}</label>
                       <div className="mt-1">
@@ -1498,38 +1515,21 @@ export default function Inventory() {
                         <p className="mt-2 text-xs text-rose-600">{categoriesError}</p>
                       ) : categoriesLoading && !selectedCategory ? (
                         <p className="mt-2 text-xs text-slate-500">{t('common.loading')}</p>
-                      ) : selectedCategory?.name ? (
-                        <p className="mt-2 text-xs text-slate-500">{selectedCategory.name}</p>
                       ) : null}
                     </div>
-
-                    <div>
-                      <label className="label">
-                        {t('inventory.itemCode')}
-                        <span className="ml-1 text-[10px] text-slate-400 font-normal">(barcode ready)</span>
-                      </label>
-                      <input
-                        id="inventory-item-code"
-                        className="input mt-1"
-                        name="itemCode"
-                        value={form.itemCode}
-                        onChange={handleFormChange}
-                        placeholder={t('inventory.itemCodePlaceholder')}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="label">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
-                      <input
-                        id="inventory-expiry-date"
-                        className="input mt-1"
-                        name="expiryDate"
-                        type="date"
-                        value={form.expiryDate}
-                        onChange={handleFormChange}
-                      />
-                    </div>
                   </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
+                <label className="label">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
+                <div className="mt-2">
+                  <FlexibleDateInput
+                    id="inventory-expiry-date"
+                    name="expiryDate"
+                    value={form.expiryDate}
+                    onChange={handleFormChange}
+                  />
                 </div>
               </div>
 

@@ -10,8 +10,9 @@ import { API_BASE } from '../lib/api';
  *   date        — display-ready date string
  *   status      — raw status string
  *   statusColor — tailwind bg+text classes for the badge
+ *   reprintLabel — optional IRD reprint banner, e.g. "Copy of Original – 1"
  */
-export default function InvoiceHeader({ biz = {}, invoiceType, invoiceNo, date, status, statusColor }) {
+export default function InvoiceHeader({ biz = {}, invoiceType, invoiceNo, date, status, statusColor, reprintLabel }) {
   const logoSrc = biz.logoUrl
     ? biz.logoUrl.startsWith('http')
       ? biz.logoUrl
@@ -68,6 +69,11 @@ export default function InvoiceHeader({ biz = {}, invoiceType, invoiceNo, date, 
           <p className="text-xs font-bold uppercase tracking-widest text-primary-600 dark:text-primary-400">
             {invoiceType}
           </p>
+          {reprintLabel ? (
+            <p className="mt-1 text-[11px] font-bold uppercase tracking-wide text-rose-600 dark:text-rose-400">
+              {reprintLabel}
+            </p>
+          ) : null}
           <p className="mt-1 font-mono text-xl font-bold text-slate-900 dark:text-white">
             #{invoiceNo}
           </p>

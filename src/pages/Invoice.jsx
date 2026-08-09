@@ -32,19 +32,39 @@ export default function Invoice() {
     loader(id).then(setRecord).catch((err) => setStatus(err.message));
   }, [type, id]);
 
-  const handlePrint = () => {
-    printElement(printRef.current);
-  };
-
-  const handlePrintThermal = () => {
-    printThermalReceipt(thermalPrintRef.current);
-  };
-
   const isSale = type === 'sales';
   const isPrintBillView = searchParams.get('print') === '1';
   const isThermalView = searchParams.get('thermal') === '1';
   const dateValue = isSale ? record?.saleDate : record?.purchaseDate;
   const items = record?.PurchaseItems || record?.SaleItems || [];
+  const isLockedSale = Boolean(
+    isSale
+    && (record?.isLocked === true || record?.isLocked === 'true' || record?.isLocked === 1),
+  );
+  // First print of a locked invoice stays unlabeled (original). Later prints show Copy of Original – N.
+  const reprintLabel = isLockedSale && Number(record?.reprintCount || 0) > 0
+    ? `Copy of Original – ${Number(record.reprintCount)}`
+    : '';
+
+  const trackReprintAfterPrint = async () => {
+    if (!isSale || !id || !isLockedSale) return;
+    try {
+      const updated = await api.recordSaleReprint(id);
+      setRecord(updated);
+    } catch {
+      // Printing already happened; tracking failure should not block the user.
+    }
+  };
+
+  const handlePrint = async () => {
+    printElement(printRef.current);
+    await trackReprintAfterPrint();
+  };
+
+  const handlePrintThermal = async () => {
+    printThermalReceipt(thermalPrintRef.current);
+    await trackReprintAfterPrint();
+  };
 
   const totalReceived = isSale
     ? Number(record?.amountReceived ?? (record?.status === 'paid' ? record?.grandTotal : 0) ?? 0)
@@ -56,10 +76,14 @@ export default function Invoice() {
     record?.dueAmount ?? Math.max(Number(record?.grandTotal || 0) - (isSale ? totalReceived : totalPaid), 0)
   );
 
-  const isPaidOrReceived = record?.status === 'paid' || record?.status === 'received';
-  const statusColor = isPaidOrReceived
-    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
+  const normalizedStatus = String(record?.status || '').toLowerCase();
+  const isPaidOrReceived = normalizedStatus === 'paid' || normalizedStatus === 'received';
+  const isCancelledStatus = ['cancelled', 'canceled', 'void'].includes(normalizedStatus);
+  const statusColor = isCancelledStatus
+    ? 'bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200'
+    : isPaidOrReceived
+      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+      : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
 
 const partyName = isSale
     ? record?.partyName ||
@@ -119,6 +143,7 @@ const partyName = isSale
               date={fmt(dateValue)}
               status={record.status}
               statusColor={statusColor}
+              reprintLabel={reprintLabel}
             />
           </div>
 
@@ -267,6 +292,7 @@ const partyName = isSale
                   dueAmount: dueAmount,
                 }}
                 notes={record.notes}
+                reprintLabel={reprintLabel}
               />
             </div>
           </div>
@@ -281,6 +307,7 @@ const partyName = isSale
                 invoiceType={isSale ? 'Sales Bill' : 'Purchase Bill'}
                 invoiceNo={record.invoiceNo || record.id.slice(0, 8)}
                 date={fmt(dateValue)}
+                reprintLabel={reprintLabel}
                 // status={record.status}
                 // statusColor="border border-black text-black"
               />

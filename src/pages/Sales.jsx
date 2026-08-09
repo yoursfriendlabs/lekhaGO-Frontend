@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Pencil, FileText, Package, Plus, Printer, Trash2, TrendingUp, DollarSign, CheckCircle2, Clock, Calendar } from 'lucide-react';
+import { Ban, Pencil, FileText, Package, Plus, Printer, RefreshCw, Trash2, TrendingUp, DollarSign, CheckCircle2, Clock, Calendar } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
@@ -53,15 +53,47 @@ function getVatAmount(lineTotal, taxRate) {
 }
 
 // ── Matches Services StatusBadge exactly ──
-function StatusBadge({ status }) {
+function isSaleLocked(sale) {
+  return sale?.isLocked === true || sale?.isLocked === 'true' || sale?.isLocked === 1;
+}
+
+function isSaleCancelled(sale) {
+  const status = String(sale?.status || '').toLowerCase();
+  return status === 'cancelled' || status === 'canceled' || status === 'void';
+}
+
+function StatusBadge({ status, locked = false, cbmsStatus = '' }) {
+  const normalized = String(status || '').toLowerCase();
+  const cbms = String(cbmsStatus || '').toLowerCase();
   const map = {
     paid: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
     due:  'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+    cancelled: 'bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200',
+    canceled: 'bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200',
+    void: 'bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200',
+  };
+  const cbmsMap = {
+    synced: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
+    return_synced: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
+    failed: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+    pending: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
   };
   const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : '—';
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[status] || 'bg-slate-100 text-slate-600'}`}>
-      {label}
+    <span className="inline-flex flex-wrap items-center justify-end gap-1">
+      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[normalized] || 'bg-slate-100 text-slate-600'}`}>
+        {label}
+      </span>
+      {locked && !['cancelled', 'canceled', 'void'].includes(normalized) ? (
+        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+          Locked
+        </span>
+      ) : null}
+      {cbms ? (
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cbmsMap[cbms] || 'bg-slate-100 text-slate-600'}`}>
+          CBMS {cbms.replace('_', ' ')}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -166,6 +198,10 @@ export default function Sales() {
   const [editingId, setEditingId] = useState(null);
   const [deletedItemIds, setDeletedItemIds] = useState([]);
   const [deleteSale, setDeleteSale] = useState(null);
+  const [cancelSale, setCancelSale] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancellingSaleId, setCancellingSaleId] = useState('');
+  const [syncingCbmsSaleId, setSyncingCbmsSaleId] = useState('');
   const [deletingSaleId, setDeletingSaleId] = useState('');
   const [savingSale, setSavingSale] = useState(false);
   const [openingSaleForm, setOpeningSaleForm] = useState(false);
@@ -587,6 +623,10 @@ export default function Sales() {
     setStatus({ type: 'info', message: '' });
     try {
       const sale = await api.getSale(saleId);
+      if (isSaleLocked(sale) || isSaleCancelled(sale)) {
+        setStatus({ type: 'error', message: t('sales.messages.lockedEditBlocked') });
+        return;
+      }
       const saleItems = sale?.SaleItems || [];
       const party = normalizeLookupParty({
         id: sale.partyId || sale.customerId || sale.Customer?.id || sale.Party?.id,
@@ -717,6 +757,62 @@ export default function Sales() {
     setDeleteSale(null);
   };
 
+  const closeCancelDialog = () => {
+    if (cancelSale && cancellingSaleId === cancelSale.id) return;
+    setCancelSale(null);
+    setCancelReason('');
+  };
+
+  const buildSaleActions = (sale) => {
+    const locked = isSaleLocked(sale);
+    const cancelled = isSaleCancelled(sale);
+    const actions = [];
+
+    if (canManageSales && !locked && !cancelled) {
+      actions.push({ label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) });
+    }
+
+    actions.push(
+      { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
+      { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
+      { label: 'Print Thermal', icon: Printer, to: `/app/invoice/sales/${sale.id}?thermal=1` },
+    );
+
+    if (canManageSales && locked && !cancelled) {
+      actions.push({
+        label: t('sales.cancelInvoice'),
+        icon: Ban,
+        tone: 'danger',
+        disabled: cancellingSaleId === sale.id,
+        onClick: () => {
+          setCancelReason('');
+          setCancelSale(sale);
+        },
+      });
+    }
+
+    if (canManageSales && locked) {
+      actions.push({
+        label: t('sales.retryCbms'),
+        icon: RefreshCw,
+        disabled: syncingCbmsSaleId === sale.id,
+        onClick: () => handleRetryCbms(sale),
+      });
+    }
+
+    if (canManageSales && !locked && !cancelled) {
+      actions.push({
+        label: t('common.delete'),
+        icon: Trash2,
+        tone: 'danger',
+        disabled: deletingSaleId === sale.id,
+        onClick: () => setDeleteSale(sale),
+      });
+    }
+
+    return actions;
+  };
+
   const handleDeleteSale = async () => {
     if (!deleteSale) return;
     if (deletingSaleId === deleteSale.id) return;
@@ -738,6 +834,50 @@ export default function Sales() {
     } finally {
       setDeletingSaleId('');
       setDeleteSale(null);
+    }
+  };
+
+  const handleCancelSale = async () => {
+    if (!cancelSale) return;
+    if (cancellingSaleId === cancelSale.id) return;
+
+    const reason = cancelReason.trim();
+    if (!reason) {
+      setStatus({ type: 'error', message: t('sales.cancelReasonRequired') });
+      return;
+    }
+
+    setCancellingSaleId(cancelSale.id);
+    setStatus({ type: 'info', message: '' });
+
+    try {
+      await api.cancelSale(cancelSale.id, { reason });
+      setStatus({ type: 'success', message: t('sales.messages.cancelled') });
+      useProductStore.getState().invalidate();
+      invalidateSales(listParams);
+      await fetchSales(listParams, true);
+      setCancelSale(null);
+      setCancelReason('');
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || t('sales.messages.cancelFailed') });
+    } finally {
+      setCancellingSaleId('');
+    }
+  };
+
+  const handleRetryCbms = async (sale) => {
+    if (!sale?.id || syncingCbmsSaleId === sale.id) return;
+    setSyncingCbmsSaleId(sale.id);
+    setStatus({ type: 'info', message: '' });
+    try {
+      await api.syncSaleCbms(sale.id);
+      setStatus({ type: 'success', message: t('sales.messages.cbmsRetryOk') });
+      invalidateSales(listParams);
+      await fetchSales(listParams, true);
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message || t('sales.messages.cbmsRetryFailed') });
+    } finally {
+      setSyncingCbmsSaleId('');
     }
   };
 
@@ -1360,7 +1500,7 @@ export default function Sales() {
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      <StatusBadge status={sale.status} />
+                      <StatusBadge status={sale.status} locked={isSaleLocked(sale)} cbmsStatus={sale.cbmsStatus} />
                       <p className="mt-1.5 font-semibold text-slate-800 dark:text-slate-200">
                         {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.grandTotal || 0).toFixed(2) })}
                       </p>
@@ -1374,23 +1514,7 @@ export default function Sales() {
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-end border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
-                    <ActionMenu
-                      actions={[
-                        ...(canManageSales ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) }] : []),
-                        { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
-                        { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
-                        { label: 'Print Thermal', icon: Printer, to: `/app/invoice/sales/${sale.id}?thermal=1` },
-                        ...(canManageSales
-                          ? [{
-                            label: t('common.delete'),
-                            icon: Trash2,
-                            tone: 'danger',
-                            disabled: deletingSaleId === sale.id,
-                            onClick: () => setDeleteSale(sale),
-                          }]
-                          : []),
-                      ]}
-                    />
+                    <ActionMenu actions={buildSaleActions(sale)} />
                   </div>
                 </div>
               );
@@ -1438,7 +1562,7 @@ export default function Sales() {
 
                       {/* Status — colored badge */}
                       <td className="py-2.5 pr-4">
-                        <StatusBadge status={sale.status} />
+                        <StatusBadge status={sale.status} locked={isSaleLocked(sale)} cbmsStatus={sale.cbmsStatus} />
                       </td>
 
                       {/* Customer — resolved through full fallback chain */}
@@ -1481,23 +1605,7 @@ export default function Sales() {
 
                       {/* Actions — icon buttons matching Services exactly */}
                       <td className="py-2.5 text-right">
-                        <ActionMenu
-                          actions={[
-                            ...(canManageSales ? [{ label: t('common.edit'), icon: Pencil, onClick: () => openEdit(sale.id) }] : []),
-                            { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
-                            { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
-                            { label: 'Print Thermal', icon: Printer, to: `/app/invoice/sales/${sale.id}?thermal=1` },
-                            ...(canManageSales
-                              ? [{
-                                label: t('common.delete'),
-                                icon: Trash2,
-                                tone: 'danger',
-                                disabled: deletingSaleId === sale.id,
-                                onClick: () => setDeleteSale(sale),
-                              }]
-                              : []),
-                          ]}
-                        />
+                        <ActionMenu actions={buildSaleActions(sale)} />
                       </td>
                     </tr>
                   );
@@ -1524,6 +1632,58 @@ export default function Sales() {
         description={deleteSale ? t('sales.deleteConfirm', { name: deleteSale.invoiceNo || deleteSale.id.slice(0, 8) }) : t('common.confirmDelete')}
         confirming={Boolean(deleteSale) && deletingSaleId === deleteSale.id}
       />
+
+      <Dialog
+        isOpen={Boolean(cancelSale)}
+        onClose={closeCancelDialog}
+        title={t('sales.cancelInvoice')}
+        size="sm"
+        showCloseButton={!(cancelSale && cancellingSaleId === cancelSale.id)}
+        closeOnOverlayClick={!(cancelSale && cancellingSaleId === cancelSale.id)}
+        footer={(
+          <>
+            <button
+              type="button"
+              className="btn-secondary w-full sm:w-auto"
+              onClick={closeCancelDialog}
+              disabled={Boolean(cancelSale && cancellingSaleId === cancelSale.id)}
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              className="w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              onClick={handleCancelSale}
+              disabled={Boolean(cancelSale && cancellingSaleId === cancelSale.id)}
+            >
+              {cancelSale && cancellingSaleId === cancelSale.id
+                ? t('common.loading')
+                : t('sales.confirmCancelInvoice')}
+            </button>
+          </>
+        )}
+      >
+        <div className="space-y-3">
+          <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+            {cancelSale
+              ? t('sales.cancelConfirm', { name: cancelSale.invoiceNo || cancelSale.id.slice(0, 8) })
+              : ''}
+          </p>
+          <div className="space-y-1">
+            <label className="label" htmlFor="sale-cancel-reason">
+              {t('sales.cancelReason')}
+            </label>
+            <textarea
+              id="sale-cancel-reason"
+              className="input min-h-[96px] resize-none"
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              placeholder={t('sales.cancelReasonPlaceholder')}
+              disabled={Boolean(cancelSale && cancellingSaleId === cancelSale.id)}
+            />
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

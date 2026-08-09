@@ -442,6 +442,14 @@ export default function QuickPos() {
 
       if (activeOrder) {
         const fullSale = await api.getSale(activeOrder.id);
+        if (fullSale?.isLocked === true || fullSale?.isLocked === 'true' || fullSale?.isLocked === 1) {
+          ignoreAutoSaveRef.current = true;
+          setCart([]);
+          setEditingId(null);
+          setDeletedItemIds([]);
+          showError('This IRD tax invoice is locked and cannot be edited from POS.');
+          return;
+        }
         const saleItems = fullSale?.SaleItems || [];
 
         const mappedCart = saleItems.map((item) => {

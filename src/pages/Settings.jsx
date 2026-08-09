@@ -38,6 +38,11 @@ const EMPTY = {
   email: '',
   panVat: '',
   logoUrl: '',
+  irdModeEnabled: false,
+  cbmsSyncEnabled: false,
+  cbmsUsername: '',
+  cbmsPassword: '',
+  cbmsPasswordSet: false,
 };
 
 const PROFILE_TAB_KEYS = [PROFILE_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB, ACCOUNT_SETTINGS_TAB];
@@ -244,7 +249,12 @@ export default function Settings() {
   }, [businessId, canViewFeature]);
 
   useEffect(() => {
-    setForm({ ...EMPTY, ...settings });
+    setForm({
+      ...EMPTY,
+      ...settings,
+      cbmsPassword: '',
+      cbmsPasswordSet: Boolean(settings?.cbmsPasswordSet),
+    });
   }, [settings]);
 
   const handleChange = (field, value) => {
@@ -308,7 +318,19 @@ export default function Settings() {
     setError('');
 
     try {
-      await saveSettings(form, businessId);
+      const payload = {
+        ...form,
+        irdModeEnabled: Boolean(form.irdModeEnabled),
+        cbmsSyncEnabled: Boolean(form.cbmsSyncEnabled),
+        cbmsUsername: form.cbmsUsername || '',
+      };
+      delete payload.cbmsPasswordSet;
+      if (String(form.cbmsPassword || '').trim()) {
+        payload.cbmsPassword = form.cbmsPassword;
+      } else {
+        delete payload.cbmsPassword;
+      }
+      await saveSettings(payload, businessId);
       setSaved(true);
     } catch (saveError) {
       setError(saveError.message);
@@ -661,6 +683,116 @@ export default function Settings() {
                       {t('settingsPage.general.panVatHint')}
                     </p>
                   </div>
+
+                  <div className="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-700/80">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <label className="label" htmlFor="irdModeEnabled">
+                          {t('settingsPage.general.irdModeTitle')}
+                        </label>
+                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                          {t('settingsPage.general.irdModeHint')}
+                        </p>
+                      </div>
+                      <button
+                        id="irdModeEnabled"
+                        type="button"
+                        role="switch"
+                        aria-checked={Boolean(form.irdModeEnabled)}
+                        disabled={generalLocked}
+                        onClick={() => handleChange('irdModeEnabled', !form.irdModeEnabled)}
+                        className={`relative mt-1 inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${
+                          form.irdModeEnabled
+                            ? 'bg-emerald-600'
+                            : 'bg-slate-300 dark:bg-slate-600'
+                        } ${generalLocked ? 'cursor-not-allowed opacity-60' : ''}`}
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                            form.irdModeEnabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                    {form.irdModeEnabled ? (
+                      <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
+                        {t('settingsPage.general.irdModeWarning')}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {form.irdModeEnabled ? (
+                    <div className="rounded-2xl border border-slate-200/80 p-4 space-y-4 dark:border-slate-700/80">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <label className="label" htmlFor="cbmsSyncEnabled">
+                            {t('settingsPage.general.cbmsSyncTitle')}
+                          </label>
+                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                            {t('settingsPage.general.cbmsSyncHint')}
+                          </p>
+                        </div>
+                        <button
+                          id="cbmsSyncEnabled"
+                          type="button"
+                          role="switch"
+                          aria-checked={Boolean(form.cbmsSyncEnabled)}
+                          disabled={generalLocked}
+                          onClick={() => handleChange('cbmsSyncEnabled', !form.cbmsSyncEnabled)}
+                          className={`relative mt-1 inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${
+                            form.cbmsSyncEnabled
+                              ? 'bg-emerald-600'
+                              : 'bg-slate-300 dark:bg-slate-600'
+                          } ${generalLocked ? 'cursor-not-allowed opacity-60' : ''}`}
+                        >
+                          <span
+                            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                              form.cbmsSyncEnabled ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <label className="label" htmlFor="cbmsUsername">
+                            {t('settingsPage.general.cbmsUsername')}
+                          </label>
+                          <input
+                            id="cbmsUsername"
+                            className="input"
+                            autoComplete="off"
+                            placeholder={t('settingsPage.general.cbmsUsernamePlaceholder')}
+                            value={form.cbmsUsername || ''}
+                            onChange={(event) => handleChange('cbmsUsername', event.target.value)}
+                            disabled={generalLocked || !form.cbmsSyncEnabled}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="label" htmlFor="cbmsPassword">
+                            {t('settingsPage.general.cbmsPassword')}
+                          </label>
+                          <input
+                            id="cbmsPassword"
+                            className="input"
+                            type="password"
+                            autoComplete="new-password"
+                            placeholder={
+                              form.cbmsPasswordSet
+                                ? t('settingsPage.general.cbmsPasswordSetPlaceholder')
+                                : t('settingsPage.general.cbmsPasswordPlaceholder')
+                            }
+                            value={form.cbmsPassword || ''}
+                            onChange={(event) => handleChange('cbmsPassword', event.target.value)}
+                            disabled={generalLocked || !form.cbmsSyncEnabled}
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        {t('settingsPage.general.cbmsSyncWarning')}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

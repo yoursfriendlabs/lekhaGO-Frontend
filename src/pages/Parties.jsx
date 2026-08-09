@@ -50,6 +50,7 @@ const emptyForm = {
   phone: "",
   email: "",
   address: "",
+  pan: "",
   type: "customer",
   openingBalance: 0,
   asOfDate: "",
@@ -664,6 +665,7 @@ export default function Parties() {
       phone: party.phone || "",
       email: party.email || "",
       address: party.address || "",
+      pan: party.pan || "",
       type: party.type || "customer",
       openingBalance: party.openingBalance || 0,
       asOfDate: party.asOfDate || "",
@@ -1594,6 +1596,16 @@ export default function Parties() {
               />
             </div>
             <div>
+              <label className="label">{t("parties.pan")}</label>
+              <input
+                className="input mt-1"
+                name="pan"
+                value={form.pan}
+                onChange={handleChange}
+                placeholder={t("parties.panPlaceholder")}
+              />
+            </div>
+            <div className="md:col-span-2">
               <label className="label">{t("parties.address")}</label>
               <input
                 className="input mt-1"

@@ -16,6 +16,7 @@ export default function ThermalReceipt({
   totals = {},
   notes = '',
   extraFields = [],
+  reprintLabel = '',
 }) {
   const finalPartyName = partyName || 'Walk-in Customer';
 
@@ -25,6 +26,11 @@ export default function ThermalReceipt({
       <div className="text-center font-bold text-base tracking-wide uppercase mb-1">
         {biz.companyName || 'PasalManager'}
       </div>
+      {reprintLabel ? (
+        <div className="mb-1 text-center text-[11px] font-bold uppercase tracking-wide">
+          {reprintLabel}
+        </div>
+      ) : null}
       
       {/* Business Details */}
       {(biz.address || biz.phone || biz.email || biz.panVat) && (

@@ -1087,6 +1087,33 @@ export const api = {
         "banks",
       ]),
     ),
+  cancelSale: (id, data = {}) =>
+    request(
+      `/api/sales/${id}/cancel`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("sale", id),
+        "sales",
+        "products",
+        "reports",
+        "dashboard",
+        "parties",
+        "party-statements",
+        "banks",
+      ]),
+    ),
+  recordSaleReprint: (id) =>
+    request(
+      `/api/sales/${id}/reprint`,
+      { method: "POST" },
+      mutationConfig([detailTags("sale", id), "sales"]),
+    ),
+  syncSaleCbms: (id) =>
+    request(
+      `/api/sales/${id}/cbms-sync`,
+      { method: "POST" },
+      mutationConfig([detailTags("sale", id), "sales", "reports"]),
+    ),
   deleteSale: (id) =>
     request(
       `/api/sales/${id}`,
