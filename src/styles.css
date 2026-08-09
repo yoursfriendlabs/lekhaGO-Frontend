@@ -161,6 +161,16 @@ body {
   display: none;
 }
 
+.print-template,
+.print-clone,
+.thermal-print-clone,
+.print-template *,
+.print-clone *,
+.thermal-print-clone * {
+  color: black !important;
+  border-color: #cbd5e1 !important;
+}
+
 @media print {
   /* Hide all top-level body children */
   body > * {

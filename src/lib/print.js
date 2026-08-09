@@ -82,11 +82,6 @@ export async function printElement(source, { prepareClone } = {}) {
     return;
   }
 
-  if (isMobileDevice()) {
-    printViaIframe(source, { prepareClone });
-    return;
-  }
-
   const clone = source.cloneNode(true);
   clone.classList.add("print-clone");
   clone.style.cssText = [
@@ -147,68 +142,6 @@ export async function printThermalReceipt(source, { prepareClone } = {}) {
     if (el) el.remove();
     document.body.classList.remove('thermal-printing');
   };
-
-  if (isMobileDevice()) {
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.top = "0";
-    iframe.style.left = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.style.opacity = "0";
-    iframe.style.pointerEvents = "none";
-    iframe.setAttribute("aria-hidden", "true");
-
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow.document;
-    doc.open();
-
-    const clone = source.cloneNode(true);
-    clone.classList.add("thermal-print-clone");
-    clone.style.cssText = [
-      "display:block !important",
-      "position:static !important",
-      "box-sizing:border-box !important",
-      "width:80mm !important",
-      "max-width:80mm !important",
-      "margin:0 !important",
-      "padding:4mm !important",
-      "opacity:1 !important",
-      "visibility:visible !important",
-      "background:#fff !important",
-      "color:#000 !important",
-      "font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important",
-    ].join(";");
-
-    if (prepareClone) prepareClone(clone);
-
-    const clonedHtml = clone.outerHTML;
-    const stylesHtml = getPageStylesHtml();
-
-    doc.write(
-      `<!doctype html><html><head><meta charset="utf-8">${stylesHtml}</head><body>${clonedHtml}</body></html>`,
-    );
-    doc.close();
-
-    const iframeCleanup = () => {
-      cleanup();
-      if (document.body.contains(iframe)) {
-        document.body.removeChild(iframe);
-      }
-    };
-
-    const printWindow = iframe.contentWindow;
-    if (printWindow) {
-      printWindow.focus();
-      printWindow.print();
-      setTimeout(iframeCleanup, 60000);
-    } else {
-      iframeCleanup();
-    }
-    return;
-  }
 
   const clone = source.cloneNode(true);
   clone.classList.add("thermal-print-clone");
