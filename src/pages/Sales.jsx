@@ -120,10 +120,10 @@ export default function Sales() {
   }, []);
 
   useEffect(() => {
-    if (businessProfile?.id) {
+    if (businessId) {
       fetchStats();
     }
-  }, [businessProfile?.id, salesList, fetchStats]);
+  }, [businessId, salesList, fetchStats]);
   const [productDirectory, setProductDirectory] = useState({});
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [partyFilterId, setPartyFilterId] = useState('');

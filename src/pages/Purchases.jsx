@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Pencil,
@@ -7,9 +7,13 @@ import {
   Plus,
   Wallet,
   Wrench,
-X,
+  X,
   Trash2,
   Printer,
+  TrendingUp,
+  DollarSign,
+  Clock,
+  Receipt,
 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import Notice from "../components/Notice";
@@ -21,6 +25,7 @@ import MobileFormStepper from "../components/MobileFormStepper.jsx";
 import PaymentTypeSummary from "../components/PaymentTypeSummary.jsx";
 import QuickPaymentButtons from "../components/QuickPaymentButtons.jsx";
 import PartySearchCreateField from "../components/PartySearchCreateField.jsx";
+import StatsCard from "../components/StatsCard.jsx";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { Dialog } from "../components/ui/Dialog.tsx";
@@ -201,6 +206,27 @@ export default function Purchases() {
 const [mobileStep, setMobileStep] = useState("details");
   const manualStatusRef = useRef(false);
   const [quickExpenseOpen, setQuickExpenseOpen] = useState(false);
+
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      setStatsLoading(true);
+      const res = await api.getPurchaseStats();
+      setStats(res);
+    } catch (err) {
+      console.error("Failed to fetch purchase stats", err);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (businessId) {
+      fetchStats();
+    }
+  }, [businessId, purchaseList, fetchStats]);
 
   // ── Invoice / Bill modal ──
   const { settings: bizSettings } = useBusinessSettings();
@@ -1975,6 +2001,40 @@ setInvoiceOrder(purchase);
           </form>
         )}
       </Dialog>
+
+      {/* QUICK STATS */}
+      {!isOpen && (
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <StatsCard
+            title={t("purchases.totalPurchases") || "Total Purchases"}
+            value={money(stats?.totalPurchases ?? 0)}
+            icon={TrendingUp}
+            tone="default"
+            loading={statsLoading}
+          />
+          <StatsCard
+            title={t("purchases.totalExpenses") || "Total Expenses"}
+            value={money(stats?.totalExpenses ?? 0)}
+            icon={Receipt}
+            tone="info"
+            loading={statsLoading}
+          />
+          <StatsCard
+            title={t("purchases.totalPaid") || "Total Paid"}
+            value={money(stats?.totalPaid ?? 0)}
+            icon={DollarSign}
+            tone="success"
+            loading={statsLoading}
+          />
+          <StatsCard
+            title={t("purchases.totalDue") || "Total Due"}
+            value={money(stats?.totalDue ?? 0)}
+            icon={Clock}
+            tone="danger"
+            loading={statsLoading}
+          />
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════
           PURCHASES LIST

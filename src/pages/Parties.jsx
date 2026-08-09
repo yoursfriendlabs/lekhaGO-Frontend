@@ -1728,6 +1728,7 @@ export default function Parties() {
               })
             }
             noteLabel={t("parties.transactionNote")}
+            showPaymentNote={true}
           />
 
           {txState.status.message ? (

@@ -540,10 +540,10 @@ export default function Services() {
   }, []);
 
   useEffect(() => {
-    if (businessProfile?.id) {
+    if (businessId) {
       fetchStats();
     }
-  }, [businessProfile?.id, serviceList, fetchStats]);
+  }, [businessId, serviceList, fetchStats]);
   const [productDirectory, setProductDirectory] = useState({});
   const [storeType, setStoreType] = useState("physical");
   const [storeDropdownOpen, setStoreDropdownOpen] = useState(false);

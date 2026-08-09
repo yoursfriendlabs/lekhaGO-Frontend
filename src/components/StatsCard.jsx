@@ -55,7 +55,7 @@ export default function StatsCard({ title, value, icon: Icon, tone = 'default', 
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 truncate">
           {title}
         </p>
-        <p className={`mt-2 font-serif font-bold ${colors.text} ${fontSizeClass} truncate`}>
+        <p className={`mt-2 font-serif font-bold ${colors.text} ${fontSizeClass}`}>
           {loading ? '...' : value}
         </p>
       </div>
