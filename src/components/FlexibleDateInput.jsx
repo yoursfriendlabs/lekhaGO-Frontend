@@ -153,9 +153,9 @@ export default function FlexibleDateInput({
     const rect = trigger.getBoundingClientRect();
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-    
+
     const dropdownWidth = 290;
-    const dropdownHeight = 220; 
+    const dropdownHeight = 220;
     const margin = 8;
 
     let left = rect.left;
@@ -167,7 +167,7 @@ export default function FlexibleDateInput({
     let top = rect.bottom + 4;
     const belowSpace = viewportHeight - rect.bottom - margin;
     const aboveSpace = rect.top - margin;
-    
+
     if (belowSpace < dropdownHeight && aboveSpace > belowSpace) {
       top = rect.top - dropdownHeight - 4;
     }
@@ -206,13 +206,8 @@ export default function FlexibleDateInput({
   }, [isPopoverOpen]);
 
   return (
-<<<<<<< HEAD
-    <div className={wrapperClassName}>
-      <div className="flex flex-col gap-2 w-full sm:flex-row sm:items-stretch">
-=======
     <div ref={containerRef} className={wrapperClassName}>
       <div className="flex items-stretch gap-1.5 w-full">
->>>>>>> 401b32bfd25d236fdf732b28c4a6e97685eb82da
         {calendar === 'ad' ? (
           <input
             id={id}
@@ -225,65 +220,6 @@ export default function FlexibleDateInput({
             required={required}
           />
         ) : (
-<<<<<<< HEAD
-          <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(92px,1fr)_minmax(132px,1.5fr)_minmax(92px,0.8fr)] sm:gap-3 xl:min-w-[520px]">
-            <select
-              id={id ? `${id}-bs-year` : undefined}
-              className={inputClassName}
-              value={bsYear}
-              disabled={disabled}
-              required={required}
-              onChange={(event) => commitBsParts(
-                event.target.value ? Number(event.target.value) : '',
-                bsMonth,
-                bsDay,
-              )}
-            >
-              <option value="">{t('dates.year') || 'Year'}</option>
-              {yearOptions.map((year) => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
-
-            <select
-              id={id ? `${id}-bs-month` : undefined}
-              className={inputClassName}
-              value={bsMonth}
-              disabled={disabled}
-              required={required}
-              onChange={(event) => commitBsParts(
-                bsYear,
-                event.target.value ? Number(event.target.value) : '',
-                bsDay,
-              )}
-            >
-              <option value="">{t('dates.month') || 'Month'}</option>
-              {BS_MONTHS.map((month) => (
-                <option key={month.value} value={month.value}>
-                  {language === 'ne' ? month.np : month.en}
-                </option>
-              ))}
-            </select>
-
-            <select
-              id={id ? `${id}-bs-day` : undefined}
-              className={inputClassName}
-              value={bsDay && Number(bsDay) > daysInMonth ? daysInMonth : bsDay}
-              disabled={disabled}
-              required={required}
-              onChange={(event) => commitBsParts(
-                bsYear,
-                bsMonth,
-                event.target.value ? Number(event.target.value) : '',
-              )}
-            >
-              <option value="">{t('dates.day') || 'Day'}</option>
-              {dayOptions.map((day) => (
-                <option key={day} value={day}>{day}</option>
-              ))}
-            </select>
-          </div>
-=======
           <button
             id={id}
             type="button"
@@ -296,7 +232,6 @@ export default function FlexibleDateInput({
             </span>
             <Calendar className="w-4 h-4 text-secondary-400 shrink-0" />
           </button>
->>>>>>> 401b32bfd25d236fdf732b28c4a6e97685eb82da
         )}
 
         {/* Small AD/BS Switcher Pill */}
