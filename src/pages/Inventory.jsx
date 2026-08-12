@@ -20,6 +20,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import ActionMenu from '../components/ActionMenu.jsx';
 import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
 import DateDisplay from '../components/DateDisplay.jsx';
+import { formatDate } from '../lib/nepaliDates.js';
 
 const makeEmptyItem = () => ({
   name: '',
@@ -118,7 +119,7 @@ function productToForm(product = {}) {
     minWholesaleQuantity: String(product.minWholesaleQuantity ?? ''),
     lowStockAlert: Boolean(product.lowStockAlert),
     imageUrl: product.imageUrl || '',
-    expiryDate: product.expiryDate || '',
+    expiryDate: product.expiryDate ? formatDate(product.expiryDate) : '',
     batchNumber: '',
   };
 }
