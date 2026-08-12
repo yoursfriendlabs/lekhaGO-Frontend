@@ -119,7 +119,7 @@ export function bsPartsToAdISO(year, month1Based, day) {
   }
 }
 
-export function formatBsParts(parts, { withLabel = true, withMonthName = true } = {}) {
+export function formatBsParts(parts, { withLabel = false, withMonthName = false } = {}) {
   if (!parts) return '';
   const month = BS_MONTHS.find((entry) => entry.value === Number(parts.month));
   const monthLabel = month ? month.en : pad2(parts.month);
@@ -133,7 +133,7 @@ export function formatDateWithCalendar(adISO, calendar = getPreferredDateCalenda
   if (!isValidAdISODate(adISO)) return String(adISO);
   if (calendar !== 'bs') return adISO;
   const bs = adISOToBsParts(adISO);
-  return bs ? formatBsParts(bs, { withLabel: true }) : adISO;
+  return bs ? formatBsParts(bs, { withLabel: false, withMonthName: false }) : adISO;
 }
 
 export function formatDateBoth(adISO) {
@@ -141,8 +141,9 @@ export function formatDateBoth(adISO) {
   if (!isValidAdISODate(adISO)) return String(adISO);
   const bs = adISOToBsParts(adISO);
   if (!bs) return adISO;
-  return `${adISO} · ${formatBsParts(bs, { withLabel: true })}`;
+  return `${adISO} · ${formatBsParts(bs, { withLabel: false, withMonthName: false })}`;
 }
+
 
 export function todayAdISO() {
   const now = new Date();

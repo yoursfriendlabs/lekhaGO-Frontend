@@ -25,6 +25,6 @@ describe('nepaliDate conversion', () => {
     const adISO = bsPartsToAdISO(2083, 4, 25);
     const formatted = formatDateBoth(adISO);
     expect(formatted).toContain(adISO);
-    expect(formatted).toContain('BS 2083-04-25');
+    expect(formatted).toContain('2083-04-25');
   });
 });

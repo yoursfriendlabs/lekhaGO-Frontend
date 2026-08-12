@@ -34,14 +34,9 @@ export default function DateDisplay({
       const bsParts = adISOToBsParts(adISO);
       if (bsParts) {
         bsFormatted = formatBsParts(bsParts, { 
-          withLabel: true, 
-          withMonthName: true 
+          withLabel: false, 
+          withMonthName: false 
         });
-        // Translate month name / labels if Nepali language is set
-        if (language === 'ne') {
-          // Replace "BS " prefix
-          bsFormatted = bsFormatted.replace('BS ', 'बि.सं. ');
-        }
       }
     }
 
