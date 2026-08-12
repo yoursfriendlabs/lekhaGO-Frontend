@@ -188,29 +188,29 @@ function formatSeriesLabel(rawLabel, fallbackLabel) {
 
 function DatePresetSelect({ fromValue, toValue, onChange }) {
   const today = dayjs();
-  
+
   const getPreset = () => {
     if (!fromValue || !toValue) return "";
-    
+
     const todayStr = today.format("YYYY-MM-DD");
     if (fromValue === todayStr && toValue === todayStr) return "today";
-    
+
     const startOfWeek = today.startOf("week").format("YYYY-MM-DD");
     const endOfWeek = today.endOf("week").format("YYYY-MM-DD");
     if (fromValue === startOfWeek && toValue === endOfWeek) return "week";
-    
+
     const startOfMonth = today.startOf("month").format("YYYY-MM-DD");
     const endOfMonth = today.endOf("month").format("YYYY-MM-DD");
     if (fromValue === startOfMonth && toValue === endOfMonth) return "month";
-    
+
     const startOfYear = today.startOf("year").format("YYYY-MM-DD");
     const endOfYear = today.endOf("year").format("YYYY-MM-DD");
     if (fromValue === startOfYear && toValue === endOfYear) return "year";
-    
+
     const startOfPrevYear = today.subtract(1, "year").startOf("year").format("YYYY-MM-DD");
     const endOfPrevYear = today.subtract(1, "year").endOf("year").format("YYYY-MM-DD");
     if (fromValue === startOfPrevYear && toValue === endOfPrevYear) return "prev_year";
-    
+
     return "custom";
   };
 
@@ -3344,7 +3344,7 @@ export default function Reports() {
                 />
               </div>
             </div>
-            
+
             <button
               onClick={handleRefresh}
               disabled={cafeSalesLoading || isBusy}
@@ -3612,7 +3612,7 @@ export default function Reports() {
                         takeaway: t("analytics.takeaway") || "Takeaway",
                         delivery: t("analytics.delivery") || "Delivery",
                       };
-                      
+
                       return (
                         <tr key={sale.id} className="hover:bg-slate-50/50 transition align-middle">
                           <td className="p-3">
