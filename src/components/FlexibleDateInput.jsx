@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { Calendar, X } from 'lucide-react';
 import {
   BS_MONTHS,
   adISOToBsParts,
@@ -32,6 +34,11 @@ export default function FlexibleDateInput({
   const [calendar, setCalendar] = useState(() => (
     rememberPreference ? getPreferredDateCalendar() : 'ad'
   ));
+
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState(null);
+  const containerRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   const bsFromValue = useMemo(() => (value ? adISOToBsParts(value) : null), [value]);
   const fallbackBs = todayBsParts();
@@ -80,6 +87,7 @@ export default function FlexibleDateInput({
   const handleCalendarChange = (nextCalendar) => {
     setCalendar(nextCalendar);
     setError('');
+    setIsPopoverOpen(false);
     if (rememberPreference) setPreferredDateCalendar(nextCalendar);
 
     if (nextCalendar === 'bs' && value && isValidAdISODate(value)) {
@@ -120,7 +128,7 @@ export default function FlexibleDateInput({
     }
     const parts = adISOToBsParts(value);
     if (!parts) return '';
-    return t('dates.alsoNepali', { date: formatBsParts(parts, { withLabel: false }) }) || `BS ${formatBsParts(parts, { withLabel: false })}`;
+    return t('dates.alsoNepali', { date: formatBsParts(parts, { withLabel: false, withMonthName: false }) }) || formatBsParts(parts, { withLabel: false, withMonthName: false });
   }, [calendar, showConvertedHint, t, value]);
 
   // Separate layout/spacing classes from the input design classes
@@ -138,9 +146,73 @@ export default function FlexibleDateInput({
   // Detect compact mode to adjust toggle button layout/padding
   const isCompact = className?.includes('input-compact') || className?.includes('h-8') || className?.includes('h-9');
 
+  const updateDropdownPosition = useCallback(() => {
+    const trigger = containerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    
+    const dropdownWidth = 290;
+    const dropdownHeight = 220; 
+    const margin = 8;
+
+    let left = rect.left;
+    if (left + dropdownWidth > viewportWidth - margin) {
+      left = viewportWidth - dropdownWidth - margin;
+    }
+    if (left < margin) left = margin;
+
+    let top = rect.bottom + 4;
+    const belowSpace = viewportHeight - rect.bottom - margin;
+    const aboveSpace = rect.top - margin;
+    
+    if (belowSpace < dropdownHeight && aboveSpace > belowSpace) {
+      top = rect.top - dropdownHeight - 4;
+    }
+
+    setDropdownStyle({ left, top, width: dropdownWidth });
+  }, []);
+
+  // Update position when opened
+  useEffect(() => {
+    if (!isPopoverOpen) return undefined;
+
+    updateDropdownPosition();
+    window.addEventListener('resize', updateDropdownPosition);
+    window.addEventListener('scroll', updateDropdownPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateDropdownPosition);
+      window.removeEventListener('scroll', updateDropdownPosition, true);
+    };
+  }, [isPopoverOpen, updateDropdownPosition]);
+
+  // Click outside listener
+  useEffect(() => {
+    if (!isPopoverOpen) return undefined;
+
+    function onMouseDown(e) {
+      const clickedTrigger = containerRef.current?.contains(e.target);
+      const clickedDropdown = dropdownRef.current?.contains(e.target);
+
+      if (!clickedTrigger && !clickedDropdown) {
+        setIsPopoverOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [isPopoverOpen]);
+
   return (
+<<<<<<< HEAD
     <div className={wrapperClassName}>
       <div className="flex flex-col gap-2 w-full sm:flex-row sm:items-stretch">
+=======
+    <div ref={containerRef} className={wrapperClassName}>
+      <div className="flex items-stretch gap-1.5 w-full">
+>>>>>>> 401b32bfd25d236fdf732b28c4a6e97685eb82da
         {calendar === 'ad' ? (
           <input
             id={id}
@@ -153,6 +225,7 @@ export default function FlexibleDateInput({
             required={required}
           />
         ) : (
+<<<<<<< HEAD
           <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(92px,1fr)_minmax(132px,1.5fr)_minmax(92px,0.8fr)] sm:gap-3 xl:min-w-[520px]">
             <select
               id={id ? `${id}-bs-year` : undefined}
@@ -210,6 +283,20 @@ export default function FlexibleDateInput({
               ))}
             </select>
           </div>
+=======
+          <button
+            id={id}
+            type="button"
+            onClick={() => !disabled && setIsPopoverOpen(!isPopoverOpen)}
+            disabled={disabled}
+            className={`${inputClassName} text-left flex items-center justify-between gap-2`}
+          >
+            <span className={`truncate ${value ? 'text-ink' : 'text-secondary-400'}`}>
+              {value && bsFromValue ? formatBsParts(bsFromValue, { withLabel: false, withMonthName: false }) : (t('dates.selectBsDate') || (language === 'ne' ? 'नेपाली मिति छान्नुहोस्' : 'Select BS Date'))}
+            </span>
+            <Calendar className="w-4 h-4 text-secondary-400 shrink-0" />
+          </button>
+>>>>>>> 401b32bfd25d236fdf732b28c4a6e97685eb82da
         )}
 
         {/* Small AD/BS Switcher Pill */}
@@ -253,6 +340,130 @@ export default function FlexibleDateInput({
           {convertedHint}
         </p>
       ) : null}
+
+      {/* Popover Dropdown via Portal */}
+      {isPopoverOpen && dropdownStyle && createPortal(
+        <div
+          ref={dropdownRef}
+          style={dropdownStyle}
+          className="fixed z-[1000] min-w-0 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900/95 backdrop-blur-md"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100 dark:border-slate-800">
+            <span className="text-sm font-semibold text-secondary-800 dark:text-slate-200">
+              {t('dates.nepaliBs') || 'Nepali (BS)'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsPopoverOpen(false)}
+              className="text-secondary-400 hover:text-secondary-600 dark:hover:text-slate-200 rounded-lg p-0.5 transition"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Select Dropdowns */}
+          <div className="grid grid-cols-[1.1fr_1.3fr_0.9fr] gap-2 mb-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-secondary-500 uppercase tracking-wider pl-0.5">
+                {t('dates.year') || 'Year'}
+              </label>
+              <select
+                id={id ? `${id}-bs-year` : undefined}
+                className="w-full rounded-lg border border-secondary-200 bg-white px-2 py-1.5 text-sm text-ink focus:border-primary-400 focus:ring-primary-400 dark:bg-slate-850 dark:border-slate-700 dark:text-white"
+                value={bsYear}
+                onChange={(event) => commitBsParts(
+                  event.target.value ? Number(event.target.value) : '',
+                  bsMonth,
+                  bsDay,
+                )}
+              >
+                <option value="">--</option>
+                {yearOptions.map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-secondary-500 uppercase tracking-wider pl-0.5">
+                {t('dates.month') || 'Month'}
+              </label>
+              <select
+                id={id ? `${id}-bs-month` : undefined}
+                className="w-full rounded-lg border border-secondary-200 bg-white px-2 py-1.5 text-sm text-ink focus:border-primary-400 focus:ring-primary-400 dark:bg-slate-850 dark:border-slate-700 dark:text-white"
+                value={bsMonth}
+                onChange={(event) => commitBsParts(
+                  bsYear,
+                  event.target.value ? Number(event.target.value) : '',
+                  bsDay,
+                )}
+              >
+                <option value="">--</option>
+                {BS_MONTHS.map((month) => (
+                  <option key={month.value} value={month.value}>
+                    {language === 'ne' ? month.np : month.en}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-secondary-500 uppercase tracking-wider pl-0.5">
+                {t('dates.day') || 'Day'}
+              </label>
+              <select
+                id={id ? `${id}-bs-day` : undefined}
+                className="w-full rounded-lg border border-secondary-200 bg-white px-2 py-1.5 text-sm text-ink focus:border-primary-400 focus:ring-primary-400 dark:bg-slate-850 dark:border-slate-700 dark:text-white"
+                value={bsDay && Number(bsDay) > daysInMonth ? daysInMonth : bsDay}
+                onChange={(event) => commitBsParts(
+                  bsYear,
+                  bsMonth,
+                  event.target.value ? Number(event.target.value) : '',
+                )}
+              >
+                <option value="">--</option>
+                {dayOptions.map((day) => (
+                  <option key={day} value={day}>{day}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Footer Actions */}
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const today = todayBsParts();
+                  commitBsParts(today.year, today.month, today.day);
+                }}
+                className="text-xs px-2.5 py-1 bg-secondary-100 dark:bg-slate-800 text-secondary-700 dark:text-slate-300 rounded-lg hover:bg-secondary-200 dark:hover:bg-slate-700 transition font-medium"
+              >
+                {t('dates.today') || (language === 'ne' ? 'आज' : 'Today')}
+              </button>
+              {(!required || value) && (
+                <button
+                  type="button"
+                  onClick={() => commitBsParts('', '', '')}
+                  className="text-xs px-2.5 py-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 rounded-lg transition font-medium"
+                >
+                  {t('common.clear') || 'Clear'}
+                </button>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsPopoverOpen(false)}
+              className="text-xs px-3.5 py-1 bg-primary text-white rounded-lg hover:bg-primary-600 shadow transition font-semibold"
+            >
+              {t('common.close') || (language === 'ne' ? 'बन्द गर्नुहोस्' : 'Close')}
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

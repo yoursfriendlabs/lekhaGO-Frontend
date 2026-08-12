@@ -165,7 +165,7 @@ function getExpiryDateColorClass(expiryDateStr) {
 
   if (diffDays <= 10) {
     return 'text-rose-600 dark:text-rose-450 font-semibold';
-  } else if (diffDays <= 25) {
+  } else if (diffDays <= 20) {
     return 'text-amber-600 dark:text-amber-450 font-semibold';
   } else {
     return 'text-emerald-600 dark:text-emerald-450 font-semibold';
@@ -1065,17 +1065,7 @@ export default function Inventory() {
             <option value="low">{t('inventory.lowStock')}</option>
             <option value="out">{t('inventory.outStock')}</option>
           </select>
-          <select
-            id="inventory-type-filter"
-            className="input min-w-[140px]"
-            value={typeFilter}
-            onChange={(event) => setTypeFilter(event.target.value)}
-          >
-            <option value="all">{t('inventory.allItems')}</option>
-            {itemTypeOptions.map((type) => (
-              <option key={type.value} value={type.value}>{type.label}</option>
-            ))}
-          </select>
+
           <select
             id="inventory-sort-filter"
             className="input min-w-[140px]"
@@ -1180,7 +1170,6 @@ export default function Inventory() {
               <tr>
                 <th className="py-2 text-left">{t('inventory.itemName')}</th>
                 <th className="py-2 text-left">{t('inventory.brand')}</th>
-                <th className="py-2 text-left">{t('inventory.itemType')}</th>
                 <th className="py-2 text-left">{t('inventory.itemCategory')}</th>
                 <th className="py-2 text-left">{t('inventory.itemCode')}</th>
                 <th className="py-2 text-left">{t('inventory.expiryDate') || 'Expiry Date'}</th>
@@ -1222,9 +1211,6 @@ export default function Inventory() {
                       </div>
                     </td>
                     <td className="py-3">{item.brand || '—'}</td>
-                    <td className="py-3 capitalize">
-                      {getItemTypeLabel(item.itemType, itemTypeOptions, t)}
-                    </td>
                     <td className="py-3">{item.category}</td>
                     <td className="py-3">{item.itemCode}</td>
                     <td className="py-3 text-left">
@@ -1692,27 +1678,6 @@ export default function Inventory() {
 
               {/* Item Type & Metal Type Fields */}
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <label className="label">{t('inventory.itemType')}</label>
-                  <div className="mt-1 grid grid-cols-2 gap-2">
-                    {itemTypeOptions.map((type) => (
-                      <button
-                        id={`inventory-item-type-${type.value}`}
-                        key={type.value}
-                        type="button"
-                        onClick={() => setForm((prev) => ({ ...prev, itemType: type.value }))}
-                        className={`h-10 rounded-2xl border px-3 text-center text-xs font-semibold transition ${
-                          form.itemType === type.value
-                            ? 'border-primary bg-primary text-white shadow-sm'
-                            : 'border-slate-200 bg-white text-slate-600 hover:border-primary-200 hover:bg-primary-50/40 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:border-primary-700 dark:hover:bg-slate-800 dark:hover:text-white'
-                        }`}
-                        title={type.description || type.label}
-                      >
-                        {type.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
                 {showJewelleryFields ? (
                   <div>
                     <label className="label">Metal type</label>
