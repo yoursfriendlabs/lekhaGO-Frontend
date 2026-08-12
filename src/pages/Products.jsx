@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import Pagination from '../components/Pagination';
+import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
 
 const makeEmptyProduct = () => ({
   name: '',
@@ -221,6 +222,8 @@ export default function Products() {
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [restockProduct, setRestockProduct] = useState(null);
   const [restockQuantity, setRestockQuantity] = useState('');
+  const [restockExpiryDate, setRestockExpiryDate] = useState('');
+  const [restockBatchNumber, setRestockBatchNumber] = useState('');
   const [restockAction, setRestockAction] = useState('add');
   const [restockSaving, setRestockSaving] = useState(false);
   const [query, setQuery] = useState('');
@@ -359,6 +362,8 @@ export default function Products() {
 
     setRestockProduct(product);
     setRestockQuantity('');
+    setRestockExpiryDate('');
+    setRestockBatchNumber('');
     setRestockAction('add');
     setListStatus({ type: 'info', message: '' });
     setIsRestockOpen(true);
@@ -368,6 +373,8 @@ export default function Products() {
     setIsRestockOpen(false);
     setRestockProduct(null);
     setRestockQuantity('');
+    setRestockExpiryDate('');
+    setRestockBatchNumber('');
     setRestockAction('add');
   };
 
@@ -410,6 +417,10 @@ export default function Products() {
       const response = await api.restockProduct(restockProduct.id, {
         quantity: quantityValue,
         action: isRestockRemove ? 'remove' : 'add',
+        ...(isRestockRemove || !restockExpiryDate ? {} : { expiryDate: restockExpiryDate }),
+        ...(isRestockRemove || !restockBatchNumber.trim()
+          ? {}
+          : { batchNumber: restockBatchNumber.trim() }),
       });
       const updatedProduct = response?.product || response;
       const fallbackStock = currentRestockStock + quantityChange;
@@ -843,6 +854,37 @@ export default function Products() {
                   />
                 </div>
               </div>
+
+              {!isRestockRemove ? (
+                <div className="space-y-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="label">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
+                      <div className="mt-1">
+                        <FlexibleDateInput
+                          id="products-restock-expiry-date"
+                          name="restockExpiryDate"
+                          value={restockExpiryDate}
+                          onChange={(event) => setRestockExpiryDate(event.target.value || '')}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="label">{t('inventory.batchNumberOptional') || 'Batch No. (Optional)'}</label>
+                      <input
+                        id="products-restock-batch-number"
+                        className="input mt-1"
+                        value={restockBatchNumber}
+                        onChange={(event) => setRestockBatchNumber(event.target.value)}
+                        placeholder={t('inventory.batchNumberPlaceholder') || 'Eg. LOT-A12'}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {t('inventory.restockExpiryHelp') || 'If this stock has a new expiry/batch, add it here. Older stock keeps its own lot.'}
+                  </p>
+                </div>
+              ) : null}
 
               <div className={`rounded-2xl border px-4 py-3 ${
                 isRestockRemove

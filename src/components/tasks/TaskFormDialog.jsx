@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Dialog } from '../ui/Dialog.tsx';
+import FlexibleDateInput from '../FlexibleDateInput.jsx';
 
 function sortStaff(members = []) {
   return [...members].sort((left, right) => {
@@ -145,10 +146,9 @@ export default function TaskFormDialog({
 
             <div>
               <label className="label" htmlFor="task-due-date">{t('tasks.form.dueDate')}</label>
-              <input
+              <FlexibleDateInput
                 id="task-due-date"
                 className="input mt-1"
-                type="date"
                 value={form?.dueDate || ''}
                 onChange={(event) => onFieldChange('dueDate', event.target.value)}
               />

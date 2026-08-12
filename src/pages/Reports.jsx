@@ -27,6 +27,8 @@ import PieChart from "../components/PieChart";
 import Pagination from '../components/Pagination';
 import PartyFilterSelect from "../components/PartyFilterSelect.jsx";
 import RefreshButton from "../components/RefreshButton.jsx";
+import FlexibleDateInput from "../components/FlexibleDateInput.jsx";
+import DateDisplay from "../components/DateDisplay.jsx";
 import { api, invalidateApiCache, API_BASE } from "../lib/api";
 import { formatCurrency } from "../lib/currency";
 import { useI18n } from "../lib/i18n.jsx";
@@ -1182,8 +1184,7 @@ function ExpenseCategoryAnalyticsSection({
           </div>
           <div>
             <label className="label">{t("common.from")}</label>
-            <input
-              type="date"
+            <FlexibleDateInput
               className="input mt-1"
               name="fromDate"
               value={filters.fromDate}
@@ -1192,8 +1193,7 @@ function ExpenseCategoryAnalyticsSection({
           </div>
           <div>
             <label className="label">{t("common.to")}</label>
-            <input
-              type="date"
+            <FlexibleDateInput
               className="input mt-1"
               name="toDate"
               value={filters.toDate}
@@ -2607,8 +2607,7 @@ export default function Reports() {
               </div>
               <div>
                 <label className="label">{t("common.from")}</label>
-                <input
-                  type="date"
+                <FlexibleDateInput
                   className="input mt-1"
                   name="fromDate"
                   value={filters.fromDate}
@@ -2617,8 +2616,7 @@ export default function Reports() {
               </div>
               <div>
                 <label className="label">{t("common.to")}</label>
-                <input
-                  type="date"
+                <FlexibleDateInput
                   className="input mt-1"
                   name="toDate"
                   value={filters.toDate}
@@ -2898,7 +2896,7 @@ export default function Reports() {
                       ) : (
                         statementRows.map((row) => (
                           <tr key={`print-${row.type}-${row.id}`}>
-                            <td className="py-3">{formatStatementDate(row.date)}</td>
+                            <td className="py-3"><DateDisplay date={row.date} format="DD/MM/YYYY" /></td>
                             <td className="py-3">{row.referenceDisplay}</td>
                             <td className="py-3">{row.partyDisplay}</td>
                             <td className="py-3">{row.typeMeta.label}</td>
@@ -2971,20 +2969,18 @@ export default function Reports() {
                     <div className="grid gap-2 grid-cols-2">
                       <div>
                         <label className="label" htmlFor="ledger-from">{t('ledger.from')}</label>
-                        <input
+                        <FlexibleDateInput
                           id="ledger-from"
                           className="input mt-1"
-                          type="date"
                           value={ledgerFilters.from}
                           onChange={(e) => handleLedgerDateChange('from', e.target.value)}
                         />
                       </div>
                       <div>
                         <label className="label" htmlFor="ledger-to">{t('ledger.to')}</label>
-                        <input
+                        <FlexibleDateInput
                           id="ledger-to"
                           className="input mt-1"
-                          type="date"
                           value={ledgerFilters.to}
                           onChange={(e) => handleLedgerDateChange('to', e.target.value)}
                         />
@@ -3086,7 +3082,7 @@ export default function Reports() {
                           ) : (
                             statementRows.map((row) => (
                               <tr key={`${row.type}-${row.id}`} className="align-top hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                                <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">{formatStatementDate(row.date)}</td>
+                                <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200"><DateDisplay date={row.date} format="DD/MM/YYYY" /></td>
                                 <td className="py-3 pr-4 text-slate-700 dark:text-slate-300">{row.referenceDisplay}</td>
                                 <td className="py-3 pr-4 text-slate-700 dark:text-slate-300">{row.partyDisplay}</td>
                                 <td className="py-3 pr-4">
@@ -3152,8 +3148,7 @@ export default function Reports() {
               </div>
               <div>
                 <label className="label">{t("common.from")}</label>
-                <input
-                  type="date"
+                <FlexibleDateInput
                   className="input mt-1"
                   name="fromDate"
                   value={filters.fromDate}
@@ -3162,8 +3157,7 @@ export default function Reports() {
               </div>
               <div>
                 <label className="label">{t("common.to")}</label>
-                <input
-                  type="date"
+                <FlexibleDateInput
                   className="input mt-1"
                   name="toDate"
                   value={filters.toDate}
@@ -3333,8 +3327,7 @@ export default function Reports() {
               </div>
               <div>
                 <label className="label text-slate-500 font-bold uppercase text-[10px] tracking-wider">{t("common.from") || "From Date"}</label>
-                <input
-                  type="date"
+                <FlexibleDateInput
                   className="input h-10 mt-1"
                   name="fromDate"
                   value={filters.fromDate}
@@ -3343,8 +3336,7 @@ export default function Reports() {
               </div>
               <div>
                 <label className="label text-slate-500 font-bold uppercase text-[10px] tracking-wider">{t("common.to") || "To Date"}</label>
-                <input
-                  type="date"
+                <FlexibleDateInput
                   className="input h-10 mt-1"
                   name="toDate"
                   value={filters.toDate}

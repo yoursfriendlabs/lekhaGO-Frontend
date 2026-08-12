@@ -26,6 +26,8 @@ import PaymentTypeSummary from "../components/PaymentTypeSummary.jsx";
 import QuickPaymentButtons from "../components/QuickPaymentButtons.jsx";
 import PartySearchCreateField from "../components/PartySearchCreateField.jsx";
 import StatsCard from "../components/StatsCard.jsx";
+import FlexibleDateInput from "../components/FlexibleDateInput.jsx";
+import DateDisplay from "../components/DateDisplay.jsx";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { Dialog } from "../components/ui/Dialog.tsx";
@@ -111,6 +113,8 @@ const emptyPurchaseItem = {
   lineTotal: "0",
   itemType: "part",
   description: "",
+  expiryDate: "",
+  batchNumber: "",
 };
 const emptyExpenseItem = {
   productId: "",
@@ -121,6 +125,8 @@ const emptyExpenseItem = {
   lineTotal: "0",
   itemType: "expense",
   description: "",
+  expiryDate: "",
+  batchNumber: "",
 };
 const TABLE_ROW_OPTIONS = [10, 20, 30, 40, 50];
 const getEmptyItem = (t) =>
@@ -724,6 +730,8 @@ const [mobileStep, setMobileStep] = useState("details");
           itemType:
             item.itemType || (entryType === "expense" ? "expense" : "part"),
           description: item.description || "",
+          expiryDate: item.expiryDate || "",
+          batchNumber: item.batchNumber || "",
         })),
       );
       setDeletedItemIds([]);
@@ -871,6 +879,16 @@ const [mobileStep, setMobileStep] = useState("details");
               item.itemType ||
               (header.entryType === "expense" ? "expense" : "part"),
             description: item.description || "",
+            expiryDate:
+              (item.itemType ||
+                (header.entryType === "expense" ? "expense" : "part")) === "part"
+                ? item.expiryDate || null
+                : null,
+            batchNumber:
+              (item.itemType ||
+                (header.entryType === "expense" ? "expense" : "part")) === "part"
+                ? String(item.batchNumber || "").trim() || null
+                : null,
           })),
           ...deletedItemIds.map((id) => ({ id, _delete: true })),
         ],
@@ -1300,8 +1318,7 @@ setInvoiceOrder(purchase);
                     <label className="label">
                       {t("purchases.purchaseDate")}
                     </label>
-                    <input
-                      type="date"
+                    <FlexibleDateInput
                       className="input mt-1"
                       name="purchaseDate"
                       value={header.purchaseDate}
@@ -1420,6 +1437,18 @@ setInvoiceOrder(purchase);
                                     {t("purchases.unitPrice")}:{" "}
                                     {money(item.unitPrice)}
                                   </span>
+                                  {item.batchNumber ? (
+                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                      {t("purchases.batchNumber") || "Batch"}:{" "}
+                                      {item.batchNumber}
+                                    </span>
+                                  ) : null}
+                                  {item.expiryDate ? (
+                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                      {t("purchases.expiryDate") || "Expiry"}:{" "}
+                                      {formatMaybeDate(item.expiryDate, "D MMM YYYY")}
+                                    </span>
+                                  ) : null}
                                   <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
                                     {t("purchases.tax")}:{" "}
                                     {Number(item.taxRate || 0).toFixed(2)}%
@@ -1631,6 +1660,48 @@ setInvoiceOrder(purchase);
                             t("products.secondaryUnit")}
                         </option>
                       </select>
+                    </div>
+                  )}
+                  {itemDraft.itemType === "part" && (
+                    <div className="sm:col-span-2 space-y-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                        {t("purchases.stockLot") || "Stock lot"}
+                      </p>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="label">
+                            {t("purchases.expiryDateOptional") || "Expiry Date (Optional)"}
+                          </label>
+                          <div className="mt-1">
+                            <FlexibleDateInput
+                              id="purchase-item-expiry-date"
+                              name="expiryDate"
+                              value={itemDraft.expiryDate || ""}
+                              onChange={(e) =>
+                                handleDraftChange("expiryDate", e.target.value || "")
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="label">
+                            {t("purchases.batchNumberOptional") || "Batch No. (Optional)"}
+                          </label>
+                          <input
+                            id="purchase-item-batch-number"
+                            className="input mt-1"
+                            value={itemDraft.batchNumber || ""}
+                            onChange={(e) =>
+                              handleDraftChange("batchNumber", e.target.value || "")
+                            }
+                            placeholder={t("purchases.batchNumberPlaceholder") || "Eg. LOT-A12"}
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {t("purchases.expiryHelp") ||
+                          "Use the expiry/batch of this purchase lot. Existing stock with other lots stays separate."}
+                      </p>
                     </div>
                   )}
                   <div>
@@ -2113,7 +2184,7 @@ setInvoiceOrder(purchase);
                         {purchase.invoiceNo || purchase.id.slice(0, 8)}
                       </p>
                       <p className="mt-0.5 text-xs text-slate-500">
-                        {formatDate(purchase.purchaseDate)}
+                        <DateDisplay date={purchase.purchaseDate} format="ddd DD, MMM" />
                       </p>
                       <p className="mt-1 truncate text-xs text-slate-500">
                         {sn || "—"}
@@ -2253,7 +2324,7 @@ setInvoiceOrder(purchase);
                         </span>
                       </td>
                       <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
-                        {formatDate(purchase.purchaseDate)}
+                        <DateDisplay date={purchase.purchaseDate} format="ddd DD, MMM" />
                       </td>
                       <td className="py-2.5 pr-4">
                         <StatusBadge status={purchase.status} />
@@ -2399,7 +2470,7 @@ setInvoiceOrder(purchase);
                     biz={bizSettings}
                     receiptType="Expense Receipt"
                     invoiceNo={invoiceOrder.invoiceNo || invoiceOrder.id?.slice(0, 8)}
-                    date={formatMaybeDate(invoiceOrder.purchaseDate, "MMMM D, YYYY")}
+                    date={<DateDisplay date={invoiceOrder.purchaseDate} format="MMMM D, YYYY" mode="inline" />}
                     partyName={getSupplierName(invoiceOrder) || "—"}
                     creatorName={getCreatorDisplayName(invoiceOrder)}
                     items={(invoiceOrder.PurchaseItems || []).map((item) => ({
@@ -2431,7 +2502,7 @@ setInvoiceOrder(purchase);
                     biz={bizSettings}
                     invoiceType="Expense Bill"
                     invoiceNo={invoiceOrder.invoiceNo || invoiceOrder.id?.slice(0, 8)}
-                    date={formatMaybeDate(invoiceOrder.purchaseDate, "MMMM D, YYYY")}
+                    date={<DateDisplay date={invoiceOrder.purchaseDate} format="MMMM D, YYYY" mode="inline" />}
                     status={invoiceOrder.status}
                     statusColor="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
                   />

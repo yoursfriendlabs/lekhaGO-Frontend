@@ -19,7 +19,7 @@ import StatsCard from '../components/StatsCard.jsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import ActionMenu from '../components/ActionMenu.jsx';
 import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
-import { formatDateBoth } from '../lib/nepaliDate.js';
+import DateDisplay from '../components/DateDisplay.jsx';
 
 const makeEmptyItem = () => ({
   name: '',
@@ -43,6 +43,7 @@ const makeEmptyItem = () => ({
   lowStockAlert: true,
   imageUrl: '',
   expiryDate: '',
+  batchNumber: '',
 });
 
 const parseNumber = (value) => {
@@ -77,6 +78,7 @@ const buildProductPayload = (form) => ({
   lowStockAlert: form.lowStockAlert,
   imageUrl: form.imageUrl || null,
   expiryDate: form.expiryDate || null,
+  ...(form.batchNumber ? { batchNumber: String(form.batchNumber).trim() } : {}),
 });
 
 function getProductCategoryName(product = {}) {
@@ -117,6 +119,7 @@ function productToForm(product = {}) {
     lowStockAlert: Boolean(product.lowStockAlert),
     imageUrl: product.imageUrl || '',
     expiryDate: product.expiryDate || '',
+    batchNumber: '',
   };
 }
 
@@ -296,8 +299,11 @@ export default function Inventory() {
   const [isRestockOpen, setIsRestockOpen] = useState(false);
   const [restockProduct, setRestockProduct] = useState(null);
   const [restockQuantity, setRestockQuantity] = useState('');
+  const [restockExpiryDate, setRestockExpiryDate] = useState('');
+  const [restockBatchNumber, setRestockBatchNumber] = useState('');
   const [restockAction, setRestockAction] = useState('add'); // 'add' | 'remove'
   const [restockSaving, setRestockSaving] = useState(false);
+  const [editBatches, setEditBatches] = useState([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyProduct, setHistoryProduct] = useState(null);
   const [historyItems, setHistoryItems] = useState([]);
@@ -687,7 +693,7 @@ export default function Inventory() {
     setIsOpen(true);
   };
 
-  const openEditDialog = (itemId) => {
+  const openEditDialog = async (itemId) => {
     if (!canManageInventory) return;
     const product = products.find((entry) => String(entry.id) === String(itemId));
     if (!product) {
@@ -697,8 +703,20 @@ export default function Inventory() {
 
     setEditingId(product.id);
     setForm(productToForm(product));
+    setEditBatches(Array.isArray(product.batches) ? product.batches : []);
     setActiveTab('stock');
     setIsOpen(true);
+
+    try {
+      const detail = await api.getProduct(product.id);
+      if (detail) {
+        setForm(productToForm(detail));
+        setEditBatches(Array.isArray(detail.batches) ? detail.batches : []);
+        patchProduct(product.id, detail);
+      }
+    } catch {
+      // List data is enough if detail fetch fails.
+    }
   };
 
   const openRestockDialog = (itemId) => {
@@ -716,6 +734,8 @@ export default function Inventory() {
 
     setRestockProduct(product);
     setRestockQuantity('');
+    setRestockExpiryDate('');
+    setRestockBatchNumber('');
     setRestockAction('add');
     setIsRestockOpen(true);
   };
@@ -725,12 +745,15 @@ export default function Inventory() {
     setForm(makeEmptyItem());
     setActiveTab('stock');
     setEditingId(null);
+    setEditBatches([]);
   };
 
   const closeRestockDialog = () => {
     setIsRestockOpen(false);
     setRestockProduct(null);
     setRestockQuantity('');
+    setRestockExpiryDate('');
+    setRestockBatchNumber('');
     setRestockAction('add');
   };
 
@@ -869,6 +892,10 @@ export default function Inventory() {
       const response = await api.restockProduct(restockProduct.id, {
         quantity: quantityValue,
         action: isRemove ? 'remove' : 'add',
+        ...(isRemove || !restockExpiryDate ? {} : { expiryDate: restockExpiryDate }),
+        ...(isRemove || !restockBatchNumber.trim()
+          ? {}
+          : { batchNumber: restockBatchNumber.trim() }),
       });
       const updatedProduct = response?.product || response;
       const fallbackStock = currentStock + quantityChange;
@@ -1093,7 +1120,7 @@ export default function Inventory() {
                   <div className="mt-2 text-xs text-slate-500 px-1">
                     <span>{t('inventory.expiryDate') || 'Expiry Date'}:</span>
                     <div className={`mt-0.5 text-sm font-extrabold tracking-wide ${getExpiryDateColorClass(item.expiryDate)}`}>
-                      {formatDateBoth(item.expiryDate)}
+                      <DateDisplay date={item.expiryDate} />
                     </div>
                     <div className="text-xs font-bold mt-0.5">{getExpiryRemainingDaysText(item.expiryDate, t)}</div>
                   </div>
@@ -1192,7 +1219,9 @@ export default function Inventory() {
                     <td className="py-3 text-left">
                       {item.expiryDate ? (
                         <div className={`leading-snug ${getExpiryDateColorClass(item.expiryDate) || 'text-slate-500'}`}>
-                          <div className="text-sm font-extrabold tracking-wide">{formatDateBoth(item.expiryDate)}</div>
+                          <div className="text-sm font-extrabold tracking-wide">
+                            <DateDisplay date={item.expiryDate} />
+                          </div>
                           <div className="text-xs font-bold mt-0.5">{getExpiryRemainingDaysText(item.expiryDate, t)}</div>
                         </div>
                       ) : (
@@ -1339,6 +1368,40 @@ export default function Inventory() {
                   />
                 </div>
               </div>
+
+              {!isRestockRemove ? (
+                <div className="space-y-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    {t('inventory.stockLots') || 'Stock lot'}
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="label">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
+                      <div className="mt-1">
+                        <FlexibleDateInput
+                          id="inventory-restock-expiry-date"
+                          name="restockExpiryDate"
+                          value={restockExpiryDate}
+                          onChange={(event) => setRestockExpiryDate(event.target.value || '')}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="label">{t('inventory.batchNumberOptional') || 'Batch No. (Optional)'}</label>
+                      <input
+                        id="inventory-restock-batch-number"
+                        className="input mt-1"
+                        value={restockBatchNumber}
+                        onChange={(event) => setRestockBatchNumber(event.target.value)}
+                        placeholder={t('inventory.batchNumberPlaceholder') || 'Eg. LOT-A12'}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {t('inventory.restockExpiryHelp') || 'If this stock has a new expiry/batch, add it here. Older stock keeps its own lot.'}
+                  </p>
+                </div>
+              ) : null}
 
               <div className={`rounded-2xl border px-4 py-3 ${
                 isRestockRemove
@@ -1522,15 +1585,95 @@ export default function Inventory() {
               </div>
 
               <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
-                <label className="label">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
-                <div className="mt-2">
-                  <FlexibleDateInput
-                    id="inventory-expiry-date"
-                    name="expiryDate"
-                    value={form.expiryDate}
-                    onChange={handleFormChange}
-                  />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                      {t('inventory.stockLots') || 'Stock lots'}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                      {editingId
+                        ? (t('inventory.stockLotsEditHint') || 'Product details stay the same. Stock is tracked in lots below.')
+                        : (t('inventory.stockLotsCreateHint') || 'Optional opening lot. Later restock/purchase can add more lots.')}
+                    </p>
+                  </div>
+                  {editingId ? (
+                    <button
+                      type="button"
+                      className="btn-ghost text-sm"
+                      onClick={() => {
+                        const productId = editingId;
+                        closeDialog();
+                        openRestockDialog(productId);
+                      }}
+                    >
+                      <Plus size={14} className="mr-1.5 inline" />
+                      {t('inventory.restockAdd') || 'Add stock'}
+                    </button>
+                  ) : null}
                 </div>
+
+                {editingId ? (
+                  <div className="mt-3 space-y-2">
+                    <div className="rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950/50">
+                      <span className="text-slate-500">{t('inventory.nearestExpiry') || 'Nearest expiry'}: </span>
+                      <span className={form.expiryDate ? getExpiryDateColorClass(form.expiryDate) : 'text-slate-500'}>
+                        {form.expiryDate ? formatDateBoth(form.expiryDate) : (t('inventory.noExpiry') || 'No expiry')}
+                      </span>
+                    </div>
+                    {editBatches.length > 0 ? (
+                      editBatches.map((batch) => (
+                        <div
+                          key={batch.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950/50"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-medium text-slate-700 dark:text-slate-200">
+                              {batch.batchNumber
+                                ? `${t('inventory.batchNumber') || 'Batch'}: ${batch.batchNumber}`
+                                : (t('inventory.noBatchNumber') || 'No batch no.')}
+                            </div>
+                            <div className={batch.expiryDate ? getExpiryDateColorClass(batch.expiryDate) : 'text-slate-500'}>
+                              {batch.expiryDate
+                                ? formatDateBoth(batch.expiryDate)
+                                : (t('inventory.noExpiry') || 'No expiry')}
+                            </div>
+                          </div>
+                          <span className="font-semibold text-slate-700 dark:text-slate-200">
+                            {formatQuantity(batch.quantityOnHand || 0)}
+                            {form.primaryUnit ? ` ${form.primaryUnit}` : ''}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-500">{t('inventory.noBatches') || 'No open lots yet.'}</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="label">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
+                      <div className="mt-1">
+                        <FlexibleDateInput
+                          id="inventory-expiry-date"
+                          name="expiryDate"
+                          value={form.expiryDate}
+                          onChange={handleFormChange}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="label">{t('inventory.batchNumberOptional') || 'Batch No. (Optional)'}</label>
+                      <input
+                        id="inventory-opening-batch-number"
+                        className="input mt-1"
+                        name="batchNumber"
+                        value={form.batchNumber}
+                        onChange={handleFormChange}
+                        placeholder={t('inventory.batchNumberPlaceholder') || 'Eg. LOT-A12'}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Item Type & Metal Type Fields */}

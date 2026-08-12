@@ -18,6 +18,7 @@ import Notice from './Notice';
 import ActionMenu from './ActionMenu';
 import RefreshButton from './RefreshButton.jsx';
 import ConfirmDialog from './ui/ConfirmDialog.jsx';
+import FlexibleDateInput from './FlexibleDateInput.jsx';
 import { Dialog } from './ui/Dialog.tsx';
 import TeamSeatUsagePanel from './subscription/TeamSeatUsagePanel.jsx';
 import { api, invalidateApiCache } from '../lib/api';
@@ -376,10 +377,9 @@ function StaffFormDialog({
                         </div>
                         <div>
                           <label className="label" htmlFor="staff-joined-date">{t('staffManagement.joinedDate')}</label>
-                          <input
+                          <FlexibleDateInput
                             id="staff-joined-date"
                             className="input mt-1"
-                            type="date"
                             value={form.joinedDate}
                             onChange={(event) => onFieldChange('joinedDate', event.target.value)}
                             disabled={readOnly}
@@ -1507,9 +1507,8 @@ function SalaryAdvanceDialog({ isOpen, member, t, onClose }) {
               </div>
               <div>
                 <label className="label" htmlFor="record-date">{t('staffManagement.salaryRecords.date')}</label>
-                <input
+                <FlexibleDateInput
                   id="record-date"
-                  type="date"
                   className="input mt-1"
                   value={date}
                   onChange={(event) => setDate(event.target.value)}

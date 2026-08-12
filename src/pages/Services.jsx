@@ -19,6 +19,8 @@ import CreatorFilterSelect from "../components/CreatorFilterSelect.jsx";
 import { Dialog } from "../components/ui/Dialog.tsx";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
 import ActionMenu from "../components/ActionMenu.jsx";
+import FlexibleDateInput from "../components/FlexibleDateInput.jsx";
+import DateDisplay from "../components/DateDisplay.jsx";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useBusinessSettings } from "../lib/businessSettings";
@@ -227,7 +229,7 @@ function getDeliveryDaysLeft(deliveryDate) {
 function DeliveryBadge({ date, isGym }) {
   if (!date) return <span className="text-slate-400">—</span>;
   const days = getDeliveryDaysLeft(date);
-  const label = formatMaybeDate(date, "D MMM YYYY");
+  const label = <DateDisplay date={date} format="D MMM YYYY" />;
   const base =
     "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold";
   if (days === null) {
@@ -2772,8 +2774,7 @@ export default function Services() {
                               <label className="label">
                                 {isGym ? "Subscription End Date" : t("services.deliveryDate")}
                               </label>
-                              <input
-                                type="date"
+                              <FlexibleDateInput
                                 className="input mt-1"
                                 name="deliveryDate"
                                 value={header.deliveryDate}
@@ -3864,9 +3865,14 @@ export default function Services() {
                     receiptType="Service Receipt"
                     invoiceNo={invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)}
                     date={
-                      invoiceOrder.status !== "closed" && invoiceOrder.deliveryDate
-                        ? (isGym ? "Expiry Date: " : "") + formatMaybeDate(invoiceOrder.deliveryDate, "MMMM D, YYYY")
-                        : formatMaybeDate(invoiceOrder.createdAt, "MMMM D, YYYY")
+                      invoiceOrder.status !== "closed" && invoiceOrder.deliveryDate ? (
+                        <span className="inline-flex items-center gap-1">
+                          {isGym ? "Expiry Date: " : ""}
+                          <DateDisplay date={invoiceOrder.deliveryDate} format="MMMM D, YYYY" mode="inline" />
+                        </span>
+                      ) : (
+                        <DateDisplay date={invoiceOrder.createdAt} format="MMMM D, YYYY" mode="inline" />
+                      )
                     }
                     partyName={invoiceOrder.Party?.name || invoiceOrder.partyName || "—"}
                     creatorName={getCreatorDisplayName(invoiceOrder)}
@@ -3914,14 +3920,14 @@ export default function Services() {
                       invoiceOrder.orderNo || invoiceOrder.id?.slice(0, 8)
                     }
                     date={
-                      invoiceOrder.status !== "closed" &&
-                      invoiceOrder.deliveryDate
-                        ? (isGym ? "Expiry Date: " : "") +
-                          formatMaybeDate(
-                            invoiceOrder.deliveryDate,
-                            "MMMM D, YYYY",
-                          )
-                        : null
+                      invoiceOrder.status !== "closed" && invoiceOrder.deliveryDate ? (
+                        <span className="inline-flex items-center gap-1">
+                          {isGym ? "Expiry Date: " : ""}
+                          <DateDisplay date={invoiceOrder.deliveryDate} format="MMMM D, YYYY" mode="inline" />
+                        </span>
+                      ) : (
+                        <DateDisplay date={invoiceOrder.createdAt} format="MMMM D, YYYY" mode="inline" />
+                      )
                     }
                     // status={invoiceOrder.status}
                     statusColor={

@@ -24,6 +24,7 @@ import NoteTextarea from "../components/NoteTextarea.jsx";
 import QuickPaymentButtons from "../components/QuickPaymentButtons.jsx";
 import QuickPartySelector from "../components/QuickPartySelector.jsx";
 import QuickActionSuccessDialog from "../components/QuickActionSuccessDialog.jsx";
+import FlexibleDateInput from "../components/FlexibleDateInput.jsx";
 import { Dialog } from "../components/ui/Dialog.tsx";
 import MobileFormStepper from "../components/MobileFormStepper.jsx";
 import { api } from "../lib/api";
@@ -2432,9 +2433,8 @@ return (
               <span className="text-xs font-medium uppercase text-slate-500">
                 {t("common.date")}
               </span>
-              <input
+              <FlexibleDateInput
                 className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
-                type="date"
                 value={checkoutForm.saleDate}
                 onChange={(event) =>
                   setCheckoutForm((previous) => ({

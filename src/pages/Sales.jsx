@@ -28,6 +28,8 @@ import { useSaleStore } from '../stores/sales';
 import { useProductStore } from '../stores/products';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
 import StatsCard from '../components/StatsCard.jsx';
+import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
+import DateDisplay from '../components/DateDisplay.jsx';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
 import { useIsMobile } from '../hooks/useIsMobile.js';
 import {
@@ -1047,7 +1049,7 @@ export default function Sales() {
                   </div>
                   <div>
                     <label className="label">{t('sales.saleDate')}</label>
-                    <input type="date" className="input mt-1" name="saleDate" value={header.saleDate} onChange={handleHeaderChange} />
+                    <FlexibleDateInput className="input mt-1" name="saleDate" value={header.saleDate} onChange={handleHeaderChange} />
                   </div>
                   {businessProfile?.settings?.enabledModules?.includes('tables') && (
                     <div>
@@ -1482,7 +1484,7 @@ export default function Sales() {
                       <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
                         {sale.invoiceNo || sale.id.slice(0, 8)}
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5">{formatDate(sale.saleDate)}</p>
+                      <p className="text-xs text-slate-500 mt-0.5"><DateDisplay date={sale.saleDate} format="D MMM" /></p>
                       <p className="mt-1 text-xs text-slate-500 truncate">{customerName || '—'}</p>
                       <PaymentTypeSummary
                         source={sale}
@@ -1557,7 +1559,7 @@ export default function Sales() {
 
                       {/* Date — formatted like Services "22 Mar" */}
                       <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
-                        {formatDate(sale.saleDate)}
+                        <DateDisplay date={sale.saleDate} format="D MMM" />
                       </td>
 
                       {/* Status — colored badge */}

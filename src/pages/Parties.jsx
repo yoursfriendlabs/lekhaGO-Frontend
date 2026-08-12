@@ -14,6 +14,8 @@ import RefreshButton from "../components/RefreshButton.jsx";
 import PaymentMethodFields from "../components/PaymentMethodFields.jsx";
 import PaymentTypeSummary from "../components/PaymentTypeSummary.jsx";
 import ActionMenu from '../components/ActionMenu.jsx';
+import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
+import DateDisplay from '../components/DateDisplay.jsx';
 import PartyFilterSelect from '../components/PartyFilterSelect.jsx';
 import { Dialog } from "../components/ui/Dialog.tsx";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
@@ -351,6 +353,7 @@ export default function Parties() {
   const partyListSentinelRef = useRef(null);
   const partyListSessionRef = useRef(0);
   const submitPartyRequestRef = useRef(false);
+  const saveAndNewRef = useRef(false);
   const supportsIntersectionObserver =
     typeof IntersectionObserver !== "undefined";
 
@@ -979,14 +982,32 @@ export default function Parties() {
         }
       }
 
-      setStatus({
-        type: "success",
-        message: txState.editingTxId
-          ? t('parties.messages.transactionUpdated')
-          : t("parties.messages.transactionSaved"),
-      });
-
-      closeTxDialog();
+      if (saveAndNewRef.current) {
+        dispatchTx({
+          type: "PATCH_FORM",
+          payload: {
+            amount: "",
+            note: "",
+            bankId: "",
+            paymentMethod: "cash",
+          },
+        });
+        dispatchTx({
+          type: "SET_STATUS",
+          payload: {
+            type: "success",
+            message: t("parties.messages.transactionSaved"),
+          },
+        });
+      } else {
+        setStatus({
+          type: "success",
+          message: txState.editingTxId
+            ? t('parties.messages.transactionUpdated')
+            : t("parties.messages.transactionSaved"),
+        });
+        closeTxDialog();
+      }
     } catch (err) {
       dispatchTx({
         type: "SET_STATUS",
@@ -1407,7 +1428,7 @@ export default function Parties() {
                             </div>
                             <div className="mt-2 flex flex-wrap text-black font-medium items-center gap-x-3 gap-y-1 text-xs">
                               <span>
-                                {formatTransactionDate(row.date || row.createdAt)}
+                                <DateDisplay date={row.date || row.createdAt} format="DD/MM/YYYY" />
                               </span>
                               {row.status ? <span>{row.status}</span> : null}
                               {row.note ? (
@@ -1714,10 +1735,9 @@ export default function Parties() {
 
           <div>
             <label className="label">{t("parties.transactionDate")}</label>
-            <input
+            <FlexibleDateInput
               className="input mt-1"
               name="txDate"
-              type="date"
               value={txState.form.txDate}
               onChange={handleTxChange}
             />
@@ -1755,12 +1775,27 @@ export default function Parties() {
             >
               {t("common.close")}
             </button>
+            {txState.mode !== "editing" && (
+              <button
+                className="btn-secondary"
+                type="submit"
+                disabled={txState.loading}
+                onClick={() => {
+                  saveAndNewRef.current = true;
+                }}
+              >
+                {txState.loading && saveAndNewRef.current ? t("common.loading") : t("common.saveAndNew") || "Save & New"}
+              </button>
+            )}
             <button
               className="btn-primary"
               type="submit"
               disabled={txState.loading}
+              onClick={() => {
+                saveAndNewRef.current = false;
+              }}
             >
-              {txState.loading ? t("common.loading") : txState.mode === "editing" ? t('common.update') : t("common.save")}
+              {txState.loading && !saveAndNewRef.current ? t("common.loading") : txState.mode === "editing" ? t('common.update') : t("common.save")}
             </button>
           </div>
         </form>

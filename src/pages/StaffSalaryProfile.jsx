@@ -27,6 +27,8 @@ import { formatMoney, parseMonthYear, toInitials } from "../lib/formatting";
 import { calculateDuration, calculateDurationDecimal } from "../lib/datetime-calc";
 import { extractCoordinates, googleMapsUrl } from "../lib/geo";
 import dayjs from "../lib/datetime";
+import FlexibleDateInput from "../components/FlexibleDateInput.jsx";
+import DateDisplay from "../components/DateDisplay.jsx";
 
 import Notice from "../components/Notice";
 import ActionMenu from "../components/ActionMenu";
@@ -541,7 +543,7 @@ function StaffProfileCard({ meta, loading }) {
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2 text-xs text-slate-400">Joined</span>
               <span className="text-right text-xs font-semibold text-slate-800 dark:text-slate-200">
-                {formatMaybeDate(meta.joinedAt) || "—"}
+                <DateDisplay date={meta.joinedAt} />
               </span>
             </div>
           </div>
@@ -812,10 +814,9 @@ function PayrollEntryPanel({
               >
                 Date
               </label>
-              <input
+              <FlexibleDateInput
                 id="sal-date"
                 className="input mt-1 text-sm"
-                type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 required
@@ -1346,9 +1347,8 @@ export default function StaffSalaryProfile() {
                       >
                         From
                       </label>
-                      <input
+                      <FlexibleDateInput
                         id="att-from"
-                        type="date"
                         className="input mt-1 block text-sm"
                         value={attendanceDateFrom}
                         onChange={(e) => setAttendanceDateFrom(e.target.value)}
@@ -1361,9 +1361,8 @@ export default function StaffSalaryProfile() {
                       >
                         To
                       </label>
-                      <input
+                      <FlexibleDateInput
                         id="att-to"
-                        type="date"
                         className="input mt-1 block text-sm"
                         value={attendanceDateTo}
                         onChange={(e) => setAttendanceDateTo(e.target.value)}
@@ -1425,7 +1424,7 @@ export default function StaffSalaryProfile() {
                             className="bg-white transition hover:bg-slate-50/60 dark:bg-slate-900 dark:hover:bg-slate-800/30"
                           >
                             <td className="p-3 font-medium text-slate-800 dark:text-slate-200">
-                              {formatMaybeDate(record.date, "YYYY-MM-DD")}
+                              <DateDisplay date={record.date} format="YYYY-MM-DD" />
                             </td>
                             <td className="p-3 tabular-nums">
                               <div className="flex flex-col items-start gap-1">
@@ -1547,7 +1546,7 @@ export default function StaffSalaryProfile() {
                             className="bg-white transition hover:bg-slate-50/60 dark:bg-slate-900 dark:hover:bg-slate-800/30"
                           >
                             <td className="p-3 text-slate-600 dark:text-slate-400">
-                              {formatMaybeDate(r.date) || "—"}
+                              <DateDisplay date={r.date} />
                             </td>
                             <td className="p-3 tabular-nums text-slate-600 dark:text-slate-400">
                               {r.monthYear || parseMonthYear(r.date) || "—"}

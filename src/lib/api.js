@@ -859,6 +859,12 @@ export const api = {
       { method: "POST", body: JSON.stringify(data) },
       mutationConfig(["products", "reports", "dashboard"]),
     ),
+  getProduct: (id) =>
+    request(
+      `/api/products/${id}`,
+      { method: "GET" },
+      listCache(["products", ...detailTags("product", id)], CACHE_TTL.short),
+    ),
   updateProduct: (id, data) =>
     request(
       `/api/products/${id}`,

@@ -9,6 +9,7 @@ import { getCreatorDisplayName } from '../lib/records';
 import { printElement, printThermalReceipt } from '../lib/print';
 import dayjs, { formatMaybeDate } from '../lib/datetime';
 import ThermalReceipt from '../components/ThermalReceipt';
+import DateDisplay from '../components/DateDisplay.jsx';
 
 function fmt(dateStr) {
   return formatMaybeDate(dateStr, 'MMMM D, YYYY');
@@ -140,7 +141,7 @@ const partyName = isSale
               biz={biz}
               invoiceType={isSale ? 'Sales Invoice' : 'Purchase Invoice'}
               invoiceNo={record.invoiceNo || record.id.slice(0, 8)}
-              date={fmt(dateValue)}
+              date={<DateDisplay date={dateValue} format="MMMM D, YYYY" mode="inline" />}
               status={record.status}
               statusColor={statusColor}
               reprintLabel={reprintLabel}
@@ -273,7 +274,7 @@ const partyName = isSale
                 biz={biz}
                 receiptType={isSale ? 'Sales Receipt' : 'Purchase Receipt'}
                 invoiceNo={record.invoiceNo || record.id.slice(0, 8)}
-                date={fmt(dateValue)}
+                date={<DateDisplay date={dateValue} format="MMMM D, YYYY" mode="inline" />}
                 partyName={partyName}
                 creatorName={creatorName}
                 tableName={record.Table?.name || record.table?.name || record.attributes?.table_no}
@@ -306,7 +307,7 @@ const partyName = isSale
                 biz={biz}
                 invoiceType={isSale ? 'Sales Bill' : 'Purchase Bill'}
                 invoiceNo={record.invoiceNo || record.id.slice(0, 8)}
-                date={fmt(dateValue)}
+                date={<DateDisplay date={dateValue} format="MMMM D, YYYY" mode="inline" />}
                 reprintLabel={reprintLabel}
                 // status={record.status}
                 // statusColor="border border-black text-black"

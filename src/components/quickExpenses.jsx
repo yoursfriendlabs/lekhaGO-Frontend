@@ -8,6 +8,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { todayISODate } from '../lib/datetime';
 import { useI18n } from '../lib/i18n.jsx';
+import FlexibleDateInput from './FlexibleDateInput.jsx';
 import {
   CUSTOM_EXPENSE_CATEGORY,
   resolveExpenseCategoryLabel,
@@ -212,8 +213,7 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-[26px] border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
             <label className="label">{t('purchases.purchaseDate')}</label>
-            <input
-              type="date"
+            <FlexibleDateInput
               className="input mt-2 w-full rounded-[18px]"
               value={quickHeader.expenseDate}
               onChange={(event) => setQuickHeader((prev) => ({ ...prev, expenseDate: event.target.value }))}

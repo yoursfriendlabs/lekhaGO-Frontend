@@ -263,6 +263,18 @@ export default function Settings() {
     setForm((previous) => ({ ...previous, [field]: value }));
   };
 
+  const handleUiPreferenceChange = (key, value) => {
+    if (generalLocked) return;
+    setSaved(false);
+    setForm((previous) => ({
+      ...previous,
+      uiPreferences: {
+        ...(previous.uiPreferences || {}),
+        [key]: value,
+      },
+    }));
+  };
+
   const openGrowthPlan = () => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set('tab', SUBSCRIPTION_SETTINGS_TAB);
@@ -665,6 +677,22 @@ export default function Settings() {
                         onChange={(event) => handleChange('email', event.target.value)}
                       />
                     </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="label" htmlFor="default-calendar">{t('settingsPage.general.defaultCalendar') || 'Default Date Calendar'}</label>
+                    <select
+                      id="default-calendar"
+                      className="input"
+                      value={form.uiPreferences?.defaultCalendar || 'ad'}
+                      onChange={(event) => handleUiPreferenceChange('defaultCalendar', event.target.value)}
+                    >
+                      <option value="ad">{t('settingsPage.general.calendarAd') || 'English (AD)'}</option>
+                      <option value="bs">{t('settingsPage.general.calendarBs') || 'Nepali (BS)'}</option>
+                    </select>
+                    <p className="text-xs text-slate-400">
+                      {t('settingsPage.general.defaultCalendarHint') || 'Choose whether dates are displayed in English (AD) or Nepali (BS) by default across the dashboard.'}
+                    </p>
                   </div>
                 </div>
 

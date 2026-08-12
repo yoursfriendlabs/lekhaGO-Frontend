@@ -28,7 +28,7 @@ export default function FlexibleDateInput({
   rememberPreference = true,
   showConvertedHint = true,
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [calendar, setCalendar] = useState(() => (
     rememberPreference ? getPreferredDateCalendar() : 'ad'
   ));
@@ -41,6 +41,7 @@ export default function FlexibleDateInput({
   const [bsDay, setBsDay] = useState(bsFromValue?.day || '');
   const [error, setError] = useState('');
 
+  // Handle outside value updates
   useEffect(() => {
     if (!bsFromValue) {
       if (!value) {
@@ -104,7 +105,7 @@ export default function FlexibleDateInput({
 
     const converted = bsPartsToAdISO(nextYear, nextMonth, nextDay);
     if (!converted) {
-      setError(t('dates.invalidBsDate'));
+      setError(t('dates.invalidBsDate') || 'Invalid Nepali date selected.');
       return;
     }
 
@@ -115,71 +116,47 @@ export default function FlexibleDateInput({
   const convertedHint = useMemo(() => {
     if (!showConvertedHint || !value || !isValidAdISODate(value)) return '';
     if (calendar === 'bs') {
-      return t('dates.savedAsEnglish', { date: value });
+      return t('dates.savedAsEnglish', { date: value }) || `Saved as English: ${value}`;
     }
     const parts = adISOToBsParts(value);
     if (!parts) return '';
-    return t('dates.alsoNepali', { date: formatBsParts(parts, { withLabel: false }) });
+    return t('dates.alsoNepali', { date: formatBsParts(parts, { withLabel: false }) }) || `BS ${formatBsParts(parts, { withLabel: false })}`;
   }, [calendar, showConvertedHint, t, value]);
 
-  const selectClassName = `${className} w-full min-w-0`;
+  // Separate layout/spacing classes from the input design classes
+  const classes = className ? className.split(' ') : [];
+  const layoutClasses = classes.filter(c => 
+    c.startsWith('mt-') || c.startsWith('mb-') || c.startsWith('ml-') || c.startsWith('mr-') || 
+    c.startsWith('mx-') || c.startsWith('my-') || c.startsWith('p-') || c.startsWith('w-') || 
+    c.startsWith('flex-') || c.startsWith('h-') || c.startsWith('col-') || c.startsWith('row-')
+  );
+  const inputStyleClasses = classes.filter(c => !layoutClasses.includes(c));
+
+  const wrapperClassName = `relative w-full ${layoutClasses.join(' ')}`;
+  const inputClassName = `${inputStyleClasses.join(' ')} w-full min-w-0`;
+
+  // Detect compact mode to adjust toggle button layout/padding
+  const isCompact = className?.includes('input-compact') || className?.includes('h-8') || className?.includes('h-9');
 
   return (
-    <div className="space-y-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="inline-flex rounded-full border border-slate-200 bg-slate-100/80 p-1 dark:border-slate-700 dark:bg-slate-900">
-          <button
-            type="button"
+    <div className={wrapperClassName}>
+      <div className="flex items-stretch gap-1.5 w-full">
+        {calendar === 'ad' ? (
+          <input
+            id={id}
+            className={inputClassName}
+            name={name}
+            type="date"
+            value={value || ''}
+            onChange={onChange}
             disabled={disabled}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-              calendar === 'ad'
-                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white'
-                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
-            }`}
-            onClick={() => handleCalendarChange('ad')}
-          >
-            {t('dates.englishAd')}
-          </button>
-          <button
-            type="button"
-            disabled={disabled}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-              calendar === 'bs'
-                ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-800 dark:text-white'
-                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
-            }`}
-            onClick={() => handleCalendarChange('bs')}
-          >
-            {t('dates.nepaliBs')}
-          </button>
-        </div>
-        {convertedHint && !error ? (
-          <p className="max-w-full truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            {convertedHint}
-          </p>
-        ) : null}
-      </div>
-
-      {calendar === 'ad' ? (
-        <input
-          id={id}
-          className={`${className} w-full`}
-          name={name}
-          type="date"
-          value={value || ''}
-          onChange={onChange}
-          disabled={disabled}
-          required={required}
-        />
-      ) : (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[7.5rem_minmax(0,1fr)_5.5rem]">
-          <label className="block min-w-0">
-            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              {t('dates.year')}
-            </span>
+            required={required}
+          />
+        ) : (
+          <div className="grid grid-cols-[1.1fr_1.3fr_0.9fr] gap-1 flex-1 min-w-0">
             <select
               id={id ? `${id}-bs-year` : undefined}
-              className={selectClassName}
+              className={inputClassName}
               value={bsYear}
               disabled={disabled}
               required={required}
@@ -189,20 +166,15 @@ export default function FlexibleDateInput({
                 bsDay,
               )}
             >
-              <option value="">{t('dates.year')}</option>
+              <option value="">{t('dates.year') || 'Year'}</option>
               {yearOptions.map((year) => (
                 <option key={year} value={year}>{year}</option>
               ))}
             </select>
-          </label>
 
-          <label className="block min-w-0">
-            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              {t('dates.month')}
-            </span>
             <select
               id={id ? `${id}-bs-month` : undefined}
-              className={selectClassName}
+              className={inputClassName}
               value={bsMonth}
               disabled={disabled}
               required={required}
@@ -212,22 +184,17 @@ export default function FlexibleDateInput({
                 bsDay,
               )}
             >
-              <option value="">{t('dates.month')}</option>
+              <option value="">{t('dates.month') || 'Month'}</option>
               {BS_MONTHS.map((month) => (
                 <option key={month.value} value={month.value}>
-                  {month.en}
+                  {language === 'ne' ? month.np : month.en}
                 </option>
               ))}
             </select>
-          </label>
 
-          <label className="block min-w-0">
-            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              {t('dates.day')}
-            </span>
             <select
               id={id ? `${id}-bs-day` : undefined}
-              className={selectClassName}
+              className={inputClassName}
               value={bsDay && Number(bsDay) > daysInMonth ? daysInMonth : bsDay}
               disabled={disabled}
               required={required}
@@ -237,19 +204,54 @@ export default function FlexibleDateInput({
                 event.target.value ? Number(event.target.value) : '',
               )}
             >
-              <option value="">{t('dates.day')}</option>
+              <option value="">{t('dates.day') || 'Day'}</option>
               {dayOptions.map((day) => (
                 <option key={day} value={day}>{day}</option>
               ))}
             </select>
-          </label>
-        </div>
-      )}
+          </div>
+        )}
 
+        {/* Small AD/BS Switcher Pill */}
+        <div className="flex shrink-0 rounded-xl border border-secondary-200 bg-secondary-50/50 p-0.5 dark:border-slate-700 dark:bg-slate-900">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => handleCalendarChange('ad')}
+            className={`rounded-lg transition font-bold uppercase ${
+              isCompact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'
+            } ${
+              calendar === 'ad'
+                ? 'bg-primary text-white shadow-sm hover:bg-primary-600'
+                : 'text-secondary-600 hover:text-secondary-900 dark:text-slate-400 dark:hover:text-white'
+            }`}
+          >
+            AD
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => handleCalendarChange('bs')}
+            className={`rounded-lg transition font-bold uppercase ${
+              isCompact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'
+            } ${
+              calendar === 'bs'
+                ? 'bg-primary text-white shadow-sm hover:bg-primary-600'
+                : 'text-secondary-600 hover:text-secondary-900 dark:text-slate-400 dark:hover:text-white'
+            }`}
+          >
+            BS
+          </button>
+        </div>
+      </div>
+
+      {/* Sub-text: Converted Hint or Error */}
       {error ? (
-        <p className="text-xs text-rose-600">{error}</p>
-      ) : !value ? (
-        <p className="text-xs text-slate-500">{t('dates.helpShort')}</p>
+        <p className="text-[10px] font-medium text-rose-600 mt-1 pl-1 leading-none">{error}</p>
+      ) : convertedHint ? (
+        <p className="text-[10px] font-medium text-secondary-500 dark:text-slate-400 mt-1 pl-1 leading-none">
+          {convertedHint}
+        </p>
       ) : null}
     </div>
   );

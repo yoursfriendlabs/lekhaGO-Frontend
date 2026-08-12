@@ -8,6 +8,7 @@ import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import NoteTextarea from '../components/NoteTextarea.jsx';
 import AsyncSearchableSelect from '../components/AsyncSearchableSelect.jsx';
 import QuickPartySelector from '../components/QuickPartySelector.jsx';
+import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
@@ -1604,9 +1605,8 @@ export default function CafeOrders() {
                 </div>
                 <div>
                   <label className="label">Date</label>
-                  <input
+                  <FlexibleDateInput
                     className="input mt-1"
-                    type="date"
                     value={orderFields.saleDate}
                     onChange={(event) => setOrderFields((prev) => ({ ...prev, saleDate: event.target.value }))}
                   />

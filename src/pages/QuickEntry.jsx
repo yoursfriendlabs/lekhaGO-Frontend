@@ -8,6 +8,7 @@ import NoteTextarea from '../components/NoteTextarea.jsx';
 import QuickActionSuccessDialog from '../components/QuickActionSuccessDialog.jsx';
 import QuickAmountPad, { evaluateQuickExpression } from '../components/QuickAmountPad.jsx';
 import QuickPartySelector from '../components/QuickPartySelector.jsx';
+import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
@@ -413,9 +414,8 @@ export default function QuickEntry() {
               <div className="grid gap-4">
                 <label>
                   <span className="label">{t('common.date')}</span>
-                  <input
+                  <FlexibleDateInput
                     className="input mt-2 h-12 rounded-[18px]"
-                    type="date"
                     value={form.txDate}
                     onChange={(event) => setForm((previous) => ({ ...previous, txDate: event.target.value }))}
                   />

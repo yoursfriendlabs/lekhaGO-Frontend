@@ -9,6 +9,8 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useSnackbar } from '../lib/snackbar.jsx';
 import { formatMaybeDate, formatMaybeDateTime } from '../lib/datetime';
 import dayjs from '../lib/datetime';
+import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
+import DateDisplay from '../components/DateDisplay.jsx';
 
 function DatePresetSelect({ fromValue, toValue, onChange }) {
   const today = dayjs();
@@ -502,9 +504,8 @@ export default function Attendance() {
 
           <div>
             <label className="label" htmlFor="attendance-date-from">{t('attendance.dateFrom')}</label>
-            <input
+            <FlexibleDateInput
               id="attendance-date-from"
-              type="date"
               className="input mt-1"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
@@ -513,9 +514,8 @@ export default function Attendance() {
 
           <div>
             <label className="label" htmlFor="attendance-date-to">{t('attendance.dateTo')}</label>
-            <input
+            <FlexibleDateInput
               id="attendance-date-to"
-              type="date"
               className="input mt-1"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
@@ -555,7 +555,7 @@ export default function Attendance() {
                         </div>
                       </td>
                     )}
-                    <td className="py-4 pr-4 font-medium">{formatMaybeDate(record.date, 'YYYY-MM-DD')}</td>
+                    <td className="py-4 pr-4 font-medium"><DateDisplay date={record.date} format="YYYY-MM-DD" /></td>
                     <td className="py-4 pr-4">
                       <div className="space-y-1">
                         <p className={record.shiftStarted || record.shift ? (record.isLatePunchIn ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-slate-900 dark:text-white'}>
