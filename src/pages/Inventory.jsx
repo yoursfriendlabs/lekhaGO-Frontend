@@ -20,6 +20,7 @@ import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import ActionMenu from '../components/ActionMenu.jsx';
 import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
 import DateDisplay from '../components/DateDisplay.jsx';
+import { formatDateBoth } from '../lib/nepaliDate.js';
 
 const makeEmptyItem = () => ({
   name: '',
@@ -148,13 +149,13 @@ function getExpiryDateColorClass(expiryDateStr) {
   if (!expiryDateStr) return '';
   const expiryDate = new Date(expiryDateStr);
   const today = new Date();
-  
+
   expiryDate.setHours(0, 0, 0, 0);
   today.setHours(0, 0, 0, 0);
-  
+
   const diffTime = expiryDate.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays <= 10) {
     return 'text-rose-600 dark:text-rose-450 font-semibold';
   } else if (diffDays <= 25) {
@@ -168,10 +169,10 @@ function getExpiryRemainingDaysText(expiryDateStr, t) {
   if (!expiryDateStr) return '';
   const expiryDate = new Date(expiryDateStr);
   const today = new Date();
-  
+
   expiryDate.setHours(0, 0, 0, 0);
   today.setHours(0, 0, 0, 0);
-  
+
   const diffTime = expiryDate.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -571,7 +572,7 @@ export default function Inventory() {
       setIsCropperOpen(true);
     };
     reader.readAsDataURL(file);
-    
+
     // Clear input value to allow uploading the same file again
     event.target.value = '';
   };
@@ -1304,9 +1305,9 @@ export default function Inventory() {
         isOpen={isRestockOpen}
         onClose={closeRestockDialog}
         title={t('inventory.restockItem')}
-        size="md"
+        size="lg"
       >
-        <form id="inventory-restock-form" className="space-y-5" onSubmit={handleRestockSubmit}>
+        <form id="inventory-restock-form" className="space-y-6" onSubmit={handleRestockSubmit}>
           <FormSectionCard hint={t('inventory.restockHelp')}>
             <div className="space-y-4">
               <div>
@@ -1374,23 +1375,24 @@ export default function Inventory() {
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                     {t('inventory.stockLots') || 'Stock lot'}
                   </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-4 sm:grid-cols-[1.2fr_1fr] sm:items-end">
                     <div>
-                      <label className="label">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
+                      <label className="label block">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
                       <div className="mt-1">
                         <FlexibleDateInput
                           id="inventory-restock-expiry-date"
                           name="restockExpiryDate"
                           value={restockExpiryDate}
                           onChange={(event) => setRestockExpiryDate(event.target.value || '')}
+                          className="w-full mt-1"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="label">{t('inventory.batchNumberOptional') || 'Batch No. (Optional)'}</label>
+                      <label className="label block">{t('inventory.batchNumberOptional') || 'Batch No. (Optional)'}</label>
                       <input
                         id="inventory-restock-batch-number"
-                        className="input mt-1"
+                        className="input mt-1 h-11"
                         value={restockBatchNumber}
                         onChange={(event) => setRestockBatchNumber(event.target.value)}
                         placeholder={t('inventory.batchNumberPlaceholder') || 'Eg. LOT-A12'}

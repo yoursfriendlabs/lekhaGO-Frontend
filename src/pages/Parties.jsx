@@ -1784,7 +1784,7 @@ export default function Parties() {
                   saveAndNewRef.current = true;
                 }}
               >
-                {txState.loading && saveAndNewRef.current ? t("common.loading") : t("common.saveAndNew") || "Save & New"}
+                {txState.loading && saveAndNewRef.current ? t("common.loading") : t("Save & New") || "Save & New"}
               </button>
             )}
             <button
