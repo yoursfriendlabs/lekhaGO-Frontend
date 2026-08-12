@@ -1,19 +1,27 @@
-export default function StatsCard({ title, value, icon: Icon, tone = 'default', loading = false, size = 'default' }) {
+export default function StatsCard({
+  title,
+  value,
+  icon: Icon,
+  tone = 'default',
+  loading = false,
+  size = 'default',
+  onClick,
+}) {
   const toneColors = {
     danger: {
-      text: 'text-rose-600 dark:text-rose-455 font-semibold',
+      text: 'text-rose-600 dark:text-rose-400 font-semibold',
       bg: 'bg-rose-50 dark:bg-rose-950/30 text-rose-500',
     },
     warning: {
-      text: 'text-amber-600 dark:text-amber-455 font-semibold',
+      text: 'text-amber-600 dark:text-amber-400 font-semibold',
       bg: 'bg-amber-50 dark:bg-amber-950/30 text-amber-500',
     },
     success: {
-      text: 'text-emerald-600 dark:text-emerald-455 font-semibold',
+      text: 'text-emerald-600 dark:text-emerald-400 font-semibold',
       bg: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-500',
     },
     info: {
-      text: 'text-blue-600 dark:text-blue-455 font-semibold',
+      text: 'text-blue-600 dark:text-blue-400 font-semibold',
       bg: 'bg-blue-50 dark:bg-blue-950/30 text-blue-500',
     },
     default: {
@@ -50,7 +58,20 @@ export default function StatsCard({ title, value, icon: Icon, tone = 'default', 
   }
 
   return (
-    <div className={`card flex items-center justify-between border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md shadow-sm ${paddingClasses[size] || paddingClasses.default}`}>
+    <div
+      className={`card flex items-center justify-between border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md shadow-sm ${paddingClasses[size] || paddingClasses.default} ${
+        onClick ? 'cursor-pointer transition hover:border-slate-300 dark:hover:border-slate-700' : ''
+      }`}
+      onClick={onClick}
+      onKeyDown={onClick ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick(event);
+        }
+      } : undefined}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+    >
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 truncate">
           {title}

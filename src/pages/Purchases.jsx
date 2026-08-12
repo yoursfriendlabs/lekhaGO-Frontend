@@ -1663,45 +1663,36 @@ setInvoiceOrder(purchase);
                     </div>
                   )}
                   {itemDraft.itemType === "part" && (
-                    <div className="sm:col-span-2 space-y-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                        {t("purchases.stockLot") || "Stock lot"}
-                      </p>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div>
-                          <label className="label">
-                            {t("purchases.expiryDateOptional") || "Expiry Date (Optional)"}
-                          </label>
-                          <div className="mt-1">
-                            <FlexibleDateInput
-                              id="purchase-item-expiry-date"
-                              name="expiryDate"
-                              value={itemDraft.expiryDate || ""}
-                              onChange={(e) =>
-                                handleDraftChange("expiryDate", e.target.value || "")
-                              }
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="label">
-                            {t("purchases.batchNumberOptional") || "Batch No. (Optional)"}
-                          </label>
-                          <input
-                            id="purchase-item-batch-number"
-                            className="input mt-1"
-                            value={itemDraft.batchNumber || ""}
-                            onChange={(e) =>
-                              handleDraftChange("batchNumber", e.target.value || "")
-                            }
-                            placeholder={t("purchases.batchNumberPlaceholder") || "Eg. LOT-A12"}
-                          />
-                        </div>
+                    <div>
+                      <label className="label">
+                        {t("purchases.expiryDateOptional") || "Expiry (optional)"}
+                      </label>
+                      <div className="mt-1">
+                        <FlexibleDateInput
+                          id="purchase-item-expiry-date"
+                          name="expiryDate"
+                          value={itemDraft.expiryDate || ""}
+                          onChange={(e) =>
+                            handleDraftChange("expiryDate", e.target.value || "")
+                          }
+                        />
                       </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {t("purchases.expiryHelp") ||
-                          "Use the expiry/batch of this purchase lot. Existing stock with other lots stays separate."}
-                      </p>
+                    </div>
+                  )}
+                  {itemDraft.itemType === "part" && (
+                    <div>
+                      <label className="label">
+                        {t("purchases.batchNumberOptional") || "Batch no. (optional)"}
+                      </label>
+                      <input
+                        id="purchase-item-batch-number"
+                        className="input mt-1"
+                        value={itemDraft.batchNumber || ""}
+                        onChange={(e) =>
+                          handleDraftChange("batchNumber", e.target.value || "")
+                        }
+                        placeholder={t("purchases.batchNumberPlaceholder") || "Eg. LOT-A12"}
+                      />
                     </div>
                   )}
                   <div>

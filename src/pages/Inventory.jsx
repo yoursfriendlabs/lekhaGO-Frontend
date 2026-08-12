@@ -137,10 +137,17 @@ function getCurrentStock(product = {}) {
 
 function getUnitText(unit = {}) {
   if (typeof unit === 'string' || typeof unit === 'number') {
-    return String(unit).trim();
+    return cleanUnitLabel(unit);
   }
   if (!unit || typeof unit !== 'object') return '';
-  return String(unit.displayName || unit.symbol || unit.name || '').trim();
+  return cleanUnitLabel(unit.name || unit.symbol || unit.displayName || '');
+}
+
+function cleanUnitLabel(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const match = text.match(/^(.+?)\s*\([^)]*\)\s*$/);
+  return (match ? match[1] : text).trim();
 }
 
 function getUnitOptionLabel(unit = {}) {
@@ -164,11 +171,11 @@ function getExpiryDateColorClass(expiryDateStr) {
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   if (diffDays <= 10) {
-    return 'text-rose-600 dark:text-rose-450 font-semibold';
+    return 'text-rose-600 dark:text-rose-400 font-semibold';
   } else if (diffDays <= 20) {
-    return 'text-amber-600 dark:text-amber-450 font-semibold';
+    return 'text-amber-600 dark:text-amber-400 font-semibold';
   } else {
-    return 'text-emerald-600 dark:text-emerald-450 font-semibold';
+    return 'text-emerald-600 dark:text-emerald-400 font-semibold';
   }
 }
 
@@ -217,7 +224,7 @@ function getItemTypeLabel(itemType, itemTypeOptions, t) {
 
 export default function Inventory() {
   const { t } = useI18n();
-  const { canManageFeature } = useAuth();
+  const { canManageFeature, businessId } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const canManageInventory = canManageFeature('inventory');
   const {
@@ -284,22 +291,43 @@ export default function Inventory() {
   const [statsLoading, setStatsLoading] = useState(false);
 
   const fetchStats = useCallback(async () => {
+    if (!businessId) return;
     try {
       setStatsLoading(true);
-      const res = await api.getProductStats();
-      setStats(res);
+      // Low / near-expiry counts come from the same list filters the UI uses,
+      // so cards always match what you see when you click/filter.
+      const [lowRes, nearRes, statsRes] = await Promise.all([
+        api.countProducts({ stock: 'low' }),
+        api.countProducts({ stock: 'nearexpiry' }),
+        api.getProductStats().catch((err) => {
+          console.error('Failed to fetch product popularity stats', err);
+          return null;
+        }),
+      ]);
+      setStats({
+        lowStockCount: Number(lowRes?.total ?? statsRes?.lowStockCount ?? 0),
+        nearExpiryCount: Number(nearRes?.total ?? statsRes?.nearExpiryCount ?? 0),
+        popularCount: Number(statsRes?.popularCount || 0),
+        leastPopularCount: Number(statsRes?.leastPopularCount || 0),
+      });
     } catch (err) {
       console.error('Failed to fetch product stats', err);
+      setStats({
+        lowStockCount: 0,
+        nearExpiryCount: 0,
+        popularCount: 0,
+        leastPopularCount: 0,
+      });
     } finally {
       setStatsLoading(false);
     }
-  }, []);
+  }, [businessId]);
 
   useEffect(() => {
-    if (businessProfile?.id) {
+    if (businessId) {
       fetchStats();
     }
-  }, [businessProfile?.id, products, fetchStats]);
+  }, [businessId, products, fetchStats]);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deleteProduct, setDeleteProduct] = useState(null);
@@ -446,7 +474,8 @@ export default function Inventory() {
       salePrice: Number(product.salePrice ?? 0),
       purchasePrice: Number(product.purchasePrice ?? 0),
       quantity: Number(product.stockOnHand ?? product.openingStock ?? 0),
-      unit: product.primaryUnit || getUnitText(product.unit) || '',
+      unit: cleanUnitLabel(product.primaryUnit || getUnitText(product.unit) || ''),
+      batchCount: Number(product.batchCount || product.batches?.length || 0),
       expiryDate: toDateInputValue(product.expiryDate),
     }));
   }, [products]);
@@ -626,7 +655,7 @@ export default function Inventory() {
       setForm((previous) => ({
         ...previous,
         unitId: unit?.id ? String(unit.id) : '',
-        primaryUnit: getUnitText(unit),
+        primaryUnit: cleanUnitLabel(unit?.name || unit?.symbol || ''),
       }));
       return;
     }
@@ -634,7 +663,7 @@ export default function Inventory() {
     setForm((previous) => ({
       ...previous,
       unitId: '',
-      primaryUnit: value.slice('legacy:'.length),
+      primaryUnit: cleanUnitLabel(value.slice('legacy:'.length)),
     }));
   };
 
@@ -998,6 +1027,10 @@ export default function Inventory() {
           icon={AlertTriangle}
           tone="danger"
           loading={statsLoading}
+          onClick={() => {
+            setStockFilter('low');
+            setPage(1);
+          }}
         />
         <StatsCard
           title={t('inventory.nearExpiryItems') || 'Near Expiry'}
@@ -1005,6 +1038,11 @@ export default function Inventory() {
           icon={Clock}
           tone="warning"
           loading={statsLoading}
+          onClick={() => {
+            setStockFilter('nearexpiry');
+            setSortKey('expiryDate');
+            setPage(1);
+          }}
         />
         <StatsCard
           title={t('inventory.popularItems') || 'Popular (Selling)'}
@@ -1064,6 +1102,7 @@ export default function Inventory() {
             <option value="in">{t('inventory.inStock')}</option>
             <option value="low">{t('inventory.lowStock')}</option>
             <option value="out">{t('inventory.outStock')}</option>
+            <option value="nearexpiry">{t('inventory.nearExpiryItems') || 'Near Expiry'}</option>
           </select>
 
           <select
@@ -1104,7 +1143,19 @@ export default function Inventory() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-slate-900 dark:text-white truncate">{item.name}</p>
                     <p className="text-xs text-slate-500">
-                      {[item.brand, item.category !== '-' ? item.category : null, showJewelleryFields ? (item.metalType && item.purity ? `${item.metalType} ${item.purity}` : item.metalType || item.purity) : null, item.unit || t('inventory.noUnit')]
+                      {[
+                        item.brand,
+                        item.category !== '-' ? item.category : null,
+                        showJewelleryFields
+                          ? (item.metalType && item.purity
+                            ? `${item.metalType} ${item.purity}`
+                            : item.metalType || item.purity)
+                          : null,
+                        item.unit || t('inventory.noUnit'),
+                        item.batchCount > 1
+                          ? `${item.batchCount} ${t('inventory.lots') || 'lots'}`
+                          : null,
+                      ]
                         .filter(Boolean)
                         .join(' · ')}
                     </p>
@@ -1203,7 +1254,17 @@ export default function Inventory() {
                         <div>
                           <p className="font-semibold text-slate-900 dark:text-white">{item.name}</p>
                           <p className="text-xs text-slate-500">
-                            {[showJewelleryFields ? (item.metalType && item.purity ? `${item.metalType} ${item.purity}` : item.metalType || item.purity) : null, item.unit || t('inventory.noUnit')]
+                            {[
+                              showJewelleryFields
+                                ? (item.metalType && item.purity
+                                  ? `${item.metalType} ${item.purity}`
+                                  : item.metalType || item.purity)
+                                : null,
+                              item.unit || t('inventory.noUnit'),
+                              item.batchCount > 1
+                                ? `${item.batchCount} ${t('inventory.lots') || 'lots'}`
+                                : null,
+                            ]
                               .filter(Boolean)
                               .join(' · ')}
                           </p>
@@ -1617,13 +1678,15 @@ export default function Inventory() {
                     <div className="rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950/50">
                       <span className="text-slate-500">{t('inventory.nearestExpiry') || 'Nearest expiry'}: </span>
                       <span className={form.expiryDate ? getExpiryDateColorClass(form.expiryDate) : 'text-slate-500'}>
-                        {form.expiryDate ? formatDateBoth(form.expiryDate) : (t('inventory.noExpiry') || 'No expiry')}
+                        {form.expiryDate ? formatDateBoth(toDateInputValue(form.expiryDate) || form.expiryDate) : (t('inventory.noExpiry') || 'No expiry')}
                       </span>
                     </div>
                     {editBatches.length > 0 ? (
-                      editBatches.map((batch) => (
+                      editBatches.map((batch, batchIndex) => {
+                        const batchExpiry = toDateInputValue(batch.expiryDate) || '';
+                        return (
                         <div
-                          key={batch.id}
+                          key={batch.id || `batch-${batchIndex}`}
                           className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950/50"
                         >
                           <div className="min-w-0">
@@ -1632,9 +1695,9 @@ export default function Inventory() {
                                 ? `${t('inventory.batchNumber') || 'Batch'}: ${batch.batchNumber}`
                                 : (t('inventory.noBatchNumber') || 'No batch no.')}
                             </div>
-                            <div className={batch.expiryDate ? getExpiryDateColorClass(batch.expiryDate) : 'text-slate-500'}>
-                              {batch.expiryDate
-                                ? formatDateBoth(batch.expiryDate)
+                            <div className={batchExpiry ? getExpiryDateColorClass(batchExpiry) : 'text-slate-500'}>
+                              {batchExpiry
+                                ? formatDateBoth(batchExpiry)
                                 : (t('inventory.noExpiry') || 'No expiry')}
                             </div>
                           </div>
@@ -1643,7 +1706,8 @@ export default function Inventory() {
                             {form.primaryUnit ? ` ${form.primaryUnit}` : ''}
                           </span>
                         </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <p className="text-xs text-slate-500">{t('inventory.noBatches') || 'No open lots yet.'}</p>
                     )}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Share2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useBusinessSettings } from '../lib/businessSettings';
 import InvoiceHeader from '../components/InvoiceHeader';
@@ -58,13 +59,40 @@ export default function Invoice() {
   };
 
   const handlePrint = async () => {
-    printElement(printRef.current);
+    printElement(printRef.current, {
+      prepareClone: (clone) => {
+        clone.style.minWidth = 'initial';
+        clone.style.width = '100%';
+        clone.classList.remove('min-w-[650px]');
+      }
+    });
     await trackReprintAfterPrint();
   };
 
   const handlePrintThermal = async () => {
     printThermalReceipt(thermalPrintRef.current);
     await trackReprintAfterPrint();
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${isSale ? 'Sales' : 'Purchase'} Invoice ${record?.invoiceNo || record?.id?.slice(0, 8)}`,
+          text: `Invoice for ${partyName}. Grand Total: ${money(record?.grandTotal)}`,
+          url: window.location.href,
+        });
+      } catch (err) {
+        // user cancelled or share failed, ignore
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Invoice link copied to clipboard!');
+      } catch (err) {
+        console.error('Clipboard copy error:', err);
+      }
+    }
   };
 
   const totalReceived = isSale
@@ -118,6 +146,10 @@ const partyName = isSale
               View Bill
             </Link>
           )}
+          <button className="btn-secondary flex items-center gap-1.5" type="button" onClick={handleShare}>
+            <Share2 size={15} className="shrink-0" />
+            Share
+          </button>
           {isThermalView ? (
             <button className="btn-primary" type="button" onClick={handlePrintThermal}>
               Print Thermal
@@ -182,48 +214,50 @@ const partyName = isSale
           </div>
 
           {/* ── Line Items ── */}
-          <div className="px-8 py-6">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-2 border-slate-200/70 dark:border-slate-700/70">
-                  <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Product</th>
-                  <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Qty</th>
-                  <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Unit Price</th>
-                  <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Tax</th>
-                  <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
-                {items.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-4 text-slate-400">No line items.</td>
+          <div className="px-4 py-6 sm:px-8">
+            <div className="w-full overflow-x-auto no-scrollbar">
+              <table className="w-full text-sm min-w-[550px] sm:min-w-0">
+                <thead>
+                  <tr className="border-b-2 border-slate-200/70 dark:border-slate-700/70">
+                    <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Product</th>
+                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Qty</th>
+                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Unit Price</th>
+                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Tax</th>
+                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Amount</th>
                   </tr>
-                ) : (
-                  items.map((item, idx) => (
-                    <tr key={item.id || idx}>
-                      <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">
-                        {item.Product?.name || item.description || '—'}
-                        {item.Product?.companyName && (
-                          <span className="ml-2 text-xs text-slate-400">{item.Product.companyName}</span>
-                        )}
-                      </td>
-                      <td className="py-3 text-right text-slate-600 dark:text-slate-400">
-                        {Number(item.quantity || 0).toFixed(2)}
-                      </td>
-                      <td className="py-3 text-right text-slate-600 dark:text-slate-400">
-                        {money(item.unitPrice)}
-                      </td>
-                      <td className="py-3 text-right text-slate-500">
-                        {Number(item.taxRate || 0) > 0 ? `${Number(item.taxRate).toFixed(1)}%` : '—'}
-                      </td>
-                      <td className="py-3 text-right font-semibold text-slate-800 dark:text-slate-200">
-                        {money(item.lineTotal)}
-                      </td>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                  {items.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-4 text-slate-400">No line items.</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    items.map((item, idx) => (
+                      <tr key={item.id || idx}>
+                        <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                          {item.Product?.name || item.description || '—'}
+                          {item.Product?.companyName && (
+                            <span className="ml-2 text-xs text-slate-400">{item.Product.companyName}</span>
+                          )}
+                        </td>
+                        <td className="py-3 text-right text-slate-600 dark:text-slate-400">
+                          {Number(item.quantity || 0).toFixed(2)}
+                        </td>
+                        <td className="py-3 text-right text-slate-600 dark:text-slate-400">
+                          {money(item.unitPrice)}
+                        </td>
+                        <td className="py-3 text-right text-slate-500">
+                          {Number(item.taxRate || 0) > 0 ? `${Number(item.taxRate).toFixed(1)}%` : '—'}
+                        </td>
+                        <td className="py-3 text-right font-semibold text-slate-800 dark:text-slate-200">
+                          {money(item.lineTotal)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* ── Totals ── */}
@@ -298,104 +332,106 @@ const partyName = isSale
             </div>
           </div>
         ) : (
-          <div
-            ref={printRef}
-            className={`${isPrintBillView ? 'overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm sm:p-8' : 'print-template bg-white p-6 text-black sm:p-8'}`}
-          >
-            <div className="border-b-2 border-black pb-4">
-              <InvoiceHeader
-                biz={biz}
-                invoiceType={isSale ? 'Sales Bill' : 'Purchase Bill'}
-                invoiceNo={record.invoiceNo || record.id.slice(0, 8)}
-                date={<DateDisplay date={dateValue} format="MMMM D, YYYY" mode="inline" />}
-                reprintLabel={reprintLabel}
-                // status={record.status}
-                // statusColor="border border-black text-black"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-6 border-b border-slate-300 py-4 text-sm">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                  {isSale ? 'Bill To' : 'Supplier'}
-                </p>
-                <p className="mt-1 font-semibold">{partyName}</p>
-                {record.partyPhone ? <p className="mt-0.5">{record.partyPhone}</p> : null}
+          <div className={isPrintBillView ? "w-full overflow-x-auto rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950 p-2 sm:p-4" : ""}>
+            <div
+              ref={printRef}
+              className={`${isPrintBillView ? 'min-w-[650px] bg-white p-6 text-black sm:p-8' : 'print-template bg-white p-6 text-black sm:p-8'}`}
+            >
+              <div className="border-b-2 border-black pb-4">
+                <InvoiceHeader
+                  biz={biz}
+                  invoiceType={isSale ? 'Sales Bill' : 'Purchase Bill'}
+                  invoiceNo={record.invoiceNo || record.id.slice(0, 8)}
+                  date={<DateDisplay date={dateValue} format="MMMM D, YYYY" mode="inline" />}
+                  reprintLabel={reprintLabel}
+                  // status={record.status}
+                  // statusColor="border border-black text-black"
+                />
               </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Details</p>
-                <p className="mt-1">Created By: {creatorName}</p>
-                {(record.Table || record.table || record.tableId || record.attributes?.table_no) && (
-                  <p className="mt-1">
-                    Table: {record.Table?.name || record.table?.name || record.attributes?.table_no}
+
+              <div className="grid grid-cols-2 gap-6 border-b border-slate-300 py-4 text-sm">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                    {isSale ? 'Bill To' : 'Supplier'}
                   </p>
-                )}
-                {/* {record.notes ? <p className="mt-1 whitespace-pre-wrap">Notes: {record.notes}</p> : null} */}
+                  <p className="mt-1 font-semibold">{partyName}</p>
+                  {record.partyPhone ? <p className="mt-0.5">{record.partyPhone}</p> : null}
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Details</p>
+                  <p className="mt-1">Created By: {creatorName}</p>
+                  {(record.Table || record.table || record.tableId || record.attributes?.table_no) && (
+                    <p className="mt-1">
+                      Table: {record.Table?.name || record.table?.name || record.attributes?.table_no}
+                    </p>
+                  )}
+                  {/* {record.notes ? <p className="mt-1 whitespace-pre-wrap">Notes: {record.notes}</p> : null} */}
+                </div>
               </div>
-            </div>
 
-            <table className="mt-5 w-full text-sm">
-              <thead>
-                <tr className="border-b border-black">
-                  <th className="py-2 text-left text-[10px] font-bold uppercase">Product</th>
-                  <th className="py-2 text-right text-[10px] font-bold uppercase">Qty</th>
-                  <th className="py-2 text-right text-[10px] font-bold uppercase">Unit Price</th>
-                  <th className="py-2 text-right text-[10px] font-bold uppercase">Tax</th>
-                  <th className="py-2 text-right text-[10px] font-bold uppercase">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="py-4 text-slate-500">No line items.</td>
+              <table className="mt-5 w-full text-sm">
+                <thead>
+                  <tr className="border-b border-black">
+                    <th className="py-2 text-left text-[10px] font-bold uppercase">Product</th>
+                    <th className="py-2 text-right text-[10px] font-bold uppercase">Qty</th>
+                    <th className="py-2 text-right text-[10px] font-bold uppercase">Unit Price</th>
+                    <th className="py-2 text-right text-[10px] font-bold uppercase">Tax</th>
+                    <th className="py-2 text-right text-[10px] font-bold uppercase">Amount</th>
                   </tr>
-                ) : (
-                  items.map((item, idx) => (
-                    <tr key={item.id || idx} className="border-b border-slate-200">
-                      <td className="py-2 pr-4 font-medium">
-                        {item.Product?.name || item.description || '—'}
-                        {item.Product?.companyName ? <span className="ml-2 text-xs">({item.Product.companyName})</span> : null}
-                      </td>
-                      <td className="py-2 text-right">{Number(item.quantity || 0).toFixed(2)}</td>
-                      <td className="py-2 text-right">{money(item.unitPrice)}</td>
-                      <td className="py-2 text-right">{Number(item.taxRate || 0) > 0 ? `${Number(item.taxRate).toFixed(1)}%` : '—'}</td>
-                      <td className="py-2 text-right font-semibold">{money(item.lineTotal)}</td>
+                </thead>
+                <tbody>
+                  {items.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-4 text-slate-500">No line items.</td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    items.map((item, idx) => (
+                      <tr key={item.id || idx} className="border-b border-slate-200">
+                        <td className="py-2 pr-4 font-medium">
+                          {item.Product?.name || item.description || '—'}
+                          {item.Product?.companyName ? <span className="ml-2 text-xs">({item.Product.companyName})</span> : null}
+                        </td>
+                        <td className="py-2 text-right">{Number(item.quantity || 0).toFixed(2)}</td>
+                        <td className="py-2 text-right">{money(item.unitPrice)}</td>
+                        <td className="py-2 text-right">{Number(item.taxRate || 0) > 0 ? `${Number(item.taxRate).toFixed(1)}%` : '—'}</td>
+                        <td className="py-2 text-right font-semibold">{money(item.lineTotal)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
 
-            <div className="mt-6 ml-auto max-w-xs space-y-2 text-sm">
-              {Number(record.subTotal || 0) > 0 ? (
-                <div className="flex justify-between"><span>Subtotal</span><span>{money(record.subTotal)}</span></div>
-              ) : null}
-              {Number(record.taxTotal || 0) > 0 ? (
-                <div className="flex justify-between"><span>Tax</span><span>{money(record.taxTotal)}</span></div>
-              ) : null}
-              {Number(record.discountTotal || record.discount || 0) > 0 ? (
-                <div className="flex justify-between text-rose-600 font-medium">
-                  <span>Discount</span>
-                  <span>-{money(record.discountTotal || record.discount)}</span>
+              <div className="mt-6 ml-auto max-w-xs space-y-2 text-sm">
+                {Number(record.subTotal || 0) > 0 ? (
+                  <div className="flex justify-between"><span>Subtotal</span><span>{money(record.subTotal)}</span></div>
+                ) : null}
+                {Number(record.taxTotal || 0) > 0 ? (
+                  <div className="flex justify-between"><span>Tax</span><span>{money(record.taxTotal)}</span></div>
+                ) : null}
+                {Number(record.discountTotal || record.discount || 0) > 0 ? (
+                  <div className="flex justify-between text-rose-600 font-medium">
+                    <span>Discount</span>
+                    <span>-{money(record.discountTotal || record.discount)}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between border-t border-black pt-2 text-base font-bold">
+                  <span>Grand Total</span><span>{money(record.grandTotal)}</span>
                 </div>
-              ) : null}
-              <div className="flex justify-between border-t border-black pt-2 text-base font-bold">
-                <span>Grand Total</span><span>{money(record.grandTotal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>{isSale ? 'Amount Received' : 'Amount Paid'}</span>
-                <span>{money(isSale ? totalReceived : totalPaid)}</span>
-              </div>
-              {dueAmount > 0 ? (
-                <div className="flex justify-between font-bold">
-                  <span>Due Amount</span><span>{money(dueAmount)}</span>
+                <div className="flex justify-between">
+                  <span>{isSale ? 'Amount Received' : 'Amount Paid'}</span>
+                  <span>{money(isSale ? totalReceived : totalPaid)}</span>
                 </div>
-              ) : null}
-            </div>
+                {dueAmount > 0 ? (
+                  <div className="flex justify-between font-bold">
+                    <span>Due Amount</span><span>{money(dueAmount)}</span>
+                  </div>
+                ) : null}
+              </div>
 
-            <div className="mt-8 flex items-center justify-between border-t border-slate-300 pt-3 text-xs">
-              <span>Thank you for your business!</span>
-              <span>Printed {dayjs().format('D MMM YYYY')}</span>
+              <div className="mt-8 flex items-center justify-between border-t border-slate-300 pt-3 text-xs">
+                <span>Thank you for your business!</span>
+                <span>Printed {dayjs().format('D MMM YYYY')}</span>
+              </div>
             </div>
           </div>
         )}

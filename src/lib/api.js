@@ -841,11 +841,19 @@ export const api = {
       { limit: 50, ...params },
       listCache(["products", "reports", "dashboard"]),
     ),
+  countProducts: (params = {}) =>
+    collectionRequest(
+      "/api/products",
+      { limit: 1, ...params },
+      listCache(["product-stats", "products"], CACHE_TTL.short, { force: true }),
+    ),
   getProductStats: () =>
     request(
       "/api/products/stats",
       { method: "GET" },
-      listCache(["products", "reports", "dashboard"], CACHE_TTL.short),
+      listCache(["product-stats", "products", "reports", "dashboard"], CACHE_TTL.short, {
+        force: true,
+      }),
     ),
   lookupProducts: (params = {}) =>
     collectionRequest(
