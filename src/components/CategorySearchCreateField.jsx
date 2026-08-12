@@ -53,7 +53,16 @@ export default function CategorySearchCreateField({
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState('');
-  const selected = normalizeCategory(selectedCategory);
+  const selected = useMemo(
+    () => normalizeCategory(selectedCategory),
+    [
+      selectedCategory?.id,
+      selectedCategory?.value,
+      selectedCategory?.name,
+      selectedCategory?.label,
+      selectedCategory?.type,
+    ],
+  );
   const debouncedQuery = useDebouncedValue(query, 250);
   const suggestedOptions = useMemo(() => dedupeCategories(options).slice(0, 8), [options]);
   const visibleResults = useMemo(() => {
@@ -95,7 +104,7 @@ export default function CategorySearchCreateField({
     const search = debouncedQuery.trim();
 
     if (!search || selected) {
-      setResults([]);
+      setResults((previous) => (previous.length > 0 ? [] : previous));
       return;
     }
 

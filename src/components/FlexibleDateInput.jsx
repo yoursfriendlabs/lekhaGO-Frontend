@@ -125,22 +125,22 @@ export default function FlexibleDateInput({
 
   // Separate layout/spacing classes from the input design classes
   const classes = className ? className.split(' ') : [];
-  const layoutClasses = classes.filter(c => 
-    c.startsWith('mt-') || c.startsWith('mb-') || c.startsWith('ml-') || c.startsWith('mr-') || 
-    c.startsWith('mx-') || c.startsWith('my-') || c.startsWith('p-') || c.startsWith('w-') || 
+  const layoutClasses = classes.filter(c =>
+    c.startsWith('mt-') || c.startsWith('mb-') || c.startsWith('ml-') || c.startsWith('mr-') ||
+    c.startsWith('mx-') || c.startsWith('my-') || c.startsWith('p-') || c.startsWith('w-') ||
     c.startsWith('flex-') || c.startsWith('h-') || c.startsWith('col-') || c.startsWith('row-')
   );
   const inputStyleClasses = classes.filter(c => !layoutClasses.includes(c));
 
-  const wrapperClassName = `relative w-full ${layoutClasses.join(' ')}`;
-  const inputClassName = `${inputStyleClasses.join(' ')} w-full min-w-0`;
+  const wrapperClassName = `relative w-full min-w-0 ${layoutClasses.join(' ')}`;
+  const inputClassName = `${inputStyleClasses.join(' ') || 'input'} w-full min-w-0`;
 
   // Detect compact mode to adjust toggle button layout/padding
   const isCompact = className?.includes('input-compact') || className?.includes('h-8') || className?.includes('h-9');
 
   return (
     <div className={wrapperClassName}>
-      <div className="flex items-stretch gap-1.5 w-full">
+      <div className="flex flex-col gap-2 w-full sm:flex-row sm:items-stretch">
         {calendar === 'ad' ? (
           <input
             id={id}
@@ -153,7 +153,7 @@ export default function FlexibleDateInput({
             required={required}
           />
         ) : (
-          <div className="grid grid-cols-[1.1fr_1.3fr_0.9fr] gap-1 flex-1 min-w-0">
+          <div className="grid w-full min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(92px,1fr)_minmax(132px,1.5fr)_minmax(92px,0.8fr)] sm:gap-3 xl:min-w-[520px]">
             <select
               id={id ? `${id}-bs-year` : undefined}
               className={inputClassName}

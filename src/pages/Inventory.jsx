@@ -58,6 +58,12 @@ const parseNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const toDateInputValue = (value) => {
+  if (!value) return '';
+  const match = String(value).match(/^\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : '';
+};
+
 const buildProductPayload = (form) => ({
   name: form.name,
   companyName: String(form.companyName || '').trim() || null,
@@ -120,7 +126,7 @@ function productToForm(product = {}) {
     minWholesaleQuantity: String(product.minWholesaleQuantity ?? ''),
     lowStockAlert: Boolean(product.lowStockAlert),
     imageUrl: product.imageUrl || '',
-    expiryDate: product.expiryDate ? formatDate(product.expiryDate) : '',
+    expiryDate: toDateInputValue(product.expiryDate),
     batchNumber: '',
   };
 }
@@ -441,7 +447,7 @@ export default function Inventory() {
       purchasePrice: Number(product.purchasePrice ?? 0),
       quantity: Number(product.stockOnHand ?? product.openingStock ?? 0),
       unit: product.primaryUnit || getUnitText(product.unit) || '',
-      expiryDate: product.expiryDate || '',
+      expiryDate: toDateInputValue(product.expiryDate),
     }));
   }, [products]);
 
@@ -698,6 +704,7 @@ export default function Inventory() {
   const openEditDialog = async (itemId) => {
     if (!canManageInventory) return;
     const product = products.find((entry) => String(entry.id) === String(itemId));
+
     if (!product) {
       setStatus({ type: 'error', message: t('common.noData') });
       return;
@@ -1135,21 +1142,23 @@ export default function Inventory() {
                   {canManageInventory && isRestockableProduct(item) ? (
                     <button
                       id={getInventoryItemActionId('restock', item.id)}
-                      className="btn-secondary flex-1 justify-center sm:w-auto"
+                      className="btn-secondary min-w-0 flex-1 justify-center gap-1.5 px-3 text-center leading-tight whitespace-normal sm:w-auto sm:px-5"
                       type="button"
                       onClick={() => openRestockDialog(item.id)}
                     >
-                      <Plus size={16} /> {t('inventory.restock')}
+                      <Plus size={16} className="shrink-0" />
+                      <span className="min-w-0 break-words">{t('inventory.restock')}</span>
                     </button>
                   ) : null}
                   {canManageInventory ? (
                     <button
                       id={getInventoryItemActionId('edit', item.id)}
-                      className="btn-ghost flex-1 justify-center sm:w-auto"
+                      className="btn-ghost min-w-0 flex-1 justify-center gap-1.5 px-3 text-center leading-tight whitespace-normal sm:w-auto sm:px-5"
                       type="button"
                       onClick={() => openEditDialog(item.id)}
                     >
-                      <Pencil size={16} /> {t('common.edit')}
+                      <Pencil size={16} className="shrink-0" />
+                      <span className="min-w-0 break-words">{t('common.edit')}</span>
                     </button>
                   ) : null}
                   <button
@@ -1308,12 +1317,12 @@ export default function Inventory() {
         title={t('inventory.restockItem')}
         size="lg"
       >
-        <form id="inventory-restock-form" className="space-y-6" onSubmit={handleRestockSubmit}>
-          <FormSectionCard hint={t('inventory.restockHelp')}>
-            <div className="space-y-4">
+        <form id="inventory-restock-form" className="space-y-4 sm:space-y-6" onSubmit={handleRestockSubmit}>
+          <FormSectionCard hint={t('inventory.restockHelp')} className="p-3 sm:p-4">
+            <div className="space-y-3 sm:space-y-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{t('inventory.itemName')}</p>
-                <p id="inventory-restock-item-name" className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{restockProduct?.name || '-'}</p>
+                <p id="inventory-restock-item-name" className="mt-1 break-words text-base font-semibold text-slate-900 dark:text-white sm:text-lg">{restockProduct?.name || '-'}</p>
                 <p id="inventory-restock-item-unit" className="text-sm text-slate-500">{restockProduct?.primaryUnit || t('inventory.noUnit')}</p>
               </div>
 
@@ -1321,33 +1330,33 @@ export default function Inventory() {
                 <button
                   id="inventory-restock-action-add"
                   type="button"
-                  className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                  className={`min-h-11 min-w-0 rounded-xl border px-2 py-2 text-center text-xs font-semibold leading-tight whitespace-normal transition sm:rounded-2xl sm:px-3 sm:py-2.5 sm:text-sm ${
                     !isRestockRemove
                       ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-200'
                       : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
                   }`}
                   onClick={() => setRestockAction('add')}
                 >
-                  {t('inventory.restockAdd')}
+                  <span className="block min-w-0 break-words">{t('inventory.restockAdd')}</span>
                 </button>
                 <button
                   id="inventory-restock-action-remove"
                   type="button"
-                  className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                  className={`min-h-11 min-w-0 rounded-xl border px-2 py-2 text-center text-xs font-semibold leading-tight whitespace-normal transition sm:rounded-2xl sm:px-3 sm:py-2.5 sm:text-sm ${
                     isRestockRemove
                       ? 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200'
                       : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
                   }`}
                   onClick={() => setRestockAction('remove')}
                 >
-                  {t('inventory.restockRemove')}
+                  <span className="block min-w-0 break-words">{t('inventory.restockRemove')}</span>
                 </button>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
                 <div>
                   <label className="label">{t('inventory.quantityOnHand')}</label>
-                  <div id="inventory-restock-current-stock" className="mt-1 rounded-2xl border border-slate-200/70 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 dark:border-slate-800/70 dark:bg-slate-900/50 dark:text-slate-200">
+                  <div id="inventory-restock-current-stock" className="mt-1 rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 dark:border-slate-800/70 dark:bg-slate-900/50 dark:text-slate-200 sm:rounded-2xl sm:px-4 sm:py-3">
                     {formatQuantity(currentRestockStock)}{restockUnitSuffix}
                   </div>
                 </div>
@@ -1372,11 +1381,11 @@ export default function Inventory() {
               </div>
 
               {!isRestockRemove ? (
-                <div className="space-y-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
+                <div className="space-y-3 rounded-xl border border-slate-200/70 bg-slate-50/70 p-3 dark:border-slate-800/70 dark:bg-slate-900/40 sm:rounded-2xl">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                     {t('inventory.stockLots') || 'Stock lot'}
                   </p>
-                  <div className="grid gap-4 sm:grid-cols-[1.2fr_1fr] sm:items-end">
+                  <div className="grid gap-3 sm:grid-cols-[1.1fr_1fr] sm:items-end sm:gap-4">
                     <div>
                       <label className="label block">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
                       <div className="mt-1">
@@ -1385,7 +1394,7 @@ export default function Inventory() {
                           name="restockExpiryDate"
                           value={restockExpiryDate}
                           onChange={(event) => setRestockExpiryDate(event.target.value || '')}
-                          className="w-full mt-1"
+                          className="input-compact w-full"
                         />
                       </div>
                     </div>
@@ -1393,7 +1402,7 @@ export default function Inventory() {
                       <label className="label block">{t('inventory.batchNumberOptional') || 'Batch No. (Optional)'}</label>
                       <input
                         id="inventory-restock-batch-number"
-                        className="input mt-1 h-11"
+                        className="input-compact mt-1 h-11 w-full"
                         value={restockBatchNumber}
                         onChange={(event) => setRestockBatchNumber(event.target.value)}
                         placeholder={t('inventory.batchNumberPlaceholder') || 'Eg. LOT-A12'}
@@ -1406,7 +1415,7 @@ export default function Inventory() {
                 </div>
               ) : null}
 
-              <div className={`rounded-2xl border px-4 py-3 ${
+              <div className={`rounded-xl border px-3 py-2.5 sm:rounded-2xl sm:px-4 sm:py-3 ${
                 isRestockRemove
                   ? 'border-rose-200 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/20'
                   : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20'
@@ -1434,14 +1443,16 @@ export default function Inventory() {
             </div>
           </FormSectionCard>
 
-          <div className="mobile-sticky-actions flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button id="inventory-restock-close" className="btn-secondary w-full sm:w-auto" type="button" onClick={closeRestockDialog}>
-              {t('common.close')}
+          <div className="mobile-sticky-actions sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t border-slate-200/70 bg-white/95 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:static sm:mx-0 sm:mb-0 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+            <button id="inventory-restock-close" className="btn-secondary w-full whitespace-normal text-center leading-tight sm:w-auto" type="button" onClick={closeRestockDialog}>
+              <span className="min-w-0 break-words">{t('common.close')}</span>
             </button>
-            <button id="inventory-restock-submit" className="btn-primary w-full sm:w-auto" type="submit" disabled={restockSaving}>
-              {restockSaving
-                ? t('common.loading')
-                : (isRestockRemove ? t('inventory.restockRemove') : t('inventory.restockAdd'))}
+            <button id="inventory-restock-submit" className="btn-primary w-full whitespace-normal text-center leading-tight sm:w-auto" type="submit" disabled={restockSaving}>
+              <span className="min-w-0 break-words">
+                {restockSaving
+                  ? t('common.loading')
+                  : (isRestockRemove ? t('inventory.restockRemove') : t('inventory.restockAdd'))}
+              </span>
             </button>
           </div>
         </form>
@@ -1457,7 +1468,7 @@ export default function Inventory() {
         isOpen={isOpen}
         onClose={closeDialog}
         title={editingId ? `${t('common.edit')} ${t('inventory.itemName').toLowerCase()}` : t('inventory.addNewItem')}
-        size="xl"
+        size="wide"
       >
         <form id="inventory-item-form" className="space-y-5" onSubmit={handleSubmit}>
           <FormSectionCard hint={t('inventory.help')}>
