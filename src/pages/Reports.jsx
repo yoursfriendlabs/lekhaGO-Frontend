@@ -2943,8 +2943,8 @@ export default function Reports() {
                     </p>
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div>
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="sm:col-span-2 xl:col-span-1">
                       <label className="label">{t('ledger.party')}</label>
                       <PartyFilterSelect
                         className="mt-1"
@@ -2966,25 +2966,23 @@ export default function Reports() {
                         }}
                       />
                     </div>
-                    <div className="grid gap-2 grid-cols-2">
-                      <div>
-                        <label className="label" htmlFor="ledger-from">{t('ledger.from')}</label>
-                        <FlexibleDateInput
-                          id="ledger-from"
-                          className="input mt-1"
-                          value={ledgerFilters.from}
-                          onChange={(e) => handleLedgerDateChange('from', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="label" htmlFor="ledger-to">{t('ledger.to')}</label>
-                        <FlexibleDateInput
-                          id="ledger-to"
-                          className="input mt-1"
-                          value={ledgerFilters.to}
-                          onChange={(e) => handleLedgerDateChange('to', e.target.value)}
-                        />
-                      </div>
+                    <div>
+                      <label className="label" htmlFor="ledger-from">{t('ledger.from')}</label>
+                      <FlexibleDateInput
+                        id="ledger-from"
+                        className="input mt-1"
+                        value={ledgerFilters.from}
+                        onChange={(e) => handleLedgerDateChange('from', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="label" htmlFor="ledger-to">{t('ledger.to')}</label>
+                      <FlexibleDateInput
+                        id="ledger-to"
+                        className="input mt-1"
+                        value={ledgerFilters.to}
+                        onChange={(e) => handleLedgerDateChange('to', e.target.value)}
+                      />
                     </div>
                   </div>
                 </div>
