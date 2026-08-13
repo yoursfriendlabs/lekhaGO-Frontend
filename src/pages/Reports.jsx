@@ -19,6 +19,7 @@ import {
   ArrowDown,
   Coffee,
   BookOpen,
+  Loader2,
 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import Notice from "../components/Notice";
@@ -186,7 +187,8 @@ function formatSeriesLabel(rawLabel, fallbackLabel) {
   return label;
 }
 
-function DatePresetSelect({ fromValue, toValue, onChange }) {
+function DatePresetSelect({ fromValue, toValue, onChange, disabled = false }) {
+  const { t } = useI18n();
   const today = dayjs();
 
   const getPreset = () => {
@@ -241,20 +243,42 @@ function DatePresetSelect({ fromValue, toValue, onChange }) {
 
   return (
     <div className="w-full">
-      <label className="label">Date Preset</label>
+      <label className="label">{t("analytics.filters.datePreset")}</label>
       <select
         className="input mt-1 w-full"
         value={getPreset()}
         onChange={handleSelect}
+        disabled={disabled}
       >
-        <option value="" disabled>Select Range...</option>
-        <option value="today">Today</option>
-        <option value="week">This Week</option>
-        <option value="month">This Month</option>
-        <option value="year">This Year</option>
-        <option value="prev_year">Previous Year</option>
-        <option value="custom" disabled>Custom Range</option>
+        <option value="" disabled>{t("analytics.filters.selectRange")}</option>
+        <option value="today">{t("dates.today")}</option>
+        <option value="week">{t("analytics.filters.thisWeek")}</option>
+        <option value="month">{t("ledger.thisMonth")}</option>
+        <option value="year">{t("ledger.thisYear")}</option>
+        <option value="prev_year">{t("analytics.filters.previousYear")}</option>
+        <option value="custom" disabled>{t("analytics.filters.customRange")}</option>
       </select>
+    </div>
+  );
+}
+
+function ReportResultsShell({ loading, t, children, className = "" }) {
+  return (
+    <div className="relative">
+      <div
+        className={`${className} ${loading ? "pointer-events-none select-none opacity-40" : ""}`.trim()}
+        aria-busy={loading}
+      >
+        {children}
+      </div>
+      {loading ? (
+        <div className="absolute inset-0 z-10 flex min-h-[8rem] items-center justify-center rounded-2xl bg-white/60 backdrop-blur-[1px] dark:bg-slate-950/50">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700">
+            <Loader2 size={16} className="animate-spin text-primary-600" />
+            {t("common.loading")}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1148,6 +1172,7 @@ function ExpenseCategoryAnalyticsSection({
   caption,
   filters,
   onFilterChange,
+  onDatesChange,
   categoryOptions,
 }) {
   const rows = analytics.breakdown;
@@ -1176,10 +1201,8 @@ function ExpenseCategoryAnalyticsSection({
             <DatePresetSelect
               fromValue={filters.fromDate}
               toValue={filters.toDate}
-              onChange={(from, to) => {
-                onFilterChange({ target: { name: 'fromDate', value: from } });
-                onFilterChange({ target: { name: 'toDate', value: to } });
-              }}
+              disabled={loading}
+              onChange={onDatesChange}
             />
           </div>
           <div>
@@ -1208,7 +1231,7 @@ function ExpenseCategoryAnalyticsSection({
               value={filters.categoryKey}
               onChange={onFilterChange}
             >
-              <option value="">{`${t("All")} ${t("analytics.categoryName")}`}</option>
+              <option value="">{`${t("common.all")} ${t("analytics.categoryName")}`}</option>
               {categoryOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -1222,11 +1245,7 @@ function ExpenseCategoryAnalyticsSection({
         </p>
       </div>
 
-      {loading ? (
-        <div className="card">
-          <p className="text-sm text-slate-500">{t("common.loading")}</p>
-        </div>
-      ) : error ? (
+      {error && !loading ? (
         <div className="card space-y-4">
           <Notice title={error} tone="error" />
           <div>
@@ -1242,7 +1261,7 @@ function ExpenseCategoryAnalyticsSection({
           </p>
         </div>
       ) : (
-        <>
+        <ReportResultsShell loading={loading} t={t} className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="card">
               <p className="text-xs uppercase text-slate-400">
@@ -1486,7 +1505,7 @@ function ExpenseCategoryAnalyticsSection({
               </div>
             </div>
           </div>
-        </>
+        </ReportResultsShell>
       )}
     </div>
   );
@@ -2088,17 +2107,25 @@ export default function Reports() {
     fetchLedger();
   }, [fetchLedger]);
 
-  // Sync Party parameters
+  // Sync Party parameters from the URL so party, dates, and sort all stay in sync
   useEffect(() => {
     if (activeTab !== 'party') return;
+    const urlFrom = searchParams.get('from') || defaultFrom;
+    const urlTo = searchParams.get('to') || defaultTo;
+    const urlOrder = searchParams.get('order') || 'desc';
     setSelectedPartyId(initialPartyId);
-    setLedgerSortOrder(searchParams.get('order') || 'desc');
+    setLedgerSortOrder(urlOrder);
+    setLedgerFilters((prev) => (
+      prev.from === urlFrom && prev.to === urlTo
+        ? prev
+        : { from: urlFrom, to: urlTo }
+    ));
     setSelectedPartyOption((current) => (
       initialPartyId && String(current?.value || '') === String(initialPartyId)
         ? current
         : null
     ));
-  }, [initialPartyId, activeTab, searchParams]);
+  }, [initialPartyId, activeTab, searchParams, defaultFrom, defaultTo]);
 
   useEffect(() => {
     if (activeTab !== 'party' || !selectedPartyId) {
@@ -2256,45 +2283,62 @@ export default function Reports() {
     },
   ];
 
-  const handleLedgerPartyChange = (option) => {
-    const partyId = option?.value || '';
-    setSelectedPartyId(partyId);
-    setSelectedPartyOption(option || null);
+  const applyLedgerQuery = useCallback((patch) => {
+    const nextPartyId = patch.partyId !== undefined ? patch.partyId : selectedPartyId;
+    const nextFrom = patch.from !== undefined ? patch.from : ledgerFilters.from;
+    const nextTo = patch.to !== undefined ? patch.to : ledgerFilters.to;
+    const nextOrder = patch.order !== undefined ? patch.order : ledgerSortOrder;
+    const partyChanged = nextPartyId !== selectedPartyId;
+    const datesChanged = nextFrom !== ledgerFilters.from || nextTo !== ledgerFilters.to;
+    const orderChanged = nextOrder !== ledgerSortOrder;
+
+    if (!partyChanged && !datesChanged && !orderChanged) return;
+
+    setLedgerLoading(true);
+    if (partyChanged) {
+      setSelectedPartyId(nextPartyId);
+      if (patch.partyOption !== undefined) {
+        setSelectedPartyOption(patch.partyOption);
+      } else if (!nextPartyId) {
+        setSelectedPartyOption(null);
+      }
+    }
+    if (datesChanged) {
+      setLedgerFilters({ from: nextFrom, to: nextTo });
+    }
+    if (orderChanged) {
+      setLedgerSortOrder(nextOrder);
+    }
     setPage(1);
     updateSearchState({
-      partyId,
-      from: ledgerFilters.from,
-      to: ledgerFilters.to,
-      order: ledgerSortOrder,
+      partyId: nextPartyId,
+      from: nextFrom,
+      to: nextTo,
+      order: nextOrder,
+    });
+  }, [ledgerFilters.from, ledgerFilters.to, ledgerSortOrder, selectedPartyId, updateSearchState]);
+
+  const handleLedgerPartyChange = (option) => {
+    applyLedgerQuery({
+      partyId: option?.value || '',
+      partyOption: option || null,
     });
   };
 
   const handleLedgerDateChange = (field, value) => {
-    const nextFilters = {
-      ...ledgerFilters,
-      [field]: value,
-    };
-    setLedgerFilters(nextFilters);
-    setPage(1);
-    updateSearchState({
-      partyId: selectedPartyId,
-      from: nextFilters.from,
-      to: nextFilters.to,
-      order: ledgerSortOrder,
-    });
+    applyLedgerQuery({ [field]: value });
+  };
+
+  const handleLedgerDatesChange = (from, to) => {
+    applyLedgerQuery({ from, to });
   };
 
   const handleResetFilters = () => {
-    const nextFilters = { from: defaultFrom, to: defaultTo };
-    setSelectedPartyId('');
-    setSelectedPartyOption(null);
-    setLedgerFilters(nextFilters);
-    setPage(1);
-    setLedgerSortOrder('desc');
-    updateSearchState({
+    applyLedgerQuery({
       partyId: '',
-      from: nextFilters.from,
-      to: nextFilters.to,
+      partyOption: null,
+      from: defaultFrom,
+      to: defaultTo,
       order: 'desc',
     });
   };
@@ -2366,9 +2410,23 @@ export default function Reports() {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleAnalyticsDatesChange = (from, to) => {
+    setFilters((prev) => {
+      if (prev.fromDate === from && prev.toDate === to) return prev;
+      return { ...prev, fromDate: from, toDate: to };
+    });
+  };
+
   const handleExpenseFilterChange = (event) => {
     const { name, value } = event.target;
     setExpenseFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleExpenseDatesChange = (from, to) => {
+    setExpenseFilters((prev) => {
+      if (prev.fromDate === from && prev.toDate === to) return prev;
+      return { ...prev, fromDate: from, toDate: to };
+    });
   };
 
   const handlePartyFilterChange = (option) => {
@@ -2600,9 +2658,8 @@ export default function Reports() {
                 <DatePresetSelect
                   fromValue={filters.fromDate}
                   toValue={filters.toDate}
-                  onChange={(from, to) => {
-                    setFilters((prev) => ({ ...prev, fromDate: from, toDate: to }));
-                  }}
+                  disabled={isBusy}
+                  onChange={handleAnalyticsDatesChange}
                 />
               </div>
               <div>
@@ -2629,6 +2686,7 @@ export default function Reports() {
             </p>
           </div>
 
+          <ReportResultsShell loading={isBusy} t={t} className="space-y-8">
           {/* Core Stat Cards */}
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="card border border-primary-50 bg-gradient-to-br from-white to-primary-50/10">
@@ -2788,6 +2846,7 @@ export default function Reports() {
               formatMoney={formatMoney}
             />
           </div>
+          </ReportResultsShell>
         </div>
       )}
 
@@ -2805,6 +2864,7 @@ export default function Reports() {
             caption={expenseSeriesCaption}
             filters={expenseFilters}
             onFilterChange={handleExpenseFilterChange}
+            onDatesChange={handleExpenseDatesChange}
             categoryOptions={availableExpenseCategoryOptions}
           />
         </div>
@@ -2960,10 +3020,8 @@ export default function Reports() {
                       <DatePresetSelect
                         fromValue={ledgerFilters.from}
                         toValue={ledgerFilters.to}
-                        onChange={(from, to) => {
-                          handleLedgerDateChange('from', from);
-                          handleLedgerDateChange('to', to);
-                        }}
+                        disabled={isLedgerBusy}
+                        onChange={handleLedgerDatesChange}
                       />
                     </div>
                     <div className="min-w-0">
@@ -3005,6 +3063,7 @@ export default function Reports() {
                 </div>
               </div>
 
+              <ReportResultsShell loading={isLedgerBusy} t={t} className="space-y-6">
               {/* Stats summary cards */}
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {summaryCards.map((card) => {
@@ -3046,14 +3105,8 @@ export default function Reports() {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const nextOrder = ledgerSortOrder === 'desc' ? 'asc' : 'desc';
-                                  setLedgerSortOrder(nextOrder);
-                                  setPage(1);
-                                  updateSearchState({
-                                    partyId: selectedPartyId,
-                                    from: ledgerFilters.from,
-                                    to: ledgerFilters.to,
-                                    order: nextOrder,
+                                  applyLedgerQuery({
+                                    order: ledgerSortOrder === 'desc' ? 'asc' : 'desc',
                                   });
                                 }}
                                 className="inline-flex items-center gap-1 font-semibold hover:text-slate-600 dark:hover:text-slate-300"
@@ -3128,6 +3181,7 @@ export default function Reports() {
                   </>
                 )}
               </div>
+              </ReportResultsShell>
             </div>
           </div>
         </div>
@@ -3143,9 +3197,8 @@ export default function Reports() {
                 <DatePresetSelect
                   fromValue={filters.fromDate}
                   toValue={filters.toDate}
-                  onChange={(from, to) => {
-                    setFilters((prev) => ({ ...prev, fromDate: from, toDate: to }));
-                  }}
+                  disabled={isBusy}
+                  onChange={handleAnalyticsDatesChange}
                 />
               </div>
               <div>
@@ -3172,6 +3225,7 @@ export default function Reports() {
             </p>
           </div>
 
+          <ReportResultsShell loading={isBusy} t={t} className="space-y-6">
           {/* Timeline trend graphs */}
           <div className="grid gap-6 md:grid-cols-2">
             <BarGraph
@@ -3309,6 +3363,7 @@ export default function Reports() {
               </div>
             )}
           </div>
+          </ReportResultsShell>
         </div>
       )}
 
@@ -3322,9 +3377,8 @@ export default function Reports() {
                 <DatePresetSelect
                   fromValue={filters.fromDate}
                   toValue={filters.toDate}
-                  onChange={(from, to) => {
-                    setFilters((prev) => ({ ...prev, fromDate: from, toDate: to }));
-                  }}
+                  disabled={cafeSalesLoading || isBusy}
+                  onChange={handleAnalyticsDatesChange}
                 />
               </div>
               <div>
