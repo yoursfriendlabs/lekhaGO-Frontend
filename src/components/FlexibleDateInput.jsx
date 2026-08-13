@@ -154,7 +154,7 @@ export default function FlexibleDateInput({
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
 
-    const dropdownWidth = 290;
+    const dropdownWidth = 320;
     const dropdownHeight = 220;
     const margin = 8;
 
@@ -207,11 +207,11 @@ export default function FlexibleDateInput({
 
   return (
     <div ref={containerRef} className={wrapperClassName}>
-      <div className="flex items-stretch gap-1.5 w-full">
+      <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-3">
         {calendar === 'ad' ? (
           <input
             id={id}
-            className={inputClassName}
+            className={`${inputClassName} min-h-11`}
             name={name}
             type="date"
             value={value || ''}
@@ -225,7 +225,7 @@ export default function FlexibleDateInput({
             type="button"
             onClick={() => !disabled && setIsPopoverOpen(!isPopoverOpen)}
             disabled={disabled}
-            className={`${inputClassName} text-left flex items-center justify-between gap-2`}
+            className={`${inputClassName} min-h-11 text-left flex items-center justify-between gap-2`}
           >
             <span className={`truncate ${value ? 'text-ink' : 'text-secondary-400'}`}>
               {value && bsFromValue ? formatBsParts(bsFromValue, { withLabel: false, withMonthName: false }) : (t('dates.selectBsDate') || (language === 'ne' ? 'नेपाली मिति छान्नुहोस्' : 'Select BS Date'))}
@@ -235,14 +235,12 @@ export default function FlexibleDateInput({
         )}
 
         {/* Small AD/BS Switcher Pill */}
-        <div className="flex shrink-0 rounded-xl border border-secondary-200 bg-secondary-50/50 p-0.5 dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex h-11 shrink-0 self-stretch rounded-xl border border-secondary-200 bg-secondary-50/50 p-0.5 dark:border-slate-700 dark:bg-slate-900">
           <button
             type="button"
             disabled={disabled}
             onClick={() => handleCalendarChange('ad')}
-            className={`rounded-lg transition font-bold uppercase ${
-              isCompact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'
-            } ${
+            className={`rounded-lg transition font-bold uppercase h-full px-3 text-[10px] ${
               calendar === 'ad'
                 ? 'bg-primary text-white shadow-sm hover:bg-primary-600'
                 : 'text-secondary-600 hover:text-secondary-900 dark:text-slate-400 dark:hover:text-white'
@@ -254,9 +252,7 @@ export default function FlexibleDateInput({
             type="button"
             disabled={disabled}
             onClick={() => handleCalendarChange('bs')}
-            className={`rounded-lg transition font-bold uppercase ${
-              isCompact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2.5 py-1 text-[10px]'
-            } ${
+            className={`rounded-lg transition font-bold uppercase h-full px-3 text-[10px] ${
               calendar === 'bs'
                 ? 'bg-primary text-white shadow-sm hover:bg-primary-600'
                 : 'text-secondary-600 hover:text-secondary-900 dark:text-slate-400 dark:hover:text-white'
@@ -298,7 +294,7 @@ export default function FlexibleDateInput({
           </div>
 
           {/* Select Dropdowns */}
-          <div className="grid grid-cols-[1.1fr_1.3fr_0.9fr] gap-2 mb-4">
+          <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-bold text-secondary-500 uppercase tracking-wider pl-0.5">
                 {t('dates.year') || 'Year'}

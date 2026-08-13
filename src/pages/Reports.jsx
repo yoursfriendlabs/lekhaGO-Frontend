@@ -2933,8 +2933,8 @@ export default function Reports() {
             <div className="space-y-6 print:hidden">
               {/* Header Box / Filter Bar */}
               <div className="card bg-[radial-gradient(circle_at_top_left,_rgba(155,104,53,0.08),_transparent_40%)]">
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <div className="space-y-4">
+                <div className="space-y-5">
+                  <div className="space-y-1">
                     <h2 className="font-serif text-2xl font-semibold text-slate-900 dark:text-slate-50">
                       {selectedPartyLabel}
                     </h2>
@@ -2943,8 +2943,8 @@ export default function Reports() {
                     </p>
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="sm:col-span-2 xl:col-span-1">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="min-w-0 sm:col-span-2 xl:col-span-1">
                       <label className="label">{t('ledger.party')}</label>
                       <PartyFilterSelect
                         className="mt-1"
@@ -2956,7 +2956,7 @@ export default function Reports() {
                         showPhone={false}
                       />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <DatePresetSelect
                         fromValue={ledgerFilters.from}
                         toValue={ledgerFilters.to}
@@ -2966,23 +2966,27 @@ export default function Reports() {
                         }}
                       />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="label" htmlFor="ledger-from">{t('ledger.from')}</label>
-                      <FlexibleDateInput
-                        id="ledger-from"
-                        className="input mt-1"
-                        value={ledgerFilters.from}
-                        onChange={(e) => handleLedgerDateChange('from', e.target.value)}
-                      />
+                      <div className="mt-1">
+                        <FlexibleDateInput
+                          id="ledger-from"
+                          className="input"
+                          value={ledgerFilters.from}
+                          onChange={(e) => handleLedgerDateChange('from', e.target.value)}
+                        />
+                      </div>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <label className="label" htmlFor="ledger-to">{t('ledger.to')}</label>
-                      <FlexibleDateInput
-                        id="ledger-to"
-                        className="input mt-1"
-                        value={ledgerFilters.to}
-                        onChange={(e) => handleLedgerDateChange('to', e.target.value)}
-                      />
+                      <div className="mt-1">
+                        <FlexibleDateInput
+                          id="ledger-to"
+                          className="input"
+                          value={ledgerFilters.to}
+                          onChange={(e) => handleLedgerDateChange('to', e.target.value)}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
