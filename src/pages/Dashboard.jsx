@@ -296,18 +296,7 @@ export default function Dashboard() {
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="min-w-0 rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-4 shadow-sm dark:border-emerald-800/50 dark:from-emerald-950/60 dark:via-slate-950/80 dark:to-slate-900/60 sm:p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs uppercase tracking-[0.2em] text-emerald-600/80">{t('dashboard.cashOverview')}</p>
-              <p className="mt-2 break-words text-2xl font-semibold text-slate-900 dark:text-white sm:text-3xl">{formatMoney(summary.cashReceived)}</p>
-              <p className="text-sm text-slate-600 dark:text-slate-300">{t('dashboard.totalReceived')}</p>
-            </div>
-            <div className="rounded-2xl bg-emerald-100 p-3 text-emerald-700 shadow-sm dark:bg-emerald-900/40 dark:text-emerald-200">
-              <UserCheck size={22} />
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-3 sm:grid-cols-1 lg:grid-cols-1">
+          <div className="grid gap-3 sm:grid-cols-1 lg:grid-cols-1">
             <div id='amount-pending' className="min-w-0 rounded-2xl border border-amber-200/70 bg-white/80 p-4 dark:border-amber-700/40 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-amber-500/80">{t('dashboard.amountPending')}</p>
               <p  className="mt-1 break-words text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.pendingAmount)}</p>
