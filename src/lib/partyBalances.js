@@ -3,6 +3,12 @@ export function toAmount(value) {
   return Number.isFinite(amount) ? amount : 0;
 }
 
+/**
+ * Party To Pay / To Receive comes from `party.currentAmount` only.
+ * The backend ledger is the source of truth:
+ * sales/services/payment-in are credits; purchases/expenses/payment-out are debits.
+ * Do not recompute this from remaining dues or the transaction list on the client.
+ */
 export function getPartyBalanceMeta(currentAmount, t) {
   const amount = toAmount(currentAmount);
 
