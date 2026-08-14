@@ -191,7 +191,6 @@ const emptyCheckoutForm = {
 };
 
 const MOBILE_PRODUCT_PAGE_SIZE = 9;
-const MOBILE_PRODUCT_SCROLL_THRESHOLD = 120;
 
 export default function QuickPos() {
   const [searchParams] = useSearchParams();
@@ -273,7 +272,6 @@ export default function QuickPos() {
   const [visibleProductCount, setVisibleProductCount] = useState(
     MOBILE_PRODUCT_PAGE_SIZE,
   );
-  const mobileProductScrollRef = useRef(null);
   const mobileProductLoadMoreRef = useRef(null);
 
   const formSteps = [
@@ -579,10 +577,6 @@ export default function QuickPos() {
     setVisibleProductCount(
       isMobile ? MOBILE_PRODUCT_PAGE_SIZE : filteredProducts.length,
     );
-
-    if (isMobile) {
-      mobileProductScrollRef.current?.scrollTo({ top: 0 });
-    }
   }, [filteredProducts.length, isMobile, search, selectedCategory]);
 
   const visibleProducts = useMemo(
@@ -602,18 +596,6 @@ export default function QuickPos() {
     );
   };
 
-  const handleMobileProductScroll = (event) => {
-    if (!hasMoreMobileProducts) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
-    if (
-      scrollHeight - scrollTop - clientHeight <=
-      MOBILE_PRODUCT_SCROLL_THRESHOLD
-    ) {
-      loadMoreMobileProducts();
-    }
-  };
-
   useEffect(() => {
     if (
       !hasMoreMobileProducts ||
@@ -628,8 +610,8 @@ export default function QuickPos() {
         if (entry.isIntersecting) loadMoreMobileProducts();
       },
       {
-        root: mobileProductScrollRef.current,
-        rootMargin: "96px",
+        root: null,
+        rootMargin: "160px",
       },
     );
 
@@ -1349,9 +1331,9 @@ return (
     });
   };
 
-  const footerBar = (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-2 rounded-[24px] bg-slate-100 p-3 sm:p-4">
+  const renderFooterBar = ({ compact = false } = {}) => (
+    <div className={compact ? "space-y-2.5" : "space-y-4"}>
+      <div className={`flex flex-col gap-2 rounded-[24px] bg-slate-100 ${compact ? "p-2.5" : "p-3 sm:p-4"}`}>
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <button
@@ -1369,13 +1351,13 @@ return (
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
               {t("sales.grandTotal")}
             </p>
-            <p className="text-lg font-bold text-slate-900">
+            <p className={`font-bold text-slate-900 ${compact ? "text-base" : "text-lg"}`}>
               {money(totals.grandTotal)}
             </p>
           </div>
         </div>
 
-        {isMobile && (
+        {!compact && isMobile && (
           <div className="flex flex-col gap-1 border-t border-slate-200/60 pt-2 text-[10px] font-medium text-slate-500">
             <div className="flex items-center justify-between">
               <span>
@@ -1688,7 +1670,7 @@ return (
   }
 
   return (
-    <div className="min-w-0 space-y-5 pb-28 md:pb-0">
+    <div className="min-w-0 space-y-5 pb-[calc(env(safe-area-inset-bottom)+11.5rem)] md:pb-44 xl:pb-0">
       <PageHeader
         title={salesTitle}
         subtitle={isMobile ? "" : t("quickPos.subtitle")}
@@ -1894,15 +1876,7 @@ return (
               </p>
             </div>
           ) : (
-            <div
-              ref={mobileProductScrollRef}
-              className={
-                isMobile
-                  ? "max-h-[410px] overflow-y-auto pr-1 overscroll-contain"
-                  : ""
-              }
-              onScroll={isMobile ? handleMobileProductScroll : undefined}
-            >
+            <div className="pb-2">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-3 2xl:grid-cols-4">
                 {visibleProducts.map((product) => {
                   const inCart = cart.find(
@@ -2366,13 +2340,15 @@ return (
               </div>
             </div>
 
-            <div className="mt-5">{footerBar}</div>
+            <div className="mt-5">{renderFooterBar()}</div>
           </div>
         </aside>
       </div>
 
-      {isMobile ? (
-        <div className="mobile-sticky-actions xl:hidden">{footerBar}</div>
+      {!checkoutOpen && !successState ? (
+        <div className="fixed inset-x-0 z-30 border-t border-slate-200/80 bg-white/95 px-4 py-3 shadow-[0_-12px_40px_rgba(15,23,42,0.12)] backdrop-blur xl:hidden bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] md:bottom-0 md:left-64">
+          {renderFooterBar({ compact: true })}
+        </div>
       ) : null}
 
       <Dialog

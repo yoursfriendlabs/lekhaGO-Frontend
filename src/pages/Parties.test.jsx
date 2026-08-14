@@ -32,6 +32,10 @@ vi.mock('../stores/parties', () => ({
   usePartyStore: () => partyStoreMocks,
 }));
 
+vi.mock('../components/DateDisplay.jsx', () => ({
+  default: ({ date }) => <span>{String(date || '')}</span>,
+}));
+
 describe('Parties', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -81,5 +85,43 @@ describe('Parties', () => {
           })
         );
     });
+  });
+
+  it('lets staff view a party transaction from the party page', async () => {
+    window.localStorage.setItem('mms_token', 'token-123');
+    window.localStorage.setItem('mms_role', 'owner');
+    window.localStorage.setItem('mms_business_id', 'business-123');
+    window.localStorage.setItem('mms_user', JSON.stringify({ id: 'user-1', name: 'Owner', role: 'owner' }));
+
+    apiMocks.listParties.mockResolvedValue({
+      items: [{
+        id: 'party-1',
+        name: 'Hari',
+        phone: '9800000000',
+        type: 'customer',
+        currentAmount: 0,
+      }],
+      total: 1,
+    });
+    apiMocks.partyStatement.mockResolvedValue({
+      party: { id: 'party-1', name: 'Hari', phone: '9800000000', type: 'customer' },
+      items: [{
+        id: 'sale-1',
+        type: 'sale',
+        date: '2026-08-01',
+        totalAmount: 100,
+        paidAmount: 100,
+        dueAmount: 0,
+      }],
+      summary: { totalRows: 1 },
+    });
+
+    renderWithProviders(<Parties />, { route: '/app/parties', withAuth: true });
+
+    const viewTransactions = await screen.findByRole('button', { name: 'View transactions' });
+    fireEvent.click(viewTransactions);
+
+    const viewLink = await screen.findByRole('link', { name: 'View' });
+    expect(viewLink).toHaveAttribute('href', '/app/invoice/sales/sale-1');
   });
 });

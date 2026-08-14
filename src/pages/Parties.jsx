@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import PageHeader from "../components/PageHeader";
 import Notice from "../components/Notice";
 import RefreshButton from "../components/RefreshButton.jsx";
@@ -42,6 +42,8 @@ import {
   ArrowUp,
   ArrowDown,
   Trash2,
+  Eye,
+  Receipt,
 } from "lucide-react";
 import { buildPaymentPayload, requiresBankSelection } from "../lib/payments";
 import { normalizePaymentType } from "../lib/paymentType";
@@ -226,6 +228,20 @@ function isEditableTransactionRow(row) {
   return row?.type === 'payment_in' || row?.type === 'payment_out';
 }
 
+function getTransactionViewPath(row) {
+  if (!row?.id || row?.note === "Opening Balance") return null;
+
+  switch (row.type) {
+    case "sale":
+      return `/app/invoice/sales/${row.id}`;
+    case "purchase":
+    case "expense":
+      return `/app/invoice/purchases/${row.id}`;
+    default:
+      return null;
+  }
+}
+
 function getStatementBadgeClass(type) {
   const classes = {
     sale: "bg-emerald-100 text-emerald-700",
@@ -351,6 +367,8 @@ export default function Parties() {
   const [partyHasMore, setPartyHasMore] = useState(false);
   const partyListScrollRef = useRef(null);
   const partyListSentinelRef = useRef(null);
+  const partyDetailRef = useRef(null);
+  const txSectionRef = useRef(null);
   const partyListSessionRef = useRef(0);
   const submitPartyRequestRef = useRef(false);
   const saveAndNewRef = useRef(false);
@@ -1023,6 +1041,24 @@ export default function Parties() {
     navigate(`/app/ledger?partyId=${selectedParty.id}`);
   };
 
+  const showPartyTransactions = (partyId, { alwaysScroll = false } = {}) => {
+    if (!partyId) return;
+    setSelectedId(partyId);
+
+    const isCompactLayout =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 1023px)").matches;
+    if (!alwaysScroll && !isCompactLayout) return;
+
+    window.setTimeout(() => {
+      const target = alwaysScroll
+        ? txSectionRef.current || partyDetailRef.current
+        : partyDetailRef.current || txSectionRef.current;
+      target?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    }, selectedId === partyId ? 0 : 80);
+  };
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -1131,10 +1167,17 @@ export default function Parties() {
                 const isSelected = selectedId === party.id;
 
                 return (
-                  <button
+                  <div
                     key={party.id}
-                    type="button"
-                    onClick={() => setSelectedId(party.id)}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => showPartyTransactions(party.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        showPartyTransactions(party.id);
+                      }
+                    }}
                     className={`w-full rounded-2xl border p-3 text-left transition-all ${
                       isSelected
                         ? "border-emerald-300 bg-emerald-50 shadow-sm ring-1 ring-emerald-200 dark:border-emerald-700 dark:bg-emerald-900/20 dark:ring-emerald-800"
@@ -1149,7 +1192,7 @@ export default function Parties() {
                       >
                         {party.name?.slice(0, 2).toUpperCase() || "P"}
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p className="flex items-center gap-1.5 font-semibold text-slate-900">
                           {party.name}
                           {balanceMeta.tone !== "settled" && (
@@ -1164,7 +1207,7 @@ export default function Parties() {
                           {party.phone || "-"}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <p className={`font-semibold ${balanceMeta.textClass}`}>
                           {t("currency.formatted", {
                             symbol: t("currency.symbol"),
@@ -1176,7 +1219,20 @@ export default function Parties() {
                         </p>
                       </div>
                     </div>
-                  </button>
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          showPartyTransactions(party.id, { alwaysScroll: true });
+                        }}
+                      >
+                        <Receipt size={14} />
+                        {t("parties.viewTransactions")}
+                      </button>
+                    </div>
+                  </div>
                 );
               })
             )}
@@ -1239,7 +1295,7 @@ export default function Parties() {
           </div>
         </div>
 
-        <div className="card space-y-4">
+        <div ref={partyDetailRef} className="card space-y-4">
           {selectedPartyView ? (
             <>
               <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1356,7 +1412,7 @@ export default function Parties() {
                 ))}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2" ref={txSectionRef}>
                 <div className="flex items-center gap-3">
                   <h4 className="text-lg font-semibold text-slate-900">
                     {t("parties.transactions", {
@@ -1408,6 +1464,7 @@ export default function Parties() {
                   statementData.rows.map((row) => {
                     const amountFields = getStatementAmountFields(row, t);
                     const canEditTransaction = canManageParties && isEditableTransactionRow(row);
+                    const viewPath = getTransactionViewPath(row);
 
                     return (
                       <div
@@ -1449,65 +1506,77 @@ export default function Parties() {
                               metaClassName="text-[11px]"
                             />
                           </div>
-                          {/* Edit only for sale/service/purchase — the only types with update APIs */}
-                          {canManageParties &&
-                          EDITABLE_TX_TYPES.has(row.type) &&
-                          row.note !== 'Opening Balance' ? (
-                            <button
-                              type="button"
-                              onClick={() => openEditTransaction(row)}
-                              className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100 active:scale-95"
-                            >
-                              Edit
-                            </button>
-                          ) : null}
-                          <div className="shrink-0 text-right text-sm">
-                            <div className="flex items-start justify-end gap-2">
-                              <div>
-                                <p className="font-semibold text-slate-900">
-                                  {amountFields.primaryLabel}:{" "}
-                                  {t("currency.formatted", {
-                                    symbol: t("currency.symbol"),
-                                    amount: amountFields.primaryValue.toFixed(2),
-                                  })}
-                                </p>
-                                {amountFields.secondaryLabel ? (
-                                  <p className="text-slate-500">
-                                    {amountFields.secondaryLabel}:{" "}
+                          <div className="flex shrink-0 flex-col items-end gap-2">
+                            <div className="flex items-center gap-1">
+                              {viewPath ? (
+                                <Link
+                                  to={viewPath}
+                                  className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-100 active:scale-95"
+                                >
+                                  <Eye size={12} />
+                                  {t("common.view")}
+                                </Link>
+                              ) : null}
+                              {canManageParties &&
+                              EDITABLE_TX_TYPES.has(row.type) &&
+                              row.note !== 'Opening Balance' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openEditTransaction(row)}
+                                  className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100 active:scale-95"
+                                >
+                                  {t("common.edit")}
+                                </button>
+                              ) : null}
+                            </div>
+                            <div className="text-right text-sm">
+                              <div className="flex items-start justify-end gap-2">
+                                <div>
+                                  <p className="font-semibold text-slate-900">
+                                    {amountFields.primaryLabel}:{" "}
                                     {t("currency.formatted", {
                                       symbol: t("currency.symbol"),
-                                      amount:
-                                    amountFields.secondaryValue.toFixed(2),
+                                      amount: amountFields.primaryValue.toFixed(2),
                                     })}
                                   </p>
-                                ) : null}
-                                {amountFields.tertiaryLabel ? (
-                                  <p className="text-rose-500">
-                                    {amountFields.tertiaryLabel}:{" "}
-                                    {t("currency.formatted", {
-                                      symbol: t("currency.symbol"),
-                                      amount: amountFields.tertiaryValue.toFixed(2),
-                                    })}
-                                  </p>
+                                  {amountFields.secondaryLabel ? (
+                                    <p className="text-slate-500">
+                                      {amountFields.secondaryLabel}:{" "}
+                                      {t("currency.formatted", {
+                                        symbol: t("currency.symbol"),
+                                        amount:
+                                      amountFields.secondaryValue.toFixed(2),
+                                      })}
+                                    </p>
+                                  ) : null}
+                                  {amountFields.tertiaryLabel ? (
+                                    <p className="text-rose-500">
+                                      {amountFields.tertiaryLabel}:{" "}
+                                      {t("currency.formatted", {
+                                        symbol: t("currency.symbol"),
+                                        amount: amountFields.tertiaryValue.toFixed(2),
+                                      })}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                {canEditTransaction ? (
+                                  <ActionMenu
+                                    actions={[
+                                      {
+                                        label: t("common.edit"),
+                                        icon: Pencil,
+                                        onClick: () => openEditTxDialog(row),
+                                      },
+                                      {
+                                        label: t("common.delete"),
+                                        icon: Trash2,
+                                        onClick: () => setDeleteTx(row),
+                                        tone: "danger",
+                                      },
+                                    ]}
+                                  />
                                 ) : null}
                               </div>
-                              {canEditTransaction ? (
-                                <ActionMenu
-                                  actions={[
-                                    {
-                                      label: t('common.edit'),
-                                      icon: Pencil,
-                                      onClick: () => openEditTxDialog(row),
-                                    },
-                                    {
-                                      label: t('common.delete'),
-                                      icon: Trash2,
-                                      onClick: () => setDeleteTx(row),
-                                      tone: 'danger',
-                                    },
-                                  ]}
-                                />
-                              ) : null}
                             </div>
                           </div>
                         </div>
