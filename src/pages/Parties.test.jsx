@@ -118,8 +118,7 @@ describe('Parties', () => {
 
     renderWithProviders(<Parties />, { route: '/app/parties', withAuth: true });
 
-    const viewTransactions = await screen.findByRole('button', { name: 'View transactions' });
-    fireEvent.click(viewTransactions);
+    fireEvent.click(await screen.findByRole('button', { name: /Hari/ }));
 
     const viewLink = await screen.findByRole('link', { name: 'View' });
     expect(viewLink).toHaveAttribute('href', '/app/invoice/sales/sale-1');

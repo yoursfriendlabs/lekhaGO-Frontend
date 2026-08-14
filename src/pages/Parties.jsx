@@ -43,7 +43,6 @@ import {
   ArrowDown,
   Trash2,
   Eye,
-  Receipt,
 } from "lucide-react";
 import { buildPaymentPayload, requiresBankSelection } from "../lib/payments";
 import { normalizePaymentType } from "../lib/paymentType";
@@ -1041,7 +1040,7 @@ export default function Parties() {
     navigate(`/app/ledger?partyId=${selectedParty.id}`);
   };
 
-  const showPartyTransactions = (partyId, { alwaysScroll = false } = {}) => {
+  const showPartyTransactions = (partyId) => {
     if (!partyId) return;
     setSelectedId(partyId);
 
@@ -1049,12 +1048,10 @@ export default function Parties() {
       typeof window !== "undefined" &&
       typeof window.matchMedia === "function" &&
       window.matchMedia("(max-width: 1023px)").matches;
-    if (!alwaysScroll && !isCompactLayout) return;
+    if (!isCompactLayout) return;
 
     window.setTimeout(() => {
-      const target = alwaysScroll
-        ? txSectionRef.current || partyDetailRef.current
-        : partyDetailRef.current || txSectionRef.current;
+      const target = partyDetailRef.current || txSectionRef.current;
       target?.scrollIntoView?.({ behavior: "smooth", block: "start" });
     }, selectedId === partyId ? 0 : 80);
   };
@@ -1167,17 +1164,10 @@ export default function Parties() {
                 const isSelected = selectedId === party.id;
 
                 return (
-                  <div
+                  <button
                     key={party.id}
-                    role="button"
-                    tabIndex={0}
+                    type="button"
                     onClick={() => showPartyTransactions(party.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        showPartyTransactions(party.id);
-                      }
-                    }}
                     className={`w-full rounded-2xl border p-3 text-left transition-all ${
                       isSelected
                         ? "border-emerald-300 bg-emerald-50 shadow-sm ring-1 ring-emerald-200 dark:border-emerald-700 dark:bg-emerald-900/20 dark:ring-emerald-800"
@@ -1219,20 +1209,7 @@ export default function Parties() {
                         </p>
                       </div>
                     </div>
-                    <div className="mt-3 flex justify-end">
-                      <button
-                        type="button"
-                        className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          showPartyTransactions(party.id, { alwaysScroll: true });
-                        }}
-                      >
-                        <Receipt size={14} />
-                        {t("parties.viewTransactions")}
-                      </button>
-                    </div>
-                  </div>
+                  </button>
                 );
               })
             )}

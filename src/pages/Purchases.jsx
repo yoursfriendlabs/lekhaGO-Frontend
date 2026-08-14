@@ -1314,7 +1314,7 @@ setInvoiceOrder(purchase);
                       }
                     />
                   </div>
-                  <div>
+                  <div className="min-w-0 xl:col-span-2">
                     <label className="label">
                       {t("purchases.purchaseDate")}
                     </label>
@@ -1663,7 +1663,7 @@ setInvoiceOrder(purchase);
                     </div>
                   )}
                   {itemDraft.itemType === "part" && (
-                    <div>
+                    <div className="min-w-0">
                       <label className="label">
                         {t("purchases.expiryDateOptional") || "Expiry (optional)"}
                       </label>

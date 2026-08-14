@@ -141,7 +141,7 @@ export default function FlexibleDateInput({
   const inputStyleClasses = classes.filter(c => !layoutClasses.includes(c));
 
   const wrapperClassName = `relative w-full min-w-0 ${layoutClasses.join(' ')}`;
-  const inputClassName = `${inputStyleClasses.join(' ') || 'input'} w-full min-w-0`;
+  const inputClassName = `${inputStyleClasses.join(' ') || 'input'} w-full min-h-11`;
 
   // Detect compact mode to adjust toggle button layout/padding
   const isCompact = className?.includes('input-compact') || className?.includes('h-8') || className?.includes('h-9');
@@ -207,32 +207,34 @@ export default function FlexibleDateInput({
 
   return (
     <div ref={containerRef} className={wrapperClassName}>
-      <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-3">
-        {calendar === 'ad' ? (
-          <input
-            id={id}
-            className={`${inputClassName} min-h-11`}
-            name={name}
-            type="date"
-            value={value || ''}
-            onChange={onChange}
-            disabled={disabled}
-            required={required}
-          />
-        ) : (
-          <button
-            id={id}
-            type="button"
-            onClick={() => !disabled && setIsPopoverOpen(!isPopoverOpen)}
-            disabled={disabled}
-            className={`${inputClassName} min-h-11 text-left flex items-center justify-between gap-2`}
-          >
-            <span className={`truncate ${value ? 'text-ink' : 'text-secondary-400'}`}>
-              {value && bsFromValue ? formatBsParts(bsFromValue, { withLabel: false, withMonthName: false }) : (t('dates.selectBsDate') || (language === 'ne' ? 'नेपाली मिति छान्नुहोस्' : 'Select BS Date'))}
-            </span>
-            <Calendar className="w-4 h-4 text-secondary-400 shrink-0" />
-          </button>
-        )}
+      <div className="flex w-full min-w-0 flex-wrap items-stretch gap-2">
+        <div className="min-w-[12.5rem] flex-1">
+          {calendar === 'ad' ? (
+            <input
+              id={id}
+              className={inputClassName}
+              name={name}
+              type="date"
+              value={value || ''}
+              onChange={onChange}
+              disabled={disabled}
+              required={required}
+            />
+          ) : (
+            <button
+              id={id}
+              type="button"
+              onClick={() => !disabled && setIsPopoverOpen(!isPopoverOpen)}
+              disabled={disabled}
+              className={`${inputClassName} flex items-center justify-between gap-2 text-left`}
+            >
+              <span className={`truncate ${value ? 'text-ink' : 'text-secondary-400'}`}>
+                {value && bsFromValue ? formatBsParts(bsFromValue, { withLabel: false, withMonthName: false }) : (t('dates.selectBsDate') || (language === 'ne' ? 'नेपाली मिति छान्नुहोस्' : 'Select BS Date'))}
+              </span>
+              <Calendar className="w-4 h-4 text-secondary-400 shrink-0" />
+            </button>
+          )}
+        </div>
 
         {/* Small AD/BS Switcher Pill */}
         <div className="flex h-11 shrink-0 self-stretch rounded-xl border border-secondary-200 bg-secondary-50/50 p-0.5 dark:border-slate-700 dark:bg-slate-900">
