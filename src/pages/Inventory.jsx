@@ -12,6 +12,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { getPurityOptionsForMetal, METAL_TYPE_OPTIONS } from '../lib/jewellery.js';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { buildSettingsTabPath, UNITS_SETTINGS_TAB } from '../lib/settingsTabs.js';
+import { useShallow } from 'zustand/react/shallow';
 import { useProductStore } from '../stores/products';
 import { Pencil, Plus, History, AlertTriangle, Clock, TrendingUp, TrendingDown, Trash2, Eye, Layers } from 'lucide-react';
 import ImageCropperModal from '../components/ImageCropperModal.jsx';
@@ -228,6 +229,9 @@ export default function Inventory() {
   const { canManageFeature, businessId } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const canManageInventory = canManageFeature('inventory');
+  // Selecting only what this page renders. Subscribing to the whole store also
+  // subscribed to its internal `lists` cache, so every fetch for any query
+  // re-rendered the entire page.
   const {
     products,
     total: productsTotal,
@@ -236,7 +240,17 @@ export default function Inventory() {
     fetch: fetchProducts,
     invalidate: invalidateProducts,
     patchProduct,
-  } = useProductStore();
+  } = useProductStore(
+    useShallow((state) => ({
+      products: state.products,
+      total: state.total,
+      loading: state.loading,
+      error: state.error,
+      fetch: state.fetch,
+      invalidate: state.invalidate,
+      patchProduct: state.patchProduct,
+    })),
+  );
   const inventoryProfile = businessProfile?.inventory || {};
   const itemTypeOptions = Array.isArray(inventoryProfile.itemTypes) && inventoryProfile.itemTypes.length
     ? inventoryProfile.itemTypes
@@ -295,19 +309,15 @@ export default function Inventory() {
     if (!businessId) return;
     try {
       setStatsLoading(true);
-      // Low / near-expiry counts come from the same list filters the UI uses,
-      // so cards always match what you see when you click/filter.
-      const [lowRes, nearRes, statsRes] = await Promise.all([
-        api.countProducts({ stock: 'low' }),
-        api.countProducts({ stock: 'nearexpiry' }),
-        api.getProductStats().catch((err) => {
-          console.error('Failed to fetch product popularity stats', err);
-          return null;
-        }),
-      ]);
+      // /api/products/stats applies the same in-stock threshold and 20-day
+      // expiry window as the `stock=low` and `stock=nearexpiry` list filters,
+      // so the cards still match what you see after clicking through. Counting
+      // via the list endpoint as well would just ask the same two questions
+      // a second time.
+      const statsRes = await api.getProductStats();
       setStats({
-        lowStockCount: Number(lowRes?.total ?? statsRes?.lowStockCount ?? 0),
-        nearExpiryCount: Number(nearRes?.total ?? statsRes?.nearExpiryCount ?? 0),
+        lowStockCount: Number(statsRes?.lowStockCount || 0),
+        nearExpiryCount: Number(statsRes?.nearExpiryCount || 0),
         popularCount: Number(statsRes?.popularCount || 0),
         leastPopularCount: Number(statsRes?.leastPopularCount || 0),
       });
@@ -324,11 +334,15 @@ export default function Inventory() {
     }
   }, [businessId]);
 
+  // Depending on `products` here refetched the stats on every list load,
+  // because the store returns a new array identity each time. The mutation
+  // handlers below refresh the stats themselves, which is the only time the
+  // numbers can actually change.
   useEffect(() => {
     if (businessId) {
       fetchStats();
     }
-  }, [businessId, products, fetchStats]);
+  }, [businessId, fetchStats]);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deleteProduct, setDeleteProduct] = useState(null);
@@ -840,6 +854,7 @@ export default function Inventory() {
       if (editingId) {
         const updatedProduct = await api.updateProduct(editingId, payload);
         patchProduct(editingId, updatedProduct || optimisticProduct);
+        fetchStats();
         setStatus({ type: 'success', message: t('inventory.messages.itemUpdated') });
       } else {
         await api.createProduct(payload);
@@ -912,6 +927,8 @@ export default function Inventory() {
         ...restockProduct,
         stockOnHand: fallbackStock,
       });
+      // Stock moved, so the low-stock and near-expiry cards need recounting.
+      fetchStats();
 
       const quantityLabel = `${formatQuantity(quantityValue)}${restockProduct.primaryUnit ? ` ${restockProduct.primaryUnit}` : ''}`;
       closeRestockDialog();

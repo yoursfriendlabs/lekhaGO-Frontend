@@ -841,12 +841,6 @@ export const api = {
       { limit: 50, ...params },
       listCache(["products", "reports", "dashboard"]),
     ),
-  countProducts: (params = {}) =>
-    collectionRequest(
-      "/api/products",
-      { limit: 1, ...params },
-      listCache(["product-stats", "products"], CACHE_TTL.short, { force: true }),
-    ),
   getProductStats: () =>
     request(
       "/api/products/stats",
@@ -1563,6 +1557,10 @@ export const api = {
       { method: "DELETE" },
       mutationConfig([detailTags("table", id), "tables"]),
     ),
+
+  // Reports whether the backend is accepting event streams. Checked once per
+  // session so we never open an EventSource the server will just reject.
+  getEventsStatus: () => request("/api/events/status"),
 };
 
 export { toQueryKey };

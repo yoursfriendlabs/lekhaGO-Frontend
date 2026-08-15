@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { API_BASE, invalidateApiCache } from '../lib/api';
+import { API_BASE, api, invalidateApiCache } from '../lib/api';
 import { getToken, getBusinessId } from '../lib/storage';
 
 /**
@@ -37,6 +37,13 @@ const EVENT_MAP = {
 const MAX_RECONNECT_DELAY_MS = 30_000;
 /** Initial reconnect delay. */
 const INITIAL_RECONNECT_DELAY_MS = 1_000;
+/**
+ * Consecutive failures with no successful handshake before we stop retrying.
+ * Without this, a server that declines the stream (disabled, or at its
+ * per-business cap) would be re-dialled by every open tab forever. Reaching
+ * this limit is not degraded behaviour: the app polls for updates anyway.
+ */
+const MAX_CONSECUTIVE_FAILURES = 4;
 
 /**
  * Hook that establishes a persistent SSE connection to the backend.
@@ -50,13 +57,14 @@ export function useSSE({ enabled = true } = {}) {
   const esRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY_MS);
+  const failureCountRef = useRef(0);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
 
     const token = getToken();
     const businessId = getBusinessId();
-    if (!token || !businessId) return;
+    if (!token || !businessId) return undefined;
 
     let destroyed = false;
 
@@ -98,8 +106,10 @@ export function useSSE({ enabled = true } = {}) {
       });
 
       es.addEventListener('connected', () => {
-        // Reset reconnect delay on successful connection
+        // A completed handshake clears both backoff and the give-up counter,
+        // so periodic server-side connection recycling stays invisible here.
         reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS;
+        failureCountRef.current = 0;
         window.dispatchEvent(
           new CustomEvent(SSE_EVENTS.CONNECTED, { detail: { businessId } }),
         );
@@ -110,6 +120,9 @@ export function useSSE({ enabled = true } = {}) {
         esRef.current = null;
 
         if (destroyed) return;
+
+        failureCountRef.current += 1;
+        if (failureCountRef.current >= MAX_CONSECUTIVE_FAILURES) return;
 
         // Exponential backoff reconnect
         const delay = reconnectDelayRef.current;
@@ -122,7 +135,17 @@ export function useSSE({ enabled = true } = {}) {
       };
     }
 
-    connect();
+    // Ask first: opening a stream the server has switched off would burn the
+    // retry budget before we learned anything.
+    api
+      .getEventsStatus()
+      .then((status) => {
+        if (!destroyed && status?.enabled) connect();
+      })
+      .catch(() => {
+        // Status is only an optimisation; fall back to trying the stream.
+        if (!destroyed) connect();
+      });
 
     return () => {
       destroyed = true;
