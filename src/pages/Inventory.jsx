@@ -129,7 +129,7 @@ function productToForm(product = {}) {
     lowStockAlert: Boolean(product.lowStockAlert),
     imageUrl: product.imageUrl || '',
     expiryDate: toDateInputValue(product.expiryDate),
-    batchNumber: '',
+    batchNumber: product.batchNumber || '',
   };
 }
 
@@ -1724,69 +1724,66 @@ export default function Inventory() {
                   ) : null}
                 </div>
 
-                {editingId ? (
-                  <div className="mt-3 space-y-2">
-                    <div className="rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950/50">
-                      <span className="text-slate-500">{t('inventory.nearestExpiry') || 'Nearest expiry'}: </span>
-                      <span className={form.expiryDate ? getExpiryDateColorClass(form.expiryDate) : 'text-slate-500'}>
-                        {form.expiryDate ? formatDateBoth(toDateInputValue(form.expiryDate) || form.expiryDate) : (t('inventory.noExpiry') || 'No expiry')}
-                      </span>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="label">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
+                    <div className="mt-1">
+                      <FlexibleDateInput
+                        id="inventory-expiry-date"
+                        name="expiryDate"
+                        value={form.expiryDate}
+                        onChange={handleFormChange}
+                      />
                     </div>
+                  </div>
+                  <div>
+                    <label className="label">{t('inventory.batchNumberOptional') || 'Batch No. (Optional)'}</label>
+                    <input
+                      id="inventory-opening-batch-number"
+                      className="input mt-1"
+                      name="batchNumber"
+                      value={form.batchNumber}
+                      onChange={handleFormChange}
+                      placeholder={t('inventory.batchNumberPlaceholder') || 'Eg. LOT-A12'}
+                    />
+                  </div>
+                </div>
+
+                {editingId && (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                      {t('inventory.existingLots') || 'Existing open lots'}
+                    </p>
                     {editBatches.length > 0 ? (
                       editBatches.map((batch, batchIndex) => {
                         const batchExpiry = toDateInputValue(batch.expiryDate) || '';
                         return (
-                        <div
-                          key={batch.id || `batch-${batchIndex}`}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950/50"
-                        >
-                          <div className="min-w-0">
-                            <div className="font-medium text-slate-700 dark:text-slate-200">
-                              {batch.batchNumber
-                                ? `${t('inventory.batchNumber') || 'Batch'}: ${batch.batchNumber}`
-                                : (t('inventory.noBatchNumber') || 'No batch no.')}
+                          <div
+                            key={batch.id || `batch-${batchIndex}`}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950/50"
+                          >
+                            <div className="min-w-0">
+                              <div className="font-medium text-slate-700 dark:text-slate-200">
+                                {batch.batchNumber
+                                  ? `${t('inventory.batchNumber') || 'Batch'}: ${batch.batchNumber}`
+                                  : (t('inventory.noBatchNumber') || 'No batch no.')}
+                              </div>
+                              <div className={batchExpiry ? getExpiryDateColorClass(batchExpiry) : 'text-slate-500'}>
+                                {batchExpiry
+                                  ? formatDateBoth(batchExpiry)
+                                  : (t('inventory.noExpiry') || 'No expiry')}
+                              </div>
                             </div>
-                            <div className={batchExpiry ? getExpiryDateColorClass(batchExpiry) : 'text-slate-500'}>
-                              {batchExpiry
-                                ? formatDateBoth(batchExpiry)
-                                : (t('inventory.noExpiry') || 'No expiry')}
-                            </div>
+                            <span className="font-semibold text-slate-700 dark:text-slate-200">
+                              {formatQuantity(batch.quantityOnHand || 0)}
+                              {form.primaryUnit ? ` ${form.primaryUnit}` : ''}
+                            </span>
                           </div>
-                          <span className="font-semibold text-slate-700 dark:text-slate-200">
-                            {formatQuantity(batch.quantityOnHand || 0)}
-                            {form.primaryUnit ? ` ${form.primaryUnit}` : ''}
-                          </span>
-                        </div>
                         );
                       })
                     ) : (
                       <p className="text-xs text-slate-500">{t('inventory.noBatches') || 'No open lots yet.'}</p>
                     )}
-                  </div>
-                ) : (
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="label">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
-                      <div className="mt-1">
-                        <FlexibleDateInput
-                          id="inventory-expiry-date"
-                          name="expiryDate"
-                          value={form.expiryDate}
-                          onChange={handleFormChange}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="label">{t('inventory.batchNumberOptional') || 'Batch No. (Optional)'}</label>
-                      <input
-                        id="inventory-opening-batch-number"
-                        className="input mt-1"
-                        name="batchNumber"
-                        value={form.batchNumber}
-                        onChange={handleFormChange}
-                        placeholder={t('inventory.batchNumberPlaceholder') || 'Eg. LOT-A12'}
-                      />
-                    </div>
                   </div>
                 )}
               </div>
@@ -1814,30 +1811,36 @@ export default function Inventory() {
             </div>
           </FormSectionCard>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6 px-1">
             <button
               id="inventory-stock-tab"
               type="button"
               onClick={() => setActiveTab('stock')}
-              className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+              className={`pb-3 text-sm font-semibold transition-all relative ${
                 activeTab === 'stock'
-                  ? 'border-primary-300 bg-primary-500 text-white'
-                  : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                  ? 'text-primary'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
               }`}
             >
               {t('inventory.stockDetails')}
+              {activeTab === 'stock' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+              )}
             </button>
             <button
               id="inventory-other-tab"
               type="button"
               onClick={() => setActiveTab('other')}
-              className={`rounded-2xl border px-4 py-3 text-left text-sm font-medium transition ${
+              className={`pb-3 text-sm font-semibold transition-all relative ${
                 activeTab === 'other'
-                  ? 'border-primary-300 bg-primary-500 text-white'
-                  : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                  ? 'text-primary'
+                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
               }`}
             >
               {t('inventory.otherDetails')}
+              {activeTab === 'other' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+              )}
             </button>
           </div>
 
@@ -1949,18 +1952,23 @@ export default function Inventory() {
                   <label className="label">{t('products.secondaryPrice')}</label>
                   <input id="inventory-secondary-sale-price" className="input mt-1" name="secondarySalePrice" type="number" step="0.01" value={form.secondarySalePrice} onChange={handleFormChange} />
                 </div>
-                <div className="flex items-center gap-3 rounded-2xl border border-slate-200/70 px-4 py-3">
-                  <input
-                    id="inventory-low-stock-alert"
-                    className="h-4 w-4 rounded border-slate-300"
-                    type="checkbox"
-                    name="lowStockAlert"
-                    checked={form.lowStockAlert}
-                    onChange={handleFormChange}
-                  />
-                  <label htmlFor="inventory-low-stock-alert" className="text-sm text-slate-600">
-                    {t('inventory.lowStockAlert')}
-                  </label>
+                <div className="flex flex-col justify-end">
+                  <div className="flex items-center justify-between rounded-xl border border-secondary-200 bg-secondary-50/20 px-3.5 py-2.5 dark:border-slate-800 dark:bg-slate-900/50">
+                    <span className="text-sm font-semibold text-secondary-700 dark:text-slate-300">
+                      {t('inventory.lowStockAlert')}
+                    </span>
+                    <label className="relative inline-flex cursor-pointer items-center text-xs">
+                      <input
+                        id="inventory-low-stock-alert"
+                        type="checkbox"
+                        className="peer sr-only"
+                        name="lowStockAlert"
+                        checked={form.lowStockAlert}
+                        onChange={handleFormChange}
+                      />
+                      <div className="peer h-6 w-11 rounded-full bg-secondary-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-secondary-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:bg-slate-700"></div>
+                    </label>
+                  </div>
                 </div>
               </div>
             )}

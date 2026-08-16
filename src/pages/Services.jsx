@@ -226,62 +226,71 @@ function getDeliveryDaysLeft(deliveryDate) {
   return d.diff(today, "day");
 }
 
-function DeliveryBadge({ date, isGym }) {
-  if (!date) return <span className="text-slate-400">—</span>;
-  const days = getDeliveryDaysLeft(date);
-  const label = <DateDisplay date={date} format="D MMM YYYY" />;
-  const base =
-    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold";
-  if (days === null) {
-    return (
-      <span className="text-xs text-slate-600 dark:text-slate-400">
-        {label}
-      </span>
-    );
-  }
-  if (days < 0) {
-    return (
-      <span
-        className={`${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`}
-      >
-        <Clock size={10} /> {label} · {isGym ? "Expired" : "Overdue"}
-      </span>
-    );
-  }
-  if (days < 3) {
-    return (
-      <span
-        className={`${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`}
-      >
-        <Clock size={10} /> {label} · {days}d left
-      </span>
-    );
-  }
-  if (days < 8) {
-    return (
-      <span
-        className={`${base} bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300`}
-      >
-        <Clock size={10} /> {label} · {days}d left
-      </span>
-    );
-  }
-  return (
-    <span
-      className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`}
-    >
-      <Clock size={10} /> {label} · {days}d left
-    </span>
-  );
-}
-
-function ClosedDeliveryLabel({ isGym }) {
+function DeliveryBadge({ date, isGym, isClosed, createdAt }) {
   const { t } = useI18n();
 
+  if (isClosed) {
+    return (
+      <div className="leading-snug text-emerald-600 dark:text-emerald-400 font-semibold text-xs md:text-sm">
+        {date ? (
+          <DateDisplay date={date} format="D MMM YYYY" />
+        ) : createdAt ? (
+          <DateDisplay date={createdAt} format="D MMM YYYY" />
+        ) : (
+          <span className="text-slate-400">—</span>
+        )}
+        <div className="text-[10px] md:text-xs font-bold mt-0.5 text-emerald-600/80 dark:text-emerald-400/80">
+          {isGym ? "Completed / Inactive" : t("services.closed") || "Completed"}
+        </div>
+      </div>
+    );
+  }
+
+  if (!date) {
+    if (createdAt) {
+      return (
+        <div className="leading-snug text-slate-500 dark:text-slate-400 text-xs md:text-sm">
+          <DateDisplay date={createdAt} format="D MMM YYYY" />
+          <div className="text-[10px] md:text-xs font-bold mt-0.5 text-slate-400 dark:text-slate-500">
+            {t("services.created") || "Created"}
+          </div>
+        </div>
+      );
+    }
+    return <span className="text-slate-400">—</span>;
+  }
+
+  const days = getDeliveryDaysLeft(date);
+  const label = <DateDisplay date={date} format="D MMM YYYY" />;
+
+  if (days === null) {
+    return (
+      <div className="leading-snug text-slate-500 dark:text-slate-400 text-xs md:text-sm">
+        {label}
+      </div>
+    );
+  }
+
+  let colorClass = "text-emerald-600 dark:text-emerald-400 font-semibold text-xs md:text-sm";
+  let remainingText = `${days}d left`;
+
+  if (days < 3) {
+    colorClass = "text-rose-600 dark:text-rose-400 font-semibold text-xs md:text-sm";
+  } else if (days < 8) {
+    colorClass = "text-amber-600 dark:text-amber-400 font-semibold text-xs md:text-sm";
+  }
+
+  if (days < 0) {
+    remainingText = isGym ? "Expired" : "Overdue";
+  } else if (days === 0) {
+    remainingText = isGym ? "Expires today" : "Due today";
+  }
+
   return (
-    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-      {isGym ? "Completed / Inactive" : t("services.closed")}
-    </span>
+    <div className="leading-snug">
+      <div className={colorClass}>{label}</div>
+      <div className="text-[10px] md:text-xs font-bold mt-0.5 text-slate-500 dark:text-slate-400">{remainingText}</div>
+    </div>
   );
 }
 
@@ -678,6 +687,7 @@ export default function Services() {
   const [newPartyPhone, setNewPartyPhone] = useState("");
   const [creatingParty, setCreatingParty] = useState(false);
   const [header, setHeader] = useState(() => makeEmptyHeader());
+  const [hasDeliveryDate, setHasDeliveryDate] = useState(true);
   const [vacantTables, setVacantTables] = useState([]);
   const [items, setItems] = useState([]);
   const quantityInputRef = useRef(null);
@@ -1332,6 +1342,7 @@ export default function Services() {
   // ── Reset & open/close dialog ──
   const resetForm = () => {
     setHeader({ ...makeEmptyHeader(), orderNo: "" });
+    setHasDeliveryDate(true);
     setItems([]);
     setDiscount("0");
     setPartyQuery("");
@@ -1445,6 +1456,7 @@ export default function Services() {
         attributes: normalizeJewelleryAttributes(full.attributes || {}),
         tableId: currentTableId,
       });
+      setHasDeliveryDate(!!full.deliveryDate);
       cacheProducts(hydratedProducts);
       setSuggestedOrderNo(full.orderNo || "");
       setAmountReceived(String(full.receivedTotal ?? 0));
@@ -1605,6 +1617,7 @@ export default function Services() {
       );
       const payload = {
         ...headerFields,
+        deliveryDate: hasDeliveryDate ? (header.deliveryDate || todayISODate()) : null,
         tableId: header.tableId || null,
         storeType,
         attributes: normalizedAttributes,
@@ -2133,11 +2146,12 @@ export default function Services() {
                         </div>
 
                         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                          {order.status !== "closed" ? (
-                            <DeliveryBadge date={order.deliveryDate} isGym={isGym} />
-                          ) : (
-                            <ClosedDeliveryLabel isGym={isGym} />
-                          )}
+                          <DeliveryBadge
+                            date={order.deliveryDate}
+                            isGym={isGym}
+                            isClosed={order.status === "closed"}
+                            createdAt={order.createdAt}
+                          />
                           <PaymentTypeSummary
                             source={order}
                             className="rounded-full bg-slate-100/80 px-2.5 py-1 dark:bg-slate-800/80"
@@ -2323,11 +2337,12 @@ export default function Services() {
                           )}
                         </td>
                         <td className="py-3 pr-4">
-                          {order.status !== "closed" ? (
-                            <DeliveryBadge date={order.deliveryDate} isGym={isGym} />
-                          ) : (
-                            <ClosedDeliveryLabel isGym={isGym} />
-                          )}
+                          <DeliveryBadge
+                            date={order.deliveryDate}
+                            isGym={isGym}
+                            isClosed={order.status === "closed"}
+                            createdAt={order.createdAt}
+                          />
                         </td>
                         <td className="py-3 pr-4">
                           <button
@@ -2770,39 +2785,62 @@ export default function Services() {
                                 </option>
                               </select>
                             </div>
-                             <div>
+
+                            <div>
                               <label className="label">
-                                {isGym ? "Subscription End Date" : t("services.deliveryDate")}
+                                {isGym ? "Subscription End" : t("services.deliveryDate") || "Delivery Date"}
                               </label>
-                              <FlexibleDateInput
-                                className="input mt-1"
-                                name="deliveryDate"
-                                value={header.deliveryDate}
-                                onChange={handleHeaderChange}
-                              />
-                              {isGym && (
-                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                  {[
-                                    { label: "+1 Month", days: 30 },
-                                    { label: "+3 Months", days: 90 },
-                                    { label: "+6 Months", days: 180 },
-                                    { label: "+1 Year", days: 365 },
-                                  ].map((opt) => (
-                                    <button
-                                      key={opt.label}
-                                      type="button"
-                                      onClick={() => {
-                                        const nextDate = dayjs().add(opt.days, "day").format("YYYY-MM-DD");
-                                        setHeader((prev) => ({ ...prev, deliveryDate: nextDate }));
-                                      }}
-                                      className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:border-[#9c5f22] text-xs font-bold text-slate-600 bg-white hover:bg-[#9c5f22]/5 transition shadow-sm"
-                                    >
-                                      {opt.label}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
+                              <div className="flex h-11 items-center justify-between rounded-xl border border-secondary-200 bg-secondary-50/20 px-3.5 mt-1 dark:border-slate-800 dark:bg-slate-900/50">
+                                <span className="text-xs font-bold text-secondary-500 dark:text-slate-400">
+                                  {hasDeliveryDate ? t("common.yes") : t("common.no")}
+                                </span>
+                                <label className="relative inline-flex cursor-pointer items-center text-xs">
+                                  <input
+                                    type="checkbox"
+                                    className="peer sr-only"
+                                    checked={hasDeliveryDate}
+                                    onChange={(e) => setHasDeliveryDate(e.target.checked)}
+                                  />
+                                  <div className="peer h-6 w-11 rounded-full bg-secondary-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-secondary-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:bg-slate-700"></div>
+                                </label>
+                              </div>
                             </div>
+
+                            {hasDeliveryDate && (
+                              <div>
+                                <label className="label">
+                                  {isGym ? "Subscription End Date" : t("services.deliveryDate")}
+                                </label>
+                                <FlexibleDateInput
+                                  className="input mt-1"
+                                  name="deliveryDate"
+                                  value={header.deliveryDate}
+                                  onChange={handleHeaderChange}
+                                />
+                                {isGym && (
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {[
+                                      { label: "+1 Month", days: 30 },
+                                      { label: "+3 Months", days: 90 },
+                                      { label: "+6 Months", days: 180 },
+                                      { label: "+1 Year", days: 365 },
+                                    ].map((opt) => (
+                                      <button
+                                        key={opt.label}
+                                        type="button"
+                                        onClick={() => {
+                                          const nextDate = dayjs().add(opt.days, "day").format("YYYY-MM-DD");
+                                          setHeader((prev) => ({ ...prev, deliveryDate: nextDate }));
+                                        }}
+                                        className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:border-[#9c5f22] text-xs font-bold text-slate-600 bg-white hover:bg-[#9c5f22]/5 transition shadow-sm"
+                                      >
+                                        {opt.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             {businessProfile?.settings?.enabledModules?.includes('tables') && (
                               <div>
                                 <label className="label">{t('tables.tableName') || 'Table'}</label>

@@ -1510,6 +1510,7 @@ setInvoiceOrder(purchase);
           <Dialog
             isOpen={showItemDialog}
             onClose={closeItemDialog}
+            closeOnOverlayClick={false}
             title={
               editingItemIdx !== null
                 ? t("common.edit")
@@ -1517,7 +1518,7 @@ setInvoiceOrder(purchase);
                   ? t("purchases.addExpenseLine")
                   : t("common.addItem")
             }
-            size="xl"
+            size="full"
             footer={
               <>
                 <button
