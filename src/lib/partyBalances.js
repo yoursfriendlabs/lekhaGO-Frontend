@@ -5,9 +5,10 @@ export function toAmount(value) {
 
 /**
  * Party To Pay / To Receive comes from `party.currentAmount` only.
- * The backend ledger is the source of truth:
- * sales/services/payment-in are credits; purchases/expenses/payment-out are debits.
- * Do not recompute this from remaining dues or the transaction list on the client.
+ * The backend is the source of truth and counts remaining dues:
+ * unpaid sales and services make it negative (they owe us, To Receive),
+ * unpaid purchases and expenses make it positive (we owe them, To Pay).
+ * Do not recompute this from the transaction list on the client.
  */
 export function getPartyBalanceMeta(currentAmount, t) {
   const amount = toAmount(currentAmount);

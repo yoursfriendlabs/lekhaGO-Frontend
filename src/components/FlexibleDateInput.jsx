@@ -101,17 +101,26 @@ export default function FlexibleDateInput({
   };
 
   const commitBsParts = (nextYear, nextMonth, nextDay) => {
-    setBsYear(nextYear);
-    setBsMonth(nextMonth);
-    setBsDay(nextDay);
+    let year = nextYear;
+    let month = nextMonth;
+    let day = nextDay;
 
-    if (!nextYear || !nextMonth || !nextDay) {
+    if (year && month && day) {
+      const maxDay = getBsDaysInMonth(Number(year), Number(month));
+      if (Number(day) > maxDay) day = maxDay;
+    }
+
+    setBsYear(year);
+    setBsMonth(month);
+    setBsDay(day);
+
+    if (!year || !month || !day) {
       setError('');
       emitAd('');
       return;
     }
 
-    const converted = bsPartsToAdISO(nextYear, nextMonth, nextDay);
+    const converted = bsPartsToAdISO(year, month, day);
     if (!converted) {
       setError(t('dates.invalidBsDate') || 'Invalid Nepali date selected.');
       return;
@@ -348,7 +357,7 @@ export default function FlexibleDateInput({
               <select
                 id={id ? `${id}-bs-day` : undefined}
                 className="w-full rounded-lg border border-secondary-200 bg-white px-2 py-1.5 text-sm text-ink focus:border-primary-400 focus:ring-primary-400 dark:bg-slate-850 dark:border-slate-700 dark:text-white"
-                value={bsDay && Number(bsDay) > daysInMonth ? daysInMonth : bsDay}
+                value={bsDay}
                 onChange={(event) => commitBsParts(
                   bsYear,
                   bsMonth,
