@@ -216,8 +216,8 @@ export default function FlexibleDateInput({
 
   return (
     <div ref={containerRef} className={wrapperClassName}>
-      <div className="flex w-full min-w-0 flex-wrap items-stretch gap-2">
-        <div className="min-w-[12.5rem] flex-1">
+      <div className="flex w-full min-w-0 flex-nowrap items-stretch gap-1.5">
+        <div className="min-w-0 flex-1">
           {calendar === 'ad' ? (
             <input
               id={id}
@@ -251,7 +251,7 @@ export default function FlexibleDateInput({
             type="button"
             disabled={disabled}
             onClick={() => handleCalendarChange('ad')}
-            className={`rounded-lg transition font-bold uppercase h-full px-3 text-[10px] ${
+            className={`rounded-lg transition font-bold uppercase h-full px-2.5 text-[10px] ${
               calendar === 'ad'
                 ? 'bg-primary text-white shadow-sm hover:bg-primary-600'
                 : 'text-secondary-600 hover:text-secondary-900 dark:text-slate-400 dark:hover:text-white'
@@ -263,7 +263,7 @@ export default function FlexibleDateInput({
             type="button"
             disabled={disabled}
             onClick={() => handleCalendarChange('bs')}
-            className={`rounded-lg transition font-bold uppercase h-full px-3 text-[10px] ${
+            className={`rounded-lg transition font-bold uppercase h-full px-2.5 text-[10px] ${
               calendar === 'bs'
                 ? 'bg-primary text-white shadow-sm hover:bg-primary-600'
                 : 'text-secondary-600 hover:text-secondary-900 dark:text-slate-400 dark:hover:text-white'
