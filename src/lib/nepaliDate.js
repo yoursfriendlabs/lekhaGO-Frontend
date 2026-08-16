@@ -1,7 +1,10 @@
-import NepaliDateModule from 'nepali-date-converter';
+import NepaliDateModule, { dateConfigMap as namedDateConfigMap } from 'nepali-date-converter';
 
-const NepaliDate = NepaliDateModule.default || NepaliDateModule;
-const dateConfigMap = NepaliDateModule.dateConfigMap || {};
+const NepaliDate = NepaliDateModule?.default || NepaliDateModule;
+const dateConfigMap = namedDateConfigMap
+  || NepaliDateModule?.dateConfigMap
+  || NepaliDate?.dateConfigMap
+  || {};
 
 export const DATE_CALENDAR_STORAGE_KEY = 'mms.dateCalendar';
 
@@ -79,9 +82,24 @@ export function getBsYearOptions({ past = 30, future = 20 } = {}) {
 
 export function getBsDaysInMonth(year, month1Based) {
   const yearConfig = dateConfigMap[String(year)];
-  if (!yearConfig) return 30;
   const key = BS_MONTH_KEYS[month1Based - 1];
-  return Number(yearConfig[key] || 30);
+  const fromConfig = yearConfig && key ? Number(yearConfig[key]) : NaN;
+  if (Number.isFinite(fromConfig) && fromConfig > 0) return fromConfig;
+
+  // Some months have 31 or 32 days. Never fall back to 30 without asking the
+  // converter, or "Today" on Shrawan 31 is rejected as invalid.
+  for (let day = 32; day >= 28; day -= 1) {
+    try {
+      const nepali = new NepaliDate(Number(year), Number(month1Based) - 1, day);
+      const bs = nepali.getBS();
+      if (bs.year === Number(year) && bs.month === Number(month1Based) - 1) {
+        return bs.date;
+      }
+    } catch {
+      // try a shorter month
+    }
+  }
+  return 30;
 }
 
 export function adISOToBsParts(adISO) {
@@ -112,6 +130,8 @@ export function bsPartsToAdISO(year, month1Based, day) {
 
   try {
     const nepali = new NepaliDate(y, m - 1, d);
+    const bs = nepali.getBS();
+    if (bs.year !== y || bs.month !== m - 1 || bs.date !== d) return null;
     const ad = nepali.getAD();
     return `${ad.year}-${pad2(ad.month + 1)}-${pad2(ad.date)}`;
   } catch {
