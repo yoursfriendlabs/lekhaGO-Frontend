@@ -2224,8 +2224,11 @@ return (
                 </span>
                 <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
                   <div className="relative">
+                    <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                      %
+                    </div>
                     <input
-                      className="input h-8 w-full rounded-lg border-primary/20 pr-9 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
+                      className="input h-8 w-full rounded-lg border-primary/20 pl-7 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
                       type="number"
                       inputMode="decimal"
                       min="0"
@@ -2239,9 +2242,6 @@ return (
                       }
                       placeholder="0"
                     />
-                    <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                      %
-                    </div>
                   </div>
                 </div>
               </label>
@@ -2257,8 +2257,11 @@ return (
                 </span>
                 <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
                   <div className="relative">
+                    <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                      {t("currency.symbol")}
+                    </div>
                     <input
-                      className="input h-8 w-full rounded-lg border-primary/20 pr-10 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
+                      className="input h-8 w-full rounded-lg border-primary/20 pl-8 text-right text-xs font-bold focus:border-primary focus:ring-primary/10"
                       type="number"
                       inputMode="decimal"
                       min="0"
@@ -2272,9 +2275,6 @@ return (
                       }
                       placeholder="0.00"
                     />
-                    <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                      {t("currency.symbol")}
-                    </div>
                   </div>
                 </div>
               </label>
@@ -2285,9 +2285,12 @@ return (
                   {showAmountReceivedInput && !isPaid ? (
                     <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
                       <div className="relative">
+                        <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+                          {t("currency.symbol")}
+                        </div>
                         <input
                           autoFocus
-                          className="input h-8 rounded-lg pr-10 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
+                          className="input h-8 rounded-lg pl-8 text-right font-bold w-full border-primary/20 focus:border-primary focus:ring-primary/10 text-xs"
                           type="number"
                           inputMode="decimal"
                           min="0"
@@ -2301,9 +2304,6 @@ return (
                           }
                           onBlur={() => setShowAmountReceivedInput(false)}
                         />
-                        <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
-                          {t("currency.symbol")}
-                        </div>
                       </div>
                     </div>
                   ) : (
