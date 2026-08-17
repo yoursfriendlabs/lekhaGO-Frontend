@@ -297,9 +297,10 @@ export default function Inventory() {
       setStatsLoading(true);
       // Low / near-expiry counts come from the same list filters the UI uses,
       // so cards always match what you see when you click/filter.
-      const [lowRes, nearRes, statsRes] = await Promise.all([
+      const [lowRes, nearRes, allRes, statsRes] = await Promise.all([
         api.countProducts({ stock: 'low' }),
         api.countProducts({ stock: 'nearexpiry' }),
+        api.countProducts({}),
         api.getProductStats().catch((err) => {
           console.error('Failed to fetch product popularity stats', err);
           return null;
@@ -308,6 +309,7 @@ export default function Inventory() {
       setStats({
         lowStockCount: Number(lowRes?.total ?? statsRes?.lowStockCount ?? 0),
         nearExpiryCount: Number(nearRes?.total ?? statsRes?.nearExpiryCount ?? 0),
+        allCount: Number(allRes?.total ?? 0),
         popularCount: Number(statsRes?.popularCount || 0),
         leastPopularCount: Number(statsRes?.leastPopularCount || 0),
       });
@@ -1002,6 +1004,7 @@ export default function Inventory() {
             setStockFilter('low');
             setPage(1);
           }}
+          isActive={stockFilter === 'low'}
         />
         <StatsCard
           title={t('inventory.nearExpiryItems') || 'Near Expiry'}
@@ -1015,14 +1018,21 @@ export default function Inventory() {
             setSortKey('expiryDate');
             setPage(1);
           }}
+          isActive={stockFilter === 'nearexpiry'}
         />
         <StatsCard
-          title={t('inventory.popularItems') || 'Popular (Selling)'}
-          value={stats?.popularCount ?? 0}
-          icon={TrendingUp}
-          tone="success"
+          title={t('inventory.allItems') || 'All Items'}
+          value={stats?.allCount ?? 0}
+          icon={Layers}
+          tone="info"
           loading={statsLoading}
           size="sm"
+          onClick={() => {
+            setStockFilter('all');
+            setSortKey('');
+            setPage(1);
+          }}
+          isActive={stockFilter === 'all'}
         />
         <StatsCard
           title={t('inventory.leastPopularItems') || 'Least Popular (Unsold)'}
@@ -1038,8 +1048,13 @@ export default function Inventory() {
 
       <div id="inventory-items-card" className="card">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-serif text-xl text-slate-900 dark:text-white sm:text-2xl">
-            {t('inventory.itemsList', { count: totalItems })}
+          <h3 className="font-serif text-xl text-slate-900 dark:text-white sm:text-2xl animate-fade-in" key={stockFilter}>
+            {stockFilter === 'low'
+              ? t('inventory.lowStockItems') || 'Low Stock Items'
+              : stockFilter === 'nearexpiry'
+                ? t('inventory.nearExpiryItems') || 'Near Expiry'
+                : t('inventory.allItems') || 'All items'}{' '}
+            ({totalItems})
           </h3>
 
         </div>
