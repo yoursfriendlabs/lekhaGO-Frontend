@@ -40,6 +40,7 @@ import { getCurrentCreatorValue } from "../lib/records";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { useSSEEvent, SSE_EVENTS } from "../hooks/useSSE.js";
 import { useProductStore } from "../stores/products";
+import { useSaleStore } from "../stores/sales";
 import { checkNewAndReadyOrders } from "../lib/cafeOrders.js";
 
 function getProductCategoryName(product = {}) {
@@ -745,6 +746,7 @@ export default function QuickPos() {
         if (currentCart.length === 0) {
           if (currentEditingId) {
             await api.deleteSale(currentEditingId);
+            useSaleStore.getState().invalidate();
             setEditingId(null);
             await api
               .updateTable(currentActiveTableId, { status: "vacant" })
@@ -815,6 +817,7 @@ export default function QuickPos() {
 
         if (currentEditingId) {
           const res = await api.updateSale(currentEditingId, payload);
+          useSaleStore.getState().invalidate();
           if (res?.SaleItems) {
             setCart((prevCart) =>
               prevCart.map((cartItem) => {
@@ -828,6 +831,7 @@ export default function QuickPos() {
           setDeletedItemIds([]);
         } else {
           const created = await api.createSale(payload);
+          useSaleStore.getState().invalidate();
           if (created?.id) {
             setEditingId(created.id);
             if (created?.SaleItems) {
@@ -1162,8 +1166,10 @@ export default function QuickPos() {
       let created;
       if (editingId) {
         created = await api.updateSale(editingId, payload);
+        useSaleStore.getState().invalidate();
       } else {
         created = await api.createSale(salePayload);
+        useSaleStore.getState().invalidate();
       }
 
       // Sync table status in database

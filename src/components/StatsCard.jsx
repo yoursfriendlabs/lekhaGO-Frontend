@@ -6,6 +6,7 @@ export default function StatsCard({
   loading = false,
   size = 'default',
   onClick,
+  isActive = false,
 }) {
   const toneColors = {
     danger: {
@@ -59,8 +60,12 @@ export default function StatsCard({
 
   return (
     <div
-      className={`card flex items-center justify-between border border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 backdrop-blur-md shadow-sm ${paddingClasses[size] || paddingClasses.default} ${
-        onClick ? 'cursor-pointer transition hover:border-slate-300 dark:hover:border-slate-700' : ''
+      className={`card flex items-center justify-between border backdrop-blur-md transition ${
+        isActive
+          ? 'border-primary ring-1 ring-primary bg-primary-50/15 dark:bg-primary-950/15 shadow-md scale-[1.01]'
+          : 'border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 shadow-sm'
+      } ${paddingClasses[size] || paddingClasses.default} ${
+        onClick ? 'cursor-pointer hover:border-slate-300 dark:hover:border-slate-700 hover:shadow' : ''
       }`}
       onClick={onClick}
       onKeyDown={onClick ? (event) => {

@@ -28,6 +28,7 @@ import { useSaleStore } from '../stores/sales';
 import { useProductStore } from '../stores/products';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
 import StatsCard from '../components/StatsCard.jsx';
+import RefreshButton from '../components/RefreshButton.jsx';
 import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
 import DateDisplay from '../components/DateDisplay.jsx';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../lib/payments';
@@ -218,6 +219,11 @@ export default function Sales() {
     ...(partyFilterId ? { partyId: partyFilterId } : {}),
     ...(createdByFilterId ? { createdBy: createdByFilterId } : {}),
   }), [createdByFilterId, partyFilterId, statusFilter]);
+
+  // Invalidate cache on mount to guarantee fresh sales are loaded (especially from POS checkouts)
+  useEffect(() => {
+    invalidateSales();
+  }, [invalidateSales]);
 
   // ── Load sales list ──
   useEffect(() => {
@@ -919,12 +925,22 @@ export default function Sales() {
         title={salesTitle}
         subtitle={salesSubtitle}
         action={
-          canManageSales ? (
-            <Link className="btn-primary w-full sm:w-auto" to="/app/pos">
-              <Plus size={16} className="mr-1.5 inline" />
-              {createSaleLabel}
-            </Link>
-          ) : null
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <RefreshButton
+              refreshing={salesLoading}
+              onClick={() => {
+                invalidateSales();
+                fetchSales(listParams, true);
+                fetchStats();
+              }}
+            />
+            {canManageSales ? (
+              <Link className="btn-primary w-full sm:w-auto" to="/app/pos">
+                <Plus size={16} className="mr-1.5 inline" />
+                {createSaleLabel}
+              </Link>
+            ) : null}
+          </div>
         }
       />
 
