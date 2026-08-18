@@ -61,7 +61,7 @@ export default function DateDisplay({
     return (
       <span className={`${className} inline-flex items-center gap-1.5`}>
         <span>{dateInfo.primary}</span>
-        <span className="text-[11px] text-slate-500 font-medium dark:text-slate-400">
+        <span className="text-[11px] text-secondary-500 font-medium dark:text-secondary-400">
           ({dateInfo.secondary})
         </span>
       </span>
@@ -72,7 +72,7 @@ export default function DateDisplay({
     return (
       <div className="flex flex-col items-start leading-tight">
         <span className={className}>{dateInfo.primary}</span>
-        <span className="text-[10px] text-slate-500 font-medium dark:text-slate-400">
+        <span className="text-[10px] text-secondary-500 font-medium dark:text-secondary-400">
           {dateInfo.secondary}
         </span>
       </div>

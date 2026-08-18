@@ -6,17 +6,17 @@ const DEFAULT_DURATION = 4000;
 
 const toneStyles = {
   info: {
-    container: 'border-sky-200 bg-white text-slate-800 shadow-sky-100/60 dark:border-sky-400/30 dark:bg-slate-900 dark:text-slate-100',
+    container: 'border-sky-200 bg-white text-ink shadow-sky-100/60 dark:border-sky-400/30 dark:bg-slate-900 dark:text-slate-100',
     icon: 'text-sky-600 dark:text-sky-300',
     Icon: Info,
   },
   success: {
-    container: 'border-emerald-200 bg-white text-slate-800 shadow-emerald-100/60 dark:border-emerald-400/30 dark:bg-slate-900 dark:text-slate-100',
+    container: 'border-emerald-200 bg-white text-ink shadow-emerald-100/60 dark:border-emerald-400/30 dark:bg-slate-900 dark:text-slate-100',
     icon: 'text-emerald-600 dark:text-emerald-300',
     Icon: CheckCircle2,
   },
   error: {
-    container: 'border-rose-200 bg-white text-slate-800 shadow-rose-100/60 dark:border-rose-400/30 dark:bg-slate-900 dark:text-slate-100',
+    container: 'border-rose-200 bg-white text-ink shadow-rose-100/60 dark:border-rose-400/30 dark:bg-slate-900 dark:text-slate-100',
     icon: 'text-rose-600 dark:text-rose-300',
     Icon: AlertCircle,
   },
@@ -90,12 +90,12 @@ export function SnackbarProvider({ children }) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold leading-5">{snackbar.title}</p>
                 {snackbar.description ? (
-                  <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-300">{snackbar.description}</p>
+                  <p className="mt-0.5 text-xs leading-5 text-secondary-500 dark:text-secondary-300">{snackbar.description}</p>
                 ) : null}
               </div>
               <button
                 type="button"
-                className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                className="rounded-full p-1 text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 onClick={() => dismissSnackbar(snackbar.id)}
                 aria-label="Dismiss notification"
               >

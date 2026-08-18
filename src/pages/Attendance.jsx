@@ -284,7 +284,7 @@ export default function Attendance() {
         label: t('attendance.punchIn'),
         action: 'in',
         statusText: t('attendance.absent'),
-        colorClass: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+        colorClass: 'bg-secondary-100 text-secondary-700 dark:bg-slate-800 dark:text-secondary-400',
         badgeColor: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
         canPunch: true,
       };
@@ -332,16 +332,16 @@ export default function Attendance() {
 
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         {/* Punch Panel Card */}
-        <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-6 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60 flex flex-col justify-between h-full min-h-[400px]">
+        <div className="rounded-3xl border border-secondary-200/70 bg-white/85 p-6 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60 flex flex-col justify-between h-full min-h-[400px]">
           <div>
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4 dark:border-slate-800">
+            <div className="flex items-center justify-between border-b border-secondary-100 pb-4 dark:border-slate-800">
               <div className="flex items-center gap-3">
-                <div className="rounded-2xl bg-[#9c5f22]/10 p-2.5 text-[#9c5f22]">
+                <div className="rounded-2xl bg-primary/10 p-2.5 text-primary">
                   <Clock size={22} />
                 </div>
                 <div>
-                  <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('attendance.title')}</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{formattedDate}</p>
+                  <h3 className="font-serif text-lg text-ink">{t('attendance.title')}</h3>
+                  <p className="text-xs text-secondary-500">{formattedDate}</p>
                 </div>
               </div>
               <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${punchState.badgeColor}`}>
@@ -351,26 +351,26 @@ export default function Attendance() {
 
             {/* Time Clock Visual */}
             <div className="mt-8 text-center">
-              <p className="font-serif text-4xl tracking-widest font-bold text-slate-800 dark:text-white">
+              <p className="font-serif text-4xl tracking-widest font-bold text-ink dark:text-white">
                 {formattedTime}
               </p>
-              <p className="mt-1 text-xs text-slate-400 uppercase tracking-widest">CURRENT TIME</p>
+              <p className="mt-1 text-xs text-secondary-400 uppercase tracking-widest">CURRENT TIME</p>
             </div>
 
             {/* Current punch state summaries */}
             <div className="mt-6 space-y-3">
               {todayStatus && (
-                <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40 space-y-2">
+                <div className="rounded-2xl border border-secondary-100 bg-mist/50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40 space-y-2">
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-400">{t('attendance.punchInTimeLabel')}</span>
-                    <span className="font-medium text-slate-800 dark:text-white">
+                    <span className="text-secondary-400">{t('attendance.punchInTimeLabel')}</span>
+                    <span className="font-medium text-ink dark:text-white">
                       {formatMaybeDateTime(todayStatus.punchInTime, 'hh:mm A')}
                     </span>
                   </div>
                   {todayStatus.punchOutTime && (
                     <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-400">{t('attendance.punchOutTimeLabel')}</span>
-                      <span className="font-medium text-slate-800 dark:text-white">
+                      <span className="text-secondary-400">{t('attendance.punchOutTimeLabel')}</span>
+                      <span className="font-medium text-ink dark:text-white">
                         {formatMaybeDateTime(todayStatus.punchOutTime, 'hh:mm A')}
                       </span>
                     </div>
@@ -397,8 +397,8 @@ export default function Attendance() {
                 punchState.action === 'in'
                   ? 'bg-primary-600 hover:bg-primary-700 text-white'
                   : punchState.action === 'out'
-                    ? 'bg-[#9c5f22] hover:bg-[#884e1b] text-white'
-                    : 'bg-slate-200 text-slate-500 cursor-not-allowed dark:bg-slate-800 dark:text-slate-500'
+                    ? 'bg-primary hover:bg-primary-700 text-white'
+                    : 'bg-secondary-200 text-secondary-500 cursor-not-allowed dark:bg-slate-800 dark:text-secondary-500'
               }`}
             >
               {punching ? (
@@ -413,7 +413,7 @@ export default function Attendance() {
                 </>
               )}
             </button>
-            <p className="mt-3 text-center text-2xs text-slate-400 flex items-center justify-center gap-1">
+            <p className="mt-3 text-center text-2xs text-secondary-400 flex items-center justify-center gap-1">
               <MapPin size={12} />
               Requires active location tracking to verify office premises.
             </p>
@@ -421,33 +421,33 @@ export default function Attendance() {
         </div>
 
         {/* Info Card / Map Placeholder */}
-        <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-6 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60 flex flex-col justify-between h-full">
+        <div className="rounded-3xl border border-secondary-200/70 bg-white/85 p-6 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60 flex flex-col justify-between h-full">
           <div>
-            <h3 className="font-serif text-lg text-slate-900 dark:text-white mb-4">Location Boundary Info</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
+            <h3 className="font-serif text-lg text-ink mb-4">Location Boundary Info</h3>
+            <p className="text-sm text-secondary-700 leading-relaxed mb-4">
               Attendance records are bound to the office perimeter. Punch entries requested from locations outside the registered radius will not be accepted by the system.
             </p>
 
-            <div className="rounded-2xl border border-slate-100 bg-slate-50/50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40 space-y-4">
+            <div className="rounded-2xl border border-secondary-100 bg-mist/50 p-4 dark:border-slate-800/60 dark:bg-slate-900/40 space-y-4">
               <div className="flex items-start gap-3">
-                <MapPin className="text-[#9c5f22] mt-0.5" size={18} />
+                <MapPin className="text-primary mt-0.5" size={18} />
                 <div>
-                  <h4 className="text-sm font-semibold text-slate-800 dark:text-white">Active Tracking</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">Device GPS coordinates will be captured locally and verified with the organization's backend server coordinates.</p>
+                  <h4 className="text-sm font-semibold text-ink dark:text-white">Active Tracking</h4>
+                  <p className="text-xs text-secondary-500 mt-0.5">Device GPS coordinates will be captured locally and verified with the organization's backend server coordinates.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <CheckCircle2 className="text-emerald-500 mt-0.5" size={18} />
                 <div>
-                  <h4 className="text-sm font-semibold text-slate-800 dark:text-white">Office Boundary</h4>
-                  <p className="text-xs text-slate-500 mt-0.5">Please ensure you are within the designated boundary before checking in or out to avoid 400 location error alerts.</p>
+                  <h4 className="text-sm font-semibold text-ink dark:text-white">Office Boundary</h4>
+                  <p className="text-xs text-secondary-500 mt-0.5">Please ensure you are within the designated boundary before checking in or out to avoid 400 location error alerts.</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 border-t border-slate-100 pt-6 dark:border-slate-800 text-center">
-            <span className="text-xs text-slate-400">Signed in as <strong className="text-slate-600 dark:text-slate-300">{user?.name || user?.email}</strong> ({role})</span>
+          <div className="mt-6 border-t border-secondary-100 pt-6 dark:border-slate-800 text-center">
+            <span className="text-xs text-secondary-400">Signed in as <strong className="text-secondary-700">{user?.name || user?.email}</strong> ({role})</span>
           </div>
         </div>
       </div>
@@ -456,15 +456,15 @@ export default function Attendance() {
       <div className="card space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h2 className="font-serif text-2xl text-slate-900 dark:text-white">{t('attendance.historyLogs')}</h2>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            <h2 className="font-serif text-2xl text-ink">{t('attendance.historyLogs')}</h2>
+            <p className="mt-2 text-sm text-secondary-500">
               {isOwner ? 'Review and audit attendance logs for all team members.' : 'View your recent attendance check-in and checkout history.'}
             </p>
           </div>
         </div>
 
         {/* Filter Controls */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 dark:bg-slate-900/40 dark:border-slate-800/60">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 bg-mist/50 p-4 rounded-2xl border border-secondary-100 dark:bg-slate-900/40 dark:border-slate-800/60">
           {isOwner && (
             <div>
               <label className="label" htmlFor="attendance-staff-filter">{t('attendance.filterStaff')}</label>
@@ -525,17 +525,17 @@ export default function Attendance() {
 
         {/* Data View */}
         {historyLoading ? (
-          <div className="rounded-3xl border border-dashed border-slate-300/80 bg-slate-50/80 p-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+          <div className="rounded-3xl border border-dashed border-slate-300/80 bg-mist/80 p-10 text-center text-sm text-secondary-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-secondary-400">
             {t('attendance.loadingLogs')}
           </div>
         ) : history.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-300/80 bg-slate-50/80 p-10 text-center dark:border-slate-700 dark:bg-slate-900/50">
-            <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('attendance.noLogs')}</h3>
+          <div className="rounded-3xl border border-dashed border-slate-300/80 bg-mist/80 p-10 text-center dark:border-slate-700 dark:bg-slate-900/50">
+            <h3 className="font-serif text-xl text-ink">{t('attendance.noLogs')}</h3>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-sm text-slate-600 dark:text-slate-300">
-              <thead className="text-left text-xs uppercase tracking-[0.14em] text-slate-400 border-b border-slate-100 dark:border-slate-800">
+            <table className="w-full min-w-[600px] text-sm text-secondary-700">
+              <thead className="text-left text-xs uppercase tracking-[0.14em] text-secondary-400 border-b border-secondary-100 dark:border-slate-800">
                 <tr>
                   {isOwner && <th className="pb-3 pr-4">{t('attendance.staffName')}</th>}
                   <th className="pb-3 pr-4">{t('attendance.date')}</th>
@@ -546,19 +546,19 @@ export default function Attendance() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {history.map((record) => (
-                  <tr key={record.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/20 transition duration-150">
+                  <tr key={record.id} className="hover:bg-mist/50 dark:hover:bg-slate-900/20 transition duration-150">
                     {isOwner && (
-                      <td className="py-4 pr-4 font-medium text-slate-900 dark:text-white">
+                      <td className="py-4 pr-4 font-medium text-ink">
                         <div className="space-y-0.5">
                           <p>{record.BusinessUser?.name || '-'}</p>
-                          <p className="text-2xs text-slate-400">{record.BusinessUser?.email || '-'}</p>
+                          <p className="text-2xs text-secondary-400">{record.BusinessUser?.email || '-'}</p>
                         </div>
                       </td>
                     )}
                     <td className="py-4 pr-4 font-medium"><DateDisplay date={record.date} format="YYYY-MM-DD" /></td>
                     <td className="py-4 pr-4">
                       <div className="space-y-1">
-                        <p className={record.shiftStarted || record.shift ? (record.isLatePunchIn ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-slate-900 dark:text-white'}>
+                        <p className={record.shiftStarted || record.shift ? (record.isLatePunchIn ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-ink'}>
                           {formatMaybeDateTime(record.punchInTime, 'hh:mm A')}
                         </p>
                         {record.isLatePunchIn && (
@@ -570,7 +570,7 @@ export default function Attendance() {
                     </td>
                     <td className="py-4 pr-4">
                       <div className="space-y-1">
-                        <p className={record.punchOutTime ? (record.shiftEnded || record.shift ? (record.isEarlyPunchOut ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-slate-900 dark:text-white') : 'text-slate-500 dark:text-slate-400'}>
+                        <p className={record.punchOutTime ? (record.shiftEnded || record.shift ? (record.isEarlyPunchOut ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-ink') : 'text-secondary-500'}>
                           {formatMaybeDateTime(record.punchOutTime, 'hh:mm A') || '—'}
                         </p>
                         {record.isEarlyPunchOut && (

@@ -87,8 +87,8 @@ export default class AppErrorBoundary extends Component {
         <div className={`${isPageScope ? 'rounded-[28px] border border-primary-100 bg-white px-6 py-8 shadow-sm dark:border-primary-900/40 dark:bg-slate-950' : 'flex min-h-screen items-center justify-center bg-mist px-6 py-12 text-ink'}`}>
           <div className={`${isPageScope ? '' : 'w-full max-w-lg rounded-3xl border border-primary-100 bg-white p-8 shadow-sm'} ${isPageScope ? 'text-ink' : ''}`}>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-600">Refreshing PasalManager</p>
-            <h1 className={`mt-3 font-serif text-slate-900 ${isPageScope ? 'text-2xl' : 'text-3xl'}`}>Loading the latest version.</h1>
-            <p className="mt-3 text-sm text-slate-600">
+            <h1 className={`mt-3 font-serif text-ink ${isPageScope ? 'text-2xl' : 'text-3xl'}`}>Loading the latest version.</h1>
+            <p className="mt-3 text-sm text-secondary-700">
               We&apos;re refreshing the app so your workspace opens on the newest release. Your saved business data is safe.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
@@ -123,17 +123,17 @@ export default class AppErrorBoundary extends Component {
       <div className={`${isPageScope ? 'rounded-[28px] border border-secondary-200 bg-white px-6 py-8 shadow-sm dark:border-slate-800/70 dark:bg-slate-950' : 'flex min-h-screen items-center justify-center bg-mist px-6 py-12 text-ink'}`}>
         <div className={`${isPageScope ? '' : 'w-full max-w-lg rounded-3xl border border-secondary-200 bg-white p-8 shadow-sm'}`}>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary-600">{eyebrow}</p>
-          <h1 className={`mt-3 font-serif text-slate-900 ${isPageScope ? 'text-2xl' : 'text-3xl'}`}>{title}</h1>
-          <p className="mt-3 text-sm text-slate-600">
+          <h1 className={`mt-3 font-serif text-ink ${isPageScope ? 'text-2xl' : 'text-3xl'}`}>{title}</h1>
+          <p className="mt-3 text-sm text-secondary-700">
             {description}
           </p>
-          <p className="mt-2 text-sm text-slate-500">{reassurance}</p>
+          <p className="mt-2 text-sm text-secondary-500">{reassurance}</p>
           {error?.message ? (
             <details className="mt-4 rounded-2xl border border-secondary-200 bg-secondary-50/70" open={import.meta.env.DEV}>
               <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-secondary-900">
                 Show technical details
               </summary>
-              <pre className="overflow-x-auto border-t border-secondary-200 px-4 py-3 text-xs text-slate-700">
+              <pre className="overflow-x-auto border-t border-secondary-200 px-4 py-3 text-xs text-ink-light">
                 {error.message}
               </pre>
             </details>

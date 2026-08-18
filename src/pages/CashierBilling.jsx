@@ -474,19 +474,19 @@ export default function CashierBilling() {
 
       {/* Top Metrics Row */}
       <div className="grid gap-4 sm:grid-cols-4">
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm border border-slate-100">
+        <div className="card bg-white p-5 flex items-center justify-between shadow-sm border border-secondary-100">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Tables</p>
-            <p className="mt-1 text-2xl font-bold text-slate-800">{stats.total}</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-secondary-400">Total Tables</p>
+            <p className="mt-1 text-2xl font-bold text-ink">{stats.total}</p>
           </div>
-          <div className="h-10 w-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-500">
+          <div className="h-10 w-10 bg-mist rounded-xl flex items-center justify-center text-secondary-500">
             <Coffee size={20} />
           </div>
         </div>
 
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm border border-slate-100">
+        <div className="card bg-white p-5 flex items-center justify-between shadow-sm border border-secondary-100">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Active Tables</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-secondary-400">Active Tables</p>
             <p className="mt-1 text-2xl font-bold text-amber-600">{stats.occupied}</p>
           </div>
           <div className="h-10 w-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600">
@@ -494,9 +494,9 @@ export default function CashierBilling() {
           </div>
         </div>
 
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm border border-slate-100">
+        <div className="card bg-white p-5 flex items-center justify-between shadow-sm border border-secondary-100">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Vacant Tables</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-secondary-400">Vacant Tables</p>
             <p className="mt-1 text-2xl font-bold text-emerald-600">{stats.vacant}</p>
           </div>
           <div className="h-10 w-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
@@ -504,9 +504,9 @@ export default function CashierBilling() {
           </div>
         </div>
 
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm border border-slate-100">
+        <div className="card bg-white p-5 flex items-center justify-between shadow-sm border border-secondary-100">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Due Amount</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-secondary-400">Due Amount</p>
             <p className="mt-1 text-2xl font-bold text-rose-600">{formatMoney(stats.openBillAmount)}</p>
           </div>
           <div className="h-10 w-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600">
@@ -519,17 +519,17 @@ export default function CashierBilling() {
       <div className="grid gap-6 lg:grid-cols-[1fr_400px] xl:grid-cols-[1fr_450px]">
         {/* Left Side: Tables Grid */}
         <div className="space-y-4 min-w-0">
-          <div className="flex flex-col gap-3 bg-white/40 backdrop-blur p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex flex-col gap-3 bg-white/40 backdrop-blur p-4 rounded-2xl border border-secondary-100 shadow-sm">
             {/* Floor Filters */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap shrink-0">Floor:</span>
+              <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap shrink-0">Floor:</span>
               <button
                 type="button"
                 onClick={() => setSelectedFloorFilter('all')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   selectedFloorFilter === 'all'
-                    ? 'bg-[#9c5f22] text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 All Floors
@@ -541,8 +541,8 @@ export default function CashierBilling() {
                   onClick={() => setSelectedFloorFilter(floor.id)}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                     selectedFloorFilter === floor.id
-                      ? 'bg-[#9c5f22] text-white shadow-sm'
-                      : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                   }`}
                 >
                   {floor.name}
@@ -553,8 +553,8 @@ export default function CashierBilling() {
                 onClick={() => setSelectedFloorFilter('unassigned')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   selectedFloorFilter === 'unassigned'
-                    ? 'bg-[#9c5f22] text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 Unassigned
@@ -562,15 +562,15 @@ export default function CashierBilling() {
             </div>
 
             {/* Status Filters */}
-            <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100/60 pt-2.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap shrink-0">Status:</span>
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-secondary-100/60 pt-2.5">
+              <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap shrink-0">Status:</span>
               <button
                 type="button"
                 onClick={() => setSelectedStatusFilter('all')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   selectedStatusFilter === 'all'
-                    ? 'bg-[#9c5f22] text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 All
@@ -580,8 +580,8 @@ export default function CashierBilling() {
                 onClick={() => setSelectedStatusFilter('vacant')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   selectedStatusFilter === 'vacant'
-                    ? 'bg-[#9c5f22] text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 Vacant
@@ -592,7 +592,7 @@ export default function CashierBilling() {
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   selectedStatusFilter === 'occupied'
                     ? 'bg-amber-600 text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 Occupied
@@ -601,13 +601,13 @@ export default function CashierBilling() {
           </div>
 
           {loading ? (
-            <div className="card bg-white p-12 text-center text-slate-500 border border-slate-100 flex flex-col items-center justify-center h-64">
+            <div className="card bg-white p-12 text-center text-secondary-500 border border-secondary-100 flex flex-col items-center justify-center h-64">
               <span className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin inline-block mb-3" />
               <p className="text-sm font-semibold">Loading cafe seating map...</p>
             </div>
           ) : filteredTables.length === 0 ? (
-            <div className="card bg-white p-12 text-center text-slate-400 border border-slate-100">
-              <Coffee size={40} className="mx-auto mb-3 opacity-30 text-slate-500" />
+            <div className="card bg-white p-12 text-center text-secondary-400 border border-secondary-100">
+              <Coffee size={40} className="mx-auto mb-3 opacity-30 text-secondary-500" />
               <p className="text-sm font-semibold">No seating tables found.</p>
             </div>
           ) : (
@@ -623,7 +623,7 @@ export default function CashierBilling() {
                     onClick={() => handleSelectTable(table)}
                     className={`card bg-white p-5 border text-left flex flex-col justify-between h-40 transition relative group ${
                       isSelected
-                        ? 'border-[#9c5f22] ring-2 ring-[#9c5f22]/20 shadow-md'
+                        ? 'border-primary ring-2 ring-primary/20 shadow-md'
                         : table.occupied
                         ? 'border-amber-200 hover:border-amber-300 bg-amber-50/5'
                         : 'border-emerald-100 hover:border-emerald-200 bg-white'
@@ -632,10 +632,10 @@ export default function CashierBilling() {
                     <div>
                       <div className="flex items-start justify-between gap-1">
                         <div className="min-w-0 flex-1">
-                          <h4 className="font-serif text-base font-bold text-slate-800 group-hover:text-[#9c5f22] transition truncate">
+                          <h4 className="font-serif text-base font-bold text-ink group-hover:text-primary transition truncate">
                             {table.name}
                           </h4>
-                          <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block mt-0.5 whitespace-nowrap">
+                          <span className="text-[10px] text-secondary-400 font-semibold uppercase tracking-wider block mt-0.5 whitespace-nowrap">
                             {table.capacity ? `${table.capacity} seats` : 'No seats config'}
                           </span>
                         </div>
@@ -650,7 +650,7 @@ export default function CashierBilling() {
                           >
                             {table.occupied ? 'Occupied' : 'Vacant'}
                           </span>
-                          <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200/50 truncate max-w-[80px]">
+                          <span className="text-[9px] bg-secondary-100 text-secondary-500 px-1.5 py-0.5 rounded border border-secondary-200/50 truncate max-w-[80px]">
                             {table.category?.name || "No Floor"}
                           </span>
                         </div>
@@ -660,16 +660,16 @@ export default function CashierBilling() {
                     <div className="mt-4 border-t border-slate-50 pt-3 flex items-center justify-between w-full">
                       {hasOrder ? (
                         <div>
-                          <p className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Active Bill</p>
-                          <p className="text-base font-bold text-slate-800">{formatMoney(orderAmount)}</p>
+                          <p className="text-[9px] uppercase tracking-wider text-secondary-400 font-semibold">Active Bill</p>
+                          <p className="text-base font-bold text-ink">{formatMoney(orderAmount)}</p>
                         </div>
                       ) : table.occupied ? (
-                        <div className="text-slate-400 text-xs italic">Booked / Dirty</div>
+                        <div className="text-secondary-400 text-xs italic">Booked / Dirty</div>
                       ) : (
                         <div className="text-emerald-600 text-xs font-semibold">Ready to Seat</div>
                       )}
 
-                      <span className="p-1 rounded-lg bg-slate-50 text-slate-400 group-hover:bg-[#9c5f22]/10 group-hover:text-[#9c5f22] transition">
+                      <span className="p-1 rounded-lg bg-mist text-secondary-400 group-hover:bg-primary/10 group-hover:text-primary transition">
                         <ChevronRight size={16} />
                       </span>
                     </div>
@@ -688,12 +688,12 @@ export default function CashierBilling() {
                 <Check size={32} />
               </div>
               <div className="space-y-2">
-                <h3 className="text-xl font-bold text-slate-900">Checkout Complete!</h3>
-                <p className="text-sm text-slate-500">
+                <h3 className="text-xl font-bold text-ink">Checkout Complete!</h3>
+                <p className="text-sm text-secondary-500">
                   Bill {successState.invoiceNo} has been marked as{' '}
                   <span className="font-semibold text-emerald-600">Paid</span>.
                 </p>
-                <p className="text-2xl font-black text-slate-800">{formatMoney(successState.total)}</p>
+                <p className="text-2xl font-black text-ink">{formatMoney(successState.total)}</p>
               </div>
 
               <div className="flex flex-col gap-2.5 pt-4">
@@ -720,22 +720,22 @@ export default function CashierBilling() {
               </div>
             </div>
           ) : !selectedTable ? (
-            <div className="card bg-slate-50/50 border border-dashed border-slate-200 p-8 text-center text-slate-400/80 flex flex-col items-center justify-center min-h-[400px]">
-              <Receipt size={48} className="text-slate-300 mb-4 animate-bounce" />
-              <p className="text-base font-bold text-slate-600">No Seating Selected</p>
-              <p className="text-xs mt-1 max-w-[240px] mx-auto text-slate-400">
+            <div className="card bg-mist/50 border border-dashed border-secondary-200 p-8 text-center text-secondary-400/80 flex flex-col items-center justify-center min-h-[400px]">
+              <Receipt size={48} className="text-secondary-300 mb-4 animate-bounce" />
+              <p className="text-base font-bold text-secondary-700">No Seating Selected</p>
+              <p className="text-xs mt-1 max-w-[240px] mx-auto text-secondary-400">
                 Click any occupied table on the floor map to review items and complete the payment.
               </p>
             </div>
           ) : loadingSaleDetails ? (
-            <div className="card bg-white p-8 border border-slate-100 flex flex-col items-center justify-center min-h-[400px]">
-              <span className="h-8 w-8 rounded-full border-2 border-[#9c5f22] border-t-transparent animate-spin mb-3" />
-              <p className="text-sm text-slate-500 font-semibold">Loading active table order...</p>
+            <div className="card bg-white p-8 border border-secondary-100 flex flex-col items-center justify-center min-h-[400px]">
+              <span className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin mb-3" />
+              <p className="text-sm text-secondary-500 font-semibold">Loading active table order...</p>
             </div>
           ) : !activeSale ? (
-            <div className="card bg-white p-6 shadow-sm border border-slate-100 space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-lg font-bold text-slate-800">{selectedTable.name} Details</h3>
+            <div className="card bg-white p-6 shadow-sm border border-secondary-100 space-y-6">
+              <div className="flex items-center justify-between border-b border-secondary-100 pb-3">
+                <h3 className="text-lg font-bold text-ink">{selectedTable.name} Details</h3>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                   selectedTable.occupied
                     ? 'bg-amber-50 text-amber-700 border-amber-200'
@@ -745,11 +745,11 @@ export default function CashierBilling() {
                 </span>
               </div>
 
-              <div className="text-center py-6 text-slate-400 space-y-4">
-                <Coffee size={36} className="mx-auto text-slate-300" />
+              <div className="text-center py-6 text-secondary-400 space-y-4">
+                <Coffee size={36} className="mx-auto text-secondary-300" />
                 <div>
-                  <p className="text-sm font-bold text-slate-600">Table is empty</p>
-                  <p className="text-xs mt-1 text-slate-400/80">No active bill or draft order exists on this table.</p>
+                  <p className="text-sm font-bold text-secondary-700">Table is empty</p>
+                  <p className="text-xs mt-1 text-secondary-400/80">No active bill or draft order exists on this table.</p>
                 </div>
               </div>
 
@@ -773,12 +773,12 @@ export default function CashierBilling() {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleCheckout} className="card bg-white p-6 shadow-md border border-slate-100 space-y-6">
+            <form onSubmit={handleCheckout} className="card bg-white p-6 shadow-md border border-secondary-100 space-y-6">
               {/* Header section */}
-              <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-start justify-between border-b border-secondary-100 pb-4">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-800">Checkout {selectedTable.name}</h3>
-                  <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                  <h3 className="text-lg font-bold text-ink">Checkout {selectedTable.name}</h3>
+                  <p className="text-xs text-secondary-400 font-semibold mt-0.5">
                     Bill: {activeSale.invoiceNo || activeSale.id.slice(0, 8)}
                   </p>
                 </div>
@@ -787,7 +787,7 @@ export default function CashierBilling() {
                     Occupied
                   </span>
                   {activeSale.createdAt && (
-                    <span className="text-[10px] text-slate-400 mt-1 flex items-center gap-1 font-semibold">
+                    <span className="text-[10px] text-secondary-400 mt-1 flex items-center gap-1 font-semibold">
                       <Clock size={10} />
                       {new Date(activeSale.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
@@ -797,8 +797,8 @@ export default function CashierBilling() {
 
               {/* Items List */}
               <div className="space-y-2">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Order Summary</p>
-                <div className="max-h-48 overflow-y-auto border border-slate-100 rounded-2xl divide-y divide-slate-50 bg-slate-50/30">
+                <p className="text-xs font-bold uppercase tracking-wide text-secondary-400">Order Summary</p>
+                <div className="max-h-48 overflow-y-auto border border-secondary-100 rounded-2xl divide-y divide-slate-50 bg-mist/30">
                   {(() => {
                     const rawItems = activeSale.SaleItems || [];
                     const items = [];
@@ -812,12 +812,12 @@ export default function CashierBilling() {
                     return items.map((item) => (
                       <div key={item.id} className="p-3 flex items-center justify-between text-sm">
                         <div className="min-w-0 pr-2">
-                          <p className="font-semibold text-slate-800 truncate">{item.productName || item.Product?.name || 'Unknown Item'}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">
+                          <p className="font-semibold text-ink truncate">{item.productName || item.Product?.name || 'Unknown Item'}</p>
+                          <p className="text-xs text-secondary-400 mt-0.5">
                             {item.quantity} x {formatMoney(item.unitPrice)}
                           </p>
                         </div>
-                        <span className="font-bold text-slate-800 shrink-0">{formatMoney(item.lineTotal)}</span>
+                        <span className="font-bold text-ink shrink-0">{formatMoney(item.lineTotal)}</span>
                       </div>
                     ));
                   })()}
@@ -825,7 +825,7 @@ export default function CashierBilling() {
               </div>
 
               {/* Discount and Taxes inputs */}
-              <div className="grid gap-3 sm:grid-cols-2 border-t border-slate-100 pt-4">
+              <div className="grid gap-3 sm:grid-cols-2 border-t border-secondary-100 pt-4">
                 <div>
                   <label className="label">Discount (Rs)</label>
                   <input
@@ -853,8 +853,8 @@ export default function CashierBilling() {
               </div>
 
               {/* Recalculated Breakdowns */}
-              <div className="rounded-2xl bg-slate-50/80 p-4 space-y-2 border border-slate-100 text-sm">
-                <div className="flex justify-between text-slate-500 font-medium">
+              <div className="rounded-2xl bg-mist/80 p-4 space-y-2 border border-secondary-100 text-sm">
+                <div className="flex justify-between text-secondary-500 font-medium">
                   <span>Subtotal</span>
                   <span>{formatMoney(computedTotals.subTotal)}</span>
                 </div>
@@ -865,25 +865,25 @@ export default function CashierBilling() {
                   </div>
                 )}
                 {computedTotals.taxTotal > 0 && (
-                  <div className="flex justify-between text-slate-500 font-medium">
+                  <div className="flex justify-between text-secondary-500 font-medium">
                     <span>Tax ({checkoutForm.taxRate}%)</span>
                     <span>{formatMoney(computedTotals.taxTotal)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-black text-slate-900 border-t border-slate-200/60 pt-2 text-base">
+                <div className="flex justify-between font-black text-ink border-t border-secondary-200/60 pt-2 text-base">
                   <span>Grand Total</span>
                   <span className="text-primary">{formatMoney(computedTotals.grandTotal)}</span>
                 </div>
               </div>
 
               {/* Financial Transaction Input */}
-              <div className="border-t border-slate-100 pt-4 space-y-4">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Payment Collection</p>
+              <div className="border-t border-secondary-100 pt-4 space-y-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-secondary-400">Payment Collection</p>
 
                 <div className="space-y-1.5">
                   <label className="label">Amount Received</label>
-                  <div className="flex w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition">
-                    <span className="flex h-11 items-center bg-slate-100 px-3.5 text-sm font-semibold text-slate-500 border-r border-slate-200 shrink-0">
+                  <div className="flex w-full items-center overflow-hidden rounded-xl border border-secondary-200 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition">
+                    <span className="flex h-11 items-center bg-secondary-100 px-3.5 text-sm font-semibold text-secondary-500 border-r border-secondary-200 shrink-0">
                       {t("currency.symbol") || "Rs"}
                     </span>
                     <input
@@ -891,7 +891,7 @@ export default function CashierBilling() {
                       required
                       min="0"
                       step="any"
-                      className="h-11 w-full bg-transparent px-3 text-sm font-bold text-slate-900 focus:outline-none"
+                      className="h-11 w-full bg-transparent px-3 text-sm font-bold text-ink focus:outline-none"
                       value={checkoutForm.amountReceived}
                       onChange={(e) => setCheckoutForm((prev) => ({ ...prev, amountReceived: e.target.value }))}
                     />
@@ -905,7 +905,7 @@ export default function CashierBilling() {
                       key={idx}
                       type="button"
                       onClick={() => setCheckoutForm((prev) => ({ ...prev, amountReceived: String(opt.value.toFixed(2)) }))}
-                      className="px-3 py-1.5 rounded-xl border border-slate-200 hover:border-[#9c5f22] text-xs font-bold text-slate-600 bg-white hover:bg-[#9c5f22]/5 transition shadow-sm"
+                      className="px-3 py-1.5 rounded-xl border border-secondary-200 hover:border-primary text-xs font-bold text-secondary-700 bg-white hover:bg-primary/5 transition shadow-sm"
                     >
                       {opt.label === 'Exact' ? `Exact (${opt.value.toFixed(0)})` : opt.label}
                     </button>
@@ -932,7 +932,7 @@ export default function CashierBilling() {
               </div>
 
               {/* Final Actions */}
-              <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-4">
+              <div className="flex flex-col gap-2.5 border-t border-secondary-100 pt-4">
                 <div className="flex gap-2.5">
                   <Link
                     to={`/app/pos?tableId=${selectedTable.id}&checkout=1&ref=billing`}
@@ -986,12 +986,12 @@ export default function CashierBilling() {
                   <Check size={32} />
                 </div>
                 <div className="space-y-2">
-                  <h3 className="text-xl font-bold text-slate-900">Checkout Complete!</h3>
-                  <p className="text-sm text-slate-500">
+                  <h3 className="text-xl font-bold text-ink">Checkout Complete!</h3>
+                  <p className="text-sm text-secondary-500">
                     Bill {successState.invoiceNo} has been marked as{' '}
                     <span className="font-semibold text-emerald-600">Paid</span>.
                   </p>
-                  <p className="text-2xl font-black text-slate-800">{formatMoney(successState.total)}</p>
+                  <p className="text-2xl font-black text-ink">{formatMoney(successState.total)}</p>
                 </div>
 
                 <div className="flex flex-col gap-2.5 pt-4">
@@ -1018,14 +1018,14 @@ export default function CashierBilling() {
                 </div>
               </div>
             ) : !selectedTable ? null : loadingSaleDetails ? (
-              <div className="card bg-white p-8 border border-slate-100 flex flex-col items-center justify-center min-h-[300px]">
-                <span className="h-8 w-8 rounded-full border-2 border-[#9c5f22] border-t-transparent animate-spin mb-3" />
-                <p className="text-sm text-slate-500 font-semibold">Loading active table order...</p>
+              <div className="card bg-white p-8 border border-secondary-100 flex flex-col items-center justify-center min-h-[300px]">
+                <span className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin mb-3" />
+                <p className="text-sm text-secondary-500 font-semibold">Loading active table order...</p>
               </div>
             ) : !activeSale ? (
-              <div className="card bg-white p-6 shadow-sm border border-slate-100 space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 className="text-lg font-bold text-slate-800">{selectedTable.name} Details</h3>
+              <div className="card bg-white p-6 shadow-sm border border-secondary-100 space-y-6">
+                <div className="flex items-center justify-between border-b border-secondary-100 pb-3">
+                  <h3 className="text-lg font-bold text-ink">{selectedTable.name} Details</h3>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
                     selectedTable.occupied
                       ? 'bg-amber-50 text-amber-700 border-amber-200'
@@ -1035,11 +1035,11 @@ export default function CashierBilling() {
                   </span>
                 </div>
 
-                <div className="text-center py-6 text-slate-400 space-y-4">
-                  <Coffee size={36} className="mx-auto text-slate-300" />
+                <div className="text-center py-6 text-secondary-400 space-y-4">
+                  <Coffee size={36} className="mx-auto text-secondary-300" />
                   <div>
-                    <p className="text-sm font-bold text-slate-600">Table is empty</p>
-                    <p className="text-xs mt-1 text-slate-400/80">No active bill or draft order exists on this table.</p>
+                    <p className="text-sm font-bold text-secondary-700">Table is empty</p>
+                    <p className="text-xs mt-1 text-secondary-400/80">No active bill or draft order exists on this table.</p>
                   </div>
                 </div>
 
@@ -1064,10 +1064,10 @@ export default function CashierBilling() {
               </div>
             ) : (
               <form onSubmit={handleCheckout} className="space-y-5">
-                <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-start justify-between border-b border-secondary-100 pb-3">
                   <div>
-                    <h3 className="text-base font-bold text-slate-800">Checkout {selectedTable.name}</h3>
-                    <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                    <h3 className="text-base font-bold text-ink">Checkout {selectedTable.name}</h3>
+                    <p className="text-xs text-secondary-400 font-semibold mt-0.5">
                       Bill: {activeSale.invoiceNo || activeSale.id.slice(0, 8)}
                     </p>
                   </div>
@@ -1080,8 +1080,8 @@ export default function CashierBilling() {
 
                 {/* Items List */}
                 <div className="space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Order Summary</p>
-                  <div className="max-h-48 overflow-y-auto border border-slate-100 rounded-2xl divide-y divide-slate-50 bg-slate-50/30">
+                  <p className="text-xs font-bold uppercase tracking-wide text-secondary-400">Order Summary</p>
+                  <div className="max-h-48 overflow-y-auto border border-secondary-100 rounded-2xl divide-y divide-slate-50 bg-mist/30">
                     {(() => {
                       const rawItems = activeSale.SaleItems || [];
                       const items = [];
@@ -1095,12 +1095,12 @@ export default function CashierBilling() {
                       return items.map((item) => (
                         <div key={item.id} className="p-3 flex items-center justify-between text-sm">
                           <div className="min-w-0 pr-2">
-                            <p className="font-semibold text-slate-800 truncate">{item.productName || item.Product?.name || 'Unknown Item'}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">
+                            <p className="font-semibold text-ink truncate">{item.productName || item.Product?.name || 'Unknown Item'}</p>
+                            <p className="text-xs text-secondary-400 mt-0.5">
                               {item.quantity} x {formatMoney(item.unitPrice)}
                             </p>
                           </div>
-                          <span className="font-bold text-slate-800 shrink-0">{formatMoney(item.lineTotal)}</span>
+                          <span className="font-bold text-ink shrink-0">{formatMoney(item.lineTotal)}</span>
                         </div>
                       ));
                     })()}
@@ -1108,7 +1108,7 @@ export default function CashierBilling() {
                 </div>
 
                 {/* Discount and Taxes inputs */}
-                <div className="grid gap-3 sm:grid-cols-2 border-t border-slate-100 pt-3">
+                <div className="grid gap-3 sm:grid-cols-2 border-t border-secondary-100 pt-3">
                   <div>
                     <label className="label">Discount (Rs)</label>
                     <input
@@ -1136,8 +1136,8 @@ export default function CashierBilling() {
                 </div>
 
                 {/* Recalculated Breakdowns */}
-                <div className="rounded-2xl bg-slate-50/80 p-4 space-y-2 border border-slate-100 text-sm">
-                  <div className="flex justify-between text-slate-500 font-medium">
+                <div className="rounded-2xl bg-mist/80 p-4 space-y-2 border border-secondary-100 text-sm">
+                  <div className="flex justify-between text-secondary-500 font-medium">
                     <span>Subtotal</span>
                     <span>{formatMoney(computedTotals.subTotal)}</span>
                   </div>
@@ -1148,25 +1148,25 @@ export default function CashierBilling() {
                     </div>
                   )}
                   {computedTotals.taxTotal > 0 && (
-                    <div className="flex justify-between text-slate-500 font-medium">
+                    <div className="flex justify-between text-secondary-500 font-medium">
                       <span>Tax ({checkoutForm.taxRate}%)</span>
                       <span>{formatMoney(computedTotals.taxTotal)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between font-black text-slate-900 border-t border-slate-200/60 pt-2 text-base">
+                  <div className="flex justify-between font-black text-ink border-t border-secondary-200/60 pt-2 text-base">
                     <span>Grand Total</span>
                     <span className="text-primary">{formatMoney(computedTotals.grandTotal)}</span>
                   </div>
                 </div>
 
                 {/* Financial Transaction Input */}
-                <div className="border-t border-slate-100 pt-3 space-y-3">
-                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Payment Collection</p>
+                <div className="border-t border-secondary-100 pt-3 space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-secondary-400">Payment Collection</p>
 
                   <div className="space-y-1.5">
                     <label className="label">Amount Received</label>
-                    <div className="flex w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition">
-                      <span className="flex h-11 items-center bg-slate-100 px-3.5 text-sm font-semibold text-slate-500 border-r border-slate-200 shrink-0">
+                    <div className="flex w-full items-center overflow-hidden rounded-xl border border-secondary-200 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition">
+                      <span className="flex h-11 items-center bg-secondary-100 px-3.5 text-sm font-semibold text-secondary-500 border-r border-secondary-200 shrink-0">
                         {t("currency.symbol") || "Rs"}
                       </span>
                       <input
@@ -1174,7 +1174,7 @@ export default function CashierBilling() {
                         required
                         min="0"
                         step="any"
-                        className="h-11 w-full bg-transparent px-3 text-sm font-bold text-slate-900 focus:outline-none"
+                        className="h-11 w-full bg-transparent px-3 text-sm font-bold text-ink focus:outline-none"
                         value={checkoutForm.amountReceived}
                         onChange={(e) => setCheckoutForm((prev) => ({ ...prev, amountReceived: e.target.value }))}
                       />
@@ -1188,7 +1188,7 @@ export default function CashierBilling() {
                         key={idx}
                         type="button"
                         onClick={() => setCheckoutForm((prev) => ({ ...prev, amountReceived: String(opt.value.toFixed(2)) }))}
-                        className="px-3 py-1.5 rounded-xl border border-slate-200 hover:border-[#9c5f22] text-xs font-bold text-slate-600 bg-white hover:bg-[#9c5f22]/5 transition shadow-sm"
+                        className="px-3 py-1.5 rounded-xl border border-secondary-200 hover:border-primary text-xs font-bold text-secondary-700 bg-white hover:bg-primary/5 transition shadow-sm"
                       >
                         {opt.label === 'Exact' ? `Exact (${opt.value.toFixed(0)})` : opt.label}
                       </button>
@@ -1215,7 +1215,7 @@ export default function CashierBilling() {
                 </div>
 
                 {/* Final Actions */}
-                <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-3">
+                <div className="flex flex-col gap-2.5 border-t border-secondary-100 pt-3">
                   <div className="flex gap-2.5">
                     <Link
                       to={`/app/pos?tableId=${selectedTable.id}&checkout=1&ref=billing`}

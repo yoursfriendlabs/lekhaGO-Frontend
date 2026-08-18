@@ -7,7 +7,7 @@ function isStandaloneMode() {
 
 function FloatingPrompt({ title, description, tone = 'info', primaryAction, secondaryAction }) {
   const tones = {
-    info: 'border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white',
+    info: 'border-secondary-200 bg-white text-ink dark:border-slate-700 dark:bg-slate-900 dark:text-white',
     success: 'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-700/50 dark:bg-emerald-950/70 dark:text-emerald-100',
   };
 

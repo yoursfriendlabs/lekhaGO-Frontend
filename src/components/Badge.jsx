@@ -7,28 +7,28 @@ import React from "react";
 
 const variantStyles = {
   default:
-    "bg-slate-100/80 text-slate-600 ring-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:ring-slate-800",
+    "bg-secondary-100/80 text-secondary-700 ring-secondary-200",
   active:
-    "bg-emerald-50/80 text-emerald-700 ring-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-800",
+    "bg-emerald-50/80 text-emerald-700 ring-emerald-200",
   inactive:
-    "bg-slate-100/80 text-slate-500 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700",
+    "bg-secondary-100/80 text-secondary-500 ring-secondary-200",
   success:
-    "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400",
+    "bg-emerald-50 text-emerald-700",
   warning:
-    "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400",
-  error: "bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400",
+    "bg-amber-50 text-amber-700",
+  error: "bg-rose-50 text-rose-700",
   pending:
-    "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    "bg-secondary-100 text-secondary-700",
 };
 
 const dotColors = {
-  default: "bg-slate-400",
+  default: "bg-secondary-400",
   active: "bg-emerald-500 shadow-sm shadow-emerald-500/30",
-  inactive: "bg-slate-400",
+  inactive: "bg-secondary-400",
   success: "bg-emerald-500",
   warning: "bg-amber-500",
   error: "bg-rose-500",
-  pending: "bg-slate-400",
+  pending: "bg-secondary-400",
 };
 
 const sizeStyles = {

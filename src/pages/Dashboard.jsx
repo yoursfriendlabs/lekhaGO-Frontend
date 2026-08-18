@@ -132,7 +132,7 @@ function getDeliveryDaysLeft(deliveryDate) {
 }
 
 function DeliveryTag({ date }) {
-  if (!date) return <span className="text-xs text-slate-400">-</span>;
+  if (!date) return <span className="text-xs text-secondary-400">-</span>;
 
   const days = getDeliveryDaysLeft(date);
   const label = formatMaybeDate(date, 'D MMM');
@@ -161,7 +161,7 @@ function DeliveryTag({ date }) {
     );
   }
 
-  return <span className="text-xs text-slate-500">{label}</span>;
+  return <span className="text-xs text-secondary-500">{label}</span>;
 }
 
 function formatDate(dateStr) {
@@ -260,7 +260,7 @@ export default function Dashboard() {
     ? 'text-rose-600 dark:text-rose-300'
     : summary.profitOrLoss > 0
       ? 'text-emerald-700 dark:text-emerald-300'
-      : 'text-slate-900 dark:text-white';
+      : 'text-ink';
 
   return (
     <div className="min-w-0 space-y-6 pb-28 md:pb-0">
@@ -269,7 +269,7 @@ export default function Dashboard() {
         subtitle={t('dashboard.subtitle')}
         action={(
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-            <span className="text-xs uppercase tracking-[0.2em] text-slate-400">{t('dashboard.filters.label')}</span>
+            <span className="text-xs uppercase tracking-[0.2em] text-secondary-400">{t('dashboard.filters.label')}</span>
             <div className="flex flex-wrap gap-2">
               {rangeOptions.map((option) => (
                 <button
@@ -280,8 +280,8 @@ export default function Dashboard() {
                   className={[
                     'rounded-full px-3 py-1 text-xs font-semibold transition',
                     dateRange === option.key
-                      ? 'bg-slate-900 text-white shadow-sm dark:bg-white/90 dark:text-slate-900'
-                      : 'bg-white/80 text-slate-600 ring-1 ring-slate-200/70 hover:bg-slate-50 dark:bg-slate-900/60 dark:text-slate-300 dark:ring-slate-700/60',
+                      ? 'bg-slate-900 text-white shadow-sm dark:bg-white/90 dark:text-ink'
+                      : 'bg-white/80 text-secondary-700 ring-1 ring-slate-200/70 hover:bg-mist/60 dark:text-secondary-300 dark:ring-slate-700/60',
                   ].join(' ')}
                 >
                   {option.label}
@@ -299,12 +299,12 @@ export default function Dashboard() {
           <div className="grid gap-3 sm:grid-cols-1 lg:grid-cols-1">
             <div id='amount-pending' className="min-w-0 rounded-2xl border border-amber-200/70 bg-white/80 p-4 dark:border-amber-700/40 dark:bg-slate-900/50">
               <p className="text-xs uppercase text-amber-500/80">{t('dashboard.amountPending')}</p>
-              <p  className="mt-1 break-words text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.pendingAmount)}</p>
+              <p  className="mt-1 break-words text-xl font-semibold text-ink">{formatMoney(summary.pendingAmount)}</p>
             </div>
-            <div id='sales-services' className="min-w-0 rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
-              <p  className="text-xs uppercase text-slate-500">{t('dashboard.salesAndServices')}</p>
-              <p className="mt-1 break-words text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.salesTotal)}</p>
-              <div  className="mt-2 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+            <div id='sales-services' className="min-w-0 rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
+              <p  className="text-xs uppercase text-secondary-500">{t('dashboard.salesAndServices')}</p>
+              <p className="mt-1 break-words text-xl font-semibold text-ink">{formatMoney(summary.salesTotal)}</p>
+              <div  className="mt-2 space-y-1 text-xs text-secondary-500">
                 <p className="flex items-center justify-between gap-2">
                   <span>{t('analytics.directSales')}</span>
                   <span>{formatMoney(summary.directSalesTotal)}</span>
@@ -315,67 +315,67 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            <div id='purchase-spend' className="min-w-0 rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
-              <p className="text-xs uppercase text-slate-500">{t('dashboard.purchaseSpend')}</p>
-              <p className="mt-1 break-words text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.purchaseTotal)}</p>
+            <div id='purchase-spend' className="min-w-0 rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
+              <p className="text-xs uppercase text-secondary-500">{t('dashboard.purchaseSpend')}</p>
+              <p className="mt-1 break-words text-xl font-semibold text-ink">{formatMoney(summary.purchaseTotal)}</p>
             </div>
-            <div id='expenses' className="min-w-0 rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
-              <p className="text-xs uppercase text-slate-500">{t('dashboard.expenses')}</p>
-              <p className="mt-1 break-words text-xl font-semibold text-slate-900 dark:text-white">{formatMoney(summary.expenseTotal)}</p>
+            <div id='expenses' className="min-w-0 rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
+              <p className="text-xs uppercase text-secondary-500">{t('dashboard.expenses')}</p>
+              <p className="mt-1 break-words text-xl font-semibold text-ink">{formatMoney(summary.expenseTotal)}</p>
               {summary.salaryExpenseTotal > 0 && (
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                <p className="mt-2 text-xs text-secondary-500">
                   {t('dashboard.includesSalary')}: {formatMoney(summary.salaryExpenseTotal)}
                 </p>
               )}
             </div>
-            <div id='profit-loss' className="min-w-0 rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
-              <p className="text-xs uppercase text-slate-500">{t('dashboard.profitLoss')}</p>
+            <div id='profit-loss' className="min-w-0 rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
+              <p className="text-xs uppercase text-secondary-500">{t('dashboard.profitLoss')}</p>
               <p className={`mt-1 break-words text-xl font-semibold ${profitLossToneClass}`}>{formatMoney(summary.profitOrLoss)}</p>
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-2 text-xs text-secondary-500">
                 {t('analytics.totalOutgoing')}: {formatMoney(summary.purchaseTotal + summary.expenseTotal)}
               </p>
             </div>
           </div>
 
-          <p className="mt-4 text-xs text-slate-500">
+          <p className="mt-4 text-xs text-secondary-500">
             {loading ? t('common.loading') : t('dashboard.filters.showing', { range: selectedRangeLabel })}
           </p>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-          <div id="quick-stats" className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
+          <div id="quick-stats" className="rounded-3xl border border-secondary-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">{t('dashboard.quickStats')}</p>
-              <BarChart3 size={18} className="text-slate-400" />
+              <p className="text-sm font-semibold text-ink">{t('dashboard.quickStats')}</p>
+              <BarChart3 size={18} className="text-secondary-400" />
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><Boxes size={14} /> {t('dashboard.products')}</div>
-                <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{summary.productCount}</p>
+              <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
+                <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><Boxes size={14} /> {t('dashboard.products')}</div>
+                <p className="mt-2 text-lg font-semibold text-ink">{summary.productCount}</p>
               </div>
-              <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><Package size={14} /> {t('dashboard.lowStockAlerts')}</div>
-                <p className={`mt-2 text-lg font-semibold ${summary.lowStockCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>{summary.lowStockCount}</p>
+              <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
+                <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><Package size={14} /> {t('dashboard.lowStockAlerts')}</div>
+                <p className={`mt-2 text-lg font-semibold ${summary.lowStockCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-ink'}`}>{summary.lowStockCount}</p>
               </div>
-              <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><Clock size={14} /> {t('inventory.nearExpiryItems') || 'Near Expiry'}</div>
-                <p className={`mt-2 text-lg font-semibold ${summary.nearExpiryCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>{summary.nearExpiryCount || 0}</p>
+              <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
+                <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><Clock size={14} /> {t('inventory.nearExpiryItems') || 'Near Expiry'}</div>
+                <p className={`mt-2 text-lg font-semibold ${summary.nearExpiryCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-ink'}`}>{summary.nearExpiryCount || 0}</p>
               </div>
-              <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><UserCheck size={14} /> {t('dashboard.pendingReceivable')}</div>
-                <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{formatMoney(summary.pendingReceivable)}</p>
+              <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
+                <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><UserCheck size={14} /> {t('dashboard.pendingReceivable')}</div>
+                <p className="mt-2 text-lg font-semibold text-ink">{formatMoney(summary.pendingReceivable)}</p>
               </div>
-              <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><ShoppingCart size={14} /> {t('dashboard.pendingPayable')}</div>
-                <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{formatMoney(summary.pendingPayable)}</p>
+              <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
+                <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><ShoppingCart size={14} /> {t('dashboard.pendingPayable')}</div>
+                <p className="mt-2 text-lg font-semibold text-ink">{formatMoney(summary.pendingPayable)}</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
+          <div className="rounded-3xl border border-secondary-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">{t('dashboard.quickActions')}</p>
-              <Package size={18} className="text-slate-400" />
+              <p className="text-sm font-semibold text-ink">{t('dashboard.quickActions')}</p>
+              <Package size={18} className="text-secondary-400" />
             </div>
             <div id="quick-actions" className="mt-4 grid gap-2 sm:grid-cols-2">
               <Link id='quick-sale'  className="btn-primary w-full justify-center" to={businessProfile?.salesFlow?.route || '/app/pos'}>{t('dashboard.quickSale')}</Link>
@@ -390,33 +390,33 @@ export default function Dashboard() {
           </div>
 
           {tasksEnabled ? (
-            <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
+            <div className="rounded-3xl border border-secondary-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{t('tasks.dashboard.title')}</p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('tasks.dashboard.subtitle')}</p>
+                  <p className="text-sm font-semibold text-ink">{t('tasks.dashboard.title')}</p>
+                  <p className="mt-1 text-xs text-secondary-500">{t('tasks.dashboard.subtitle')}</p>
                 </div>
-                <BellRing size={18} className="text-slate-400" />
+                <BellRing size={18} className="text-secondary-400" />
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
-                  <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><ClipboardList size={14} /> {t('tasks.notifications.assignedOpen')}</div>
-                  <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{taskSummary?.counters?.assignedToMeOpen || 0}</p>
+                <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
+                  <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><ClipboardList size={14} /> {t('tasks.notifications.assignedOpen')}</div>
+                  <p className="mt-2 text-lg font-semibold text-ink">{taskSummary?.counters?.assignedToMeOpen || 0}</p>
                 </div>
                 <div className="rounded-2xl border border-rose-200/70 bg-rose-50/60 p-3 dark:border-rose-700/40 dark:bg-rose-900/20">
                   <div className="flex items-center gap-2 text-xs uppercase text-rose-500"><Clock size={14} /> {t('tasks.notifications.assignedOverdue')}</div>
-                  <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{taskSummary?.counters?.assignedToMeOverdue || 0}</p>
+                  <p className="mt-2 text-lg font-semibold text-ink">{taskSummary?.counters?.assignedToMeOverdue || 0}</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200/70 p-3 dark:border-slate-700/60">
-                  <div className="flex items-center gap-2 text-xs uppercase text-slate-500"><UserCheck size={14} /> {t('tasks.notifications.createdOpen')}</div>
-                  <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">{taskSummary?.counters?.createdByMeOpen || 0}</p>
+                <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
+                  <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><UserCheck size={14} /> {t('tasks.notifications.createdOpen')}</div>
+                  <p className="mt-2 text-lg font-semibold text-ink">{taskSummary?.counters?.createdByMeOpen || 0}</p>
                 </div>
               </div>
 
               <div className="mt-4">
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{t('tasks.notifications.recentActivity')}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">{t('tasks.notifications.recentActivity')}</p>
                   <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/tasks">{t('dashboard.viewAll')}</Link>
                 </div>
                 {taskSummary?.recentActivities?.length ? (
@@ -424,18 +424,18 @@ export default function Dashboard() {
                     {taskSummary.recentActivities.slice(0, 2).map((activity) => (
                       <Link
                         key={activity.id || `${activity.taskId}-${activity.createdAt}`}
-                        className="block rounded-2xl border border-slate-200/70 bg-slate-50/80 p-3 transition hover:border-primary-200 hover:bg-primary-50/60 dark:border-slate-700/60 dark:bg-slate-900/60 dark:hover:border-primary-500/30 dark:hover:bg-primary-500/10"
+                        className="block rounded-2xl border border-secondary-200/70 bg-mist/80 p-3 transition hover:border-primary-200 hover:bg-primary-50/60 dark:border-slate-700/60 dark:bg-slate-900/60 dark:hover:border-primary-500/30 dark:hover:bg-primary-500/10"
                         to={activity.task?.id || activity.taskId ? `/app/tasks?task=${activity.task?.id || activity.taskId}` : '/app/tasks'}
                       >
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{activity.task?.title || t('tasks.detail.title')}</p>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        <p className="text-sm font-semibold text-ink">{activity.task?.title || t('tasks.detail.title')}</p>
+                        <p className="mt-1 text-xs text-secondary-500">
                           {(activity.actor?.name || t('tasks.detail.unknownUser'))} · {formatMaybeDate(activity.createdAt, 'D MMM')}
                         </p>
                       </Link>
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{t('tasks.notifications.empty')}</p>
+                  <p className="mt-3 text-sm text-secondary-500">{t('tasks.notifications.empty')}</p>
                 )}
               </div>
             </div>
@@ -445,14 +445,14 @@ export default function Dashboard() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         {servicesEnabled ? (
-        <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
+        <div className="rounded-3xl border border-secondary-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
-            <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.upcomingDeliveries')}</h3>
+            <h3 className="font-serif text-lg text-ink">{t('dashboard.upcomingDeliveries')}</h3>
             <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/services">{t('dashboard.viewAll')}</Link>
           </div>
           <div className="mt-4 space-y-2">
             {upcomingDeliveries.length === 0 ? (
-              <p className="text-sm text-slate-500">{t('dashboard.noUpcomingDeliveries')}</p>
+              <p className="text-sm text-secondary-500">{t('dashboard.noUpcomingDeliveries')}</p>
             ) : (
               upcomingDeliveries.map((order) => {
                 const days = getDeliveryDaysLeft(order.deliveryDate);
@@ -463,27 +463,27 @@ export default function Dashboard() {
                   ? 'border border-red-200/70 bg-red-50/60 dark:border-red-800/40 dark:bg-red-900/15'
                   : isWarning
                   ? 'border border-amber-200/70 bg-amber-50/60 dark:border-amber-800/40 dark:bg-amber-900/15'
-                  : 'border border-slate-200/70 bg-white/70 dark:border-slate-700/60 dark:bg-slate-900/60';
+                  : 'border border-secondary-200/70 bg-white/70 dark:border-slate-700/60 dark:bg-slate-900/60';
 
                 return (
                   <div key={order.id || order.orderNo} className={`flex items-center justify-between rounded-2xl p-3 ${rowClass}`}>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{customerName || String(order.id ?? '').slice(0, 6) || '-'}</p>
+                        <p className="text-sm font-semibold text-ink">{customerName || String(order.id ?? '').slice(0, 6) || '-'}</p>
                         {order.vehicleId ? (
-                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{order.vehicleId}</span>
+                          <span className="rounded bg-secondary-100 px-1.5 py-0.5 text-xs text-secondary-500 dark:bg-slate-800 dark:text-secondary-400">{order.vehicleId}</span>
                         ) : null}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-2">
                         {order.orderNo ? (
-                          <span className="text-xs text-slate-500">{order.orderNo}</span>
+                          <span className="text-xs text-secondary-500">{order.orderNo}</span>
                         ) : null}
                         <DeliveryTag date={order.deliveryDate} />
                       </div>
                     </div>
                     <div className="ml-3 text-right">
-                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{formatMoney(order.grandTotal)}</p>
-                      <span className={`text-xs font-medium capitalize ${order.status === 'in_progress' ? 'text-amber-600 dark:text-amber-400' : order.status === 'open' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500'}`}>
+                      <p className="text-sm font-semibold text-ink-light">{formatMoney(order.grandTotal)}</p>
+                      <span className={`text-xs font-medium capitalize ${order.status === 'in_progress' ? 'text-amber-600 dark:text-amber-400' : order.status === 'open' ? 'text-blue-600 dark:text-blue-400' : 'text-secondary-500'}`}>
                         {order.status === 'in_progress' ? t('services.inProgress') : order.status === 'open' ? t('services.open') : order.status === 'closed' ? t('services.closed') : order.status || '-'}
                       </span>
                     </div>
@@ -495,20 +495,20 @@ export default function Dashboard() {
         </div>
         ) : null}
 
-        <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
+        <div className="rounded-3xl border border-secondary-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
-            <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.recentPurchases')}</h3>
+            <h3 className="font-serif text-lg text-ink">{t('dashboard.recentPurchases')}</h3>
             <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/purchases">{t('dashboard.viewAll')}</Link>
           </div>
           <div className="mt-4 space-y-3">
             {recentPurchases.length === 0 ? (
-              <p className="text-sm text-slate-500">{t('dashboard.noPurchases')}</p>
+              <p className="text-sm text-secondary-500">{t('dashboard.noPurchases')}</p>
             ) : (
               recentPurchases.map((purchase) => (
-                <div key={purchase.id || purchase.invoiceNo} className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60">
+                <div key={purchase.id || purchase.invoiceNo} className="flex items-center justify-between rounded-2xl border border-secondary-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{purchase.invoiceNo || String(purchase.id ?? '').slice(0, 6) || '-'}</p>
-                    <p className="text-xs text-slate-500">{formatDate(purchase.purchaseDate)} - {purchase.status || t('nav.purchases')}</p>
+                    <p className="text-sm font-semibold text-ink">{purchase.invoiceNo || String(purchase.id ?? '').slice(0, 6) || '-'}</p>
+                    <p className="text-xs text-secondary-500">{formatDate(purchase.purchaseDate)} - {purchase.status || t('nav.purchases')}</p>
                   </div>
                   <p className="shrink-0 text-sm font-semibold text-amber-600 dark:text-amber-300">{formatMoney(purchase.grandTotal)}</p>
                 </div>
@@ -519,20 +519,20 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
+        <div className="rounded-3xl border border-secondary-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
-            <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.recentSales')}</h3>
+            <h3 className="font-serif text-lg text-ink">{t('dashboard.recentSales')}</h3>
             <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/services">{t('dashboard.viewAll')}</Link>
           </div>
           <div className="mt-4 space-y-3">
             {recentSales.length === 0 ? (
-              <p className="text-sm text-slate-500">{t('dashboard.noSales')}</p>
+              <p className="text-sm text-secondary-500">{t('dashboard.noSales')}</p>
             ) : (
               recentSales.map((sale) => (
-                <div key={sale.id || sale.invoiceNo} className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60">
+                <div key={sale.id || sale.invoiceNo} className="flex items-center justify-between rounded-2xl border border-secondary-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{sale.customerName || String(sale.id ?? '').slice(0, 6) || '-'}</p>
-                    <p className="text-xs text-slate-500">{formatDate(sale.saleDate)} - {sale.status || t('nav.sales')}</p>
+                    <p className="text-sm font-semibold text-ink">{sale.customerName || String(sale.id ?? '').slice(0, 6) || '-'}</p>
+                    <p className="text-xs text-secondary-500">{formatDate(sale.saleDate)} - {sale.status || t('nav.sales')}</p>
                   </div>
                   <p className="shrink-0 text-sm font-semibold text-emerald-700 dark:text-emerald-300">{formatMoney(sale.grandTotal)}</p>
                 </div>
@@ -541,14 +541,14 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
+        <div className="rounded-3xl border border-secondary-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
-            <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('dashboard.lowStockAlerts')}</h3>
+            <h3 className="font-serif text-lg text-ink">{t('dashboard.lowStockAlerts')}</h3>
             <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/inventory">{t('dashboard.viewInventory')}</Link>
           </div>
           <div className="mt-4 space-y-3">
             {lowStockItems.length === 0 ? (
-              <p className="text-sm text-slate-500">{t('dashboard.noLowStock')}</p>
+              <p className="text-sm text-secondary-500">{t('dashboard.noLowStock')}</p>
             ) : (
               lowStockItems.map((item, index) => (
                 <div
@@ -556,8 +556,8 @@ export default function Dashboard() {
                   className="flex items-center justify-between rounded-2xl border border-rose-200/60 bg-rose-50/60 p-3 dark:border-rose-700/40 dark:bg-rose-900/20"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{item.name || '-'}</p>
-                    <p className="text-xs text-slate-500">{item.sku || 'n/a'}</p>
+                    <p className="text-sm font-semibold text-ink">{item.name || '-'}</p>
+                    <p className="text-xs text-secondary-500">{item.sku || 'n/a'}</p>
                   </div>
                   <p className="shrink-0 text-sm font-semibold text-rose-600 dark:text-rose-300">{asNumber(item.quantityOnHand ?? item.stockOnHand).toFixed(2)}</p>
                 </div>

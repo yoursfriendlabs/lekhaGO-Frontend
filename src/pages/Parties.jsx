@@ -251,7 +251,7 @@ function getStatementBadgeClass(type) {
     payment_out: "bg-red-500 text-white",
   };
 
-  return classes[type] || "bg-slate-100 text-slate-600";
+  return classes[type] || "bg-secondary-100 text-secondary-700";
 }
 
 function getStatementRowTitle(row, t) {
@@ -1079,7 +1079,7 @@ export default function Parties() {
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="card flex flex-col gap-4 lg:sticky lg:top-6 lg:self-start">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
+            <h3 className="font-serif text-2xl text-ink">
               {t("parties.listTitle", { count: partyTotal || parties.length })}
             </h3>
             <div className="flex flex-wrap gap-2">
@@ -1100,8 +1100,8 @@ export default function Parties() {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm focus-within:border-emerald-300 dark:border-slate-800 dark:bg-slate-950">
-              <Search size={16} className="text-slate-400" />
+            <div className="flex flex-1 items-center gap-2 rounded-xl border border-secondary-200 bg-white px-3 py-2 text-sm text-secondary-700 shadow-sm focus-within:border-emerald-300 dark:border-slate-800 dark:bg-slate-950">
+              <Search size={16} className="text-secondary-400" />
               <input
                 className="w-full bg-transparent outline-none"
                 placeholder={t("parties.searchPlaceholder")}
@@ -1123,7 +1123,7 @@ export default function Parties() {
                 className={
                   filterType === type
                     ? "rounded-xl bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700"
-                    : "rounded-xl bg-slate-100 px-3 py-1 text-sm text-slate-600"
+                    : "rounded-xl bg-secondary-100 px-3 py-1 text-sm text-secondary-700"
                 }
               >
                 {t(`parties.types.${type}`)}
@@ -1136,10 +1136,10 @@ export default function Parties() {
             className="min-h-[360px] max-h-[60vh] space-y-2 overflow-y-auto pr-1 no-scrollbar lg:max-h-[calc(100vh-22rem)]"
           >
             {loadingParties && parties.length === 0 ? (
-              <p className="text-sm text-slate-500">{t("common.loading")}</p>
+              <p className="text-sm text-secondary-500">{t("common.loading")}</p>
             ) : parties.length === 0 ? (
               <div className="space-y-2">
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-secondary-500">
                   {t("parties.noParties")}
                 </p>
                 {listError ? (
@@ -1171,7 +1171,7 @@ export default function Parties() {
                     className={`w-full rounded-2xl border p-3 text-left transition-all ${
                       isSelected
                         ? "border-emerald-300 bg-emerald-50 shadow-sm ring-1 ring-emerald-200 dark:border-emerald-700 dark:bg-emerald-900/20 dark:ring-emerald-800"
-                        : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800"
+                        : "border-secondary-200 bg-white hover:border-secondary-300 hover:bg-mist dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800"
                     }`}
                   >
                     <div className="flex items-center gap-3">
@@ -1183,7 +1183,7 @@ export default function Parties() {
                         {party.name?.slice(0, 2).toUpperCase() || "P"}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="flex items-center gap-1.5 font-semibold text-slate-900">
+                        <p className="flex items-center gap-1.5 font-semibold text-ink">
                           {party.name}
                           {balanceMeta.tone !== "settled" && (
                             <span
@@ -1193,7 +1193,7 @@ export default function Parties() {
                             </span>
                           )}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-secondary-500">
                           {party.phone || "-"}
                         </p>
                       </div>
@@ -1204,7 +1204,7 @@ export default function Parties() {
                             amount: balanceMeta.absoluteAmount.toFixed(2),
                           })}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-secondary-500">
                           {balanceMeta.label}
                         </p>
                       </div>
@@ -1221,7 +1221,7 @@ export default function Parties() {
             />
           </div>
 
-          <div className="flex items-center justify-between gap-2 border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-slate-700/60">
+          <div className="flex items-center justify-between gap-2 border-t border-secondary-200/70 pt-3 text-xs text-secondary-500 dark:border-slate-700/60">
             <span>
               {t("pagination.showing", {
                 start: parties.length ? 1 : 0,
@@ -1281,11 +1281,11 @@ export default function Parties() {
                     {selectedPartyView.name?.slice(0, 1).toUpperCase() || "P"}
                   </div>
                   <div>
-                    <p className="text-xl font-semibold text-slate-900">
+                    <p className="text-xl font-semibold text-ink">
                       {selectedPartyView.name}
                     </p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-secondary-500">
                         {selectedPartyView.phone || "-"}
                       </p>
                       {!selectedPartyHasDue && selectedPartyWhatsAppLink ? (
@@ -1293,7 +1293,7 @@ export default function Parties() {
                           href={selectedPartyWhatsAppLink}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-200"
+                          className="inline-flex items-center gap-1 rounded-full bg-secondary-100 px-2 py-0.5 text-[11px] font-semibold text-secondary-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-secondary-200"
                           aria-label={`Open WhatsApp chat for ${selectedPartyView.phone}`}
                         >
                           <MessageCircle size={12} />
@@ -1304,7 +1304,7 @@ export default function Parties() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs uppercase text-slate-400">
+                  <p className="text-xs uppercase text-secondary-400">
                     {selectedBalanceMeta.label}
                   </p>
                   <p
@@ -1366,12 +1366,12 @@ export default function Parties() {
                 {partySummaryCards.map((card) => (
                   <div
                     key={card.key}
-                    className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3 dark:border-slate-800/60 dark:bg-slate-900/30"
+                    className="rounded-2xl border border-secondary-200/70 bg-mist/70 p-3 dark:border-slate-800/60 dark:bg-slate-900/30"
                   >
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                       {card.label}
                     </p>
-                    <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-white">
+                    <p className="mt-2 text-sm font-semibold text-ink">
                       {t("common.total")}:{" "}
                       {t("currency.formatted", {
                         symbol: t("currency.symbol"),
@@ -1391,7 +1391,7 @@ export default function Parties() {
 
               <div className="flex flex-wrap items-center justify-between gap-3 pt-2" ref={txSectionRef}>
                 <div className="flex items-center gap-3">
-                  <h4 className="text-lg font-semibold text-slate-900">
+                  <h4 className="text-lg font-semibold text-ink">
                     {t("parties.transactions", {
                       count: statementData.summary.totalRows,
                     })}
@@ -1402,7 +1402,7 @@ export default function Parties() {
                       setTxSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
                       setTxPage(1);
                     }}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 active:scale-95 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-secondary-200 bg-white text-secondary-700 transition hover:bg-mist hover:text-ink active:scale-95 dark:border-slate-800 dark:bg-slate-950 dark:text-secondary-400 dark:hover:bg-slate-900 dark:hover:text-slate-100"
                     title={txSortOrder === "desc" ? "Newest First" : "Oldest First"}
                   >
                     {txSortOrder === "desc" ? <ArrowDown size={15} /> : <ArrowUp size={15} />}
@@ -1430,11 +1430,11 @@ export default function Parties() {
 
               <div className="space-y-2">
                 {statementLoading ? (
-                  <p className="py-3 text-sm text-slate-500">
+                  <p className="py-3 text-sm text-secondary-500">
                     {t("common.loading")}
                   </p>
                 ) : statementData.rows.length === 0 ? (
-                  <p className="py-3 text-sm text-slate-500">
+                  <p className="py-3 text-sm text-secondary-500">
                     {t("parties.noTransactions")}
                   </p>
                 ) : (
@@ -1446,7 +1446,7 @@ export default function Parties() {
                     return (
                       <div
                         key={`${row.type}-${row.id}`}
-                        className="rounded-2xl border border-slate-200 bg-white p-3"
+                        className="rounded-2xl border border-secondary-200 bg-white p-3"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0 flex-1">
@@ -1456,7 +1456,7 @@ export default function Parties() {
                               >
                                 {getStatementTypeLabel(row.type, t)}
                               </span>
-                              <span className="truncate text-sm font-medium text-slate-800">
+                              <span className="truncate text-sm font-medium text-ink">
                                 {getStatementRowTitle(row, t)}
                               </span>
                             </div>
@@ -1469,7 +1469,7 @@ export default function Parties() {
                                 <span className="italic">
                                   Note: {row.note === 'Opening Balance' ? t('parties.openingBalanceNote') : row.note}
                                   {row.note === 'Opening Balance' && (
-                                    <span className="ml-1 text-slate-500 font-normal block sm:inline">
+                                    <span className="ml-1 text-secondary-500 font-normal block sm:inline">
                                       ({t('parties.editProfileToChangeOpeningBalance')})
                                     </span>
                                   )}
@@ -1488,7 +1488,7 @@ export default function Parties() {
                               {viewPath ? (
                                 <Link
                                   to={viewPath}
-                                  className="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-100 active:scale-95"
+                                  className="inline-flex items-center gap-1 rounded-md bg-mist px-2 py-1 text-xs font-semibold text-ink-light transition-all hover:bg-secondary-100 active:scale-95"
                                 >
                                   <Eye size={12} />
                                   {t("common.view")}
@@ -1509,7 +1509,7 @@ export default function Parties() {
                             <div className="text-right text-sm">
                               <div className="flex items-start justify-end gap-2">
                                 <div>
-                                  <p className="font-semibold text-slate-900">
+                                  <p className="font-semibold text-ink">
                                     {amountFields.primaryLabel}:{" "}
                                     {t("currency.formatted", {
                                       symbol: t("currency.symbol"),
@@ -1517,7 +1517,7 @@ export default function Parties() {
                                     })}
                                   </p>
                                   {amountFields.secondaryLabel ? (
-                                    <p className="text-slate-500">
+                                    <p className="text-secondary-500">
                                       {amountFields.secondaryLabel}:{" "}
                                       {t("currency.formatted", {
                                         symbol: t("currency.symbol"),
@@ -1564,7 +1564,7 @@ export default function Parties() {
               </div>
 
               {totalTxPages > 1 && (
-                <div className="flex items-center justify-between pt-2 text-sm text-slate-500">
+                <div className="flex items-center justify-between pt-2 text-sm text-secondary-500">
                   <span>
                     {statementData.summary.totalRows} transactions · page{" "}
                     {txPage} of {totalTxPages}
@@ -1574,7 +1574,7 @@ export default function Parties() {
                       type="button"
                       disabled={txPage === 1}
                       onClick={() => setTxPage((prev) => prev - 1)}
-                      className="rounded-lg border border-slate-200 px-3 py-1 text-xs disabled:opacity-40"
+                      className="rounded-lg border border-secondary-200 px-3 py-1 text-xs disabled:opacity-40"
                     >
                       Prev
                     </button>
@@ -1582,7 +1582,7 @@ export default function Parties() {
                       type="button"
                       disabled={txPage === totalTxPages}
                       onClick={() => setTxPage((prev) => prev + 1)}
-                      className="rounded-lg border border-slate-200 px-3 py-1 text-xs disabled:opacity-40"
+                      className="rounded-lg border border-secondary-200 px-3 py-1 text-xs disabled:opacity-40"
                     >
                       Next
                     </button>
@@ -1591,7 +1591,7 @@ export default function Parties() {
               )}
             </>
           ) : (
-            <p className="text-sm text-slate-500">{t("parties.noParties")}</p>
+            <p className="text-sm text-secondary-500">{t("parties.noParties")}</p>
           )}
         </div>
       </div>
@@ -1652,7 +1652,7 @@ export default function Parties() {
             </div>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 border-t border-slate-100 pt-3">
+          <div className="grid gap-3 md:grid-cols-2 border-t border-secondary-100 pt-3">
             <div>
               <label className="label">{t("parties.email")}</label>
               <input
@@ -1757,7 +1757,7 @@ export default function Parties() {
                       ? opt.value === "give"
                         ? "rounded-xl border-2 border-emerald-400 bg-emerald-50 py-2.5 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
                         : "rounded-xl border-2 border-rose-400 bg-rose-50 py-2.5 text-sm font-semibold text-rose-700 dark:bg-rose-900/20 dark:text-rose-300"
-                      : "rounded-xl border-2 border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                      : "rounded-xl border-2 border-secondary-200 bg-white py-2.5 text-sm font-semibold text-secondary-700 hover:border-secondary-300 dark:border-slate-700 dark:bg-slate-900 dark:text-secondary-300"
                   }
                 >
                   {opt.label}

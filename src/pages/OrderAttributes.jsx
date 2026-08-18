@@ -133,7 +133,7 @@ export default function OrderAttributes() {
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-1">
           <form onSubmit={handleSubmit} className="card sticky top-24 space-y-4 p-6">
-            <h3 className="text-lg font-bold text-slate-900">
+            <h3 className="text-lg font-bold text-ink">
               {editingId ? t('orderAttributes.editAttribute') : t('orderAttributes.addAttribute')}
             </h3>
 
@@ -206,7 +206,7 @@ export default function OrderAttributes() {
                 <button
                   onClick={handleCancel}
                   type="button"
-                  className="flex-1 rounded-xl bg-slate-100 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-200"
+                  className="flex-1 rounded-xl bg-secondary-100 py-2.5 text-sm font-bold text-secondary-700 transition hover:bg-secondary-200"
                 >
                   {t('common.cancel')}
                 </button>
@@ -218,7 +218,7 @@ export default function OrderAttributes() {
         <div className="lg:col-span-2">
           <div className="card overflow-hidden">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs font-semibold uppercase text-slate-500">
+              <thead className="bg-mist text-xs font-semibold uppercase text-secondary-500">
                 <tr>
                   <th className="px-6 py-4">{t('orderAttributes.name')}</th>
                   <th className="px-6 py-4">{t('orderAttributes.type')}</th>
@@ -228,8 +228,8 @@ export default function OrderAttributes() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {attributes.map((attr) => (
-                  <tr key={attr.id} className="hover:bg-slate-50/50">
-                    <td className="px-6 py-4 font-medium text-slate-900">{attr.name}</td>
+                  <tr key={attr.id} className="hover:bg-mist/50">
+                    <td className="px-6 py-4 font-medium text-ink">{attr.name}</td>
                     <td className="px-6 py-4">
                       <span className="rounded-lg bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600">
                         {t(`orderAttributes.types.${attr.type}`)}
@@ -260,7 +260,7 @@ export default function OrderAttributes() {
                 ))}
                 {attributes.length === 0 && (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan="5" className="px-6 py-12 text-center text-secondary-500">
                       {t('common.noData') || 'No attributes found.'}
                     </td>
                   </tr>

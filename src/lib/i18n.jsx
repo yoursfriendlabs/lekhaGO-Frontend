@@ -161,6 +161,7 @@ const dictionaries = {
       tabs: {
         general: 'General',
         profile: 'Profile',
+        appearance: 'Appearance',
         subscription: 'Subscription',
         account: 'Account',
         staff: 'Staff',
@@ -171,10 +172,15 @@ const dictionaries = {
         orderAttributes: 'Order Attributes',
         tablesFloors: 'Tables & Floors',
       },
+      sections: {
+        company: 'Company settings',
+        profile: 'Profile settings',
+      },
       descriptions: {
         general: 'Company details shown on invoices, receipts, and printed documents.',
         generalLocked: 'Business settings are read-only until the workspace moves to a paid plan.',
         profile: 'Update your personal profile and business display name.',
+        appearance: 'Choose a color theme for the workspace. The choice stays on this device.',
         subscription: 'Review plans, billing access, payment setup, and upgrade steps.',
         account: 'Update your password, review email verification, and keep your account secure.',
         staff: 'Manage staff access, roles, and account status.',
@@ -681,6 +687,32 @@ const dictionaries = {
       fallback: {
         na: 'Not available',
         unknown: 'Unknown',
+      },
+    },
+    theme: {
+      title: 'Workspace look',
+      subtitle: 'Pick a primary color. Buttons, highlights, and navigation follow this theme.',
+      pickerLabel: 'Color theme',
+      customHexLabel: 'Your color',
+      customHexHint: 'Paste a hex code such as #1a73e8. PasalManager builds the full theme from that color.',
+      customHexPlaceholder: '#1a73e8',
+      customHexApply: 'Apply',
+      customHexInvalid: 'Enter a valid hex color, like #9b6835.',
+      names: {
+        teak: 'Teak',
+        teal: 'Himalayan Teal',
+        indigo: 'Indigo',
+        forest: 'Forest',
+        ruby: 'Ruby',
+        custom: 'Custom',
+      },
+      hints: {
+        teak: 'Warm wood. The classic PasalManager look for everyday shops.',
+        teal: 'Fresh and modern. Easy on the eyes for long billing days.',
+        indigo: 'Calm and professional. A clear look for offices and studios.',
+        forest: 'Natural green. A grounded look for stores and workshops.',
+        ruby: 'Bold crimson. Strong contrast for busy counters.',
+        custom: 'Built from the hex color you pasted.',
       },
     },
     topbar: {
@@ -2253,6 +2285,7 @@ const dictionaries = {
       tabs: {
         general: 'सामान्य',
         profile: 'प्रोफाइल',
+        appearance: 'रूप',
         subscription: 'सब्स्क्रिप्सन',
         account: 'खाता',
         staff: 'कर्मचारी',
@@ -2263,10 +2296,15 @@ const dictionaries = {
         orderAttributes: 'अर्डर विशेषता',
         tablesFloors: 'टेबल र फ्लोरहरू',
       },
+      sections: {
+        company: 'कम्पनी सेटिङ',
+        profile: 'प्रोफाइल सेटिङ',
+      },
       descriptions: {
         general: 'इनभ्वाइस, रसिद, र प्रिन्ट कागजातमा देखिने व्यापार विवरणहरू व्यवस्थापन गर्नुहोस्।',
         generalLocked: 'पेड प्लान नभएसम्म व्यापार सेटिङ पढ्न मात्र मिल्ने हुन्छ।',
         profile: 'आफ्नो प्रोफाइल र व्यवसायको देखिने नाम अपडेट गर्नुहोस्।',
+        appearance: 'वर्कस्पेसको रङ थिम छान्नुहोस्। यो छनोट यस उपकरणमा सुरक्षित रहन्छ।',
         subscription: 'प्लान, बिलिङ पहुँच, भुक्तानी सेटअप, र अपग्रेड चरणहरू हेर्नुहोस्।',
         account: 'पासवर्ड बदल्नुहोस्, इमेल प्रमाणीकरण हेर्नुहोस्, र आफ्नो खाता सुरक्षित राख्नुहोस्।',
         staff: 'कर्मचारी पहुँच, भूमिका, र खाता स्थिति व्यवस्थापन गर्नुहोस्।',
@@ -2773,6 +2811,32 @@ const dictionaries = {
       fallback: {
         na: 'उपलब्ध छैन',
         unknown: 'अज्ञात',
+      },
+    },
+    theme: {
+      title: 'वर्कस्पेसको रूप',
+      subtitle: 'मुख्य रङ छान्नुहोस्। बटन, हाइलाइट, र नेभिगेसन यही थिम अनुसार बदलिन्छ।',
+      pickerLabel: 'रङ थिम',
+      customHexLabel: 'आफ्नै रङ',
+      customHexHint: '#1a73e8 जस्तो hex कोड टाँस्नुहोस्। PasalManager त्यही रङबाट पूरा थिम बनाउँछ।',
+      customHexPlaceholder: '#1a73e8',
+      customHexApply: 'लागू गर्नुहोस्',
+      customHexInvalid: '#9b6835 जस्तो मान्य hex रङ लेख्नुहोस्।',
+      names: {
+        teak: 'टीक',
+        teal: 'हिमाली टिल',
+        indigo: 'इन्डिगो',
+        forest: 'वन',
+        ruby: 'रुबी',
+        custom: 'कस्टम',
+      },
+      hints: {
+        teak: 'न्यानो काठ जस्तो। दैनिक पसलका लागि क्लासिक PasalManager रूप।',
+        teal: 'ताजा र आधुनिक। लामो बिलिङ दिनमा आँखा आराम हुन्छ।',
+        indigo: 'शान्त र व्यावसायिक। कार्यालय र स्टुडियोका लागि स्पष्ट रूप।',
+        forest: 'प्राकृतिक हरियो। पसल र वर्कशपका लागि सन्तुलित रूप।',
+        ruby: 'बाक्लो क्रिमसन। व्यस्त काउन्टरमा बलियो कन्ट्रास्ट।',
+        custom: 'तपाईंले टाँसेको hex रङबाट बनाइएको थिम।',
       },
     },
     topbar: {

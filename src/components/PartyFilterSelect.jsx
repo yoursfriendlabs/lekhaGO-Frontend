@@ -65,8 +65,8 @@ export default function PartyFilterSelect({
 
     return (
       <div className="min-w-0">
-        <p className="truncate font-semibold text-slate-800 dark:text-slate-100">{name}</p>
-        {showPhone && phone ? <p className="truncate text-xs text-slate-500">{phone}</p> : null}
+        <p className="truncate font-semibold text-ink">{name}</p>
+        {showPhone && phone ? <p className="truncate text-xs text-secondary-500">{phone}</p> : null}
       </div>
     );
   };

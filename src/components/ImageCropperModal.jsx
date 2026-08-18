@@ -204,7 +204,7 @@ export default function ImageCropperModal({
         {/* Viewport Cropping Area */}
         <div
           ref={containerRef}
-          className="relative overflow-hidden border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-900/10 dark:bg-slate-950 shadow-inner flex items-center justify-center cursor-move"
+          className="relative overflow-hidden border border-secondary-200 dark:border-slate-800 rounded-2xl bg-slate-900/10 dark:bg-slate-950 shadow-inner flex items-center justify-center cursor-move"
           style={{ width: `${viewportSize}px`, height: `${viewportSize}px` }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -241,7 +241,7 @@ export default function ImageCropperModal({
         {/* Zoom & Rotation Controls */}
         <div className="w-full max-w-xs space-y-4">
           <div className="flex items-center gap-3">
-            <ZoomIn className="text-slate-400 shrink-0" size={16} />
+            <ZoomIn className="text-secondary-400 shrink-0" size={16} />
             <input
               type="range"
               min="1"
@@ -250,9 +250,9 @@ export default function ImageCropperModal({
               value={zoom}
               onChange={handleZoomChange}
               disabled={!imgLoaded}
-              className="w-full h-1 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary"
+              className="w-full h-1 bg-secondary-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary"
             />
-            <span className="text-xs font-semibold text-slate-500 w-10 text-right">
+            <span className="text-xs font-semibold text-secondary-500 w-10 text-right">
               {Math.round(zoom * 100)}%
             </span>
           </div>
@@ -262,7 +262,7 @@ export default function ImageCropperModal({
               type="button"
               onClick={handleRotate}
               disabled={!imgLoaded}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900 transition disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-secondary-200 px-3 py-1.5 text-xs font-bold text-ink-light hover:bg-mist dark:border-slate-800 dark:text-secondary-300 dark:hover:bg-slate-900 transition disabled:opacity-50"
             >
               <RotateCw size={14} />
               Rotate 90°
@@ -271,7 +271,7 @@ export default function ImageCropperModal({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex w-full items-center justify-end gap-3 border-t border-slate-100 dark:border-slate-800/80 pt-4 mt-2">
+        <div className="flex w-full items-center justify-end gap-3 border-t border-secondary-100 dark:border-slate-800/80 pt-4 mt-2">
           <button
             type="button"
             className="btn-ghost inline-flex items-center gap-1 px-4 py-2"

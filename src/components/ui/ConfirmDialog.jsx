@@ -67,7 +67,7 @@ export default function ConfirmDialog({
         >
           <AlertTriangle size={18} />
         </div>
-        <div className="min-w-0 flex-1 pt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+        <div className="min-w-0 flex-1 pt-1 text-sm leading-6 text-secondary-700">
           {description || t('common.confirmDelete')}
         </div>
       </div>

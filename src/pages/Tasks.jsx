@@ -104,7 +104,7 @@ function TaskScopeFilter({ value, onChange, t }) {
           className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
             value === option.key
               ? "bg-primary-600 text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800"
+              : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200 dark:bg-slate-900/60 dark:text-secondary-300 dark:hover:bg-slate-800"
           }`}
         >
           {option.label}
@@ -154,20 +154,20 @@ function TaskCard({
           ? "border-sky-200 dark:border-sky-600/40"
           : dueState === "overdue"
             ? "border-rose-200 dark:border-rose-600/30"
-            : "border-slate-200/70 dark:border-slate-800/70"
+            : "border-secondary-200/70"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <Link to={taskHref} className="min-w-0 text-left">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate font-serif text-lg text-slate-900 dark:text-white">
+            <h3 className="truncate font-serif text-lg text-ink">
               {task.title || t("tasks.detail.title")}
             </h3>
             {showUnread ? (
               <TaskUnreadBadge task={task} userId={currentUserId} t={t} />
             ) : null}
           </div>
-          <p className="mt-2 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-2 line-clamp-2 text-sm text-secondary-500">
             {task.description || t("tasks.empty.noDescription")}
           </p>
         </Link>
@@ -187,40 +187,40 @@ function TaskCard({
         <TaskDueBadge task={task} t={t} />
       </div>
 
-      <div className="mt-4 grid gap-3 text-sm text-slate-500 dark:text-slate-400 sm:grid-cols-2">
+      <div className="mt-4 grid gap-3 text-sm text-secondary-500 sm:grid-cols-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">
             {t("tasks.card.assignees")}
           </p>
-          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+          <p className="mt-1 text-sm text-ink-light">
             {assigneeNames.length
               ? assigneeNames.join(", ")
               : t("tasks.empty.noAssignees")}
           </p>
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">
             {t("tasks.card.activity")}
           </p>
-          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+          <p className="mt-1 text-sm text-ink-light">
             {task.lastActivityAt
               ? `${formatMaybeDateTime(task.lastActivityAt, "D MMM, HH:mm")} · ${task.lastActivityBy?.name || humanizeTaskKey(task.lastActivityType)}`
               : t("tasks.empty.noActivity")}
           </p>
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">
             {t("tasks.card.creator")}
           </p>
-          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+          <p className="mt-1 text-sm text-ink-light">
             {task.creator?.name || t("tasks.detail.unknownUser")}
           </p>
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">
             {t("tasks.card.dueDate")}
           </p>
-          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+          <p className="mt-1 text-sm text-ink-light">
             {task.dueDate
               ? formatMaybeDate(task.dueDate, "D MMM YYYY")
               : t("tasks.empty.noDueDate")}
@@ -256,13 +256,13 @@ function TaskBoard({
       {columns.map((column) => (
         <section
           key={column.key}
-          className="min-w-[18rem] flex-1 rounded-3xl border border-slate-200/70 bg-slate-50/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/60"
+          className="min-w-[18rem] flex-1 rounded-3xl border border-secondary-200/70 bg-mist/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/60"
         >
           <div className="flex items-center justify-between gap-3">
-            <h3 className="font-serif text-lg text-slate-900 dark:text-white">
+            <h3 className="font-serif text-lg text-ink">
               {column.label}
             </h3>
-            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-500 shadow-sm dark:bg-slate-950/80 dark:text-slate-300">
+            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-500 shadow-sm dark:bg-slate-950/80 dark:text-secondary-300">
               {grouped.get(column.key)?.length || 0}
             </span>
           </div>
@@ -285,7 +285,7 @@ function TaskBoard({
                   />
                 ))
             ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200/80 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-800/70 dark:text-slate-400">
+              <div className="rounded-2xl border border-dashed border-secondary-200/80 px-4 py-8 text-center text-sm text-secondary-500 dark:border-slate-800/70 dark:text-secondary-400">
                 {t("tasks.empty.boardColumn")}
               </div>
             )}
@@ -742,14 +742,14 @@ export default function Tasks() {
         subtitle={t("tasks.pageSubtitle")}
         action={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
-            <div className="inline-flex overflow-hidden rounded-full border border-slate-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
+            <div className="inline-flex overflow-hidden rounded-full border border-secondary-200/80 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
               <button
                 type="button"
                 onClick={() => handleFilterChange("view", "list")}
                 className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold transition ${
                   viewMode === "list"
                     ? "bg-primary-600 text-white"
-                    : "text-slate-600 dark:text-slate-300"
+                    : "text-secondary-700"
                 }`}
               >
                 <List size={15} />
@@ -761,7 +761,7 @@ export default function Tasks() {
                 className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold transition ${
                   viewMode === "board"
                     ? "bg-primary-600 text-white"
-                    : "text-slate-600 dark:text-slate-300"
+                    : "text-secondary-700"
                 }`}
               >
                 <Columns3 size={15} />
@@ -798,7 +798,7 @@ export default function Tasks() {
         <div className="card space-y-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-400">
                 {t("tasks.filters.title")}
               </p>
               <TaskScopeFilter
@@ -812,7 +812,7 @@ export default function Tasks() {
               <label className="relative block w-full max-w-md">
                 <Search
                   size={18}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400"
                 />
 
                 <input
@@ -820,7 +820,7 @@ export default function Tasks() {
                   value={queryInput}
                   onChange={(event) => setQueryInput(event.target.value)}
                   placeholder={t("tasks.filters.searchPlaceholder")}
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all duration-200 placeholder:text-slate-400 focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:focus:border-slate-600 dark:focus:ring-slate-800"
+                  className="h-11 w-full rounded-xl border border-secondary-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all duration-200 placeholder:text-secondary-400 focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:focus:border-slate-600 dark:focus:ring-slate-800"
                 />
               </label>
 
@@ -904,14 +904,14 @@ export default function Tasks() {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-          <div className="rounded-3xl border border-slate-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
+          <div className="rounded-3xl border border-secondary-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
             <div className="flex items-center gap-3">
               <ClipboardList className="h-5 w-5 text-primary-600 dark:text-primary-300" />
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">
                   {t("tasks.summary.openTasks")}
                 </p>
-                <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">
+                <p className="mt-1 text-2xl font-semibold text-ink">
                   {Math.max(tasksData.total - completedCount, 0)}
                 </p>
               </div>
@@ -925,7 +925,7 @@ export default function Tasks() {
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-500/80">
                   {t("tasks.summary.overdue")}
                 </p>
-                <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">
+                <p className="mt-1 text-2xl font-semibold text-ink">
                   {overdueCount}
                 </p>
               </div>
@@ -939,7 +939,7 @@ export default function Tasks() {
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-500/80">
                   {t("tasks.summary.unread")}
                 </p>
-                <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">
+                <p className="mt-1 text-2xl font-semibold text-ink">
                   {unreadCount}
                 </p>
               </div>
@@ -957,15 +957,15 @@ export default function Tasks() {
       ) : null}
 
       {loading ? (
-        <div className="rounded-3xl border border-slate-200/70 bg-slate-50/80 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-800/70 dark:bg-slate-900/60 dark:text-slate-400">
+        <div className="rounded-3xl border border-secondary-200/70 bg-mist/80 px-4 py-10 text-center text-sm text-secondary-500 dark:border-slate-800/70 dark:bg-slate-900/60 dark:text-secondary-400">
           {t("tasks.loading.list")}
         </div>
       ) : tasksData.items.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-slate-200/80 bg-white/80 px-4 py-12 text-center dark:border-slate-800/70 dark:bg-slate-950/50">
-          <h3 className="font-serif text-xl text-slate-900 dark:text-white">
+        <div className="rounded-3xl border border-dashed border-secondary-200/80 bg-white/80 px-4 py-12 text-center dark:border-slate-800/70 dark:bg-slate-950/50">
+          <h3 className="font-serif text-xl text-ink">
             {t("tasks.empty.title")}
           </h3>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-sm text-secondary-500">
             {t("tasks.empty.description")}
           </p>
           {canManageTasks ? (
@@ -1090,11 +1090,11 @@ export default function Tasks() {
           {statusError ? <Notice title={statusError} tone="error" /> : null}
 
           {statusDialog ? (
-            <div className="rounded-2xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-900/60">
-              <p className="font-semibold text-slate-800 dark:text-slate-200">
+            <div className="rounded-2xl bg-mist px-4 py-3 text-sm dark:bg-slate-900/60">
+              <p className="font-semibold text-ink dark:text-slate-200">
                 {statusDialog.title || t("tasks.detail.title")}
               </p>
-              <p className="mt-1 text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-secondary-500">
                 {getTaskStatusLabel(statusDialog.status, meta)}
               </p>
             </div>
@@ -1111,18 +1111,18 @@ export default function Tasks() {
                   className={`flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition ${
                     isSelected
                       ? option.selectedClass
-                      : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
+                      : "border-secondary-200 bg-white hover:border-secondary-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"
                   }`}
                 >
                   <span
                     className={`h-3 w-3 shrink-0 rounded-full ${option.dotClass}`}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-slate-800 dark:text-slate-200">
+                    <p className="font-semibold text-ink dark:text-slate-200">
                       {option.label}
                     </p>
                     {option.description ? (
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-secondary-500">
                         {option.description}
                       </p>
                     ) : null}
@@ -1138,7 +1138,7 @@ export default function Tasks() {
       </Dialog>
 
       {canViewTasks ? (
-        <div className="rounded-3xl border border-slate-200/70 bg-white/80 px-4 py-3 text-sm text-slate-500 dark:border-slate-800/70 dark:bg-slate-950/50 dark:text-slate-400">
+        <div className="rounded-3xl border border-secondary-200/70 bg-white/80 px-4 py-3 text-sm text-secondary-500 dark:border-slate-800/70 dark:bg-slate-950/50 dark:text-secondary-400">
           <span>{t("tasks.footerHint")}</span>
           <Link
             className="ml-2 font-semibold text-primary-600 dark:text-primary-300"

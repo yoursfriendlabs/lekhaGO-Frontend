@@ -257,7 +257,7 @@ function AppShell() {
   const routeNotice = location.state?.notice || null;
 
   return (
-    <div className="gradient-bg min-h-[100dvh] overflow-x-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 md:h-screen md:overflow-hidden">
+    <div className="gradient-bg min-h-[100dvh] overflow-x-hidden bg-mist text-ink md:h-screen md:overflow-hidden">
       <div className="flex min-h-[100dvh] max-w-full md:h-screen">
         <Sidebar />
         <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col overflow-x-hidden md:ml-64 md:min-h-0 md:h-screen md:overflow-hidden">
@@ -288,10 +288,10 @@ function AppShell() {
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
                       {t('auth.emailVerificationBannerEyebrow')}
                     </p>
-                    <h2 className="mt-2 font-serif text-xl text-slate-900 dark:text-white">
+                    <h2 className="mt-2 font-serif text-xl text-ink">
                       {requiresActivation ? t('auth.activationBannerStaffTitle') : t('auth.activationBannerTitle')}
                     </h2>
-                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    <p className="mt-2 text-sm text-secondary-600">
                       {requiresActivation ? t('auth.activationBannerStaffDescription') : t('auth.activationBannerDescription')}
                     </p>
                   </div>

@@ -110,14 +110,14 @@ export default function UpgradeSubscriptionCta({ variant = 'button', className =
                 >
                   {subscriptionStatus.kind === 'trial-expiring' ? t('appAccess.trialExpiringEyebrow') : t('appAccess.trialEyebrow')}
                 </p>
-                <h3 className="mt-1 text-base font-semibold text-slate-900">
+                <h3 className="mt-1 text-base font-semibold text-ink">
                   {subscriptionStatus.kind === 'trial-expiring' ? t('appAccess.trialExpiringTitle') : t('appAccess.trialTitle')}
                 </h3>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               {subscriptionStatus.trial?.endsAt ? (
-                <span className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-3 py-2 text-xs font-medium text-slate-700">
+                <span className="inline-flex items-center gap-2 rounded-full border border-secondary-200/80 bg-white/90 px-3 py-2 text-xs font-medium text-ink-light">
                   <CalendarDays className="h-4 w-4" aria-hidden />
                   {t('appAccess.trialEndsShort', { date: trialEndDate })}
                 </span>
@@ -127,7 +127,7 @@ export default function UpgradeSubscriptionCta({ variant = 'button', className =
                   className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium ${
                     subscriptionStatus.kind === 'trial-expiring'
                       ? 'border-amber-200/80 bg-amber-50/90 text-amber-800'
-                      : 'border-slate-200/80 bg-white/90 text-slate-700'
+                      : 'border-secondary-200/80 bg-white/90 text-ink-light'
                   }`}
                 >
                   <Clock3 className="h-4 w-4" aria-hidden />
@@ -143,12 +143,12 @@ export default function UpgradeSubscriptionCta({ variant = 'button', className =
             </button>
           </div>
         ) : (
-          <div className="rounded-3xl border border-[#9b6835]/20 bg-gradient-to-br from-[#fff7ed] via-white to-[#f8efe4] p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9b6835]">
+          <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary-50 via-white to-primary-100 p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
               {t('upgradePrompt.sidebarEyebrow')}
             </p>
-            <h3 className="mt-2 text-lg font-semibold text-slate-900">{t('upgradePrompt.sidebarTitle')}</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{t('upgradePrompt.sidebarDescription')}</p>
+            <h3 className="mt-2 text-lg font-semibold text-ink">{t('upgradePrompt.sidebarTitle')}</h3>
+            <p className="mt-2 text-sm leading-6 text-secondary-700">{t('upgradePrompt.sidebarDescription')}</p>
             <button type="button" className={`${buttonClasses} mt-4 w-full`} onClick={handlePrimaryAction}>
               <span className="flex items-center justify-center gap-2">
                 {buttonLabel}
@@ -194,21 +194,21 @@ export default function UpgradeSubscriptionCta({ variant = 'button', className =
               return (
                 <div
                   key={benefit.key}
-                  className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm"
+                  className="rounded-2xl border border-secondary-200/80 bg-white p-4 shadow-sm"
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#9b6835]/10 text-[#9b6835]">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                     <Icon className="h-5 w-5" aria-hidden />
                   </div>
-                  <h4 className="mt-4 text-base font-semibold text-slate-900">{benefit.title}</h4>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{benefit.description}</p>
+                  <h4 className="mt-4 text-base font-semibold text-ink">{benefit.title}</h4>
+                  <p className="mt-2 text-sm leading-6 text-secondary-700">{benefit.description}</p>
                 </div>
               );
             })}
           </div>
 
-          <div className="rounded-2xl border border-slate-200/80 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-slate-900">{t('upgradePrompt.noteTitle')}</p>
-            <p className="mt-1 text-sm leading-6 text-slate-600">{t('upgradePrompt.noteDescription')}</p>
+          <div className="rounded-2xl border border-secondary-200/80 bg-mist p-4">
+            <p className="text-sm font-semibold text-ink">{t('upgradePrompt.noteTitle')}</p>
+            <p className="mt-1 text-sm leading-6 text-secondary-700">{t('upgradePrompt.noteDescription')}</p>
           </div>
         </div>
       </Dialog>

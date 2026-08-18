@@ -14,7 +14,7 @@ export default function MobileFormStepper({
   const isLastStep = currentIndex === steps.length - 1;
 
   return (
-    <div className="bg-white px-3 py-3 dark:bg-slate-950 border-b border-slate-200/60 dark:border-slate-800/60">
+    <div className="bg-white px-3 py-3 dark:bg-slate-950 border-b border-secondary-200/60 dark:border-slate-800/60">
       <div className="mx-auto flex w-full max-w-lg items-center justify-between gap-1.5">
         {steps.map((step, index) => {
           const isActive = step.id === currentStep;
@@ -34,7 +34,7 @@ export default function MobileFormStepper({
                       ? 'bg-primary text-white shadow-md shadow-primary/20 ring-2 ring-primary/10'
                       : isPast
                         ? 'bg-primary text-white'
-                        : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
+                        : 'bg-secondary-100 text-secondary-400 dark:bg-slate-800 dark:text-secondary-500'
                   }`}
                 >
                   {isPast ? (
@@ -49,7 +49,7 @@ export default function MobileFormStepper({
                   className={`mt-1 whitespace-nowrap text-[9px] font-bold uppercase tracking-wider transition-colors duration-300 ${
                     isActive
                       ? 'text-primary dark:text-primary-400'
-                      : 'text-slate-400 dark:text-slate-600'
+                      : 'text-secondary-400 dark:text-secondary-700'
                   }`}
                 >
                   {step.label}
@@ -57,7 +57,7 @@ export default function MobileFormStepper({
               </button>
 
               {index < steps.length - 1 ? (
-                <div className="mb-3.5 h-[1.5px] flex-1 rounded-full bg-slate-100 dark:bg-slate-800">
+                <div className="mb-3.5 h-[1.5px] flex-1 rounded-full bg-secondary-100 dark:bg-slate-800">
                   <div
                     className="h-full rounded-full bg-primary transition-all duration-500"
                     style={{ width: isPast ? '100%' : '0%' }}
@@ -70,12 +70,12 @@ export default function MobileFormStepper({
       </div>
 
       {showNavigation ? (
-        <div className="mt-3 flex gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+        <div className="mt-3 flex gap-2 border-t border-secondary-200 pt-3 dark:border-slate-800">
           {!isFirstStep && (
             <button
               type="button"
               onClick={onBack}
-              className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 active:scale-95 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+              className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-ink transition hover:bg-mist active:scale-95 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               {backLabel}
             </button>
@@ -88,7 +88,7 @@ export default function MobileFormStepper({
               className={`flex-1 rounded-md px-3 py-2.5 text-sm font-semibold transition active:scale-95 ${
                 canProceed
                   ? 'bg-blue-600 text-white shadow-sm hover:bg-blue-700'
-                  : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-secondary-200 text-secondary-400 cursor-not-allowed'
               }`}
             >
               {nextLabel}

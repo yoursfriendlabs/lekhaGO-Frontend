@@ -86,7 +86,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="hidden h-full w-64 flex-col gap-6 border-r border-slate-200/70 bg-white/80 p-6 dark:border-slate-800/70 dark:bg-slate-950/70 md:fixed md:inset-y-0 md:left-0 md:flex md:overflow-y-auto">
+    <aside className="hidden h-full w-64 flex-col gap-6 border-r border-secondary-200/70 bg-surface/80 p-6 md:fixed md:inset-y-0 md:left-0 md:flex md:overflow-y-auto">
       <div className="space-y-3">
         <BrandLogo className="h-10 w-full" />
       </div>
@@ -99,8 +99,8 @@ export default function Sidebar() {
             className={({ isActive }) =>
               `rounded-xl px-3 py-2 text-sm font-semibold transition ${
                 isActive
-                  ? 'bg-[#9c5f22] text-white'
-                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/70'
+                  ? 'bg-primary text-white'
+                  : 'text-ink-light hover:bg-primary/10'
               }`
             }
           >
@@ -110,7 +110,7 @@ export default function Sidebar() {
       </nav>
       <div className="mt-auto space-y-3">
         <UpgradeSubscriptionCta variant="sidebar" />
-        <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-xs text-slate-500 dark:border-slate-800/60 dark:bg-slate-900/60 dark:text-slate-400">
+        <div className="rounded-2xl border border-secondary-200/70 bg-surface/70 p-4 text-xs text-secondary-500">
           {/* {t('notices.businessRequiredDesc')} */}
         </div>
       </div>

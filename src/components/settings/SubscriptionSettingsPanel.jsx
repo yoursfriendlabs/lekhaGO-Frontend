@@ -79,7 +79,7 @@ function StatusPill({ label, tone = 'slate' }) {
     amber: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-200',
     blue: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200',
     rose: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-200',
-    slate: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+    slate: 'bg-secondary-200 text-ink-light dark:bg-slate-800 dark:text-slate-200',
   };
 
   return (
@@ -95,16 +95,16 @@ function MetricCard({ label, value, description, icon: Icon, tone = 'slate' }) {
     amber: 'border-amber-200/70 bg-amber-50/70 dark:border-amber-800/40 dark:bg-amber-950/20',
     blue: 'border-sky-200/70 bg-sky-50/70 dark:border-sky-800/40 dark:bg-sky-950/20',
     rose: 'border-rose-200/70 bg-rose-50/70 dark:border-rose-800/40 dark:bg-rose-950/20',
-    slate: 'border-slate-200/70 bg-slate-50/70 dark:border-slate-800/60 dark:bg-slate-900/50',
+    slate: 'border-secondary-200/70 bg-mist/70 dark:border-slate-800/60 dark:bg-slate-900/50',
   };
 
   return (
     <div className={`rounded-3xl border p-5 ${tones[tone] || tones.slate}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
-          <p className="mt-3 break-words text-2xl font-semibold text-slate-900 dark:text-white">{value}</p>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{description}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-400">{label}</p>
+          <p className="mt-3 break-words text-2xl font-semibold text-ink">{value}</p>
+          <p className="mt-2 text-sm text-secondary-500">{description}</p>
         </div>
         <div className="rounded-2xl bg-white/90 p-3 shadow-sm dark:bg-slate-950/70">
           <Icon size={18} />
@@ -415,10 +415,10 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
       {/* Header Panel */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h2 className="text-xl font-bold tracking-tight text-ink">
             Subscription
           </h2>
-          <p className="text-sm text-slate-500 dark:text-slate-450">
+          <p className="text-sm text-secondary-500 dark:text-slate-450">
             Billing overview and subscription plan upgrades.
           </p>
         </div>
@@ -444,14 +444,14 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
       {error ? <Notice title={error} tone="error" /> : null}
 
       {/* Active Subscription Billing Card */}
-      <div className="rounded-2xl border border-slate-200 bg-white/70 p-6 dark:border-slate-800/80 dark:bg-slate-900/50">
+      <div className="rounded-2xl border border-secondary-200 bg-white/70 p-6 dark:border-slate-800/80 dark:bg-slate-900/50">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Current Plan</span>
             <h3 className="text-xl font-extrabold text-slate-950 dark:text-white mt-0.5">
               {currentPlan?.label || humanizeKey(access?.planKey) || 'Freemium'}
             </h3>
-            <p className="text-xs text-slate-550 dark:text-slate-400 mt-1">
+            <p className="text-xs text-slate-550 dark:text-secondary-400 mt-1">
               {currentPlan?.key === 'freemium' ? 'Starter plan for getting a business up and running.' : currentPlan?.description}
             </p>
           </div>
@@ -467,30 +467,30 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-4 border-t border-slate-100 pt-5 dark:border-slate-800 sm:grid-cols-3 text-xs">
+        <div className="mt-6 grid gap-4 border-t border-secondary-100 pt-5 dark:border-slate-800 sm:grid-cols-3 text-xs">
           <div>
-            <span className="text-[11px] text-slate-400 dark:text-slate-505 uppercase tracking-wider font-semibold">
+            <span className="text-[11px] text-secondary-400 dark:text-slate-505 uppercase tracking-wider font-semibold">
               {t('adminPage.plan.currentPlanFields.billingCycle')}
             </span>
-            <p className="mt-1 font-semibold text-slate-800 dark:text-slate-200 capitalize">
+            <p className="mt-1 font-semibold text-ink dark:text-slate-200 capitalize">
               {resolveSubscriptionLabel(t, 'billingCycleLabels', currentPlan?.billingCycle) || 'Free'}
             </p>
           </div>
           <div>
-            <span className="text-[11px] text-slate-400 dark:text-slate-505 uppercase tracking-wider font-semibold">
+            <span className="text-[11px] text-secondary-400 dark:text-slate-505 uppercase tracking-wider font-semibold">
               {t('adminPage.plan.currentPlanFields.billingAmount')}
             </span>
-            <p className="mt-1 font-semibold text-slate-800 dark:text-slate-200">
+            <p className="mt-1 font-semibold text-ink dark:text-slate-200">
               {currentPlan?.key === 'freemium' ? 'Free' : formatMoney(currentPlan?.billingAmount, t)}
             </p>
           </div>
           <div>
-            <span className="text-[11px] text-slate-400 dark:text-slate-555 uppercase tracking-wider font-semibold">
+            <span className="text-[11px] text-secondary-400 dark:text-slate-555 uppercase tracking-wider font-semibold">
               {showCancelledBanner
                 ? t('adminPage.plan.currentPlanFields.endDate')
                 : t('adminPage.plan.currentPlanFields.nextBillingDate')}
             </span>
-            <p className="mt-1 font-semibold text-slate-800 dark:text-slate-200">
+            <p className="mt-1 font-semibold text-ink dark:text-slate-200">
               {formatSubscriptionStatusDate(
                 cancellation?.effectiveUntil || currentPlan?.nextBillingDate || currentPlan?.subscriptionEndDate,
                 locale
@@ -565,17 +565,17 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
       ) : null}
 
       {canCancelSubscription ? (
-        <div className="rounded-2xl border border-slate-200 bg-white/70 p-6 dark:border-slate-800/80 dark:bg-slate-900/50">
+        <div className="rounded-2xl border border-secondary-200 bg-white/70 p-6 dark:border-slate-800/80 dark:bg-slate-900/50">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-start gap-3">
               <div className="rounded-xl bg-rose-100 p-2 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
                 <ShieldAlert size={20} />
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                <h4 className="text-sm font-bold text-ink">
                   {t('adminPage.plan.cancellationTitle')}
                 </h4>
-                <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                <p className="mt-1 text-xs leading-5 text-secondary-500">
                   {t('adminPage.plan.cancellationSubtitle')}
                 </p>
               </div>
@@ -611,7 +611,7 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
 
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-amber-200/50 pt-4 dark:border-amber-900/30">
             <div className="text-sm">
-              <span className="text-xs text-slate-450 dark:text-slate-500 block">Amount Due</span>
+              <span className="text-xs text-slate-450 dark:text-secondary-500 block">Amount Due</span>
               <strong className="text-base text-slate-850 dark:text-slate-200">
                 {pendingChange?.billingAmount !== undefined
                   ? formatMoney(pendingChange.billingAmount, t)
@@ -640,10 +640,10 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
       {/* Available Plans Selection */}
       <div className="space-y-4">
         <div>
-          <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+          <h3 className="text-lg font-bold text-ink">
             Available Packages
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="text-xs text-secondary-500">
             Select the right tier to fuel your business growth.
           </p>
         </div>
@@ -671,7 +671,7 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
                   className={`relative flex flex-col justify-between rounded-2xl border p-6 shadow-sm transition ${
                     isGrowth
                       ? 'border-indigo-500/80 bg-indigo-50/20 dark:border-indigo-500/50 dark:bg-indigo-950/15 ring-1 ring-indigo-500/20'
-                      : 'border-slate-200 bg-white dark:border-slate-800/80 dark:bg-slate-900/40'
+                      : 'border-secondary-200 bg-white dark:border-slate-800/80 dark:bg-slate-900/40'
                   }`}
                 >
                   {isGrowth && (
@@ -682,28 +682,28 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
 
                   <div className="space-y-4">
                     <div>
-                      <h4 className="text-lg font-bold text-slate-900 dark:text-white">{plan.label}</h4>
-                      <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400 leading-relaxed min-h-[36px]">
+                      <h4 className="text-lg font-bold text-ink">{plan.label}</h4>
+                      <p className="mt-1.5 text-xs text-secondary-500 leading-relaxed min-h-[36px]">
                         {plan.description || t('adminPage.fallback.na')}
                       </p>
                     </div>
 
                     <div className="py-2">
-                      <p className="text-3xl font-extrabold text-slate-900 dark:text-white">
+                      <p className="text-3xl font-extrabold text-ink">
                         {plan.key === 'freemium'
                           ? 'Free'
                           : billingOption?.amountConfigured && billingOption?.amount !== null
                             ? formatMoney(billingOption.amount, t)
                             : 'Quote'}
                       </p>
-                      <p className="text-xs text-slate-400 capitalize mt-1">
+                      <p className="text-xs text-secondary-400 capitalize mt-1">
                         {plan.key === 'freemium' ? 'Forever' : plan.key === 'custom' ? 'Custom terms' : `per ${selectedCycle}`}
                       </p>
                     </div>
 
                     {/* Cycle Toggle Selector */}
                     {plan.key !== 'custom' && plan.billingOptions && plan.billingOptions.length > 1 && (
-                      <div className="flex bg-slate-100/80 dark:bg-slate-800/60 p-0.5 rounded-lg text-[10px]">
+                      <div className="flex bg-secondary-100/80 dark:bg-slate-800/60 p-0.5 rounded-lg text-[10px]">
                         {plan.billingOptions.map((option) => (
                           <button
                             key={option.cycle}
@@ -714,8 +714,8 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
                             }))}
                             className={`flex-1 text-center py-1.5 rounded-md font-semibold transition ${
                               selectedCycle === option.cycle
-                                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-350'
+                                ? 'bg-white dark:bg-slate-900 text-ink shadow-sm'
+                                : 'text-secondary-400 hover:text-secondary-700 dark:hover:text-slate-350'
                             }`}
                           >
                             {option.cycle === 'monthly' ? 'Monthly' : 'Yearly'}
@@ -730,7 +730,7 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
                       <button
                         type="button"
                         disabled
-                        className="w-full rounded-xl bg-slate-100 py-2.5 text-xs font-bold text-slate-400 dark:bg-slate-800 dark:text-slate-500"
+                        className="w-full rounded-xl bg-secondary-100 py-2.5 text-xs font-bold text-secondary-400 dark:bg-slate-800 dark:text-secondary-500"
                       >
                         Active Plan
                       </button>
@@ -773,7 +773,7 @@ export default function SubscriptionSettingsPanel({ isOwner = false }) {
 
       {/* Staff Capacity Panel */}
       {isOwner ? (
-        <div className="border-t border-slate-100 pt-6 dark:border-slate-800">
+        <div className="border-t border-secondary-100 pt-6 dark:border-slate-800">
           <TeamSeatUsagePanel
             summary={staffSummary}
             staffing={subscriptionData?.staffing || subscription?.staffing}

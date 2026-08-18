@@ -188,10 +188,10 @@ export default function ExpensesCategoriesSettingsPanel() {
       <div className="card space-y-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="space-y-1">
-            <h2 className="font-serif text-xl text-slate-900 dark:text-white">
+            <h2 className="font-serif text-xl text-ink">
               {t('expenseCategories.title')}
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-secondary-500">
               {t('expenseCategories.subtitle')}
             </p>
           </div>
@@ -216,20 +216,20 @@ export default function ExpensesCategoriesSettingsPanel() {
 
         <div className="space-y-3 md:hidden">
           {listLoading && categories.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+            <p className="py-3 text-sm text-secondary-500">{t('common.loading')}</p>
           ) : categories.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">
+            <p className="py-3 text-sm text-secondary-500">
               {t('expenseCategories.noCategories')}
             </p>
           ) : (
             categories.map((category) => (
               <div
                 key={category.id}
-                className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60"
+                className="rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60"
               >
                 <div className="space-y-1">
-                  <p className="font-semibold text-slate-900 dark:text-white">{category.name}</p>
-                  <p className="text-xs text-slate-500">{category.type || CATEGORY_TYPE}</p>
+                  <p className="font-semibold text-ink">{category.name}</p>
+                  <p className="text-xs text-secondary-500">{category.type || CATEGORY_TYPE}</p>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button className="btn-ghost" type="button" onClick={() => openEdit(category)}>
@@ -251,8 +251,8 @@ export default function ExpensesCategoriesSettingsPanel() {
         </div>
 
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-            <thead className="text-xs uppercase text-slate-400">
+          <table className="w-full text-sm text-secondary-700">
+            <thead className="text-xs uppercase text-secondary-400">
               <tr>
                 <th className="py-2 text-left">{t('expenseCategories.name')}</th>
                 <th className="py-2 text-left">{t('inventory.itemType')}</th>
@@ -262,13 +262,13 @@ export default function ExpensesCategoriesSettingsPanel() {
             <tbody>
               {listLoading && categories.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="py-3 text-slate-500">
+                  <td colSpan={3} className="py-3 text-secondary-500">
                     {t('common.loading')}
                   </td>
                 </tr>
               ) : categories.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="py-3 text-slate-500">
+                  <td colSpan={3} className="py-3 text-secondary-500">
                     {t('expenseCategories.noCategories')}
                   </td>
                 </tr>
@@ -276,9 +276,9 @@ export default function ExpensesCategoriesSettingsPanel() {
                 categories.map((category) => (
                   <tr
                     key={category.id}
-                    className="border-t border-slate-200/70 dark:border-slate-800/70"
+                    className="border-t border-secondary-200/70"
                   >
-                    <td className="py-3 font-semibold text-slate-900 dark:text-white">
+                    <td className="py-3 font-semibold text-ink">
                       {category.name}
                     </td>
                     <td className="py-3 capitalize">{category.type || CATEGORY_TYPE}</td>

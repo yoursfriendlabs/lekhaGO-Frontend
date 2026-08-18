@@ -646,7 +646,7 @@ export default function Products() {
       />
       <div className="card">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('products.catalog')}</h3>
+          <h3 className="font-serif text-2xl text-ink">{t('products.catalog')}</h3>
           <div className="flex flex-wrap gap-2">
             <button className="btn-secondary" type="button" onClick={() => openDialog('bulk')}>
               {t('products.addMultiple')}
@@ -676,8 +676,8 @@ export default function Products() {
         </div>
         {listStatus.message ? <Notice title={listStatus.message} tone={listStatus.type} /> : null}
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-            <thead className="text-xs uppercase text-slate-400">
+          <table className="w-full text-sm text-secondary-700">
+            <thead className="text-xs uppercase text-secondary-400">
               <tr>
                 <th className="py-2 text-left">{t('products.name')}</th>
                 <th className="py-2 text-left">{t('products.company')}</th>
@@ -701,19 +701,19 @@ export default function Products() {
             <tbody>
               {pagedProducts.length === 0 ? (
                 <tr>
-                  <td colSpan={17} className="py-3 text-slate-500">
+                  <td colSpan={17} className="py-3 text-secondary-500">
                     {t('products.noProducts')}
                   </td>
                 </tr>
               ) : (
                 pagedProducts.map((product) => (
-                  <tr key={product.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                    <td className="py-2 font-medium text-slate-900 dark:text-white">
+                  <tr key={product.id} className="border-t border-secondary-200/70">
+                    <td className="py-2 font-medium text-ink">
                       <div className="flex items-center gap-2">
                         {product.imageUrl ? (
-                          <img src={product.imageUrl} alt={product.name} className="h-8 w-8 rounded-lg object-cover border border-slate-200 dark:border-slate-800 cursor-zoom-in" onClick={() => setPreviewImage(product.imageUrl)} />
+                          <img src={product.imageUrl} alt={product.name} className="h-8 w-8 rounded-lg object-cover border border-secondary-200 dark:border-slate-800 cursor-zoom-in" onClick={() => setPreviewImage(product.imageUrl)} />
                         ) : (
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500 font-bold text-[10px]">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary-100 text-secondary-400 dark:bg-slate-800 dark:text-secondary-500 font-bold text-[10px]">
                             {product.name.charAt(0).toUpperCase()}
                           </div>
                         )}
@@ -773,7 +773,7 @@ export default function Products() {
                           {t('inventory.restock')}
                         </button>
                       ) : (
-                        <span className="text-slate-300">—</span>
+                        <span className="text-secondary-300">—</span>
                       )}
                     </td>
                   </tr>
@@ -799,9 +799,9 @@ export default function Products() {
           <FormSectionCard hint={t('inventory.restockHelp')}>
             <div className="space-y-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{t('inventory.itemName')}</p>
-                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">{restockProduct?.name || '-'}</p>
-                <p className="text-sm text-slate-500">{restockProduct?.primaryUnit || t('inventory.noUnit')}</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-secondary-400">{t('inventory.itemName')}</p>
+                <p className="mt-1 text-lg font-semibold text-ink">{restockProduct?.name || '-'}</p>
+                <p className="text-sm text-secondary-500">{restockProduct?.primaryUnit || t('inventory.noUnit')}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -810,7 +810,7 @@ export default function Products() {
                   className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
                     !isRestockRemove
                       ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-200'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
+                      : 'border-secondary-200 bg-white text-secondary-700 hover:bg-mist dark:border-slate-800 dark:bg-slate-950 dark:text-secondary-300'
                   }`}
                   onClick={() => setRestockAction('add')}
                 >
@@ -821,7 +821,7 @@ export default function Products() {
                   className={`rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
                     isRestockRemove
                       ? 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
+                      : 'border-secondary-200 bg-white text-secondary-700 hover:bg-mist dark:border-slate-800 dark:bg-slate-950 dark:text-secondary-300'
                   }`}
                   onClick={() => setRestockAction('remove')}
                 >
@@ -832,7 +832,7 @@ export default function Products() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="label">{t('inventory.quantityOnHand')}</label>
-                  <div className="mt-1 rounded-2xl border border-slate-200/70 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 dark:border-slate-800/70 dark:bg-slate-900/50 dark:text-slate-200">
+                  <div className="mt-1 rounded-2xl border border-secondary-200/70 bg-mist px-4 py-3 text-sm font-medium text-ink-light dark:border-slate-800/70 dark:bg-slate-900/50 dark:text-slate-200">
                     {formatQuantity(currentRestockStock)}{restockUnitSuffix}
                   </div>
                 </div>
@@ -856,7 +856,7 @@ export default function Products() {
               </div>
 
               {!isRestockRemove ? (
-                <div className="space-y-3 rounded-2xl border border-slate-200/70 bg-slate-50/70 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
+                <div className="space-y-3 rounded-2xl border border-secondary-200/70 bg-mist/70 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                       <label className="label">{t('inventory.expiryDateOptional') || 'Expiry Date (Optional)'}</label>
@@ -880,7 +880,7 @@ export default function Products() {
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-secondary-500">
                     {t('inventory.restockExpiryHelp') || 'If this stock has a new expiry/batch, add it here. Older stock keeps its own lot.'}
                   </p>
                 </div>
@@ -920,7 +920,7 @@ export default function Products() {
       </Dialog>
 
       <Dialog isOpen={previewImage !== null} onClose={() => setPreviewImage(null)} title={t('common.preview') || 'Image Preview'} size="lg">
-        <div className="flex justify-center items-center p-2 bg-slate-50 dark:bg-slate-900 rounded-2xl overflow-hidden">
+        <div className="flex justify-center items-center p-2 bg-mist rounded-2xl overflow-hidden">
           <img src={previewImage} alt="Preview" className="max-w-full max-h-[70vh] rounded-xl object-contain" />
         </div>
       </Dialog>
@@ -955,12 +955,12 @@ export default function Products() {
               <div className="w-full md:w-1/3">
                 <label className="label mb-1.5 block">Product Image</label>
                 {form.imageUrl ? (
-                  <div className="relative group rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 aspect-square w-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+                  <div className="relative group rounded-2xl overflow-hidden border border-secondary-200 dark:border-slate-800 aspect-square w-full bg-mist flex items-center justify-center">
                     <img src={form.imageUrl} alt="Product" className="object-cover w-full h-full cursor-zoom-in" onClick={() => setPreviewImage(form.imageUrl)} />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                       <button
                         type="button"
-                        className="bg-white/90 hover:bg-white text-slate-800 hover:text-slate-900 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm transition"
+                        className="bg-white/90 hover:bg-white text-ink hover:text-ink text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm transition"
                         onClick={() => document.getElementById('product-image-input').click()}
                       >
                         Change
@@ -976,21 +976,21 @@ export default function Products() {
                   </div>
                 ) : (
                   <div
-                    className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-primary-500 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer aspect-square bg-slate-50/50 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-900/40 transition group"
+                    className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-primary-500 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer aspect-square bg-mist/50 hover:bg-mist/20 dark:hover:bg-slate-900/40 transition group"
                     onClick={() => document.getElementById('product-image-input').click()}
                   >
                     {imageUploading ? (
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-xs text-slate-500">Uploading...</span>
+                        <span className="text-xs text-secondary-500">Uploading...</span>
                       </div>
                     ) : (
                       <div className="flex flex-col items-center gap-2">
-                        <div className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 group-hover:scale-105 transition-transform">
-                          <Plus className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                        <div className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-secondary-100 dark:border-slate-700 group-hover:scale-105 transition-transform">
+                          <Plus className="w-5 h-5 text-secondary-500" />
                         </div>
-                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Upload image</span>
-                        <span className="text-[10px] text-slate-400">JPG, PNG, WEBP (Max 5MB)</span>
+                        <span className="text-xs font-semibold text-ink-light dark:text-secondary-300">Upload image</span>
+                        <span className="text-[10px] text-secondary-400">JPG, PNG, WEBP (Max 5MB)</span>
                       </div>
                     )}
                   </div>
@@ -1014,14 +1014,14 @@ export default function Products() {
                 <div>
                   <label className="label">{t('products.company')}</label>
                   <input className="input mt-1" name="companyName" value={form.companyName} onChange={handleChange} />
-                  <p className="mt-1 text-xs text-slate-500">{t('products.useBrand')}</p>
+                  <p className="mt-1 text-xs text-secondary-500">{t('products.useBrand')}</p>
                 </div>
               </div>
             </div>
             <div>
               <label className="label">{t('products.sku')}</label>
               <input className="input mt-1" name="sku" value={form.sku} onChange={handleChange} />
-              <p className="mt-1 text-xs text-slate-500">{t('products.barcodeHint')}</p>
+              <p className="mt-1 text-xs text-secondary-500">{t('products.barcodeHint')}</p>
             </div>
             <div>
               <label className="label">{t('products.type')}</label>
@@ -1066,7 +1066,7 @@ export default function Products() {
                   value={form.conversionRate}
                   onChange={handleChange}
                 />
-                <p className="mt-1 text-xs text-slate-500">{t('products.conversionHint')}</p>
+                <p className="mt-1 text-xs text-secondary-500">{t('products.conversionHint')}</p>
               </div>
               <div>
                 <label className="label">{t('products.secondaryPrice')}</label>
@@ -1078,7 +1078,7 @@ export default function Products() {
                   value={form.secondarySalePrice}
                   onChange={handleChange}
                 />
-                <p className="mt-1 text-xs text-slate-500">{t('products.secondaryPriceHint')}</p>
+                <p className="mt-1 text-xs text-secondary-500">{t('products.secondaryPriceHint')}</p>
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
@@ -1103,7 +1103,7 @@ export default function Products() {
                   onChange={handleChange}
                   className="h-4 w-4 rounded border-slate-300 dark:border-slate-600"
                 />
-                <label htmlFor="lowStockAlert" className="text-sm text-slate-600 dark:text-slate-300">
+                <label htmlFor="lowStockAlert" className="text-sm text-secondary-700">
                   {t('inventory.lowStockAlert')}
                 </label>
               </div>
@@ -1193,7 +1193,7 @@ export default function Products() {
         ) : (
           <form className="space-y-4" onSubmit={handleBulkSubmit}>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm text-slate-600 dark:text-slate-300">
+              <div className="text-sm text-secondary-700">
                 {t('products.rowsHint')}
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1223,8 +1223,8 @@ export default function Products() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-                <thead className="text-xs uppercase text-slate-400">
+              <table className="w-full text-sm text-secondary-700">
+                <thead className="text-xs uppercase text-secondary-400">
                   <tr>
                     <th className="py-2 text-left">#</th>
                     <th className="py-2 text-left">{t('products.name')}</th>
@@ -1249,14 +1249,14 @@ export default function Products() {
                 <tbody>
                   {bulkRows.length === 0 ? (
                     <tr>
-                      <td colSpan={18} className="py-3 text-slate-500">
+                      <td colSpan={18} className="py-3 text-secondary-500">
                         {t('products.noRows')}
                       </td>
                     </tr>
                   ) : (
                     bulkRows.map((row, idx) => (
-                      <tr key={`bulk-row-${idx}`} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                        <td className="py-2 pr-2 text-xs text-slate-400">{idx + 1}</td>
+                      <tr key={`bulk-row-${idx}`} className="border-t border-secondary-200/70">
+                        <td className="py-2 pr-2 text-xs text-secondary-400">{idx + 1}</td>
                         <td className="py-2 pr-2">
                           <input
                             className="input min-w-[160px]"
@@ -1417,7 +1417,7 @@ export default function Products() {
                               {t('common.remove')}
                             </button>
                           ) : (
-                            <span className="text-xs text-slate-400">—</span>
+                            <span className="text-xs text-secondary-400">—</span>
                           )}
                         </td>
                       </tr>

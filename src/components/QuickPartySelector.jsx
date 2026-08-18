@@ -143,11 +143,11 @@ export default function QuickPartySelector({
         {showCreateForm ? (
           <form onSubmit={handleCreateParty} className="space-y-3 rounded-2xl border border-primary-200 bg-primary-50/50 p-4">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-bold text-slate-900">Add New Customer Party</h4>
+              <h4 className="text-sm font-bold text-ink">Add New Customer Party</h4>
               <button
                 type="button"
                 onClick={() => setShowCreateForm(false)}
-                className="text-xs text-slate-500 hover:text-slate-800"
+                className="text-xs text-secondary-500 hover:text-ink"
               >
                 Cancel
               </button>
@@ -158,7 +158,7 @@ export default function QuickPartySelector({
             <div>
               <label className="label text-xs">Customer Name *</label>
               <div className="relative mt-1">
-                <User size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <User size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400" />
                 <input
                   className="input h-10 w-full !pl-9 text-sm"
                   placeholder="Enter customer full name"
@@ -172,7 +172,7 @@ export default function QuickPartySelector({
             <div>
               <label className="label text-xs">Phone Number</label>
               <div className="relative mt-1">
-                <Phone size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Phone size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400" />
                 <input
                   className="input h-10 w-full !pl-9 text-sm"
                   type="tel"
@@ -186,7 +186,7 @@ export default function QuickPartySelector({
             <div>
               <label className="label text-xs">{isCafe ? 'Delivery Address' : 'Address'}</label>
               <div className="relative mt-1">
-                <MapPin size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <MapPin size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400" />
                 <input
                   className="input h-10 w-full !pl-9 text-sm"
                   placeholder={isCafe ? 'Delivery address / location details' : 'Address / location details'}
@@ -220,12 +220,12 @@ export default function QuickPartySelector({
               <div className="relative flex-1">
                 {!query && (
                   <Search
-                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary-400"
                     size={16}
                   />
                 )}
                 <input
-                  className={`input h-11 w-full rounded-[18px] bg-slate-50 text-sm focus:bg-white transition ${
+                  className={`input h-11 w-full rounded-[18px] bg-mist text-sm focus:bg-white transition ${
                     query ? "px-3.5 pr-9" : "!pl-10 pr-4"
                   }`}
                   value={query}
@@ -237,7 +237,7 @@ export default function QuickPartySelector({
                   <button
                     type="button"
                     onClick={() => setQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-secondary-400 hover:text-ink-light p-1"
                   >
                     <X size={14} />
                   </button>
@@ -261,11 +261,11 @@ export default function QuickPartySelector({
 
             <div className="space-y-3">
               {loading ? (
-                <div className="rounded-[28px] border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+                <div className="rounded-[28px] border border-dashed border-secondary-200 bg-mist px-4 py-6 text-center text-sm text-secondary-500">
                   {t('common.loading')}
                 </div>
               ) : visibleParties.length === 0 ? (
-                <div className="rounded-[28px] border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500 space-y-2">
+                <div className="rounded-[28px] border border-dashed border-secondary-200 bg-mist px-4 py-6 text-center text-sm text-secondary-500 space-y-2">
                   <p>{t('parties.noParties')}</p>
                   <button
                     type="button"
@@ -294,15 +294,15 @@ export default function QuickPartySelector({
                       className={`flex w-full items-center gap-3 rounded-[20px] border px-4 py-3 text-left transition ${
                         isSelected
                           ? 'border-primary-300 bg-primary-50 shadow-sm'
-                          : 'border-slate-100 bg-white hover:border-primary-100 hover:bg-primary-50/40'
+                          : 'border-secondary-100 bg-white hover:border-primary-100 hover:bg-primary-50/40'
                       }`}
                     >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary-100 text-sm font-semibold text-secondary-800">
                         {getInitials(party.name)}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-base font-semibold text-slate-900">{party.name || '—'}</p>
-                        <p className="truncate text-xs text-slate-500">
+                        <p className="truncate text-base font-semibold text-ink">{party.name || '—'}</p>
+                        <p className="truncate text-xs text-secondary-500">
                           {party.phone || t('common.notAvailable')}
                           {party.address ? ` · ${party.address}` : ''}
                         </p>
@@ -311,7 +311,7 @@ export default function QuickPartySelector({
                         <p className={`text-sm font-bold ${balanceMeta.textClass}`}>
                           {money(balanceMeta.absoluteAmount)}
                         </p>
-                        <p className="text-[10px] text-slate-400 uppercase font-bold tracking-tighter">{balanceMeta.label}</p>
+                        <p className="text-[10px] text-secondary-400 uppercase font-bold tracking-tighter">{balanceMeta.label}</p>
                       </div>
                     </button>
                   );
@@ -321,7 +321,7 @@ export default function QuickPartySelector({
           </>
         )}
 
-        <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+        <div className="rounded-[24px] border border-secondary-200 bg-mist px-4 py-3 text-xs text-secondary-500">
           <div className="flex items-center gap-2">
             <UserRound size={14} className="text-primary-500" />
             <span>{t('quickEntry.partySelectorHint')}</span>

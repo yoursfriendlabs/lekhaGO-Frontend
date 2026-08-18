@@ -109,7 +109,7 @@ export default function Invoice() {
   const isPaidOrReceived = normalizedStatus === 'paid' || normalizedStatus === 'received';
   const isCancelledStatus = ['cancelled', 'canceled', 'void'].includes(normalizedStatus);
   const statusColor = isCancelledStatus
-    ? 'bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200'
+    ? 'bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200'
     : isPaidOrReceived
       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
       : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
@@ -166,7 +166,7 @@ const partyName = isSale
 
       {record ? (
         <>
-        <div className={`${(isPrintBillView || isThermalView) ? 'hidden' : ''} overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950`}>
+        <div className={`${(isPrintBillView || isThermalView) ? 'hidden' : ''} overflow-hidden rounded-3xl border border-secondary-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950`}>
           {/* ── Header ── */}
           <div className="px-8 pt-0">
             <InvoiceHeader
@@ -181,25 +181,25 @@ const partyName = isSale
           </div>
 
           {/* ── Bill To / From + Notes ── */}
-          <div className="grid gap-6 px-8 py-6 sm:grid-cols-2 bg-slate-50/60 dark:bg-slate-900/30 border-b border-slate-200/70 dark:border-slate-800/70">
+          <div className="grid gap-6 px-8 py-6 sm:grid-cols-2 bg-mist/60 dark:bg-slate-900/30 border-b border-secondary-200/70">
             <div>
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-secondary-400">
                 {isSale ? 'Bill To' : 'Supplier'}
               </p>
-<p className="font-semibold text-slate-800 dark:text-slate-200">{partyName}</p>
+<p className="font-semibold text-ink dark:text-slate-200">{partyName}</p>
               {(record.partyPhone || record.attributes?.customer_phone) && (
-                <p className="mt-0.5 text-sm text-slate-500">
+                <p className="mt-0.5 text-sm text-secondary-500">
                   {record.partyPhone || record.attributes?.customer_phone}
                 </p>
               )}
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-secondary-500">
                 Created By:{' '}
-                <span className="font-medium text-slate-700 dark:text-slate-300">{creatorName}</span>
+                <span className="font-medium text-ink-light dark:text-secondary-300">{creatorName}</span>
               </p>
               {(record.Table || record.table || record.tableId || record.attributes?.table_no) && (
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-secondary-500">
                   Table:{' '}
-                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                  <span className="font-semibold text-ink-light dark:text-secondary-300">
                     {record.Table?.name || record.table?.name || record.attributes?.table_no}
                   </span>
                 </p>
@@ -207,8 +207,8 @@ const partyName = isSale
             </div>
             {record.notes && (
               <div>
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Notes</p>
-                <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-400">{record.notes}</p>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-secondary-400">Notes</p>
+                <p className="whitespace-pre-wrap text-sm text-secondary-700 dark:text-secondary-400">{record.notes}</p>
               </div>
             )}
           </div>
@@ -218,38 +218,38 @@ const partyName = isSale
             <div className="w-full overflow-x-auto no-scrollbar">
               <table className="w-full text-sm min-w-[550px] sm:min-w-0">
                 <thead>
-                  <tr className="border-b-2 border-slate-200/70 dark:border-slate-700/70">
-                    <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">Product</th>
-                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Qty</th>
-                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Unit Price</th>
-                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Tax</th>
-                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-slate-400">Amount</th>
+                  <tr className="border-b-2 border-secondary-200/70 dark:border-slate-700/70">
+                    <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-secondary-400">Product</th>
+                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-secondary-400">Qty</th>
+                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-secondary-400">Unit Price</th>
+                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-secondary-400">Tax</th>
+                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-secondary-400">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-4 text-slate-400">No line items.</td>
+                      <td colSpan={5} className="py-4 text-secondary-400">No line items.</td>
                     </tr>
                   ) : (
                     items.map((item, idx) => (
                       <tr key={item.id || idx}>
-                        <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                        <td className="py-3 pr-4 font-medium text-ink dark:text-slate-200">
                           {item.Product?.name || item.description || '—'}
                           {item.Product?.companyName && (
-                            <span className="ml-2 text-xs text-slate-400">{item.Product.companyName}</span>
+                            <span className="ml-2 text-xs text-secondary-400">{item.Product.companyName}</span>
                           )}
                         </td>
-                        <td className="py-3 text-right text-slate-600 dark:text-slate-400">
+                        <td className="py-3 text-right text-secondary-700 dark:text-secondary-400">
                           {Number(item.quantity || 0).toFixed(2)}
                         </td>
-                        <td className="py-3 text-right text-slate-600 dark:text-slate-400">
+                        <td className="py-3 text-right text-secondary-700 dark:text-secondary-400">
                           {money(item.unitPrice)}
                         </td>
-                        <td className="py-3 text-right text-slate-500">
+                        <td className="py-3 text-right text-secondary-500">
                           {Number(item.taxRate || 0) > 0 ? `${Number(item.taxRate).toFixed(1)}%` : '—'}
                         </td>
-                        <td className="py-3 text-right font-semibold text-slate-800 dark:text-slate-200">
+                        <td className="py-3 text-right font-semibold text-ink dark:text-slate-200">
                           {money(item.lineTotal)}
                         </td>
                       </tr>
@@ -261,16 +261,16 @@ const partyName = isSale
           </div>
 
           {/* ── Totals ── */}
-          <div className="border-t border-slate-200/70 dark:border-slate-800/70 px-8 py-6">
+          <div className="border-t border-secondary-200/70 px-8 py-6">
             <div className="ml-auto max-w-xs space-y-2 text-sm">
               {Number(record.subTotal || 0) > 0 && (
-                <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                <div className="flex justify-between text-secondary-500">
                   <span>Subtotal</span>
                   <span>{money(record.subTotal)}</span>
                 </div>
               )}
               {Number(record.taxTotal || 0) > 0 && (
-                <div className="flex justify-between text-slate-500 dark:text-slate-400">
+                <div className="flex justify-between text-secondary-500">
                   <span>Tax</span>
                   <span>{money(record.taxTotal)}</span>
                 </div>
@@ -281,7 +281,7 @@ const partyName = isSale
                   <span>-{money(record.discountTotal || record.discount)}</span>
                 </div>
               )}
-              <div className="flex justify-between border-t border-slate-200/70 pt-3 font-bold text-slate-900 dark:border-slate-700 dark:text-white">
+              <div className="flex justify-between border-t border-secondary-200/70 pt-3 font-bold text-ink dark:border-slate-700 dark:text-white">
                 <span className="text-base">Grand Total</span>
                 <span className="text-lg">{money(record.grandTotal)}</span>
               </div>
@@ -299,16 +299,16 @@ const partyName = isSale
           </div>
 
           {/* ── Footer ── */}
-          <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-8 py-4 dark:border-slate-800/70 dark:bg-slate-900/30">
-            <p className="text-xs text-slate-400">Thank you for your business!</p>
-            <p className="text-xs text-slate-400">
+          <div className="flex items-center justify-between border-t border-secondary-200/70 bg-mist/60 px-8 py-4 dark:border-slate-800/70 dark:bg-slate-900/30">
+            <p className="text-xs text-secondary-400">Thank you for your business!</p>
+            <p className="text-xs text-secondary-400">
               Printed {dayjs().format('D MMM YYYY')}
             </p>
           </div>
         </div>
 
         {isThermalView ? (
-          <div className="mx-auto max-w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm">
+          <div className="mx-auto max-w-[340px] overflow-hidden rounded-2xl border border-secondary-200 bg-white p-6 text-black shadow-sm">
             <div ref={thermalPrintRef}>
               <ThermalReceipt
                 biz={biz}
@@ -338,7 +338,7 @@ const partyName = isSale
             </div>
           </div>
         ) : (
-          <div className={isPrintBillView ? "w-full overflow-x-auto rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950 p-2 sm:p-4" : ""}>
+          <div className={isPrintBillView ? "w-full overflow-x-auto rounded-3xl border border-secondary-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950 p-2 sm:p-4" : ""}>
             <div
               ref={printRef}
               className={`${isPrintBillView ? 'min-w-[650px] bg-white p-6 text-black sm:p-8' : 'print-template bg-white p-6 text-black sm:p-8'}`}
@@ -357,14 +357,14 @@ const partyName = isSale
 
               <div className="grid grid-cols-2 gap-6 border-b border-slate-300 py-4 text-sm">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-secondary-700">
                     {isSale ? 'Bill To' : 'Supplier'}
                   </p>
                   <p className="mt-1 font-semibold">{partyName}</p>
                   {record.partyPhone ? <p className="mt-0.5">{record.partyPhone}</p> : null}
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Details</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-secondary-700">Details</p>
                   <p className="mt-1">Created By: {creatorName}</p>
                   {(record.Table || record.table || record.tableId || record.attributes?.table_no) && (
                     <p className="mt-1">
@@ -388,11 +388,11 @@ const partyName = isSale
                 <tbody>
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-4 text-slate-500">No line items.</td>
+                      <td colSpan={5} className="py-4 text-secondary-500">No line items.</td>
                     </tr>
                   ) : (
                     items.map((item, idx) => (
-                      <tr key={item.id || idx} className="border-b border-slate-200">
+                      <tr key={item.id || idx} className="border-b border-secondary-200">
                         <td className="py-2 pr-4 font-medium">
                           {item.Product?.name || item.description || '—'}
                           {item.Product?.companyName ? <span className="ml-2 text-xs">({item.Product.companyName})</span> : null}

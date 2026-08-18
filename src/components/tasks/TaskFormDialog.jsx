@@ -88,7 +88,7 @@ export default function TaskFormDialog({
         ) : null}
 
         <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-4 rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 dark:border-slate-800/70 dark:bg-slate-900/60">
+          <div className="space-y-4 rounded-3xl border border-secondary-200/70 bg-mist/80 p-5 dark:border-slate-800/70 dark:bg-slate-900/60">
             <div>
               <label className="label" htmlFor="task-title">{t('tasks.form.title')}</label>
               <input
@@ -113,7 +113,7 @@ export default function TaskFormDialog({
             </div>
           </div>
 
-          <div className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-5 dark:border-slate-800/70 dark:bg-slate-950/60">
+          <div className="space-y-4 rounded-3xl border border-secondary-200/70 bg-white/90 p-5 dark:border-slate-800/70 dark:bg-slate-950/60">
             <div>
               <label className="label" htmlFor="task-priority">{t('tasks.form.priority')}</label>
               <select
@@ -156,15 +156,15 @@ export default function TaskFormDialog({
           </div>
         </section>
 
-        <section className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-5 dark:border-slate-800/70 dark:bg-slate-950/60">
+        <section className="space-y-4 rounded-3xl border border-secondary-200/70 bg-white/90 p-5 dark:border-slate-800/70 dark:bg-slate-950/60">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('tasks.form.assignees')}</h3>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('tasks.form.assigneesHint')}</p>
+              <h3 className="font-serif text-lg text-ink">{t('tasks.form.assignees')}</h3>
+              <p className="mt-1 text-sm text-secondary-500">{t('tasks.form.assigneesHint')}</p>
             </div>
 
             <label className="relative block w-full sm:max-w-xs">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary-400" />
               <input
                 className="input !pl-10"
                 value={query}
@@ -175,7 +175,7 @@ export default function TaskFormDialog({
           </div>
 
           {filteredStaff.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200/80 px-4 py-6 text-center text-sm text-slate-500 dark:border-slate-800/70 dark:text-slate-400">
+            <div className="rounded-2xl border border-dashed border-secondary-200/80 px-4 py-6 text-center text-sm text-secondary-500 dark:border-slate-800/70 dark:text-secondary-400">
               {staffMembers.length === 0 ? t('tasks.form.noStaff') : t('tasks.form.noStaffMatches')}
             </div>
           ) : (
@@ -190,7 +190,7 @@ export default function TaskFormDialog({
                     className={`flex items-start gap-3 rounded-2xl border px-4 py-3 transition ${
                       checked
                         ? 'border-primary-300 bg-primary-50/70 dark:border-primary-500/40 dark:bg-primary-500/10'
-                        : 'border-slate-200/80 bg-slate-50/80 dark:border-slate-800/70 dark:bg-slate-900/70'
+                        : 'border-secondary-200/80 bg-mist/80 dark:border-slate-800/70 dark:bg-slate-900/70'
                     }`}
                   >
                     <input
@@ -200,10 +200,10 @@ export default function TaskFormDialog({
                       onChange={() => handleAssigneeToggle(userId)}
                     />
                     <div className="min-w-0">
-                      <p className="font-medium text-slate-900 dark:text-white">{member?.user?.name || t('tasks.detail.unknownUser')}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">{member?.jobTitle || member?.category?.label || t('tasks.detail.staffMember')}</p>
+                      <p className="font-medium text-ink">{member?.user?.name || t('tasks.detail.unknownUser')}</p>
+                      <p className="text-xs text-secondary-500">{member?.jobTitle || member?.category?.label || t('tasks.detail.staffMember')}</p>
                       {member?.user?.email ? (
-                        <p className="mt-1 break-all text-xs text-slate-400 dark:text-slate-500">{member.user.email}</p>
+                        <p className="mt-1 break-all text-xs text-secondary-400">{member.user.email}</p>
                       ) : null}
                     </div>
                   </label>

@@ -229,8 +229,8 @@ export default function BanksSettingsPanel() {
       <div className="card space-y-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="space-y-1">
-            <h2 className="font-serif text-xl text-slate-900 dark:text-white">{t('banks.title')}</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{t('banks.subtitle')}</p>
+            <h2 className="font-serif text-xl text-ink">{t('banks.title')}</h2>
+            <p className="text-sm text-secondary-500">{t('banks.subtitle')}</p>
           </div>
           <button className="btn-primary w-full md:w-auto" type="button" onClick={openCreate}>
             <Plus size={16} className="mr-1.5 inline" />
@@ -267,22 +267,22 @@ export default function BanksSettingsPanel() {
 
         <div className="md:hidden space-y-3">
           {listLoading && banks.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+            <p className="py-3 text-sm text-secondary-500">{t('common.loading')}</p>
           ) : banks.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">{t('banks.noBanks')}</p>
+            <p className="py-3 text-sm text-secondary-500">{t('banks.noBanks')}</p>
           ) : (
             banks.map((bank) => (
               <div
                 key={bank.id}
-                className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60"
+                className="rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-slate-900 dark:text-white">
+                    <p className="font-semibold text-ink">
                       {bank.name || t('banks.unnamed')}
                     </p>
-                    <p className="text-xs text-slate-500">{bank.accountNumber || bank.accountName || '-'}</p>
-                    <p className="mt-2 text-xs text-slate-500">
+                    <p className="text-xs text-secondary-500">{bank.accountNumber || bank.accountName || '-'}</p>
+                    <p className="mt-2 text-xs text-secondary-500">
                       {t('banks.currentBalance')}: {formatMoney(bank.currentBalance)}
                     </p>
                   </div>
@@ -290,7 +290,7 @@ export default function BanksSettingsPanel() {
                     className={`rounded-full px-2 py-1 text-xs font-semibold ${
                       bank.isActive
                         ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                        : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                        : 'bg-secondary-100 text-secondary-700 dark:bg-slate-800 dark:text-secondary-300'
                     }`}
                   >
                     {bank.isActive ? t('banks.filters.active') : t('banks.filters.inactive')}
@@ -316,8 +316,8 @@ export default function BanksSettingsPanel() {
         </div>
 
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-            <thead className="text-xs uppercase text-slate-400">
+          <table className="w-full text-sm text-secondary-700">
+            <thead className="text-xs uppercase text-secondary-400">
               <tr>
                 <th className="py-2 text-left">{t('banks.name')}</th>
                 <th className="py-2 text-left">{t('banks.accountNumber')}</th>
@@ -331,29 +331,29 @@ export default function BanksSettingsPanel() {
             <tbody>
               {listLoading && banks.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-3 text-slate-500">
+                  <td colSpan={7} className="py-3 text-secondary-500">
                     {t('common.loading')}
                   </td>
                 </tr>
               ) : banks.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-3 text-slate-500">
+                  <td colSpan={7} className="py-3 text-secondary-500">
                     {t('banks.noBanks')}
                   </td>
                 </tr>
               ) : (
                 banks.map((bank) => (
-                  <tr key={bank.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
+                  <tr key={bank.id} className="border-t border-secondary-200/70">
                     <td className="py-2">
-                      <div className="font-semibold text-slate-900 dark:text-white">
+                      <div className="font-semibold text-ink">
                         {bank.name || t('banks.unnamed')}
                       </div>
-                      <div className="text-xs text-slate-500">{bank.accountName || '-'}</div>
+                      <div className="text-xs text-secondary-500">{bank.accountName || '-'}</div>
                     </td>
                     <td className="py-2">{bank.accountNumber || '-'}</td>
                     <td className="py-2">{bank.branchName || '-'}</td>
                     <td className="py-2 text-right">{formatMoney(bank.openingBalance)}</td>
-                    <td className="py-2 text-right font-semibold text-slate-900 dark:text-white">
+                    <td className="py-2 text-right font-semibold text-ink">
                       {formatMoney(bank.currentBalance)}
                     </td>
                     <td className="py-2">
@@ -361,7 +361,7 @@ export default function BanksSettingsPanel() {
                         className={`rounded-full px-2 py-1 text-xs font-semibold ${
                           bank.isActive
                             ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                            : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                            : 'bg-secondary-100 text-secondary-700 dark:bg-slate-800 dark:text-secondary-300'
                         }`}
                       >
                         {bank.isActive ? t('banks.filters.active') : t('banks.filters.inactive')}
@@ -457,7 +457,7 @@ export default function BanksSettingsPanel() {
             />
           </div>
 
-          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800/40">
+          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-secondary-200/70 px-3 py-2.5 text-sm text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:text-secondary-300 dark:hover:bg-slate-800/40">
             <input
               type="checkbox"
               className="h-4 w-4 rounded accent-primary-600"

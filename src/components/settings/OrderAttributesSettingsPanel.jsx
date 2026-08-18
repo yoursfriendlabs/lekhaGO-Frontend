@@ -162,8 +162,8 @@ export default function OrderAttributesSettingsPanel() {
       <div className="grid gap-6 xl:grid-cols-[minmax(300px,360px)_1fr]">
         <div className="card space-y-4 xl:sticky xl:top-24 xl:self-start">
           <div className="space-y-1">
-            <h2 className="font-serif text-xl text-slate-900 dark:text-white">{t('orderAttributes.title')}</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{t('orderAttributes.subtitle')}</p>
+            <h2 className="font-serif text-xl text-ink">{t('orderAttributes.title')}</h2>
+            <p className="text-sm text-secondary-500">{t('orderAttributes.subtitle')}</p>
           </div>
 
           {status.message ? <Notice title={status.message} tone={status.type} /> : null}
@@ -181,11 +181,11 @@ export default function OrderAttributesSettingsPanel() {
               />
             </div>
 
-            <div className="rounded-2xl border border-dashed border-slate-200/80 bg-slate-50/80 px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/40">
-              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
+            <div className="rounded-2xl border border-dashed border-secondary-200/80 bg-mist/80 px-4 py-3 dark:border-slate-700/60 dark:bg-slate-900/40">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-secondary-400">
                 {t('orderAttributes.key')}
               </p>
-              <p className="mt-1 font-mono text-sm text-slate-700 dark:text-slate-200">
+              <p className="mt-1 font-mono text-sm text-ink-light">
                 {editingId ? form.key || 'attribute_key' : derivedKey || 'attribute_key'}
               </p>
             </div>
@@ -238,10 +238,10 @@ export default function OrderAttributesSettingsPanel() {
         <div className="card space-y-4">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="font-serif text-lg text-slate-900 dark:text-white">
+              <h3 className="font-serif text-lg text-ink">
                 {t('orderAttributes.title')}
               </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <p className="text-sm text-secondary-500">
                 {t('common.total')}: {attributes.length}
               </p>
             </div>
@@ -249,19 +249,19 @@ export default function OrderAttributesSettingsPanel() {
 
           <div className="space-y-3 md:hidden">
             {loadingList ? (
-              <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+              <p className="py-3 text-sm text-secondary-500">{t('common.loading')}</p>
             ) : attributes.length === 0 ? (
-              <p className="py-3 text-sm text-slate-500">{t('common.noData') || 'No attributes found.'}</p>
+              <p className="py-3 text-sm text-secondary-500">{t('common.noData') || 'No attributes found.'}</p>
             ) : (
               attributes.map((attribute) => (
                 <div
                   key={attribute.id}
-                  className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60"
+                  className="rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60"
                 >
                   <div className="space-y-2">
                     <div>
-                      <p className="font-semibold text-slate-900 dark:text-white">{attribute.name}</p>
-                      <p className="font-mono text-xs text-slate-500">{attribute.key}</p>
+                      <p className="font-semibold text-ink">{attribute.name}</p>
+                      <p className="font-mono text-xs text-secondary-500">{attribute.key}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <span className="rounded-lg bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600 dark:bg-blue-500/10 dark:text-blue-200">
@@ -286,8 +286,8 @@ export default function OrderAttributesSettingsPanel() {
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-left text-sm text-slate-600 dark:text-slate-300">
-              <thead className="text-xs uppercase text-slate-400">
+            <table className="w-full text-left text-sm text-secondary-700">
+              <thead className="text-xs uppercase text-secondary-400">
                 <tr>
                   <th className="py-3">{t('orderAttributes.name')}</th>
                   <th className="py-3">{t('orderAttributes.key')}</th>
@@ -299,21 +299,21 @@ export default function OrderAttributesSettingsPanel() {
               <tbody>
                 {loadingList ? (
                   <tr>
-                    <td colSpan={5} className="py-4 text-slate-500">
+                    <td colSpan={5} className="py-4 text-secondary-500">
                       {t('common.loading')}
                     </td>
                   </tr>
                 ) : attributes.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-4 text-slate-500">
+                    <td colSpan={5} className="py-4 text-secondary-500">
                       {t('common.noData') || 'No attributes found.'}
                     </td>
                   </tr>
                 ) : (
                   attributes.map((attribute) => (
-                    <tr key={attribute.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                      <td className="py-3 font-medium text-slate-900 dark:text-white">{attribute.name}</td>
-                      <td className="py-3 font-mono text-xs text-slate-500">{attribute.key}</td>
+                    <tr key={attribute.id} className="border-t border-secondary-200/70">
+                      <td className="py-3 font-medium text-ink">{attribute.name}</td>
+                      <td className="py-3 font-mono text-xs text-secondary-500">{attribute.key}</td>
                       <td className="py-3">
                         <span className="rounded-lg bg-blue-50 px-2 py-1 text-xs font-medium text-blue-600 dark:bg-blue-500/10 dark:text-blue-200">
                           {t(`orderAttributes.types.${attribute.type}`)}

@@ -177,23 +177,23 @@ export default function ActivateAccount() {
             <p className="mt-6 text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
               {t('auth.activationEyebrow')}
             </p>
-            <h1 className="mt-3 font-serif text-4xl leading-tight text-slate-900 dark:text-white">
+            <h1 className="mt-3 font-serif text-4xl leading-tight text-ink">
               {t('auth.activationTitle')}
             </h1>
-            <p className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
+            <p className="mt-4 text-sm leading-6 text-secondary-700">
               {subtitle}
             </p>
             {email ? (
-              <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm dark:border-primary/30 dark:bg-slate-900/70 dark:text-slate-200">
+              <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-white/80 px-4 py-2 text-sm font-medium text-ink-light shadow-sm dark:border-primary/30 dark:bg-slate-900/70 dark:text-slate-200">
                 <MailCheck size={16} className="text-primary" />
                 {email}
               </div>
             ) : null}
-            <div className="mt-8 rounded-3xl border border-slate-200/80 bg-white/75 p-5 dark:border-slate-800/70 dark:bg-slate-900/70">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+            <div className="mt-8 rounded-3xl border border-secondary-200/80 bg-white/75 p-5 dark:border-slate-800/70 dark:bg-slate-900/70">
+              <p className="text-sm font-semibold text-ink">
                 {t('auth.activationAsideTitle')}
               </p>
-              <ul className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+              <ul className="mt-3 space-y-2 text-sm text-secondary-700">
                 <li>{t('auth.activationTipAccess')}</li>
                 <li>{t('auth.verificationTipInbox')}</li>
                 <li>{t('auth.verificationTipSingleUse')}</li>
@@ -205,8 +205,8 @@ export default function ActivateAccount() {
             <form className="space-y-6" onSubmit={handleVerify}>
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <label className="label !text-slate-700 dark:!text-slate-200">{t('auth.otpCode')}</label>
-                  <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                  <label className="label !text-ink-light dark:!text-slate-200">{t('auth.otpCode')}</label>
+                  <span className="text-xs font-medium uppercase tracking-[0.18em] text-secondary-400">
                     {OTP_LENGTH} {t('auth.digitsLabel')}
                   </span>
                 </div>
@@ -221,7 +221,7 @@ export default function ActivateAccount() {
                 <Notice title={t('auth.emailUnavailable')} description={t('auth.activationEmailMissing')} tone="warn" />
               ) : null}
 
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+              <div className="rounded-2xl border border-dashed border-secondary-200 bg-mist/70 px-4 py-3 text-sm text-secondary-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-secondary-300">
                 {sendingCode
                   ? t('auth.sendingCode')
                   : resendCountdown > 0

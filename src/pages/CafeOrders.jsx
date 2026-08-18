@@ -802,8 +802,8 @@ export default function CafeOrders() {
 
 
       {/* Order Type & View Switcher Bar */}
-      <div className="flex flex-col gap-4 rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+      <div className="flex flex-col gap-4 rounded-[28px] border border-secondary-200/80 bg-white/90 p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border-b border-secondary-100 pb-3 dark:border-slate-800">
           {/* Order Type Filter Tabs */}
           <div className="flex flex-wrap items-center gap-2 max-w-full">
             <button
@@ -811,13 +811,13 @@ export default function CafeOrders() {
               onClick={() => { setSelectedOrderTypeFilter('all'); if (viewMode === 'floor') setViewMode('kanban'); }}
               className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
                 selectedOrderTypeFilter === 'all' && viewMode !== 'floor'
-                  ? 'bg-[#9c5f22] text-white shadow-md'
-                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80'
+                  ? 'bg-primary text-white shadow-md'
+                  : 'bg-white text-ink-light hover:bg-secondary-100 border border-secondary-200/80'
               }`}
             >
               📋 All Orders
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-                selectedOrderTypeFilter === 'all' && viewMode !== 'floor' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                selectedOrderTypeFilter === 'all' && viewMode !== 'floor' ? 'bg-white/20 text-white' : 'bg-secondary-100 text-ink-light'
               }`}>
                 {typeCounts.all}
               </span>
@@ -828,8 +828,8 @@ export default function CafeOrders() {
               onClick={() => { setSelectedOrderTypeFilter('dine_in'); if (viewMode === 'floor') setViewMode('kanban'); }}
               className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
                 selectedOrderTypeFilter === 'dine_in' && viewMode !== 'floor'
-                  ? 'bg-[#9c5f22] text-white shadow-md'
-                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80'
+                  ? 'bg-primary text-white shadow-md'
+                  : 'bg-white text-ink-light hover:bg-secondary-100 border border-secondary-200/80'
               }`}
             >
               🍽️ Table / Dine In
@@ -845,8 +845,8 @@ export default function CafeOrders() {
               onClick={() => { setSelectedOrderTypeFilter('takeaway'); if (viewMode === 'floor') setViewMode('kanban'); }}
               className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
                 selectedOrderTypeFilter === 'takeaway' && viewMode !== 'floor'
-                  ? 'bg-[#9c5f22] text-white shadow-md'
-                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80'
+                  ? 'bg-primary text-white shadow-md'
+                  : 'bg-white text-ink-light hover:bg-secondary-100 border border-secondary-200/80'
               }`}
             >
               🛍️ Takeaway / Walk-in
@@ -863,7 +863,7 @@ export default function CafeOrders() {
               className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
                 selectedOrderTypeFilter === 'delivery' && viewMode !== 'floor'
                   ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80'
+                  : 'bg-white text-ink-light hover:bg-secondary-100 border border-secondary-200/80'
               }`}
             >
               🚚 Home Delivery
@@ -876,14 +876,14 @@ export default function CafeOrders() {
           </div>
 
           {/* View Mode Toggle Controls */}
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/60 shrink-0 self-start lg:self-auto">
+          <div className="flex items-center gap-1.5 bg-secondary-100 p-1.5 rounded-2xl border border-secondary-200/60 shrink-0 self-start lg:self-auto">
             <button
               type="button"
               onClick={() => setViewMode('kanban')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                 viewMode === 'kanban'
-                  ? 'bg-white text-[#9c5f22] shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-primary shadow-2xs'
+                  : 'text-secondary-700 hover:text-ink'
               }`}
             >
               <LayoutGrid size={15} />
@@ -895,8 +895,8 @@ export default function CafeOrders() {
               onClick={() => setViewMode('table')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                 viewMode === 'table'
-                  ? 'bg-white text-[#9c5f22] shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-primary shadow-2xs'
+                  : 'text-secondary-700 hover:text-ink'
               }`}
             >
               <Table size={15} />
@@ -909,14 +909,14 @@ export default function CafeOrders() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           {viewMode !== 'floor' && viewMode !== 'kitchen' ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-1 whitespace-nowrap">Stage:</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-secondary-400 mr-1 whitespace-nowrap">Stage:</span>
               <button
                 type="button"
                 onClick={() => setSelectedStatusFilter('all')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                   selectedStatusFilter === 'all'
                     ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
                 }`}
               >
                 All Stages ({filteredOrders.length})
@@ -929,7 +929,7 @@ export default function CafeOrders() {
                   className={`px-3 py-1.5 text-xs font-semibold rounded-xl border transition whitespace-nowrap ${
                     selectedStatusFilter === column.value
                       ? `${column.tone} shadow-sm`
-                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                      : 'border-secondary-200 bg-white text-secondary-700 hover:border-secondary-300'
                   }`}
                 >
                   {column.label} ({orderCounts[column.value] || 0})
@@ -944,20 +944,20 @@ export default function CafeOrders() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search party name, phone, address, invoice..."
-              className="w-full rounded-2xl border border-slate-200/80 bg-white py-2 pl-9 pr-3 text-xs font-medium text-slate-800 focus:border-[#9c5f22] focus:outline-none"
+              className="w-full rounded-2xl border border-secondary-200/80 bg-white py-2 pl-9 pr-3 text-xs font-medium text-ink focus:border-primary focus:outline-none"
             />
-            <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+            <Search size={14} className="absolute left-3 top-2.5 text-secondary-400" />
           </div>
         </div>
       </div>
 
       {/* View 1: Seating Map / Floor Plan */}
       {viewMode === 'floor' ? (
-        <div className="rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-6 space-y-4">
+        <div className="rounded-[28px] border border-secondary-200/80 bg-white/90 p-4 shadow-sm sm:p-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9b6835]">Floor Map</p>
-              <h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">Seating Tables</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Floor Map</p>
+              <h2 className="mt-1 text-xl font-bold text-ink sm:text-2xl">Seating Tables</h2>
             </div>
             {selectedTableFilter ? (
               <button
@@ -970,14 +970,14 @@ export default function CafeOrders() {
             ) : null}
           </div>
 
-          <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
+          <div className="flex flex-wrap gap-2 border-b border-secondary-100 pb-3 dark:border-slate-800">
             <button
               type="button"
               onClick={() => setSelectedFloorTab('all')}
               className={`px-3.5 py-1.5 text-xs font-bold rounded-full transition-all border ${
                 selectedFloorTab === 'all'
-                  ? 'bg-[#9b6835] text-white border-[#9b6835] shadow-sm'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  ? 'bg-primary text-white border-primary shadow-sm'
+                  : 'bg-white text-secondary-700 border-secondary-200 hover:bg-mist'
               }`}
             >
               All Tables
@@ -989,8 +989,8 @@ export default function CafeOrders() {
                 onClick={() => setSelectedFloorTab(floor.id)}
                 className={`px-3.5 py-1.5 text-xs font-bold rounded-full transition-all border ${
                   selectedFloorTab === floor.id
-                    ? 'bg-[#9b6835] text-white border-[#9b6835] shadow-sm'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    ? 'bg-primary text-white border-primary shadow-sm'
+                    : 'bg-white text-secondary-700 border-secondary-200 hover:bg-mist'
                 }`}
               >
                 {floor.name}
@@ -1015,7 +1015,7 @@ export default function CafeOrders() {
                 >
                   <div className="w-full">
                     <div className="flex items-start justify-between gap-2">
-                      <span className="font-serif text-lg sm:text-xl font-bold text-slate-800">
+                      <span className="font-serif text-lg sm:text-xl font-bold text-ink">
                         {table.label}
                       </span>
                       <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
@@ -1027,17 +1027,17 @@ export default function CafeOrders() {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1 mt-1 text-xs text-slate-500">
-                      <Users size={12} className="text-slate-400" />
+                    <div className="flex items-center gap-1 mt-1 text-xs text-secondary-500">
+                      <Users size={12} className="text-secondary-400" />
                       <span>{table.capacity ? `${table.capacity} Seats` : 'No limit'}</span>
                     </div>
                   </div>
 
-                  <div className="w-full pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                  <div className="w-full pt-2 border-t border-secondary-100 flex items-center justify-between">
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-secondary-100 text-secondary-700 border border-secondary-200">
                       {table.category?.name || 'No Floor'}
                     </span>
-                    <span className="text-[11px] text-slate-500 truncate max-w-[90px]">
+                    <span className="text-[11px] text-secondary-500 truncate max-w-[90px]">
                       {table.orderMeta?.waiterName || (isOccupied ? 'Dining' : 'Open')}
                     </span>
                   </div>
@@ -1048,10 +1048,10 @@ export default function CafeOrders() {
         </div>
       ) : viewMode === 'table' ? (
         /* View 2: Data Table View */
-        <div className="rounded-[28px] border border-slate-200/80 bg-white/90 p-4 sm:p-6 shadow-sm overflow-x-auto">
+        <div className="rounded-[28px] border border-secondary-200/80 bg-white/90 p-4 sm:p-6 shadow-sm overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+              <tr className="border-b border-secondary-200 text-secondary-400 font-bold uppercase tracking-wider text-[10px]">
                 <th className="p-3">Order / Date</th>
                 <th className="p-3">Type</th>
                 <th className="p-3">Customer / Party</th>
@@ -1066,7 +1066,7 @@ export default function CafeOrders() {
             <tbody className="divide-y divide-slate-100">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-slate-400">
+                  <td colSpan={9} className="p-8 text-center text-secondary-400">
                     No orders match your search or filters.
                   </td>
                 </tr>
@@ -1078,10 +1078,10 @@ export default function CafeOrders() {
                   const statusMeta = getCafeOrderStatusMeta(meta.orderStatus);
 
                   return (
-                    <tr key={order.id} className="hover:bg-slate-50/80 transition">
-                      <td className="p-3 font-semibold text-slate-800">
+                    <tr key={order.id} className="hover:bg-mist/80 transition">
+                      <td className="p-3 font-semibold text-ink">
                         <div>#{order.invoiceNo || order.id.slice(0, 8)}</div>
-                        <div className="text-[10px] text-slate-400 font-normal">{formatRelativeDate(order.createdAt || order.saleDate)}</div>
+                        <div className="text-[10px] text-secondary-400 font-normal">{formatRelativeDate(order.createdAt || order.saleDate)}</div>
                       </td>
                       <td className="p-3 whitespace-nowrap">
                         {meta.orderType === 'delivery' ? (
@@ -1101,18 +1101,18 @@ export default function CafeOrders() {
                       <td className="p-3">
                         {meta.partyName ? (
                           <div>
-                            <div className="font-bold text-slate-800">{meta.partyName}</div>
+                            <div className="font-bold text-ink">{meta.partyName}</div>
                             {meta.partyPhone && (
                               <a href={`tel:${meta.partyPhone}`} className="text-amber-800 text-[11px] hover:underline flex items-center gap-1">
                                 <Phone size={10} /> {meta.partyPhone}
                               </a>
                             )}
                             {meta.partyAddress && (
-                              <div className="text-slate-500 text-[10px] truncate max-w-[160px]">{meta.partyAddress}</div>
+                              <div className="text-secondary-500 text-[10px] truncate max-w-[160px]">{meta.partyAddress}</div>
                             )}
                           </div>
                         ) : (
-                          <span className="text-slate-400 italic">Walk-in</span>
+                          <span className="text-secondary-400 italic">Walk-in</span>
                         )}
                       </td>
                       <td className="p-3 max-w-[220px]">
@@ -1122,7 +1122,7 @@ export default function CafeOrders() {
                             {order.SaleItems.length > 2 ? ` +${order.SaleItems.length - 2} more` : ''}
                           </span>
                         ) : (
-                          <span className="text-slate-400">No items</span>
+                          <span className="text-secondary-400">No items</span>
                         )}
                       </td>
                       <td className="p-3 whitespace-nowrap">
@@ -1131,18 +1131,18 @@ export default function CafeOrders() {
                         </span>
                       </td>
                       <td className="p-3 whitespace-nowrap">
-                        <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border ${statusMeta?.tone || 'bg-slate-100 text-slate-700'}`}>
+                        <span className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border ${statusMeta?.tone || 'bg-secondary-100 text-ink-light'}`}>
                           {statusMeta?.label || meta.orderStatus}
                         </span>
                       </td>
-                      <td className="p-3 text-right text-slate-500 whitespace-nowrap">
+                      <td className="p-3 text-right text-secondary-500 whitespace-nowrap">
                         {Number(order.discountTotal || order.discount || 0) > 0 ? (
                           <span className="text-rose-600 font-medium">-{formatMoney(order.discountTotal || order.discount)}</span>
                         ) : (
-                          <span className="text-slate-400">—</span>
+                          <span className="text-secondary-400">—</span>
                         )}
                       </td>
-                      <td className="p-3 text-right font-bold text-slate-900 whitespace-nowrap">
+                      <td className="p-3 text-right font-bold text-ink whitespace-nowrap">
                         {formatMoney(order.grandTotal)}
                       </td>
                       <td className="p-3 text-center whitespace-nowrap">
@@ -1168,21 +1168,21 @@ export default function CafeOrders() {
                           )}
                           <button
                             type="button"
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                            className="rounded-lg p-1.5 text-secondary-500 hover:bg-secondary-100"
                             onClick={() => navigate(`/app/pos?tableId=${order.tableId || ''}&ref=orders`)}
                             title="Edit"
                           >
                             <Pencil size={14} />
                           </button>
                            <Link
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                            className="rounded-lg p-1.5 text-secondary-500 hover:bg-secondary-100"
                             to={`/app/invoice/sales/${order.id}`}
                             title="Invoice"
                           >
                             <FileText size={14} />
                           </Link>
                           <Link
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+                            className="rounded-lg p-1.5 text-secondary-500 hover:bg-secondary-100"
                             to={`/app/invoice/sales/${order.id}?thermal=1`}
                             title="Print Thermal Receipt"
                           >
@@ -1209,19 +1209,19 @@ export default function CafeOrders() {
         /* View 4: Kitchen Items View (Infinite Scroll) */
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+            <h3 className="text-sm font-bold text-ink uppercase tracking-wider">
               Preparation Queue ({kitchenItems.length} items)
             </h3>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-secondary-500">
               Showing {Math.min(visibleCount, kitchenItems.length)} of {kitchenItems.length}
             </span>
           </div>
           
           {kitchenItems.length === 0 ? (
-            <div className="rounded-[28px] border border-slate-200 border-dashed bg-white p-12 text-center">
-              <ShoppingBag className="mx-auto text-slate-300 mb-3" size={32} />
-              <p className="text-sm font-semibold text-slate-700">No active kitchen items</p>
-              <p className="text-xs text-slate-400 mt-1">New items will appear here when orders are placed.</p>
+            <div className="rounded-[28px] border border-secondary-200 border-dashed bg-white p-12 text-center">
+              <ShoppingBag className="mx-auto text-secondary-300 mb-3" size={32} />
+              <p className="text-sm font-semibold text-ink-light">No active kitchen items</p>
+              <p className="text-xs text-secondary-400 mt-1">New items will appear here when orders are placed.</p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -1233,25 +1233,25 @@ export default function CafeOrders() {
                   <div
                     key={item.id}
                     className={`rounded-2xl border bg-white p-4 shadow-xs space-y-3 flex flex-col justify-between transition ${
-                      isNew ? 'border-blue-100 bg-blue-50/20' : 'border-slate-200'
+                      isNew ? 'border-blue-100 bg-blue-50/20' : 'border-secondary-200'
                     }`}
                   >
                     <div>
                       <div className="flex items-start justify-between gap-2">
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
                           item.orderType === 'dine_in' ? 'bg-amber-100 text-amber-800' :
-                          item.orderType === 'delivery' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-800'
+                          item.orderType === 'delivery' ? 'bg-blue-100 text-blue-800' : 'bg-secondary-100 text-ink'
                         }`}>
                           {item.orderType === 'dine_in' ? `Table ${item.tableNo || '?'}` : 
                            item.orderType === 'delivery' ? 'Delivery' : 'Takeaway'}
                         </span>
-                        <span className="text-[10px] text-slate-400 font-medium">
+                        <span className="text-[10px] text-secondary-400 font-medium">
                           {formatRelativeDate(item.createdAt)}
                         </span>
                       </div>
                       
-                      <h4 className="text-lg font-bold text-slate-900 mt-2 flex items-baseline gap-2">
-                        <span className="text-xl text-[#9c5f22] font-extrabold">{item.quantity}x</span>
+                      <h4 className="text-lg font-bold text-ink mt-2 flex items-baseline gap-2">
+                        <span className="text-xl text-primary font-extrabold">{item.quantity}x</span>
                         <span className="truncate">{item.productName}</span>
                       </h4>
                       
@@ -1263,9 +1263,9 @@ export default function CafeOrders() {
                       )}
                     </div>
                     
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 mt-auto">
+                    <div className="pt-2 border-t border-secondary-100 flex items-center justify-between gap-2 mt-auto">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        isNew ? 'bg-slate-100 text-slate-700' : 'bg-amber-100 text-amber-800'
+                        isNew ? 'bg-secondary-100 text-ink-light' : 'bg-amber-100 text-amber-800'
                       }`}>
                         {isNew ? 'New Order' : 'Preparing'}
                       </span>
@@ -1298,7 +1298,7 @@ export default function CafeOrders() {
           )}
           
           {visibleCount < kitchenItems.length && (
-            <div id="kitchen-sentinel" className="py-6 text-center text-sm text-slate-400 font-medium animate-pulse">
+            <div id="kitchen-sentinel" className="py-6 text-center text-sm text-secondary-400 font-medium animate-pulse">
               Loading more items...
             </div>
           )}
@@ -1309,26 +1309,26 @@ export default function CafeOrders() {
           {visibleBoardColumns.map((column) => (
             <section
               key={column.value}
-              className="w-80 sm:w-84 shrink-0 h-[calc(100vh-220px)] min-h-[600px] flex flex-col rounded-[28px] border border-slate-200/80 bg-white/90 p-4 shadow-sm sm:p-5"
+              className="w-80 sm:w-84 shrink-0 h-[calc(100vh-220px)] min-h-[600px] flex flex-col rounded-[28px] border border-secondary-200/80 bg-white/90 p-4 shadow-sm sm:p-5"
             >
-              <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center justify-between gap-3 border-b border-secondary-100 pb-3">
                 <div className="flex items-center gap-2">
                   <span className={`h-2.5 w-2.5 rounded-full ${column.accent}`} />
-                  <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-700">{column.label}</h3>
+                  <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-ink-light">{column.label}</h3>
                 </div>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-extrabold text-slate-700">
+                <span className="rounded-full bg-secondary-100 px-2.5 py-1 text-xs font-extrabold text-ink-light">
                   {column.items.length}
                 </span>
               </div>
 
               <div className="mt-4 space-y-3 flex-1 overflow-y-auto pr-1">
                 {loading ? (
-                  <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500 text-center">
+                  <div className="rounded-3xl border border-dashed border-secondary-200 bg-mist p-4 text-sm text-secondary-500 text-center">
                     Loading orders...
                   </div>
                 ) : column.items.length === 0 ? (
-                  <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6 text-sm text-slate-400 text-center flex flex-col items-center justify-center gap-2">
-                    <Package2 size={24} className="text-slate-300" />
+                  <div className="rounded-3xl border border-dashed border-secondary-200 bg-mist p-6 text-sm text-secondary-400 text-center flex flex-col items-center justify-center gap-2">
+                    <Package2 size={24} className="text-secondary-300" />
                     <span>No orders in this column.</span>
                   </div>
                 ) : (
@@ -1340,7 +1340,7 @@ export default function CafeOrders() {
                     return (
                       <article
                         key={order.id}
-                        className="rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm transition hover:shadow-md space-y-3"
+                        className="rounded-3xl border border-secondary-200/80 bg-white p-4 shadow-sm transition hover:shadow-md space-y-3"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -1358,7 +1358,7 @@ export default function CafeOrders() {
                               </span>
                             )}
 
-                            <span className="text-[11px] font-semibold text-slate-400">
+                            <span className="text-[11px] font-semibold text-secondary-400">
                               #{order.invoiceNo || order.id.slice(0, 8)}
                             </span>
                           </div>
@@ -1374,7 +1374,7 @@ export default function CafeOrders() {
                             <UserRound size={16} className="text-amber-600 mt-0.5 shrink-0" />
                             <div className="min-w-0 flex-1 space-y-1">
                               {meta.partyName && (
-                                <p className="font-bold text-sm text-slate-800 truncate">{meta.partyName}</p>
+                                <p className="font-bold text-sm text-ink truncate">{meta.partyName}</p>
                               )}
                               {meta.partyPhone && (
                                 <a href={`tel:${meta.partyPhone}`} className="text-amber-800 font-semibold hover:underline flex items-center gap-1.5">
@@ -1382,7 +1382,7 @@ export default function CafeOrders() {
                                 </a>
                               )}
                               {meta.partyAddress && (
-                                <p className="text-slate-600 flex items-center gap-1.5 text-xs">
+                                <p className="text-secondary-700 flex items-center gap-1.5 text-xs">
                                   <MapPin size={12} className="text-rose-500 shrink-0" />
                                   <span className="truncate">{meta.partyAddress}</span>
                                 </p>
@@ -1393,13 +1393,13 @@ export default function CafeOrders() {
 
                         {/* Items Preview */}
                         {Array.isArray(order.SaleItems) && order.SaleItems.length > 0 ? (
-                          <div className="rounded-2xl bg-slate-50 p-2.5 text-xs text-slate-700 space-y-1 border border-slate-100">
+                          <div className="rounded-2xl bg-mist p-2.5 text-xs text-ink-light space-y-1 border border-secondary-100">
                             <div className="flex items-center justify-between mb-1">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Items ({order.SaleItems.length})</p>
+                              <p className="text-[10px] font-bold text-secondary-400 uppercase tracking-wider">Items ({order.SaleItems.length})</p>
                               <button
                                 type="button"
                                 onClick={() => setSelectedOrderForItemsDialog(order)}
-                                className="text-[10px] font-bold text-[#9c5f22] hover:underline"
+                                className="text-[10px] font-bold text-primary hover:underline"
                               >
                                 View All
                               </button>
@@ -1407,14 +1407,14 @@ export default function CafeOrders() {
                             {order.SaleItems.slice(0, 4).map((si) => (
                               <div key={si.id || si.productId} className="flex justify-between font-medium">
                                 <span className="truncate pr-2">{si.quantity}x {si.Product?.name || si.name || 'Item'}</span>
-                                <span className="text-slate-500 shrink-0">{formatMoney(si.lineTotal)}</span>
+                                <span className="text-secondary-500 shrink-0">{formatMoney(si.lineTotal)}</span>
                               </div>
                             ))}
                             {order.SaleItems.length > 4 && (
                               <button
                                 type="button"
                                 onClick={() => setSelectedOrderForItemsDialog(order)}
-                                className="w-full text-center text-[10px] font-bold text-[#9c5f22] hover:underline pt-1 border-t border-slate-200/50 mt-1 block"
+                                className="w-full text-center text-[10px] font-bold text-primary hover:underline pt-1 border-t border-secondary-200/50 mt-1 block"
                               >
                                 + {order.SaleItems.length - 4} more items
                               </button>
@@ -1422,26 +1422,26 @@ export default function CafeOrders() {
                           </div>
                         ) : null}
 
-                        <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                        <div className="flex items-center justify-between text-xs text-secondary-500 pt-1">
                           <div className="flex items-center gap-1.5">
-                            <Clock size={13} className="text-slate-400" />
+                            <Clock size={13} className="text-secondary-400" />
                             <span>{formatRelativeDate(order.createdAt || order.saleDate)}</span>
                           </div>
                           {meta.waiterName && (
-                            <span className="text-[11px] bg-slate-100 px-2 py-0.5 rounded-full font-medium">
+                            <span className="text-[11px] bg-secondary-100 px-2 py-0.5 rounded-full font-medium">
                               {meta.waiterName}
                             </span>
                           )}
                         </div>
 
                         {order.notes ? (
-                          <p className="rounded-2xl bg-amber-50/50 p-2.5 text-xs text-slate-600 border border-amber-100">{order.notes}</p>
+                          <p className="rounded-2xl bg-amber-50/50 p-2.5 text-xs text-secondary-700 border border-amber-100">{order.notes}</p>
                         ) : null}
 
-                        <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                        <div className="flex items-center justify-between gap-3 pt-2 border-t border-secondary-100">
                           <div>
-                            <p className="text-[10px] uppercase font-bold text-slate-400">Total</p>
-                            <p className="text-base font-bold text-slate-900">
+                            <p className="text-[10px] uppercase font-bold text-secondary-400">Total</p>
+                            <p className="text-base font-bold text-ink">
                               {formatMoney(order.grandTotal)}
                               {Number(order.discountTotal || order.discount || 0) > 0 && (
                                 <span className="text-[10px] text-rose-600 font-medium block">
@@ -1454,21 +1454,21 @@ export default function CafeOrders() {
                             <button
                               type="button"
                               title="Edit order"
-                              className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                              className="rounded-xl p-2 text-secondary-500 transition hover:bg-secondary-100 hover:text-ink"
                               onClick={() => navigate(`/app/pos?tableId=${order.tableId || ''}&ref=orders`)}
                             >
                               <Pencil size={15} />
                             </button>
                             <Link
                               title="Open invoice"
-                              className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                              className="rounded-xl p-2 text-secondary-500 transition hover:bg-secondary-100 hover:text-ink"
                               to={`/app/invoice/sales/${order.id}`}
                             >
                               <FileText size={15} />
                             </Link>
                             <Link
                               title="Print Thermal Receipt"
-                              className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+                              className="rounded-xl p-2 text-secondary-500 transition hover:bg-secondary-100 hover:text-ink"
                               to={`/app/invoice/sales/${order.id}?thermal=1`}
                             >
                               <Printer size={15} />
@@ -1517,7 +1517,7 @@ export default function CafeOrders() {
                       ...prev,
                       [column.value]: (prev[column.value] || 10) + 10,
                     }))}
-                    className="w-full py-2.5 my-2 text-xs font-bold text-[#9c5f22] bg-[#9c5f22]/5 hover:bg-[#9c5f22]/10 rounded-2xl transition border border-dashed border-[#9c5f22]/20 flex items-center justify-center gap-1 active:scale-98"
+                    className="w-full py-2.5 my-2 text-xs font-bold text-primary bg-primary/5 hover:bg-primary/10 rounded-2xl transition border border-dashed border-primary/20 flex items-center justify-center gap-1 active:scale-98"
                   >
                     🔄 Load More (+10)
                   </button>
@@ -1537,12 +1537,12 @@ export default function CafeOrders() {
         <form className="space-y-5" onSubmit={saveOrder}>
           {isCompactLayout ? (
             <>
-              <div className="rounded-[28px] border border-slate-200/80 bg-gradient-to-br from-[#fff8f1] via-white to-slate-50 p-4 shadow-sm">
+              <div className="rounded-[28px] border border-secondary-200/80 bg-gradient-to-br from-primary-50 via-white to-slate-50 p-4 shadow-sm">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9b6835]">Order Draft</p>
-                    <h3 className="mt-2 truncate text-xl font-semibold text-slate-900">{dialogOrderLabel}</h3>
-                    <p className="mt-1 text-sm text-slate-500">{dialogSecondaryLabel}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Order Draft</p>
+                    <h3 className="mt-2 truncate text-xl font-semibold text-ink">{dialogOrderLabel}</h3>
+                    <p className="mt-1 text-sm text-secondary-500">{dialogSecondaryLabel}</p>
                   </div>
                   <span className={`inline-flex w-fit rounded-full border px-3 py-1.5 text-xs font-semibold ${getCafePaymentMeta({ dueAmount, grandTotal: totals.grandTotal }).tone}`}>
                     {getCafePaymentMeta({ dueAmount, grandTotal: totals.grandTotal }).label}
@@ -1551,19 +1551,19 @@ export default function CafeOrders() {
 
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div className="rounded-2xl bg-white/85 px-3 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Items</p>
-                    <p className="mt-1 text-base font-semibold text-slate-900">{items.length}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary-400">Items</p>
+                    <p className="mt-1 text-base font-semibold text-ink">{items.length}</p>
                   </div>
                   <div className="rounded-2xl bg-white/85 px-3 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Guests</p>
-                    <p className="mt-1 text-base font-semibold text-slate-900">{orderFields.guestCount || '1'}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary-400">Guests</p>
+                    <p className="mt-1 text-base font-semibold text-ink">{orderFields.guestCount || '1'}</p>
                   </div>
                   <div className="rounded-2xl bg-white/85 px-3 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Total</p>
-                    <p className="mt-1 text-base font-semibold text-slate-900">{formatMoney(totals.grandTotal)}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary-400">Total</p>
+                    <p className="mt-1 text-base font-semibold text-ink">{formatMoney(totals.grandTotal)}</p>
                   </div>
                   <div className="rounded-2xl bg-white/85 px-3 py-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">Due</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary-400">Due</p>
                     <p className={`mt-1 text-base font-semibold ${dueAmount > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
                       {formatMoney(dueAmount)}
                     </p>
@@ -1580,7 +1580,7 @@ export default function CafeOrders() {
                     className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition ${
                       activeDialogStep === step.id
                         ? 'bg-slate-900 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
                     }`}
                   >
                     {step.label}
@@ -1668,11 +1668,11 @@ export default function CafeOrders() {
                   />
                 </div>
 
-                <div className="sm:col-span-2 xl:col-span-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <div className="sm:col-span-2 xl:col-span-4 rounded-2xl border border-secondary-200 bg-mist/70 p-4">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <label className="label text-slate-900 font-bold">Customer / Party (Phone Orders)</label>
-                      <p className="mt-0.5 text-xs text-slate-500">Record customer name, phone number, and delivery address.</p>
+                      <label className="label text-ink font-bold">Customer / Party (Phone Orders)</label>
+                      <p className="mt-0.5 text-xs text-secondary-500">Record customer name, phone number, and delivery address.</p>
                     </div>
                     <button
                       type="button"
@@ -1685,8 +1685,8 @@ export default function CafeOrders() {
                   {selectedParty ? (
                     <div className="mt-3 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/80 p-3">
                       <div className="min-w-0 flex-1">
-                        <p className="font-bold text-slate-900 text-sm">{selectedParty.name}</p>
-                        <p className="text-xs text-slate-600">
+                        <p className="font-bold text-ink text-sm">{selectedParty.name}</p>
+                        <p className="text-xs text-secondary-700">
                           {selectedParty.phone || 'No phone'} {selectedParty.address ? ` · ${selectedParty.address}` : ''}
                         </p>
                       </div>
@@ -1699,7 +1699,7 @@ export default function CafeOrders() {
                       </button>
                     </div>
                   ) : (
-                    <p className="mt-2 text-xs italic text-slate-400">No customer party attached (Walk-in Customer).</p>
+                    <p className="mt-2 text-xs italic text-secondary-400">No customer party attached (Walk-in Customer).</p>
                   )}
                 </div>
 
@@ -1719,7 +1719,7 @@ export default function CafeOrders() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <p className="label">Table Selection</p>
-                      <p className="mt-1 text-xs text-slate-500">Choose the table for this order.</p>
+                      <p className="mt-1 text-xs text-secondary-500">Choose the table for this order.</p>
                     </div>
                     {orderFields.tableNo ? (
                       <button
@@ -1732,17 +1732,17 @@ export default function CafeOrders() {
                     ) : null}
                   </div>
 
-                  <div className="mt-3 flex flex-col gap-4 border-b border-slate-100 pb-3 dark:border-slate-800">
+                  <div className="mt-3 flex flex-col gap-4 border-b border-secondary-100 pb-3 dark:border-slate-800">
                     {/* Floor Filter Chips */}
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none max-w-full">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap">Floor:</span>
+                      <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap">Floor:</span>
                       <button
                         type="button"
                         onClick={() => setDialogFloorFilter('all')}
                         className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                           dialogFloorFilter === 'all'
-                            ? 'bg-[#9b6835] text-white shadow-sm'
-                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                            ? 'bg-primary text-white shadow-sm'
+                            : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                         }`}
                       >
                         All Floors
@@ -1754,8 +1754,8 @@ export default function CafeOrders() {
                           onClick={() => setDialogFloorFilter(floor.id)}
                           className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                             dialogFloorFilter === floor.id
-                              ? 'bg-[#9b6835] text-white shadow-sm'
-                              : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                              ? 'bg-primary text-white shadow-sm'
+                              : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                           }`}
                         >
                           {floor.name}
@@ -1766,8 +1766,8 @@ export default function CafeOrders() {
                         onClick={() => setDialogFloorFilter('unassigned')}
                         className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                           dialogFloorFilter === 'unassigned'
-                            ? 'bg-[#9b6835] text-white shadow-sm'
-                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                            ? 'bg-primary text-white shadow-sm'
+                            : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                         }`}
                       >
                         Unassigned
@@ -1776,14 +1776,14 @@ export default function CafeOrders() {
 
                     {/* Status Filter Chips */}
                     <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                      <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap">Status:</span>
+                      <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap">Status:</span>
                       <button
                         type="button"
                         onClick={() => setDialogStatusFilter('all')}
                         className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                           dialogStatusFilter === 'all'
-                            ? 'bg-[#9b6835] text-white shadow-sm'
-                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                            ? 'bg-primary text-white shadow-sm'
+                            : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                         }`}
                       >
                         All
@@ -1794,7 +1794,7 @@ export default function CafeOrders() {
                         className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                           dialogStatusFilter === 'vacant'
                             ? 'bg-emerald-600 text-white shadow-sm'
-                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                            : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                         }`}
                       >
                         Vacant
@@ -1805,7 +1805,7 @@ export default function CafeOrders() {
                         className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                           dialogStatusFilter === 'occupied'
                             ? 'bg-amber-600 text-white shadow-sm'
-                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                            : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                         }`}
                       >
                         Occupied
@@ -1846,22 +1846,22 @@ export default function CafeOrders() {
                             onClick={() => setOrderFields((prev) => ({ ...prev, tableNo: table.id }))}
                             className={`group relative rounded-2xl border p-4 text-left transition duration-200 hover:scale-[1.02] hover:shadow-md flex flex-col justify-between h-28 ${
                               selected
-                                ? 'border-[#9b6835] bg-[#9b6835]/10 shadow-sm'
+                                ? 'border-primary bg-primary/10 shadow-sm'
                                 : occupiedByOther
                                   ? 'border-amber-200 bg-amber-50/50 hover:bg-amber-100 text-amber-800'
-                                  : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 text-slate-700'
+                                  : 'border-secondary-200 bg-white hover:border-secondary-300 hover:bg-mist text-ink-light'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2 w-full">
-                              <span className="text-sm font-bold text-slate-900 truncate max-w-[80px]">{table.label}</span>
+                              <span className="text-sm font-bold text-ink truncate max-w-[80px]">{table.label}</span>
                               <span className={`px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider ${isOccupied ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
                                 {isOccupied ? "Occupied" : "Vacant"}
                               </span>
                             </div>
                             
-                            <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-slate-100 dark:border-slate-800 mt-2">
-                              <span className="text-[10px] text-slate-400">{table.capacity ? `${table.capacity} seats` : "No limit"}</span>
-                              <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium border border-slate-200/50 truncate max-w-[70px]">
+                            <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-secondary-100 dark:border-slate-800 mt-2">
+                              <span className="text-[10px] text-secondary-400">{table.capacity ? `${table.capacity} seats` : "No limit"}</span>
+                              <span className="text-[9px] bg-secondary-100 text-secondary-500 px-1.5 py-0.5 rounded font-medium border border-secondary-200/50 truncate max-w-[70px]">
                                 {table.category?.name || "No Floor"}
                               </span>
                             </div>
@@ -1871,7 +1871,7 @@ export default function CafeOrders() {
                   </div>
                 </div>
               ) : (
-                <div className="mt-5 rounded-2xl border border-slate-200/70 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                <div className="mt-5 rounded-2xl border border-secondary-200/70 bg-mist px-4 py-3 text-sm text-secondary-700">
                   {getCafeOrderTypeLabel(orderFields.orderType)} orders do not need a table assignment.
                 </div>
               )}
@@ -1889,13 +1889,13 @@ export default function CafeOrders() {
                   const vatAmount = getVatAmount(item.lineTotal, item.taxRate);
 
                   return (
-                    <div key={`cafe-item-${index}`} className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4">
+                    <div key={`cafe-item-${index}`} className="rounded-3xl border border-secondary-200/70 bg-mist/70 p-4">
                       <div className="mb-4 flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                          <p className="truncate text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">
                             {product?.name || `Menu Item ${index + 1}`}
                           </p>
-                          <p className="mt-1 text-sm text-slate-500">
+                          <p className="mt-1 text-sm text-secondary-500">
                             {formatMoney(item.lineTotal)} total · {formatMoney(vatAmount)} tax
                           </p>
                         </div>
@@ -1933,9 +1933,9 @@ export default function CafeOrders() {
                             renderOption={(option) => (
                               <div className="flex items-center gap-2">
                                 {option.entity?.imageUrl ? (
-                                  <img src={option.entity.imageUrl} alt={option.label} className="h-6 w-6 rounded object-cover border border-slate-200 dark:border-slate-800" />
+                                  <img src={option.entity.imageUrl} alt={option.label} className="h-6 w-6 rounded object-cover border border-secondary-200 dark:border-slate-800" />
                                 ) : (
-                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-400 dark:bg-slate-800">
+                                  <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-secondary-100 text-[10px] font-bold text-secondary-400 dark:bg-slate-800">
                                     {option.entity?.name?.charAt(0).toUpperCase() || 'P'}
                                   </div>
                                 )}
@@ -1954,7 +1954,7 @@ export default function CafeOrders() {
                             value={item.quantity}
                             onChange={(event) => handleItemChange(index, 'quantity', event.target.value)}
                           />
-                          <p className="mt-1 text-xs text-slate-500">{getProductUnitLabel(product, item.unitType)}</p>
+                          <p className="mt-1 text-xs text-secondary-500">{getProductUnitLabel(product, item.unitType)}</p>
                         </div>
                         <div>
                           <label className="label">Unit Type</label>
@@ -1992,19 +1992,19 @@ export default function CafeOrders() {
           {showPaymentStep ? (
             <FormSectionCard title="Payment">
               <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-                <div className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4">
+                <div className="rounded-3xl border border-secondary-200/70 bg-mist/70 p-4">
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Subtotal</p>
-                      <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoney(totals.subTotal)}</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-secondary-400">Subtotal</p>
+                      <p className="mt-1 text-lg font-semibold text-ink">{formatMoney(totals.subTotal)}</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Tax</p>
-                      <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoney(totals.taxTotal)}</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-secondary-400">Tax</p>
+                      <p className="mt-1 text-lg font-semibold text-ink">{formatMoney(totals.taxTotal)}</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Grand Total</p>
-                      <p className="mt-1 text-lg font-semibold text-slate-900">{formatMoney(totals.grandTotal)}</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-secondary-400">Grand Total</p>
+                      <p className="mt-1 text-lg font-semibold text-ink">{formatMoney(totals.grandTotal)}</p>
                     </div>
                   </div>
 
@@ -2021,7 +2021,7 @@ export default function CafeOrders() {
                         onChange={(event) => setOrderFields((prev) => ({ ...prev, amountReceived: event.target.value }))}
                       />
                     </div>
-                    <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-secondary-200/70 px-3 py-2.5 text-sm text-ink-light transition hover:bg-secondary-100">
                       <input
                         type="checkbox"
                         className="h-4 w-4 rounded accent-primary-600"
@@ -2041,7 +2041,7 @@ export default function CafeOrders() {
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4">
+                <div className="rounded-3xl border border-secondary-200/70 bg-mist/70 p-4">
                   <PaymentMethodFields
                     value={orderFields}
                     onChange={(patch) => setOrderFields((prev) => ({ ...prev, ...patch }))}
@@ -2053,15 +2053,15 @@ export default function CafeOrders() {
 
           {isCompactLayout ? (
             <div className="mobile-sticky-actions space-y-3">
-              <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-100/90 px-4 py-3 text-sm">
+              <div className="flex items-center justify-between gap-3 rounded-2xl bg-secondary-100/90 px-4 py-3 text-sm">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                     {dialogSteps[activeDialogStepIndex]?.label || 'Details'}
                   </p>
-                  <p className="mt-1 truncate font-semibold text-slate-700">{dialogOrderLabel}</p>
+                  <p className="mt-1 truncate font-semibold text-ink-light">{dialogOrderLabel}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                     {dueAmount > 0 ? 'Due' : 'Total'}
                   </p>
                   <p className={`mt-1 font-semibold ${dueAmount > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
@@ -2132,7 +2132,7 @@ export default function CafeOrders() {
       >
         {selectedOrderForItemsDialog && (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-slate-800">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-secondary-100 pb-3 dark:border-slate-800">
               <span className={`px-2.5 py-1 rounded-xl text-xs font-extrabold border ${
                 getCafeOrderAttributes(selectedOrderForItemsDialog).orderType === 'delivery' ? 'bg-blue-100 text-blue-800 border-blue-200' :
                 getCafeOrderAttributes(selectedOrderForItemsDialog).orderType === 'takeaway' ? 'bg-amber-100 text-amber-800 border-amber-200' :
@@ -2153,14 +2153,14 @@ export default function CafeOrders() {
               {Array.isArray(selectedOrderForItemsDialog.SaleItems) && selectedOrderForItemsDialog.SaleItems.map((si) => (
                 <div key={si.id} className="py-2.5 flex items-center justify-between text-sm">
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold text-slate-800 flex items-center gap-2">
-                      <span className="text-[#9c5f22] font-extrabold text-base">{si.quantity}x</span>
+                    <p className="font-bold text-ink flex items-center gap-2">
+                      <span className="text-primary font-extrabold text-base">{si.quantity}x</span>
                       <span>{si.Product?.name || si.name || 'Unnamed Item'}</span>
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="font-semibold text-slate-900">{formatMoney(si.lineTotal)}</p>
-                    <p className="text-[10px] text-slate-400">@ {formatMoney(si.unitPrice)}</p>
+                    <p className="font-semibold text-ink">{formatMoney(si.lineTotal)}</p>
+                    <p className="text-[10px] text-secondary-400">@ {formatMoney(si.unitPrice)}</p>
                   </div>
                 </div>
               ))}

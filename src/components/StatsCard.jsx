@@ -26,8 +26,8 @@ export default function StatsCard({
       bg: 'bg-blue-50 dark:bg-blue-950/30 text-blue-500',
     },
     default: {
-      text: 'text-slate-900 dark:text-white',
-      bg: 'bg-slate-50 dark:bg-slate-800/30 text-slate-500',
+      text: 'text-ink',
+      bg: 'bg-primary/10 text-primary',
     },
   };
 
@@ -63,9 +63,9 @@ export default function StatsCard({
       className={`card flex items-center justify-between border backdrop-blur-md transition ${
         isActive
           ? 'border-primary ring-1 ring-primary bg-primary-50/15 dark:bg-primary-950/15 shadow-md scale-[1.01]'
-          : 'border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 shadow-sm'
+          : 'border-secondary-100 bg-surface/70 shadow-sm'
       } ${paddingClasses[size] || paddingClasses.default} ${
-        onClick ? 'cursor-pointer hover:border-slate-300 dark:hover:border-slate-700 hover:shadow' : ''
+        onClick ? 'cursor-pointer hover:border-primary/40 hover:shadow' : ''
       }`}
       onClick={onClick}
       onKeyDown={onClick ? (event) => {
@@ -78,7 +78,7 @@ export default function StatsCard({
       tabIndex={onClick ? 0 : undefined}
     >
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 truncate">
+        <p className="text-xs font-semibold uppercase tracking-wider text-secondary-400 truncate">
           {title}
         </p>
         <p className={`mt-2 font-serif font-bold ${colors.text} ${fontSizeClass}`}>
