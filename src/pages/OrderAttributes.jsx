@@ -218,7 +218,7 @@ export default function OrderAttributes() {
         <div className="lg:col-span-2">
           <div className="card overflow-hidden">
             <table className="w-full text-left text-sm">
-              <thead className="bg-mist text-xs font-semibold uppercase text-secondary-500">
+              <thead className="bg-mist text-xs font-semibold uppercase text-ink">
                 <tr>
                   <th className="px-6 py-4">{t('orderAttributes.name')}</th>
                   <th className="px-6 py-4">{t('orderAttributes.type')}</th>

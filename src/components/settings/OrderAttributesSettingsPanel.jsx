@@ -287,7 +287,7 @@ export default function OrderAttributesSettingsPanel() {
 
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm text-secondary-700">
-              <thead className="text-xs uppercase text-secondary-400">
+              <thead className="text-xs uppercase text-ink">
                 <tr>
                   <th className="py-3">{t('orderAttributes.name')}</th>
                   <th className="py-3">{t('orderAttributes.key')}</th>

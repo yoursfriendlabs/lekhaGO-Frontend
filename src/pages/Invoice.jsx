@@ -219,11 +219,11 @@ const partyName = isSale
               <table className="w-full text-sm min-w-[550px] sm:min-w-0">
                 <thead>
                   <tr className="border-b-2 border-secondary-200/70 dark:border-slate-700/70">
-                    <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-secondary-400">Product</th>
-                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-secondary-400">Qty</th>
-                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-secondary-400">Unit Price</th>
-                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-secondary-400">Tax</th>
-                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-secondary-400">Amount</th>
+                    <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-ink">Product</th>
+                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-ink">Qty</th>
+                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-ink">Unit Price</th>
+                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-ink">Tax</th>
+                    <th className="pb-3 text-right text-[10px] font-bold uppercase tracking-wider text-ink">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">

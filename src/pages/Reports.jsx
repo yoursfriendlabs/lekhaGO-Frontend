@@ -1097,7 +1097,7 @@ function PopularRankingCard({
       ) : (
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[620px] text-sm text-secondary-700">
-            <thead className="text-xs uppercase tracking-[0.14em] text-secondary-400">
+            <thead className="text-xs uppercase tracking-[0.14em] text-ink">
               <tr>
                 <th className="py-2 text-left">{t("analytics.rank")}</th>
                 <th className="py-2 text-left">{typeLabel}</th>
@@ -2935,7 +2935,7 @@ export default function Reports() {
                 </div>
                 <div className="px-8 py-6">
                   <table className="w-full text-sm text-ink-light">
-                    <thead className="text-xs text-secondary-400 uppercase">
+                    <thead className="text-xs text-ink uppercase">
                       <tr className="tracking-wider border-b pb-2">
                         <th className="pb-3 text-left">{t('common.date')}</th>
                         <th className="pb-3 text-left">{t('ledger.referenceNo')}</th>
@@ -3099,7 +3099,7 @@ export default function Reports() {
                   <>
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[980px] text-sm">
-                        <thead className="text-xs uppercase text-secondary-400">
+                        <thead className="text-xs uppercase text-ink">
                           <tr>
                             <th className="py-2.5 pr-4 text-left">
                               <button
@@ -3284,7 +3284,7 @@ export default function Reports() {
             ) : (
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[720px] text-sm text-secondary-700">
-                  <thead className="text-xs uppercase text-secondary-400 tracking-wider">
+                  <thead className="text-xs uppercase text-ink tracking-wider">
                     <tr className="border-b pb-2">
                       <th className="py-2.5 text-left">{t("analytics.period")}</th>
                       <th className="py-2.5 text-right">
@@ -3640,7 +3640,7 @@ export default function Reports() {
             ) : (
               <div className="overflow-x-auto border border-secondary-100 rounded-2xl bg-mist/20">
                 <table className="w-full min-w-[900px] text-xs">
-                  <thead className="text-[10px] uppercase font-bold text-secondary-400 bg-mist border-b border-secondary-100">
+                  <thead className="text-[10px] uppercase font-bold text-ink bg-mist border-b border-secondary-100">
                     <tr>
                       <th className="p-3 text-left">{t("analytics.invoiceDate") || "Invoice / Date"}</th>
                       <th className="p-3 text-left">{t("analytics.tableWaiter") || "Table / Waiter"}</th>

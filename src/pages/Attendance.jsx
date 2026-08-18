@@ -535,7 +535,7 @@ export default function Attendance() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px] text-sm text-secondary-700">
-              <thead className="text-left text-xs uppercase tracking-[0.14em] text-secondary-400 border-b border-secondary-100 dark:border-slate-800">
+              <thead className="text-left text-xs uppercase tracking-[0.14em] text-ink border-b border-secondary-100 dark:border-slate-800">
                 <tr>
                   {isOwner && <th className="pb-3 pr-4">{t('attendance.staffName')}</th>}
                   <th className="pb-3 pr-4">{t('attendance.date')}</th>

@@ -61,6 +61,8 @@ describe('color themes', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('ruby');
     expect(document.documentElement.style.getPropertyValue('--color-primary')).toBe('190 18 60');
     expect(document.documentElement.style.getPropertyValue('--color-primary-hex')).toBe('#be123c');
+    expect(document.documentElement.style.getPropertyValue('--color-ink')).toBe('17 24 39');
+    expect(document.documentElement.style.getPropertyValue('--color-secondary-600')).toBe('75 85 99');
     expect(meta.getAttribute('content')).toBe(theme.swatch);
   });
 

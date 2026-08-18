@@ -677,7 +677,7 @@ export default function Products() {
         {listStatus.message ? <Notice title={listStatus.message} tone={listStatus.type} /> : null}
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-sm text-secondary-700">
-            <thead className="text-xs uppercase text-secondary-400">
+            <thead className="text-xs uppercase text-ink">
               <tr>
                 <th className="py-2 text-left">{t('products.name')}</th>
                 <th className="py-2 text-left">{t('products.company')}</th>
@@ -1224,7 +1224,7 @@ export default function Products() {
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-secondary-700">
-                <thead className="text-xs uppercase text-secondary-400">
+                <thead className="text-xs uppercase text-ink">
                   <tr>
                     <th className="py-2 text-left">#</th>
                     <th className="py-2 text-left">{t('products.name')}</th>

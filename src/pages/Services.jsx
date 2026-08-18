@@ -2248,7 +2248,7 @@ export default function Services() {
 
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
-              <thead className="text-xs uppercase tracking-[0.18em] text-secondary-400">
+              <thead className="text-xs uppercase tracking-[0.18em] text-ink">
                 <tr>
                   <th className="py-2 pr-4 text-left">
                     {t("services.orderNo")}

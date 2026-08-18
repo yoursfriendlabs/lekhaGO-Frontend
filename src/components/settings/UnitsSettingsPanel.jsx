@@ -243,7 +243,7 @@ export default function UnitsSettingsPanel() {
 
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-sm text-secondary-700">
-            <thead className="text-xs uppercase text-secondary-400">
+            <thead className="text-xs uppercase text-ink">
               <tr>
                 <th className="py-2 text-left">{t('unitsManagement.name')}</th>
                 <th className="py-2 text-left">{t('unitsManagement.symbol')}</th>

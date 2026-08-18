@@ -197,6 +197,26 @@ export const COLOR_THEMES = [
 export const CUSTOM_COLOR_THEME_ID = 'custom';
 export const CUSTOM_PRIMARY_STORAGE_KEY = 'mms_custom_primary';
 
+/** Stable greys/blacks so copy and tables stay readable on every primary. */
+export const NEUTRAL_COLORS = {
+  secondary: {
+    DEFAULT: '#6b7280',
+    50: '#f9fafb',
+    100: '#f3f4f6',
+    200: '#e5e7eb',
+    300: '#d1d5db',
+    400: '#9ca3af',
+    500: '#6b7280',
+    600: '#4b5563',
+    700: '#374151',
+    800: '#1f2937',
+    900: '#111827',
+  },
+  ink: '#111827',
+  inkLight: '#4b5563',
+  surface: '#ffffff',
+};
+
 export function parseHexColor(value) {
   const raw = String(value || '').trim();
   const match = raw.match(/^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/);
@@ -324,7 +344,6 @@ export function buildPaletteFromHex(value) {
   const buttonHex = ensureReadablePrimary(sourceHex);
   const buttonHsl = rgbToHsl(hexToRgb(buttonHex));
   const sat = Math.min(100, Math.max(22, baseHsl.s));
-  const mutedSat = Math.max(8, sat * 0.4);
 
   return {
     id: CUSTOM_COLOR_THEME_ID,
@@ -346,23 +365,8 @@ export function buildPaletteFromHex(value) {
         800: shade(buttonHsl, Math.max(13, buttonHsl.l - 24)),
         900: shade(buttonHsl, Math.max(10, buttonHsl.l - 32), Math.min(100, buttonHsl.s + 6)),
       },
-      secondary: {
-        DEFAULT: shade(baseHsl, 42, mutedSat),
-        50: shade(baseHsl, 97.2, mutedSat * 0.45),
-        100: shade(baseHsl, 93.5, mutedSat * 0.55),
-        200: shade(baseHsl, 86, mutedSat * 0.7),
-        300: shade(baseHsl, 74, mutedSat * 0.85),
-        400: shade(baseHsl, 58, mutedSat),
-        500: shade(baseHsl, 42, mutedSat),
-        600: shade(baseHsl, 36, mutedSat),
-        700: shade(baseHsl, 30, mutedSat),
-        800: shade(baseHsl, 24, mutedSat),
-        900: shade(baseHsl, 18, mutedSat),
-      },
-      ink: shade(baseHsl, 9, Math.min(28, sat)),
-      inkLight: shade(baseHsl, 32, Math.min(24, sat)),
+      ...NEUTRAL_COLORS,
       mist: shade(baseHsl, 97.2, Math.min(28, sat)),
-      surface: '#ffffff',
     },
   };
 }
@@ -438,15 +442,15 @@ export function applyColorTheme(id = DEFAULT_COLOR_THEME_ID, customHex = '') {
     setVar(`--color-primary${suffix}`, hex);
   });
 
-  Object.entries(theme.colors.secondary).forEach(([shade, hex]) => {
+  Object.entries(NEUTRAL_COLORS.secondary).forEach(([shade, hex]) => {
     const suffix = shade === 'DEFAULT' ? '' : `-${shade}`;
     setVar(`--color-secondary${suffix}`, hex);
   });
 
-  setVar('--color-ink', theme.colors.ink);
-  setVar('--color-ink-light', theme.colors.inkLight);
+  setVar('--color-ink', NEUTRAL_COLORS.ink);
+  setVar('--color-ink-light', NEUTRAL_COLORS.inkLight);
   setVar('--color-mist', theme.colors.mist);
-  setVar('--color-surface', theme.colors.surface);
+  setVar('--color-surface', NEUTRAL_COLORS.surface);
   root.style.setProperty('--color-primary-hex', theme.swatch);
 
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme.swatch);

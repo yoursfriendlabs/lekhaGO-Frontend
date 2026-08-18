@@ -1409,7 +1409,7 @@ export default function StaffSalaryProfile() {
                             (h) => (
                               <th
                                 key={h}
-                                className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-secondary-400"
+                                className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-ink"
                               >
                                 {h}
                               </th>
@@ -1521,19 +1521,19 @@ export default function StaffSalaryProfile() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-secondary-100 bg-mist dark:border-slate-800 dark:bg-slate-900/60">
-                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-secondary-400">
+                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-ink">
                             Date
                           </th>
-                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-secondary-400">
+                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-ink">
                             Period
                           </th>
-                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-secondary-400">
+                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-ink">
                             Type
                           </th>
-                          <th className="p-3 text-right text-[10px] font-semibold uppercase tracking-widest text-secondary-400">
+                          <th className="p-3 text-right text-[10px] font-semibold uppercase tracking-widest text-ink">
                             Amount
                           </th>
-                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-secondary-400">
+                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-ink">
                             Note
                           </th>
                           <th className="p-3" />

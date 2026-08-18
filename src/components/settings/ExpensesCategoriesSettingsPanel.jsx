@@ -252,7 +252,7 @@ export default function ExpensesCategoriesSettingsPanel() {
 
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-sm text-secondary-700">
-            <thead className="text-xs uppercase text-secondary-400">
+            <thead className="text-xs uppercase text-ink">
               <tr>
                 <th className="py-2 text-left">{t('expenseCategories.name')}</th>
                 <th className="py-2 text-left">{t('inventory.itemType')}</th>

@@ -1543,7 +1543,7 @@ export default function Sales() {
         {/* ── Desktop table ── */}
         <div className="mt-4 overflow-x-auto hidden md:block">
           <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-secondary-400">
+            <thead className="text-xs uppercase text-ink">
               <tr>
                 <th className="py-2 pr-4 text-left">{t('common.invoice')}</th>
                 <th className="py-2 pr-4 text-left">{t('common.date')}</th>

@@ -2258,7 +2258,7 @@ setInvoiceOrder(purchase);
         {/* Desktop */}
         <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-secondary-400">
+            <thead className="text-xs uppercase text-ink">
               <tr>
                 <th className="py-2 pr-4 text-left">{t("common.invoice")}</th>
                 <th className="py-2 pr-4 text-left">
