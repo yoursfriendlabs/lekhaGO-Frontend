@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { Building2, CheckCircle, Package2, ShieldCheck, Upload, Users, X } from 'lucide-react';
+import StatsCard, { STATS_GRID_CLASS } from '../components/StatsCard.jsx';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import AccountSecurityPanel from '../components/account/AccountSecurityPanel.jsx';
@@ -57,23 +58,6 @@ function scrollToGrowthPlan() {
       block: 'start',
     });
   }, 0);
-}
-
-function SettingsStatCard({ label, value, hint, icon: Icon }) {
-  return (
-    <div className="rounded-3xl border border-secondary-200/70 bg-surface/85 p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">{label}</p>
-          <p className="mt-3 break-words text-2xl font-semibold text-ink">{value}</p>
-          <p className="mt-2 text-sm text-secondary-600">{hint}</p>
-        </div>
-        <div className="rounded-2xl bg-primary/10 p-3 text-primary">
-          <Icon size={20} />
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default function Settings() {
@@ -465,14 +449,15 @@ export default function Settings() {
     <div className="min-w-0 max-w-6xl space-y-6 overflow-x-hidden">
       <PageHeader title={t('settingsPage.title')} subtitle={activeTabMeta?.description || t('settingsPage.subtitle')} />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className={STATS_GRID_CLASS}>
         {overviewCards.map((card) => (
-          <SettingsStatCard
+          <StatsCard
             key={card.key}
-            label={card.label}
+            title={card.label}
             value={card.value}
             hint={card.hint}
             icon={card.icon}
+            tone="default"
           />
         ))}
       </section>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
+  Ban,
   Pencil,
   FileText,
   Package,
@@ -25,7 +26,7 @@ import MobileFormStepper from "../components/MobileFormStepper.jsx";
 import PaymentTypeSummary from "../components/PaymentTypeSummary.jsx";
 import QuickPaymentButtons from "../components/QuickPaymentButtons.jsx";
 import PartySearchCreateField from "../components/PartySearchCreateField.jsx";
-import StatsCard from "../components/StatsCard.jsx";
+import StatsCard, { STATS_GRID_CLASS } from "../components/StatsCard.jsx";
 import FlexibleDateInput from "../components/FlexibleDateInput.jsx";
 import DateDisplay from "../components/DateDisplay.jsx";
 import { api } from "../lib/api";
@@ -57,25 +58,37 @@ import {
   normalizeLookupProduct,
   toProductLookupOption,
 } from "../lib/lookups.js";
+import { getIrdReprintLabel, isIrdCancelled, isIrdLocked } from "../lib/ird";
 import QuickExpense from "../components/quickExpenses.jsx";
 
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
-function StatusBadge({ status }) {
+function StatusBadge({ status, locked = false }) {
+  const normalized = String(status || "").toLowerCase();
   const map = {
     received:
       "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
     ordered:
       "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
     due: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+    cancelled: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
+    canceled: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
+    void: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
   };
   const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : "—";
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[status] || "bg-secondary-100 text-secondary-700"}`}
-    >
-      {label}
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[normalized] || "bg-secondary-100 text-secondary-700"}`}
+      >
+        {label}
+      </span>
+      {locked && !["cancelled", "canceled", "void"].includes(normalized) ? (
+        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+          Locked
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -202,6 +215,9 @@ export default function Purchases() {
   const [deletedItemIds, setDeletedItemIds] = useState([]);
   const quantityInputRef = useRef(null);
   const [deletePurchase, setDeletePurchase] = useState(null);
+  const [cancelPurchase, setCancelPurchase] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancellingPurchaseId, setCancellingPurchaseId] = useState("");
   const [deletingPurchaseId, setDeletingPurchaseId] = useState("");
   const [savingPurchase, setSavingPurchase] = useState(false);
   const [recordingPaymentId, setRecordingPaymentId] = useState("");
@@ -236,6 +252,7 @@ const [mobileStep, setMobileStep] = useState("details");
 
   // ── Invoice / Bill modal ──
   const { settings: bizSettings } = useBusinessSettings();
+  const irdModeEnabled = Boolean(bizSettings?.irdModeEnabled);
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [isThermalInvoice, setIsThermalInvoice] = useState(false);
@@ -680,6 +697,10 @@ const [mobileStep, setMobileStep] = useState("details");
       setStatus({ type: "info", message: "" });
       setPayDialog(null);
       const purchase = await api.getPurchase(purchaseId);
+      if (isIrdLocked(purchase) || isIrdCancelled(purchase)) {
+        setStatus({ type: "error", message: t("purchases.messages.lockedEditBlocked") });
+        return;
+      }
       const purchaseItems = purchase?.PurchaseItems || [];
       const entryType = purchase.entryType || purchase.type || "purchase";
       const party = normalizeLookupParty({
@@ -893,8 +914,13 @@ const [mobileStep, setMobileStep] = useState("details");
           ...deletedItemIds.map((id) => ({ id, _delete: true })),
         ],
       };
-      if (manualInvoiceNo) payload.invoiceNo = manualInvoiceNo;
-      else delete payload.invoiceNo;
+      if (irdModeEnabled && formMode !== "edit") {
+        delete payload.invoiceNo;
+      } else if (manualInvoiceNo) {
+        payload.invoiceNo = manualInvoiceNo;
+      } else {
+        delete payload.invoiceNo;
+      }
       const successMsg =
         formMode === "edit" && editingId
           ? t("purchases.messages.updated")
@@ -925,6 +951,12 @@ const [mobileStep, setMobileStep] = useState("details");
     if (deletePurchase && deletingPurchaseId === deletePurchase.id) return;
     setDeletePurchase(null);
   };
+
+  const closeCancelDialog = () => {
+    if (cancelPurchase && cancellingPurchaseId === cancelPurchase.id) return;
+    setCancelPurchase(null);
+    setCancelReason("");
+  };
   const handleDeletePurchase = async () => {
     if (
       !canManagePurchases ||
@@ -953,8 +985,39 @@ const [mobileStep, setMobileStep] = useState("details");
     }
   };
 
+  const handleCancelPurchase = async () => {
+    if (!cancelPurchase) return;
+    if (cancellingPurchaseId === cancelPurchase.id) return;
+
+    const reason = cancelReason.trim();
+    if (!reason) {
+      setStatus({ type: "error", message: t("purchases.cancelReasonRequired") });
+      return;
+    }
+
+    setCancellingPurchaseId(cancelPurchase.id);
+    setStatus({ type: "info", message: "" });
+    try {
+      await api.cancelPurchase(cancelPurchase.id, { reason });
+      setStatus({ type: "success", message: t("purchases.messages.cancelled") });
+      useProductStore.getState().invalidate();
+      invalidatePurchases(listParams);
+      await fetchPurchases(listParams, true);
+      setCancelPurchase(null);
+      setCancelReason("");
+    } catch (err) {
+      setStatus({
+        type: "error",
+        message: err.message || t("purchases.messages.cancelFailed"),
+      });
+    } finally {
+      setCancellingPurchaseId("");
+    }
+  };
+
   const openPayDialog = (purchase) => {
     if (!canManagePurchases) return;
+    if (isIrdCancelled(purchase)) return;
     setPayDialog(purchase);
     setPayAmount("");
     setPayPaymentMethod("cash");
@@ -987,11 +1050,82 @@ setInvoiceOrder(purchase);
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     printElement(invoicePrintRef.current);
+    await trackPurchaseReprint();
   };
-  const handlePrintThermal = () => {
+  const handlePrintThermal = async () => {
     printThermalReceipt(thermalInvoicePrintRef.current);
+    await trackPurchaseReprint();
+  };
+
+  const trackPurchaseReprint = async () => {
+    if (!invoiceOrder?.id || !isIrdLocked(invoiceOrder)) return;
+    try {
+      const updated = await api.recordPurchaseReprint(invoiceOrder.id);
+      setInvoiceOrder(updated);
+    } catch {
+      // Printing already happened; tracking failure should not block the user.
+    }
+  };
+
+  const invoiceReprintLabel = getIrdReprintLabel(invoiceOrder);
+
+  const buildPurchaseActions = (purchase) => {
+    const locked = isIrdLocked(purchase);
+    const cancelled = isIrdCancelled(purchase);
+    const actions = [];
+
+    if (canManagePurchases && !locked && !cancelled) {
+      actions.push({
+        label: t("common.edit"),
+        icon: Pencil,
+        onClick: () => openEdit(purchase.id),
+      });
+    }
+
+    actions.push(
+      {
+        label: "View Bill",
+        icon: FileText,
+        onClick: () => openInvoiceModal(purchase),
+      },
+      {
+        label: "Print Bill",
+        icon: Printer,
+        onClick: () => openInvoiceModal(purchase),
+      },
+      {
+        label: "Print Thermal",
+        icon: Printer,
+        onClick: () => openInvoiceModal(purchase, { thermal: true }),
+      },
+    );
+
+    if (canManagePurchases && locked && !cancelled) {
+      actions.push({
+        label: t("purchases.cancelInvoice"),
+        icon: Ban,
+        tone: "danger",
+        disabled: cancellingPurchaseId === purchase.id,
+        onClick: () => {
+          setCancelReason("");
+          setCancelPurchase(purchase);
+        },
+      });
+    }
+
+    if (canManagePurchases && !locked && !cancelled) {
+      actions.push({
+        label: t("common.delete"),
+        icon: Trash2,
+        tone: "danger",
+        disabled: deletingPurchaseId === purchase.id,
+        onClick: () => setDeletePurchase(purchase),
+      });
+    }
+
+    return actions;
   };
 
   const handleRecordPayment = async (event) => {
@@ -1309,6 +1443,7 @@ setInvoiceOrder(purchase);
                       name="invoiceNo"
                       value={header.invoiceNo}
                       onChange={handleHeaderChange}
+                      disabled={irdModeEnabled}
                       placeholder={
                         formMode === "create" ? suggestedInvoiceNo : ""
                       }
@@ -2067,7 +2202,7 @@ setInvoiceOrder(purchase);
 
       {/* QUICK STATS */}
       {!isOpen && (
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className={STATS_GRID_CLASS}>
           <StatsCard
             title={t("purchases.totalPurchases") || "Total Purchases"}
             value={money(stats?.totalPurchases ?? 0)}
@@ -2170,7 +2305,7 @@ setInvoiceOrder(purchase);
                           <PI size={12} />
                           {pm.label}
                         </span>
-                        <StatusBadge status={purchase.status} />
+                        <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} />
                       </div>
                       <p className="mt-2 truncate font-semibold text-ink">
                         {purchase.invoiceNo || purchase.id.slice(0, 8)}
@@ -2192,7 +2327,7 @@ setInvoiceOrder(purchase);
                       <p className="font-semibold text-ink dark:text-slate-200">
                         {money(purchase.grandTotal)}
                       </p>
-                      {due > 0 ? (
+                      {due > 0 && !isIrdCancelled(purchase) ? (
                         <button
                           type="button"
                           className="mt-1 inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60"
@@ -2208,46 +2343,7 @@ setInvoiceOrder(purchase);
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-end border-t border-secondary-200/50 pt-2.5 dark:border-slate-700/40">
-                    <ActionMenu
-                      actions={[
-                        ...(canManagePurchases
-                          ? [
-                              {
-                                label: t("common.edit"),
-                                icon: Pencil,
-                                onClick: () => openEdit(purchase.id),
-                              },
-                            ]
-                          : []),
-{
-                          label: "View Bill",
-                          icon: FileText,
-                          onClick: () => openInvoiceModal(purchase),
-                        },
-                        {
-                          label: "Print Bill",
-                          icon: Printer,
-                          onClick: () => openInvoiceModal(purchase),
-                        },
-                        {
-                          label: "Print Thermal",
-                          icon: Printer,
-                          onClick: () =>
-                            openInvoiceModal(purchase, { thermal: true }),
-                        },
-                        ...(canManagePurchases
-                          ? [
-                              {
-                                label: t("common.delete"),
-                                icon: Trash2,
-                                tone: "danger",
-                                disabled: deletingPurchaseId === purchase.id,
-                                onClick: () => setDeletePurchase(purchase),
-                              },
-                            ]
-                          : []),
-                      ]}
-                    />
+                    <ActionMenu actions={buildPurchaseActions(purchase)} />
                   </div>
                 </div>
               );
@@ -2319,7 +2415,7 @@ setInvoiceOrder(purchase);
                         <DateDisplay date={purchase.purchaseDate} format="ddd DD, MMM" />
                       </td>
                       <td className="py-2.5 pr-4">
-                        <StatusBadge status={purchase.status} />
+                        <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} />
                       </td>
                       <td className="py-2.5 pr-4 text-ink-light dark:text-secondary-300">
                         {sn || <span className="text-secondary-400">—</span>}
@@ -2334,7 +2430,7 @@ setInvoiceOrder(purchase);
                         {money(purchase.amountReceived)}
                       </td>
                       <td className="py-2.5 pr-4 text-right">
-                        {due > 0 ? (
+                        {due > 0 && !isIrdCancelled(purchase) ? (
                           <button
                             type="button"
                             className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60"
@@ -2349,47 +2445,7 @@ setInvoiceOrder(purchase);
                         )}
                       </td>
                       <td className="py-2.5 text-right">
-                        <ActionMenu
-                          actions={[
-                            ...(canManagePurchases
-                              ? [
-                                  {
-                                    label: t("common.edit"),
-                                    icon: Pencil,
-                                    onClick: () => openEdit(purchase.id),
-                                  },
-                                ]
-                              : []),
-{
-                              label: "View Bill",
-                              icon: FileText,
-                              onClick: () => openInvoiceModal(purchase),
-                            },
-                            {
-                              label: "Print Bill",
-                              icon: Printer,
-                              onClick: () => openInvoiceModal(purchase),
-                            },
-                            {
-                              label: "Print Thermal",
-                              icon: Printer,
-                              onClick: () =>
-                                openInvoiceModal(purchase, { thermal: true }),
-                            },
-                            ...(canManagePurchases
-                              ? [
-                                  {
-                                    label: t("common.delete"),
-                                    icon: Trash2,
-                                    tone: "danger",
-                                    disabled:
-                                      deletingPurchaseId === purchase.id,
-                                    onClick: () => setDeletePurchase(purchase),
-                                  },
-                                ]
-                              : []),
-                          ]}
-                        />
+                        <ActionMenu actions={buildPurchaseActions(purchase)} />
                       </td>
                     </tr>
                   );
@@ -2480,6 +2536,7 @@ setInvoiceOrder(purchase);
                       dueAmount: getPurchaseDueAmount(invoiceOrder),
                     }}
                     notes={invoiceOrder.notes}
+                    reprintLabel={invoiceReprintLabel}
                   />
                 </div>
               </div>
@@ -2497,6 +2554,7 @@ setInvoiceOrder(purchase);
                     date={<DateDisplay date={invoiceOrder.purchaseDate} format="MMMM D, YYYY" mode="inline" />}
                     status={invoiceOrder.status}
                     statusColor="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    reprintLabel={invoiceReprintLabel}
                   />
                 </div>
 
@@ -2649,6 +2707,60 @@ setInvoiceOrder(purchase);
           Boolean(deletePurchase) && deletingPurchaseId === deletePurchase.id
         }
       />
+
+      <Dialog
+        isOpen={Boolean(cancelPurchase)}
+        onClose={closeCancelDialog}
+        title={t("purchases.cancelInvoice")}
+        size="sm"
+        showCloseButton={!(cancelPurchase && cancellingPurchaseId === cancelPurchase.id)}
+        closeOnOverlayClick={!(cancelPurchase && cancellingPurchaseId === cancelPurchase.id)}
+        footer={(
+          <>
+            <button
+              type="button"
+              className="btn-secondary w-full sm:w-auto"
+              onClick={closeCancelDialog}
+              disabled={Boolean(cancelPurchase && cancellingPurchaseId === cancelPurchase.id)}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="button"
+              className="w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              onClick={handleCancelPurchase}
+              disabled={Boolean(cancelPurchase && cancellingPurchaseId === cancelPurchase.id)}
+            >
+              {cancelPurchase && cancellingPurchaseId === cancelPurchase.id
+                ? t("common.loading")
+                : t("purchases.confirmCancelInvoice")}
+            </button>
+          </>
+        )}
+      >
+        <div className="space-y-3">
+          <p className="text-sm leading-6 text-secondary-700">
+            {cancelPurchase
+              ? t("purchases.cancelConfirm", {
+                  name: cancelPurchase.invoiceNo || cancelPurchase.id.slice(0, 8),
+                })
+              : ""}
+          </p>
+          <div className="space-y-1">
+            <label className="label" htmlFor="purchase-cancel-reason">
+              {t("purchases.cancelReason")}
+            </label>
+            <textarea
+              id="purchase-cancel-reason"
+              className="input min-h-[96px] resize-none"
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              placeholder={t("purchases.cancelReasonPlaceholder")}
+              disabled={Boolean(cancelPurchase && cancellingPurchaseId === cancelPurchase.id)}
+            />
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

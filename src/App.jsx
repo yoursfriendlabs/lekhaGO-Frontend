@@ -13,7 +13,7 @@ import Notice from './components/Notice';
 import RouteFallback from './components/RouteFallback';
 import PwaLifecycle from './components/PwaLifecycle';
 import SubscriptionStatusBanner, { formatSubscriptionStatusDate } from './components/subscription/SubscriptionStatusBanner.jsx';
-import { getFeatureAccessLevel as getPermissionAccessLevel } from './lib/accessControl';
+import { getFeatureAccessLevel as getPermissionAccessLevel, isOwnStaffMembership } from './lib/accessControl';
 import { hasUnverifiedEmail, isStaffActivationRequired } from './lib/authFlow';
 import { getSubscriptionGuard, getSubscriptionStatusState, humanizeKey } from './lib/subscription';
 import { buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB } from './lib/settingsTabs';
@@ -131,6 +131,27 @@ export function SubscriptionFeatureRoute({ children, featureKey, featureKeys, re
         notice,
       }}
     />
+  );
+}
+
+function StaffOrPersonalProfileRoute() {
+  const { role, accessControl } = useAuth();
+  if (role === 'staff' && accessControl?.membershipId) {
+    return <StaffSalaryProfile />;
+  }
+  return <Profile />;
+}
+
+function OwnOrManagedStaffSalaryRoute() {
+  const { membershipId } = useParams();
+  const { accessControl, canViewFeature } = useAuth();
+  if (isOwnStaffMembership(accessControl, membershipId) || canViewFeature('staff')) {
+    return <StaffSalaryProfile />;
+  }
+  return (
+    <SubscriptionFeatureRoute featureKey="staff">
+      <StaffSalaryProfile />
+    </SubscriptionFeatureRoute>
   );
 }
 
@@ -385,7 +406,7 @@ function AppShell() {
                   <Route path="staff" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="staff"><Staff /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route
                     path="staff-salary/:membershipId"
-                    element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="staff"><StaffSalaryProfile /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>}
+                    element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><OwnOrManagedStaffSalaryRoute /></RoleGuard></EmailActivationRequiredRoute>}
                   />
                   <Route path="admin" element={<Navigate to="/app/settings" replace />} />
                   <Route
@@ -393,7 +414,7 @@ function AppShell() {
                     element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="order-attributes"><Navigate to={buildSettingsTabPath(ORDER_ATTRIBUTES_SETTINGS_TAB)} replace /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>}
                   />
                   <Route path="settings" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Settings /></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="profile" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Profile /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="profile" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><StaffOrPersonalProfileRoute /></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="invoice/:type/:id" element={<EmailActivationRequiredRoute><InvoiceAccessRoute><Invoice /></InvoiceAccessRoute></EmailActivationRequiredRoute>} />
                   <Route path="activate-account" element={<ActivationOnlyRoute><ActivateAccount /></ActivationOnlyRoute>} />
                 </Routes>

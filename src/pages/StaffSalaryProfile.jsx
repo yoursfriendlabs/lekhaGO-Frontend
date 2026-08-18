@@ -21,6 +21,7 @@ import {
 
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { isOwnStaffMembership } from "../lib/accessControl";
 import { useI18n } from "../lib/i18n.jsx";
 import { formatMaybeDate, formatMaybeDateTime } from "../lib/datetime";
 import { formatMoney, parseMonthYear, toInitials } from "../lib/formatting";
@@ -30,9 +31,13 @@ import dayjs from "../lib/datetime";
 import FlexibleDateInput from "../components/FlexibleDateInput.jsx";
 import DateDisplay from "../components/DateDisplay.jsx";
 
+import StatsCard, { STATS_GRID_CLASS } from "../components/StatsCard.jsx";
 import Notice from "../components/Notice";
+import PageHeader from "../components/PageHeader";
 import ActionMenu from "../components/ActionMenu";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
+import AccountSecurityPanel from "../components/account/AccountSecurityPanel.jsx";
+import ProfileSettingsPanel from "../components/settings/ProfileSettingsPanel.jsx";
 import { useSnackbar } from "../lib/snackbar.jsx";
 import { Badge } from "../components/Badge";
 import { useLoadingState } from "../hooks/useLoadingState";
@@ -188,69 +193,6 @@ function AttendancePill({ status }) {
   const variant = status === "present" ? "success" : "error";
   const label = status === "present" ? "Present" : "Absent";
   return <Badge variant={variant}>{label}</Badge>;
-}
-
-function MetricCard({ label, value, sub, icon: Icon, accent = false }) {
-  return (
-    <div
-      className={`group relative overflow-hidden rounded-2xl p-5 transition-all duration-300 ${
-        accent
-          ? "bg-gradient-to-br from-primary to-primary-400 shadow-lg shadow-amber-900/10"
-          : "border border-secondary-100 bg-white shadow-sm hover:shadow-md hover:border-secondary-200 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
-      }`}
-    >
-      {accent && (
-        <div className="pointer-events-none absolute -inset-20 bg-gradient-to-tr from-white/5 via-transparent to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-      )}
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p
-            className={`text-[11px] font-semibold uppercase tracking-widest ${
-              accent
-                ? "text-amber-200/80"
-                : "text-secondary-400"
-            }`}
-          >
-            {label}
-          </p>
-          <p
-            className={`mt-2.5 text-2xl font-bold tabular-nums tracking-tight ${
-              accent ? "text-white" : "text-ink"
-            }`}
-          >
-            {value}
-          </p>
-          {sub && (
-            <p
-              className={`mt-1 text-xs ${
-                accent
-                  ? "text-amber-200/70"
-                  : "text-secondary-400"
-              }`}
-            >
-              {sub}
-            </p>
-          )}
-        </div>
-        <div
-          className={`shrink-0 rounded-xl p-2.5 transition-all duration-200 group-hover:scale-110 ${
-            accent
-              ? "bg-white/15"
-              : "bg-mist dark:bg-slate-800 group-hover:bg-secondary-100 dark:group-hover:bg-slate-700"
-          }`}
-        >
-          <Icon
-            size={16}
-            className={
-              accent
-                ? "text-white"
-                : "text-secondary-400"
-            }
-          />
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function Card({ children, className = "" }) {
@@ -891,12 +833,14 @@ function PayrollEntryPanel({
 export default function StaffSalaryProfile() {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const { membershipId } = useParams();
-  const { canViewFeature, canManageFeature } = useAuth();
+  const { membershipId: membershipIdParam } = useParams();
+  const { canViewFeature, canManageFeature, accessControl, user } = useAuth();
   const { showSuccess, showError } = useSnackbar();
 
-  const canView = canViewFeature("staff") || canViewFeature("attendance") || canViewFeature("ledger");
-  const canManage = canManageFeature("staff");
+  const membershipId = membershipIdParam || accessControl?.membershipId || "";
+  const isSelf = isOwnStaffMembership(accessControl, membershipId);
+  const canView = isSelf || canViewFeature("staff") || canViewFeature("attendance") || canViewFeature("ledger");
+  const canManage = canManageFeature("staff") && !isSelf;
 
   // Loading state
   const loading = useLoadingState({ meta: true });
@@ -953,9 +897,9 @@ export default function StaffSalaryProfile() {
       const m = await api.getStaffMember(membershipId);
       if (m) {
         setEmployeeMeta({
-          name: m.user?.name || m.user?.email || "",
-          email: m.user?.email || m.email || "",
-          phone: m.phone || m.user?.phone || "",
+          name: m.user?.name || m.user?.email || user?.name || "",
+          email: m.user?.email || m.email || user?.email || "",
+          phone: m.phone || m.user?.phone || user?.phone || "",
           jobTitle: m.jobTitle || "",
           category: m.category?.label || m.category || "",
           shift: m.shift || "",
@@ -974,7 +918,7 @@ export default function StaffSalaryProfile() {
     } finally {
       loading.setLoading("meta", false);
     }
-  }, [membershipId, loading]);
+  }, [membershipId, loading, user?.email, user?.name, user?.phone]);
 
   const loadSalaryRecords = useCallback(async () => {
     if (!membershipId) return;
@@ -1094,6 +1038,16 @@ export default function StaffSalaryProfile() {
     setEmployeeMeta((prev) => ({ ...prev, baseSalary: newAmount }));
   };
 
+  useEffect(() => {
+    if (!isSelf) return;
+    setEmployeeMeta((prev) => ({
+      ...prev,
+      name: user?.name || prev.name,
+      phone: user?.phone || prev.phone,
+      email: user?.email || prev.email,
+    }));
+  }, [isSelf, user?.email, user?.name, user?.phone]);
+
   const menuActions = useMemo(
     () =>
       [
@@ -1105,38 +1059,50 @@ export default function StaffSalaryProfile() {
             setPayrollAdding(true);
           },
         },
-        {
+        !isSelf && {
           label: "Export records",
           icon: Download,
           onClick: () => showError("Export is not wired to backend in this build."),
         },
       ].filter(Boolean),
-    [canManage, membershipId, showError],
+    [canManage, isSelf, membershipId, showError],
   );
 
   const tabs = [
     { key: "overview", label: "Overview" },
     { key: "attendance", label: "Attendance" },
     { key: "history", label: "Payroll" },
+    ...(isSelf ? [{ key: "account", label: t("staffProfile.account") }] : []),
   ];
+
+  if (!membershipId) {
+    return <Notice title={t("staffProfile.missingMembership")} tone="error" />;
+  }
 
   if (!canView) return null;
 
   return (
     <div className="space-y-5">
-      {/* ── Page top bar ── */}
-      <div className="flex items-center justify-between gap-4">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-xs font-medium text-secondary-400 transition hover:text-ink-light dark:hover:text-slate-200"
-          aria-label="Go back to staff list"
-        >
-          <ArrowLeft size={13} />
-          Back to staff
-        </button>
-        <ActionMenu actions={menuActions} label="Actions" />
-      </div>
+      {isSelf ? (
+        <PageHeader
+          title={t("staffProfile.title")}
+          subtitle={t("staffProfile.subtitle")}
+          action={menuActions.length ? <ActionMenu actions={menuActions} label="Actions" /> : null}
+        />
+      ) : (
+        <div className="flex items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 text-xs font-medium text-secondary-400 transition hover:text-ink-light dark:hover:text-slate-200"
+            aria-label={t("staffProfile.backToStaff")}
+          >
+            <ArrowLeft size={13} />
+            {t("staffProfile.backToStaff")}
+          </button>
+          <ActionMenu actions={menuActions} label="Actions" />
+        </div>
+      )}
 
       {error && (
         <Notice title={error} tone="error" onDismiss={() => setError("")} />
@@ -1159,7 +1125,7 @@ export default function StaffSalaryProfile() {
           {activeTab === "overview" && (
             <div className="space-y-4">
               {/* Salary metrics */}
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className={STATS_GRID_CLASS}>
                 {loading.meta ? (
                   <>
                     <CardSkeleton />
@@ -1169,30 +1135,33 @@ export default function StaffSalaryProfile() {
                   </>
                 ) : (
                   <>
-                    <MetricCard
-                      label="Monthly salary"
+                    <StatsCard
+                      title="Monthly salary"
                       value={formatMoney(t, stats.monthlySalary)}
-                      sub="Base pay"
+                      hint="Base pay"
                       icon={DollarSign}
-                      accent
+                      tone="default"
                     />
-                    <MetricCard
-                      label="Balance due"
+                    <StatsCard
+                      title="Balance due"
                       value={formatMoney(t, stats.netRemaining)}
-                      sub="Remaining this month"
+                      hint="Remaining this month"
                       icon={Clock}
+                      tone={Number(stats.netRemaining) < 0 ? "danger" : "warning"}
                     />
-                    <MetricCard
-                      label="Advances taken"
+                    <StatsCard
+                      title="Advances taken"
                       value={formatMoney(t, stats.totalAdvanceThisMonth)}
-                      sub={currentMonthYear}
+                      hint={currentMonthYear}
                       icon={FileText}
+                      tone="info"
                     />
-                    <MetricCard
-                      label="Salary paid"
+                    <StatsCard
+                      title="Salary paid"
                       value={formatMoney(t, stats.totalPaidThisMonth)}
-                      sub={currentMonthYear}
+                      hint={currentMonthYear}
                       icon={ShieldCheck}
+                      tone="success"
                     />
                   </>
                 )}
@@ -1245,47 +1214,38 @@ export default function StaffSalaryProfile() {
                   description="Last 30 days."
                 />
                 {loading.meta ? (
-                  <div className="grid grid-cols-4 gap-4 p-5">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <div key={i} className="text-center">
-                        <Skeleton className="mx-auto h-6 w-12" />
-                        <Skeleton className="mx-auto mt-1 h-3 w-14" />
-                      </div>
-                    ))}
+                  <div className={`${STATS_GRID_CLASS} p-5`}>
+                    <CardSkeleton />
+                    <CardSkeleton />
+                    <CardSkeleton />
+                    <CardSkeleton />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-4 divide-x divide-slate-100 dark:divide-slate-800">
-                    {[
-                      {
-                        label: "Present",
-                        value: attendanceSummary.present,
-                        color: "text-emerald-600 dark:text-emerald-400",
-                      },
-                      {
-                        label: "Late",
-                        value: attendanceSummary.late,
-                        color: "text-amber-600 dark:text-amber-400",
-                      },
-                      {
-                        label: "Absent",
-                        value: attendanceSummary.absent,
-                        color: "text-rose-600 dark:text-rose-400",
-                      },
-                      {
-                        label: "Hours",
-                        value: attendanceSummary.totalHours,
-                        color: "text-indigo-600 dark:text-indigo-400",
-                      },
-                    ].map(({ label, value, color }) => (
-                      <div key={label} className="py-5 text-center">
-                        <p className={`text-2xl font-bold tabular-nums ${color}`}>
-                          {value}
-                        </p>
-                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-secondary-400">
-                          {label}
-                        </p>
-                      </div>
-                    ))}
+                  <div className={`${STATS_GRID_CLASS} p-5`}>
+                    <StatsCard
+                      title="Present"
+                      value={attendanceSummary.present}
+                      icon={Users}
+                      tone="success"
+                    />
+                    <StatsCard
+                      title="Late"
+                      value={attendanceSummary.late}
+                      icon={Clock}
+                      tone="warning"
+                    />
+                    <StatsCard
+                      title="Absent"
+                      value={attendanceSummary.absent}
+                      icon={Calendar}
+                      tone="danger"
+                    />
+                    <StatsCard
+                      title="Hours"
+                      value={attendanceSummary.totalHours}
+                      icon={Timer}
+                      tone="info"
+                    />
                   </div>
                 )}
               </Card>
@@ -1298,31 +1258,34 @@ export default function StaffSalaryProfile() {
           {activeTab === "attendance" && (
             <div className="space-y-4">
               {/* Summary row */}
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <MetricCard
-                  label="Present"
+              <div className={STATS_GRID_CLASS}>
+                <StatsCard
+                  title="Present"
                   value={attendanceSummary.present}
-                  sub={`${attendanceDateFrom} → ${attendanceDateTo}`}
+                  hint={`${attendanceDateFrom} → ${attendanceDateTo}`}
                   icon={Users}
+                  tone="success"
                 />
-                <MetricCard
-                  label="Late arrivals"
+                <StatsCard
+                  title="Late arrivals"
                   value={attendanceSummary.late}
-                  sub="In selected range"
+                  hint="In selected range"
                   icon={Clock}
+                  tone="warning"
                 />
-                <MetricCard
-                  label="Absent"
+                <StatsCard
+                  title="Absent"
                   value={attendanceSummary.absent}
-                  sub="In selected range"
+                  hint="In selected range"
                   icon={Calendar}
+                  tone="danger"
                 />
-                <MetricCard
-                  label="Total hours"
+                <StatsCard
+                  title="Total hours"
                   value={attendanceSummary.totalHours}
-                  sub="In selected range"
+                  hint="In selected range"
                   icon={Timer}
-                  accent
+                  tone="info"
                 />
               </div>
 
@@ -1504,7 +1467,11 @@ export default function StaffSalaryProfile() {
               ) : records.length === 0 ? (
                 <Empty
                   title="No payroll records yet"
-                  description="Add the first entry using the form below."
+                  description={
+                    canManage
+                      ? "Add the first entry using the form below."
+                      : "Payroll entries added by your employer will show up here."
+                  }
                   action={
                     canManage
                       ? {
@@ -1601,6 +1568,13 @@ export default function StaffSalaryProfile() {
               )}
             </div>
           )}
+
+          {activeTab === "account" && isSelf ? (
+            <div className="space-y-4">
+              <ProfileSettingsPanel isOwner={false} />
+              <AccountSecurityPanel />
+            </div>
+          ) : null}
         </div>
       </div>
 

@@ -421,7 +421,29 @@ export function getNavItemPermissionKey(item = {}) {
   const route = String(item?.route || '');
   if (route.includes('/pos')) return 'quickPos';
   if (item?.key === 'sales' && route.includes('/billing')) return 'billing';
+  if (item?.key === 'profile' || route.includes('/profile')) return 'profile';
   return getPermissionKeyForFeature(item?.key) || item?.key || '';
+}
+
+export function isOwnStaffMembership(accessControl, membershipId) {
+  const ownId = String(accessControl?.membershipId || '').trim();
+  const requested = String(membershipId || '').trim();
+  return Boolean(ownId && requested && ownId === requested);
+}
+
+export function withOwnProfileNavItem(items = [], { role, membershipId, label = 'Profile' } = {}) {
+  if (role !== 'staff' || !String(membershipId || '').trim()) {
+    return Array.isArray(items) ? [...items] : [];
+  }
+
+  const next = (Array.isArray(items) ? items : []).filter(
+    (item) => item?.key !== 'profile' && item?.key !== 'staff-salary',
+  );
+  const profileItem = { key: 'profile', label, route: '/app/profile' };
+  const settingsIdx = next.findIndex((item) => item?.key === 'settings');
+  if (settingsIdx >= 0) next.splice(settingsIdx, 0, profileItem);
+  else next.push(profileItem);
+  return next;
 }
 
 export function expandNavigationForPermissions(items = [], canView) {

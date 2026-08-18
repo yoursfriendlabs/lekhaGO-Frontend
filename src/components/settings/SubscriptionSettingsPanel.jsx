@@ -89,31 +89,6 @@ function StatusPill({ label, tone = 'slate' }) {
   );
 }
 
-function MetricCard({ label, value, description, icon: Icon, tone = 'slate' }) {
-  const tones = {
-    emerald: 'border-emerald-200/70 bg-emerald-50/70 dark:border-emerald-800/40 dark:bg-emerald-950/20',
-    amber: 'border-amber-200/70 bg-amber-50/70 dark:border-amber-800/40 dark:bg-amber-950/20',
-    blue: 'border-sky-200/70 bg-sky-50/70 dark:border-sky-800/40 dark:bg-sky-950/20',
-    rose: 'border-rose-200/70 bg-rose-50/70 dark:border-rose-800/40 dark:bg-rose-950/20',
-    slate: 'border-secondary-200/70 bg-mist/70 dark:border-slate-800/60 dark:bg-slate-900/50',
-  };
-
-  return (
-    <div className={`rounded-3xl border p-5 ${tones[tone] || tones.slate}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-400">{label}</p>
-          <p className="mt-3 break-words text-2xl font-semibold text-ink">{value}</p>
-          <p className="mt-2 text-sm text-secondary-500">{description}</p>
-        </div>
-        <div className="rounded-2xl bg-white/90 p-3 shadow-sm dark:bg-slate-950/70">
-          <Icon size={18} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function SubscriptionSettingsPanel({ isOwner = false }) {
   const { locale, t } = useI18n();
   const { businessId, subscription, updateSubscription, refreshSession } = useAuth();

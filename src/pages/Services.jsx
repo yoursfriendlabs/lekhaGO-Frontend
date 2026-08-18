@@ -30,7 +30,7 @@ import { printElement, printThermalReceipt } from "../lib/print.js";
 import FileUpload from "../components/FileUpload";
 import DynamicAttributes from "../components/DynamicAttributes";
 import ThermalReceipt from "../components/ThermalReceipt";
-import StatsCard from "../components/StatsCard.jsx";
+import StatsCard, { STATS_GRID_CLASS } from "../components/StatsCard.jsx";
 import {
   getJewelleryBreakdown,
   getPurityOptionsForMetal,
@@ -60,6 +60,7 @@ import {
   MessageCircle,
   Printer,
   Trash2,
+  Ban,
 } from "lucide-react";
 import { usePartyStore } from "../stores/parties";
 import { useServiceStore } from "../stores/services";
@@ -86,6 +87,7 @@ import dayjs, {
   toDateInputValue,
 } from "../lib/datetime";
 import { getPartyBalanceMeta } from "../lib/partyBalances.js";
+import { getIrdReprintLabel, isIrdCancelled, isIrdLocked } from "../lib/ird";
 
 const emptyItem = {
   itemType: "labor",
@@ -453,27 +455,39 @@ function isPlaceholderItem(item) {
   );
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, locked = false }) {
   const { t } = useI18n();
+  const normalized = String(status || "").toLowerCase();
   const map = {
     open: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
     in_progress:
       "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
     closed:
       "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    cancelled: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
+    canceled: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
+    void: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
   };
   const label =
     status === "in_progress"
       ? t("services.inProgress")
-      : // : status === 'open' ? t('services.open')
-        status === "closed"
+      : status === "closed"
         ? t("services.closed")
-        : "—";
+        : ["cancelled", "canceled", "void"].includes(normalized)
+          ? t("services.cancelled")
+          : "—";
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[status] || "bg-secondary-100 text-secondary-700"}`}
-    >
-      {label}
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[normalized] || "bg-secondary-100 text-secondary-700"}`}
+      >
+        {label}
+      </span>
+      {locked && !["cancelled", "canceled", "void"].includes(normalized) ? (
+        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+          {t("common.locked")}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -507,6 +521,7 @@ export default function Services() {
   const partyPickerRef = useRef(null);
   const partyDropdownRef = useRef(null);
   const { settings: bizSettings, businessProfile } = useBusinessSettings();
+  const irdModeEnabled = Boolean(bizSettings?.irdModeEnabled);
   const businessType = String(businessProfile?.type || "").toLowerCase();
   const isGym = businessType === "gym";
   const showGoldJewelleryDetails = businessType === "gold";
@@ -625,6 +640,9 @@ export default function Services() {
   const [editLoading, setEditLoading] = useState(false);
   const [deletingServiceId, setDeletingServiceId] = useState("");
   const [deleteService, setDeleteService] = useState(null);
+  const [cancelService, setCancelService] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancellingServiceId, setCancellingServiceId] = useState("");
 
   // ── Lightbox ──
   const [lightboxState, setLightboxState] = useState(null);
@@ -1417,6 +1435,13 @@ export default function Services() {
 
   const openEditDialog = async (order) => {
     if (!canManageServices) return;
+    if (isIrdLocked(order) || isIrdCancelled(order)) {
+      setListNotice({
+        type: "error",
+        message: t("services.messages.lockedEditBlocked"),
+      });
+      return;
+    }
     resetForm();
     setEditingId(order.id);
     setDialogOpen(true);
@@ -1646,7 +1671,9 @@ export default function Services() {
           lineTotal: Number(item.lineTotal),
         })),
       };
-      if (manualOrderNo) {
+      if (irdModeEnabled && !editingId) {
+        delete payload.orderNo;
+      } else if (manualOrderNo) {
         payload.orderNo = manualOrderNo;
       } else {
         delete payload.orderNo;
@@ -1688,6 +1715,7 @@ export default function Services() {
   // ── Status dialog ──
   const openStatusDialog = (order) => {
     if (!canManageServices) return;
+    if (isIrdCancelled(order)) return;
     setStatusDialog(order);
     setNewStatus(order.status || "open");
     setStatusError("");
@@ -1723,6 +1751,7 @@ export default function Services() {
   // ── Record payment ──
   const openPayDialog = (order) => {
     if (!canManageServices) return;
+    if (isIrdCancelled(order)) return;
     setPayDialog(order);
     setPayAmount("");
     setPayNotes("");
@@ -1816,6 +1845,12 @@ export default function Services() {
     setDeleteService(null);
   };
 
+  const closeCancelDialog = () => {
+    if (cancelService && cancellingServiceId === cancelService.id) return;
+    setCancelService(null);
+    setCancelReason("");
+  };
+
   const handleDeleteService = async () => {
     if (!canManageServices) return;
     if (!deleteService) return;
@@ -1846,6 +1881,41 @@ export default function Services() {
     }
   };
 
+  const handleCancelService = async () => {
+    if (!canManageServices || !cancelService) return;
+    if (cancellingServiceId === cancelService.id) return;
+
+    const reason = cancelReason.trim();
+    if (!reason) {
+      setListNotice({
+        type: "error",
+        message: t("services.cancelReasonRequired"),
+      });
+      return;
+    }
+
+    setCancellingServiceId(cancelService.id);
+    setListNotice({ type: "", message: "" });
+    try {
+      await api.cancelService(cancelService.id, { reason });
+      useProductStore.getState().invalidate();
+      setListNotice({
+        type: "success",
+        message: t("services.messages.cancelled"),
+      });
+      await loadServices();
+      setCancelService(null);
+      setCancelReason("");
+    } catch (err) {
+      setListNotice({
+        type: "error",
+        message: err.message || t("services.messages.cancelFailed"),
+      });
+    } finally {
+      setCancellingServiceId("");
+    }
+  };
+
   const money = (val) =>
     t("currency.formatted", {
       symbol: t("currency.symbol"),
@@ -1855,12 +1925,86 @@ export default function Services() {
   const formScrollRef = useRef(null);
   const invoicePrintRef = useRef(null);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     printElement(invoicePrintRef.current);
+    await trackServiceReprint();
   };
 
-  const handlePrintThermal = () => {
+  const handlePrintThermal = async () => {
     printThermalReceipt(thermalInvoicePrintRef.current);
+    await trackServiceReprint();
+  };
+
+  const trackServiceReprint = async () => {
+    if (!invoiceOrder?.id || !isIrdLocked(invoiceOrder)) return;
+    try {
+      const updated = normalizeServiceOrder(
+        await api.recordServiceReprint(invoiceOrder.id),
+      );
+      setInvoiceOrder(updated);
+      patchService(updated.id, updated);
+    } catch {
+      // Printing already happened; tracking failure should not block the user.
+    }
+  };
+
+  const invoiceReprintLabel = getIrdReprintLabel(invoiceOrder);
+
+  const buildServiceActions = (order) => {
+    const locked = isIrdLocked(order);
+    const cancelled = isIrdCancelled(order);
+    const actions = [];
+
+    if (canManageServices && !locked && !cancelled) {
+      actions.push({
+        label: t("common.edit"),
+        icon: Pencil,
+        onClick: () => openEditDialog(order),
+      });
+    }
+
+    actions.push(
+      {
+        label: "View Bill",
+        icon: FileText,
+        onClick: () => openInvoiceModal(order),
+      },
+      {
+        label: "Print Bill",
+        icon: Printer,
+        onClick: () => openInvoiceModal(order, { print: true }),
+      },
+      {
+        label: "Print Thermal",
+        icon: Printer,
+        onClick: () => openInvoiceModal(order, { print: true, thermal: true }),
+      },
+    );
+
+    if (canManageServices && locked && !cancelled) {
+      actions.push({
+        label: t("services.cancelInvoice"),
+        icon: Ban,
+        tone: "danger",
+        disabled: cancellingServiceId === order.id,
+        onClick: () => {
+          setCancelReason("");
+          setCancelService(order);
+        },
+      });
+    }
+
+    if (canManageServices && !locked && !cancelled) {
+      actions.push({
+        label: t("common.delete"),
+        icon: Trash2,
+        tone: "danger",
+        disabled: deletingServiceId === order.id,
+        onClick: () => setDeleteService(order),
+      });
+    }
+
+    return actions;
   };
 
   const showDetailsStep = mobileStep === "details";
@@ -1962,7 +2106,7 @@ export default function Services() {
         }
       />
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className={STATS_GRID_CLASS}>
         <StatsCard
           title={t("services.totalOrders")}
           value={stats?.totalOrders ?? 0}
@@ -2108,10 +2252,10 @@ export default function Services() {
                               className="transition hover:opacity-75"
                               onClick={() => openStatusDialog(order)}
                             >
-                              <StatusBadge status={order.status} />
+                              <StatusBadge status={order.status} locked={isIrdLocked(order)} />
                             </button>
                           ) : (
-                            <StatusBadge status={order.status} />
+                            <StatusBadge status={order.status} locked={isIrdLocked(order)} />
                           )}
                           {order.storeType === "online" ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
@@ -2168,7 +2312,7 @@ export default function Services() {
                         <p className="mt-2 text-base font-semibold text-ink">
                           {money(order.grandTotal)}
                         </p>
-                        {due > 0 ? (
+                        {due > 0 && !isIrdCancelled(order) ? (
                           <button
                             type="button"
                             className="mt-2 inline-flex items-center justify-center rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
@@ -2185,47 +2329,7 @@ export default function Services() {
                     </div>
 
                     <div className="mt-4 flex justify-end border-t border-secondary-200/70 pt-3 dark:border-slate-800/70">
-                      <ActionMenu
-                        actions={[
-                          ...(canManageServices
-                            ? [
-                                {
-                                  label: t("common.edit"),
-                                  icon: Pencil,
-                                  onClick: () => openEditDialog(order),
-                                },
-                              ]
-                            : []),
-                          {
-                            label: "View Bill",
-                            icon: FileText,
-                            onClick: () => openInvoiceModal(order),
-                          },
-                          {
-                            label: "Print Bill",
-                            icon: Printer,
-                            onClick: () =>
-                              openInvoiceModal(order, { print: true }),
-                          },
-                          {
-                            label: "Print Thermal",
-                            icon: Printer,
-                            onClick: () =>
-                              openInvoiceModal(order, { print: true, thermal: true }),
-                          },
-                          ...(canManageServices
-                            ? [
-                                {
-                                  label: t("common.delete"),
-                                  icon: Trash2,
-                                  tone: "danger",
-                                  disabled: deletingServiceId === order.id,
-                                  onClick: () => setDeleteService(order),
-                                },
-                              ]
-                            : []),
-                        ]}
-                      />
+                      <ActionMenu actions={buildServiceActions(order)} />
                     </div>
 
                     {attachmentUrls.length > 0 ? (
@@ -2350,7 +2454,7 @@ export default function Services() {
                             className="transition hover:opacity-75"
                             onClick={() => openStatusDialog(order)}
                           >
-                            <StatusBadge status={order.status} />
+                            <StatusBadge status={order.status} locked={isIrdLocked(order)} />
                           </button>
                         </td>
                         <td className="py-3 pr-4">
@@ -2385,7 +2489,7 @@ export default function Services() {
                           {money(order.receivedTotal)}
                         </td>
                         <td className="py-3 pr-4 text-right">
-                          {due > 0 ? (
+                          {due > 0 && !isIrdCancelled(order) ? (
                             <button
                               type="button"
                               className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60"
@@ -2400,47 +2504,7 @@ export default function Services() {
                           )}
                         </td>
                         <td className="py-3 text-right">
-                          <ActionMenu
-                            actions={[
-                              ...(canManageServices
-                                ? [
-                                    {
-                                      label: t("common.edit"),
-                                      icon: Pencil,
-                                      onClick: () => openEditDialog(order),
-                                    },
-                                  ]
-                                : []),
-                              {
-                                label: "View Bill",
-                                icon: FileText,
-                                onClick: () => openInvoiceModal(order),
-                              },
-                              {
-                                label: "Print Bill",
-                                icon: Printer,
-                                onClick: () =>
-                                  openInvoiceModal(order, { print: true }),
-                              },
-                              {
-                                label: "Print Thermal",
-                                icon: Printer,
-                                onClick: () =>
-                                  openInvoiceModal(order, { print: true, thermal: true }),
-                              },
-                              ...(canManageServices
-                                ? [
-                                    {
-                                      label: t("common.delete"),
-                                      icon: Trash2,
-                                      tone: "danger",
-                                      disabled: deletingServiceId === order.id,
-                                      onClick: () => setDeleteService(order),
-                                    },
-                                  ]
-                                : []),
-                            ]}
-                          />
+                          <ActionMenu actions={buildServiceActions(order)} />
                         </td>
                       </tr>
                     );
@@ -2764,6 +2828,7 @@ export default function Services() {
                                 name="orderNo"
                                 value={header.orderNo}
                                 onChange={handleHeaderChange}
+                                disabled={irdModeEnabled}
                                 placeholder={!editingId ? suggestedOrderNo : ""}
                               />
                             </div>
@@ -3941,6 +4006,7 @@ export default function Services() {
                         return { label: attrLabel, value: String(val || "—") };
                       }),
                     ]}
+                    reprintLabel={invoiceReprintLabel}
                   />
                 </div>
               </div>
@@ -3975,6 +4041,7 @@ export default function Services() {
                           ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
                           : "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
                     }
+                    reprintLabel={invoiceReprintLabel}
                   />
                 </div>
 
@@ -4479,6 +4546,60 @@ export default function Services() {
           Boolean(deleteService) && deletingServiceId === deleteService.id
         }
       />
+
+      <Dialog
+        isOpen={Boolean(cancelService)}
+        onClose={closeCancelDialog}
+        title={t("services.cancelInvoice")}
+        size="sm"
+        showCloseButton={!(cancelService && cancellingServiceId === cancelService.id)}
+        closeOnOverlayClick={!(cancelService && cancellingServiceId === cancelService.id)}
+        footer={(
+          <>
+            <button
+              type="button"
+              className="btn-secondary w-full sm:w-auto"
+              onClick={closeCancelDialog}
+              disabled={Boolean(cancelService && cancellingServiceId === cancelService.id)}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="button"
+              className="w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              onClick={handleCancelService}
+              disabled={Boolean(cancelService && cancellingServiceId === cancelService.id)}
+            >
+              {cancelService && cancellingServiceId === cancelService.id
+                ? t("common.loading")
+                : t("services.confirmCancelInvoice")}
+            </button>
+          </>
+        )}
+      >
+        <div className="space-y-3">
+          <p className="text-sm leading-6 text-secondary-700">
+            {cancelService
+              ? t("services.cancelConfirm", {
+                  name: cancelService.orderNo || cancelService.id.slice(0, 8),
+                })
+              : ""}
+          </p>
+          <div className="space-y-1">
+            <label className="label" htmlFor="service-cancel-reason">
+              {t("services.cancelReason")}
+            </label>
+            <textarea
+              id="service-cancel-reason"
+              className="input min-h-[96px] resize-none"
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              placeholder={t("services.cancelReasonPlaceholder")}
+              disabled={Boolean(cancelService && cancellingServiceId === cancelService.id)}
+            />
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

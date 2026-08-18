@@ -11,6 +11,7 @@ import {
   Search,
   ClipboardList,
 } from "lucide-react";
+import StatsCard from "../components/StatsCard.jsx";
 import ActionMenu from "../components/ActionMenu.jsx";
 import Notice from "../components/Notice.jsx";
 import PageHeader from "../components/PageHeader.jsx";
@@ -903,48 +904,25 @@ export default function Tasks() {
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-          <div className="rounded-3xl border border-secondary-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/70 dark:bg-slate-950/60">
-            <div className="flex items-center gap-3">
-              <ClipboardList className="h-5 w-5 text-primary-600 dark:text-primary-300" />
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">
-                  {t("tasks.summary.openTasks")}
-                </p>
-                <p className="mt-1 text-2xl font-semibold text-ink">
-                  {Math.max(tasksData.total - completedCount, 0)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-rose-200/70 bg-rose-50/70 p-5 shadow-sm dark:border-rose-700/30 dark:bg-rose-900/20">
-            <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 text-rose-600 dark:text-rose-300" />
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-rose-500/80">
-                  {t("tasks.summary.overdue")}
-                </p>
-                <p className="mt-1 text-2xl font-semibold text-ink">
-                  {overdueCount}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-sky-200/70 bg-sky-50/70 p-5 shadow-sm dark:border-sky-700/30 dark:bg-sky-900/20">
-            <div className="flex items-center gap-3">
-              <BellRing className="h-5 w-5 text-sky-600 dark:text-sky-300" />
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-500/80">
-                  {t("tasks.summary.unread")}
-                </p>
-                <p className="mt-1 text-2xl font-semibold text-ink">
-                  {unreadCount}
-                </p>
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
+          <StatsCard
+            title={t("tasks.summary.openTasks")}
+            value={Math.max(tasksData.total - completedCount, 0)}
+            icon={ClipboardList}
+            tone="default"
+          />
+          <StatsCard
+            title={t("tasks.summary.overdue")}
+            value={overdueCount}
+            icon={Clock}
+            tone="danger"
+          />
+          <StatsCard
+            title={t("tasks.summary.unread")}
+            value={unreadCount}
+            icon={BellRing}
+            tone="info"
+          />
         </div>
       </section>
 

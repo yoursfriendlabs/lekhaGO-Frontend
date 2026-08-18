@@ -3,13 +3,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
   Coffee,
   Receipt,
-  Users,
   Clock,
   AlertCircle,
   ShoppingCart,
   RefreshCw,
   Printer,
   Check,
+  CheckCircle2,
   FileText,
   Ban,
   DollarSign,
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
+import StatsCard, { STATS_GRID_CLASS } from '../components/StatsCard.jsx';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
@@ -472,47 +473,31 @@ export default function CashierBilling() {
         />
       )}
 
-      {/* Top Metrics Row */}
-      <div className="grid gap-4 sm:grid-cols-4">
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm border border-secondary-100">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-secondary-400">Total Tables</p>
-            <p className="mt-1 text-2xl font-bold text-ink">{stats.total}</p>
-          </div>
-          <div className="h-10 w-10 bg-mist rounded-xl flex items-center justify-center text-secondary-500">
-            <Coffee size={20} />
-          </div>
-        </div>
-
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm border border-secondary-100">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-secondary-400">Active Tables</p>
-            <p className="mt-1 text-2xl font-bold text-amber-600">{stats.occupied}</p>
-          </div>
-          <div className="h-10 w-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
-          </div>
-        </div>
-
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm border border-secondary-100">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-secondary-400">Vacant Tables</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-600">{stats.vacant}</p>
-          </div>
-          <div className="h-10 w-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          </div>
-        </div>
-
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm border border-secondary-100">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-secondary-400">Due Amount</p>
-            <p className="mt-1 text-2xl font-bold text-rose-600">{formatMoney(stats.openBillAmount)}</p>
-          </div>
-          <div className="h-10 w-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600">
-            <DollarSign size={20} />
-          </div>
-        </div>
+      <div className={STATS_GRID_CLASS}>
+        <StatsCard
+          title="Total Tables"
+          value={stats.total}
+          icon={Coffee}
+          tone="default"
+        />
+        <StatsCard
+          title="Active Tables"
+          value={stats.occupied}
+          icon={Clock}
+          tone="warning"
+        />
+        <StatsCard
+          title="Vacant Tables"
+          value={stats.vacant}
+          icon={CheckCircle2}
+          tone="success"
+        />
+        <StatsCard
+          title="Due Amount"
+          value={formatMoney(stats.openBillAmount)}
+          icon={DollarSign}
+          tone="danger"
+        />
       </div>
 
       {/* Main Split Grid */}

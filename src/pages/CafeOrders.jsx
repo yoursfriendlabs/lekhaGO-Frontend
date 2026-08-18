@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Clock, FileText, LayoutGrid, MapPin, Package2, Pencil, Phone, Plus, Printer, Search, ShoppingBag, ShoppingCart, Store, Table, Trash2, UserRound, Users } from 'lucide-react';
+import { ArrowRight, ClipboardList, Clock, FileText, LayoutGrid, MapPin, Package2, Pencil, Phone, Plus, Printer, Search, ShoppingBag, ShoppingCart, Store, Table, Trash2, TrendingUp, UserRound, Users } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import FormSectionCard from '../components/FormSectionCard.jsx';
@@ -22,7 +22,7 @@ import { getCurrentCreatorValue } from '../lib/records';
 import { mergeLookupEntities, normalizeLookupParty, normalizeLookupProduct, toProductLookupOption } from '../lib/lookups.js';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useProductStore } from '../stores/products';
-import StatCard from '../components/StatCard';
+import StatsCard, { STATS_GRID_CLASS } from '../components/StatsCard.jsx';
 import {
   buildCafeOrderAttributes,
   buildCafeTableMap,
@@ -776,26 +776,34 @@ export default function CafeOrders() {
       {status.message ? <Notice title={status.message} tone={status.type} /> : null}
 
       {/* Stats Cards Overview */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Total Orders"
+      <div className={STATS_GRID_CLASS}>
+        <StatsCard
+          title="Total Orders"
           value={statsSummary.totalOrders}
           hint="All loaded orders"
+          icon={ClipboardList}
+          tone="default"
         />
-        <StatCard
-          label="Active Orders"
+        <StatsCard
+          title="Active Orders"
           value={statsSummary.activeCount}
           hint="Dine-in / Prep queue"
+          icon={Clock}
+          tone="warning"
         />
-        <StatCard
-          label="Total Discount"
+        <StatsCard
+          title="Total Discount"
           value={formatMoney(statsSummary.totalDiscount)}
           hint="Given to customers"
+          icon={ShoppingBag}
+          tone="info"
         />
-        <StatCard
-          label="Total Sales"
+        <StatsCard
+          title="Total Sales"
           value={formatMoney(statsSummary.totalSales)}
           hint="Total revenue"
+          icon={TrendingUp}
+          tone="success"
         />
       </div>
 

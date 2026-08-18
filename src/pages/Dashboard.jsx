@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { BarChart3, BellRing, Boxes, Clock, ClipboardList, Package, ShoppingCart, UserCheck } from 'lucide-react';
+import { BarChart3, BellRing, Boxes, Clock, ClipboardList, Package, ShoppingCart, TrendingUp, UserCheck, Wallet } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import { useTaskNotifications } from '../hooks/useTaskNotifications';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
+import StatsCard from '../components/StatsCard.jsx';
 import { useI18n } from '../lib/i18n.jsx';
 import dayjs, { formatMaybeDate } from '../lib/datetime';
 
@@ -185,7 +186,7 @@ export default function Dashboard() {
   /* ── Redirect general staff to their salary profile (or staff list if membershipId missing) ── */
   if (accessControl?.staffCategory === 'general_staff') {
     if (accessControl?.membershipId) {
-      return <Navigate to={`/app/staff-salary/${encodeURIComponent(accessControl.membershipId)}`} replace />;
+      return <Navigate to="/app/profile" replace />;
     }
 
     return <Navigate to="/app/staff" replace />;
@@ -256,11 +257,6 @@ export default function Dashboard() {
   const tasksEnabled = canViewFeature('tasks');
   const canManageTasks = canManageFeature('tasks');
   const { summary: taskSummary } = useTaskNotifications({ enabled: tasksEnabled });
-  const profitLossToneClass = summary.profitOrLoss < 0
-    ? 'text-rose-600 dark:text-rose-300'
-    : summary.profitOrLoss > 0
-      ? 'text-emerald-700 dark:text-emerald-300'
-      : 'text-ink';
 
   return (
     <div className="min-w-0 space-y-6 pb-28 md:pb-0">
@@ -295,49 +291,61 @@ export default function Dashboard() {
       {loadError ? <Notice title={loadError} tone="error" /> : null}
 
       <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="min-w-0 rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-amber-50 p-4 shadow-sm dark:border-emerald-800/50 dark:from-emerald-950/60 dark:via-slate-950/80 dark:to-slate-900/60 sm:p-6">
-          <div className="grid gap-3 sm:grid-cols-1 lg:grid-cols-1">
-            <div id='amount-pending' className="min-w-0 rounded-2xl border border-amber-200/70 bg-white/80 p-4 dark:border-amber-700/40 dark:bg-slate-900/50">
-              <p className="text-xs uppercase text-amber-500/80">{t('dashboard.amountPending')}</p>
-              <p  className="mt-1 break-words text-xl font-semibold text-ink">{formatMoney(summary.pendingAmount)}</p>
-            </div>
-            <div id='sales-services' className="min-w-0 rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
-              <p  className="text-xs uppercase text-secondary-500">{t('dashboard.salesAndServices')}</p>
-              <p className="mt-1 break-words text-xl font-semibold text-ink">{formatMoney(summary.salesTotal)}</p>
-              <div  className="mt-2 space-y-1 text-xs text-secondary-500">
-                <p className="flex items-center justify-between gap-2">
-                  <span>{t('analytics.directSales')}</span>
-                  <span>{formatMoney(summary.directSalesTotal)}</span>
-                </p>
-                <p className="flex items-center justify-between gap-2">
-                  <span>{t('nav.services')}</span>
-                  <span>{formatMoney(summary.serviceTotal)}</span>
-                </p>
-              </div>
-            </div>
-            <div id='purchase-spend' className="min-w-0 rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
-              <p className="text-xs uppercase text-secondary-500">{t('dashboard.purchaseSpend')}</p>
-              <p className="mt-1 break-words text-xl font-semibold text-ink">{formatMoney(summary.purchaseTotal)}</p>
-            </div>
-            <div id='expenses' className="min-w-0 rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
-              <p className="text-xs uppercase text-secondary-500">{t('dashboard.expenses')}</p>
-              <p className="mt-1 break-words text-xl font-semibold text-ink">{formatMoney(summary.expenseTotal)}</p>
-              {summary.salaryExpenseTotal > 0 && (
-                <p className="mt-2 text-xs text-secondary-500">
-                  {t('dashboard.includesSalary')}: {formatMoney(summary.salaryExpenseTotal)}
-                </p>
-              )}
-            </div>
-            <div id='profit-loss' className="min-w-0 rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-700/50 dark:bg-slate-900/50">
-              <p className="text-xs uppercase text-secondary-500">{t('dashboard.profitLoss')}</p>
-              <p className={`mt-1 break-words text-xl font-semibold ${profitLossToneClass}`}>{formatMoney(summary.profitOrLoss)}</p>
-              <p className="mt-2 text-xs text-secondary-500">
-                {t('analytics.totalOutgoing')}: {formatMoney(summary.purchaseTotal + summary.expenseTotal)}
+        <div className="min-w-0 space-y-3">
+          <StatsCard
+            id="amount-pending"
+            title={t('dashboard.amountPending')}
+            value={formatMoney(summary.pendingAmount)}
+            icon={Clock}
+            tone="warning"
+            loading={loading}
+          />
+          <StatsCard
+            id="sales-services"
+            title={t('dashboard.salesAndServices')}
+            value={formatMoney(summary.salesTotal)}
+            icon={TrendingUp}
+            tone="success"
+            loading={loading}
+          >
+            <div className="mt-2 space-y-1 text-xs text-secondary-500">
+              <p className="flex items-center justify-between gap-2">
+                <span>{t('analytics.directSales')}</span>
+                <span className="font-medium tabular-nums">{formatMoney(summary.directSalesTotal)}</span>
+              </p>
+              <p className="flex items-center justify-between gap-2">
+                <span>{t('nav.services')}</span>
+                <span className="font-medium tabular-nums">{formatMoney(summary.serviceTotal)}</span>
               </p>
             </div>
-          </div>
-
-          <p className="mt-4 text-xs text-secondary-500">
+          </StatsCard>
+          <StatsCard
+            id="purchase-spend"
+            title={t('dashboard.purchaseSpend')}
+            value={formatMoney(summary.purchaseTotal)}
+            icon={ShoppingCart}
+            tone="default"
+            loading={loading}
+          />
+          <StatsCard
+            id="expenses"
+            title={t('dashboard.expenses')}
+            value={formatMoney(summary.expenseTotal)}
+            icon={Wallet}
+            tone="info"
+            loading={loading}
+            hint={summary.salaryExpenseTotal > 0 ? `${t('dashboard.includesSalary')}: ${formatMoney(summary.salaryExpenseTotal)}` : undefined}
+          />
+          <StatsCard
+            id="profit-loss"
+            title={t('dashboard.profitLoss')}
+            value={formatMoney(summary.profitOrLoss)}
+            icon={BarChart3}
+            tone={summary.profitOrLoss < 0 ? 'danger' : summary.profitOrLoss > 0 ? 'success' : 'default'}
+            loading={loading}
+            hint={`${t('analytics.totalOutgoing')}: ${formatMoney(summary.purchaseTotal + summary.expenseTotal)}`}
+          />
+          <p className="text-xs text-secondary-500">
             {loading ? t('common.loading') : t('dashboard.filters.showing', { range: selectedRangeLabel })}
           </p>
         </div>
@@ -348,27 +356,37 @@ export default function Dashboard() {
               <p className="text-sm font-semibold text-ink">{t('dashboard.quickStats')}</p>
               <BarChart3 size={18} className="text-secondary-400" />
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><Boxes size={14} /> {t('dashboard.products')}</div>
-                <p className="mt-2 text-lg font-semibold text-ink">{summary.productCount}</p>
-              </div>
-              <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><Package size={14} /> {t('dashboard.lowStockAlerts')}</div>
-                <p className={`mt-2 text-lg font-semibold ${summary.lowStockCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-ink'}`}>{summary.lowStockCount}</p>
-              </div>
-              <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><Clock size={14} /> {t('inventory.nearExpiryItems') || 'Near Expiry'}</div>
-                <p className={`mt-2 text-lg font-semibold ${summary.nearExpiryCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-ink'}`}>{summary.nearExpiryCount || 0}</p>
-              </div>
-              <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><UserCheck size={14} /> {t('dashboard.pendingReceivable')}</div>
-                <p className="mt-2 text-lg font-semibold text-ink">{formatMoney(summary.pendingReceivable)}</p>
-              </div>
-              <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
-                <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><ShoppingCart size={14} /> {t('dashboard.pendingPayable')}</div>
-                <p className="mt-2 text-lg font-semibold text-ink">{formatMoney(summary.pendingPayable)}</p>
-              </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <StatsCard
+                title={t('dashboard.products')}
+                value={summary.productCount}
+                icon={Boxes}
+                tone="default"
+              />
+              <StatsCard
+                title={t('dashboard.lowStockAlerts')}
+                value={summary.lowStockCount}
+                icon={Package}
+                tone={summary.lowStockCount > 0 ? 'danger' : 'default'}
+              />
+              <StatsCard
+                title={t('inventory.nearExpiryItems') || 'Near Expiry'}
+                value={summary.nearExpiryCount || 0}
+                icon={Clock}
+                tone={summary.nearExpiryCount > 0 ? 'warning' : 'default'}
+              />
+              <StatsCard
+                title={t('dashboard.pendingReceivable')}
+                value={formatMoney(summary.pendingReceivable)}
+                icon={UserCheck}
+                tone="success"
+              />
+              <StatsCard
+                title={t('dashboard.pendingPayable')}
+                value={formatMoney(summary.pendingPayable)}
+                icon={ShoppingCart}
+                tone="warning"
+              />
             </div>
           </div>
 
@@ -406,18 +424,24 @@ export default function Dashboard() {
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
-                  <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><ClipboardList size={14} /> {t('tasks.notifications.assignedOpen')}</div>
-                  <p className="mt-2 text-lg font-semibold text-ink">{taskSummary?.counters?.assignedToMeOpen || 0}</p>
-                </div>
-                <div className="rounded-2xl border border-rose-200/70 bg-rose-50/60 p-3 dark:border-rose-700/40 dark:bg-rose-900/20">
-                  <div className="flex items-center gap-2 text-xs uppercase text-rose-500"><Clock size={14} /> {t('tasks.notifications.assignedOverdue')}</div>
-                  <p className="mt-2 text-lg font-semibold text-ink">{taskSummary?.counters?.assignedToMeOverdue || 0}</p>
-                </div>
-                <div className="rounded-2xl border border-secondary-200/70 p-3 dark:border-slate-700/60">
-                  <div className="flex items-center gap-2 text-xs uppercase text-secondary-500"><UserCheck size={14} /> {t('tasks.notifications.createdOpen')}</div>
-                  <p className="mt-2 text-lg font-semibold text-ink">{taskSummary?.counters?.createdByMeOpen || 0}</p>
-                </div>
+                <StatsCard
+                  title={t('tasks.notifications.assignedOpen')}
+                  value={taskSummary?.counters?.assignedToMeOpen || 0}
+                  icon={ClipboardList}
+                  tone="default"
+                />
+                <StatsCard
+                  title={t('tasks.notifications.assignedOverdue')}
+                  value={taskSummary?.counters?.assignedToMeOverdue || 0}
+                  icon={Clock}
+                  tone="danger"
+                />
+                <StatsCard
+                  title={t('tasks.notifications.createdOpen')}
+                  value={taskSummary?.counters?.createdByMeOpen || 0}
+                  icon={UserCheck}
+                  tone="info"
+                />
               </div>
 
               <div className="mt-4">

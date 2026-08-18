@@ -4,7 +4,8 @@ import Notice from '../components/Notice';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
-import { Coffee, Users, Pencil, Trash2, Plus, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Coffee, Users, Pencil, Trash2, Plus, ToggleLeft, ToggleRight, Clock, CheckCircle2 } from 'lucide-react';
+import StatsCard from '../components/StatsCard.jsx';
 
 const emptyForm = {
   name: '',
@@ -195,37 +196,25 @@ export default function Tables() {
         subtitle={t('tables.subtitle') || 'Manage seating layout, occupancy status, and table capacities.'}
       />
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-secondary-400">Total Tables</p>
-            <p className="mt-1 text-2xl font-bold text-ink dark:text-slate-200">{stats.total}</p>
-          </div>
-          <div className="h-10 w-10 bg-secondary-100 rounded-xl flex items-center justify-center text-secondary-700 dark:bg-slate-800 dark:text-secondary-300">
-            <Coffee size={20} />
-          </div>
-        </div>
-
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-secondary-400">Vacant Tables</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.vacant}</p>
-          </div>
-          <div className="h-10 w-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          </div>
-        </div>
-
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-secondary-400">Occupied Tables</p>
-            <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.occupied}</p>
-          </div>
-          <div className="h-10 w-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-          </div>
-        </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
+        <StatsCard
+          title="Total Tables"
+          value={stats.total}
+          icon={Coffee}
+          tone="default"
+        />
+        <StatsCard
+          title="Vacant Tables"
+          value={stats.vacant}
+          icon={CheckCircle2}
+          tone="success"
+        />
+        <StatsCard
+          title="Occupied Tables"
+          value={stats.occupied}
+          icon={Clock}
+          tone="warning"
+        />
       </div>
 
       {/* Main Content Area */}

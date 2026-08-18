@@ -16,7 +16,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useProductStore } from '../stores/products';
 import { Pencil, Plus, History, AlertTriangle, Clock, TrendingUp, TrendingDown, Trash2, Eye, Layers } from 'lucide-react';
 import ImageCropperModal from '../components/ImageCropperModal.jsx';
-import StatsCard from '../components/StatsCard.jsx';
+import StatsCard, { STATS_GRID_CLASS } from '../components/StatsCard.jsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import ActionMenu from '../components/ActionMenu.jsx';
 import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
@@ -1015,14 +1015,13 @@ export default function Inventory() {
       />
 
       {/* Inventory Stats Cards */}
-      <div id="inventory-stats-grid" className="grid gap-2.5 grid-cols-2 lg:grid-cols-4 sm:gap-4">
+      <div id="inventory-stats-grid" className={STATS_GRID_CLASS}>
         <StatsCard
           title={t('inventory.lowStockItems') || 'Low Stock Items'}
           value={stats?.lowStockCount ?? 0}
           icon={AlertTriangle}
           tone="danger"
           loading={statsLoading}
-          size="sm"
           onClick={() => {
             setStockFilter('low');
             setPage(1);
@@ -1035,7 +1034,6 @@ export default function Inventory() {
           icon={Clock}
           tone="warning"
           loading={statsLoading}
-          size="sm"
           onClick={() => {
             setStockFilter('nearexpiry');
             setSortKey('expiryDate');
@@ -1049,7 +1047,6 @@ export default function Inventory() {
           icon={Layers}
           tone="info"
           loading={statsLoading}
-          size="sm"
           onClick={() => {
             setStockFilter('all');
             setSortKey('');
@@ -1063,7 +1060,6 @@ export default function Inventory() {
           icon={TrendingDown}
           tone="default"
           loading={statsLoading}
-          size="sm"
         />
       </div>
 

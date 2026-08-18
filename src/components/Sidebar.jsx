@@ -3,7 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { getNavigationForBusinessType } from '../lib/businessTypeConfig.js';
-import { expandNavigationForPermissions, getNavItemPermissionKey } from '../lib/accessControl';
+import { expandNavigationForPermissions, getNavItemPermissionKey, withOwnProfileNavItem } from '../lib/accessControl';
 import BrandLogo from './BrandLogo.jsx';
 import UpgradeSubscriptionCta from './subscription/UpgradeSubscriptionCta.jsx';
 
@@ -79,9 +79,7 @@ export default function Sidebar() {
   const membershipId = accessControl?.membershipId;
   let visibleNavItems;
   if (isGeneralStaff) {
-    const salaryRoute = membershipId ? `/app/staff-salary/${encodeURIComponent(membershipId)}` : '/app/staff';
     visibleNavItems = [
-      { key: 'staff-salary', label: t('nav.staff'), route: salaryRoute },
       { key: 'attendance', label: t('nav.attendance'), route: '/app/attendance' },
       { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
     ];
@@ -93,6 +91,11 @@ export default function Sidebar() {
       })
       .filter((item) => hasFeatureAccess(getNavItemPermissionKey(item)));
   }
+  visibleNavItems = withOwnProfileNavItem(visibleNavItems, {
+    role,
+    membershipId,
+    label: t('nav.profile'),
+  });
 
   return (
     <aside className="hidden h-full w-64 flex-col gap-6 border-r border-secondary-200/70 bg-surface/80 p-6 md:fixed md:inset-y-0 md:left-0 md:flex md:overflow-y-auto">

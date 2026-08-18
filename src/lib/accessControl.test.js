@@ -4,7 +4,9 @@ import {
   enforcePermissionDependencies,
   getFeatureAccessLevel,
   getStaffPermissionUiFeatures,
+  isOwnStaffMembership,
   normalizeAccessControl,
+  withOwnProfileNavItem,
 } from './accessControl';
 import {
   getCategoryPermissions,
@@ -254,5 +256,33 @@ describe('access control helpers', () => {
     expect(accessControl.permissions.reports).toBe('manage');
     expect(getFeatureAccessLevel(accessControl, 'reports', 'staff')).toBe('manage');
     expect(getFeatureAccessLevel(accessControl, 'ledger', 'staff')).toBe('manage');
+  });
+
+  it('recognizes a staff member viewing their own membership', () => {
+    expect(isOwnStaffMembership({ membershipId: 'mem-1' }, 'mem-1')).toBe(true);
+    expect(isOwnStaffMembership({ membershipId: 'mem-1' }, 'mem-2')).toBe(false);
+    expect(isOwnStaffMembership({}, 'mem-1')).toBe(false);
+  });
+
+  it('inserts a profile nav item for signed-in staff without replacing their work links', () => {
+    const items = withOwnProfileNavItem(
+      [
+        { key: 'sales', label: 'Sales', route: '/app/sales' },
+        { key: 'settings', label: 'Settings', route: '/app/settings' },
+      ],
+      { role: 'staff', membershipId: 'mem-1', label: 'Profile' },
+    );
+
+    expect(items.map((item) => item.key)).toEqual(['sales', 'profile', 'settings']);
+    expect(items.find((item) => item.key === 'profile').route).toBe('/app/profile');
+    expect(
+      withOwnProfileNavItem(
+        [
+          { key: 'sales', label: 'Sales', route: '/app/sales' },
+          { key: 'settings', label: 'Settings', route: '/app/settings' },
+        ],
+        { role: 'owner', membershipId: 'mem-1' },
+      ).map((item) => item.key),
+    ).toEqual(['sales', 'settings']);
   });
 });

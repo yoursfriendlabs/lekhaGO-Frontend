@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Share2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { useBusinessSettings } from '../lib/businessSettings';
+import { getIrdReprintLabel, isIrdLocked } from '../lib/ird';
 import InvoiceHeader from '../components/InvoiceHeader';
 import Notice from '../components/Notice';
 import { formatCurrency } from '../lib/currency';
@@ -39,19 +40,16 @@ export default function Invoice() {
   const isThermalView = searchParams.get('thermal') === '1';
   const dateValue = isSale ? record?.saleDate : record?.purchaseDate;
   const items = record?.PurchaseItems || record?.SaleItems || [];
-  const isLockedSale = Boolean(
-    isSale
-    && (record?.isLocked === true || record?.isLocked === 'true' || record?.isLocked === 1),
-  );
+  const isLockedInvoice = isIrdLocked(record);
   // First print of a locked invoice stays unlabeled (original). Later prints show Copy of Original – N.
-  const reprintLabel = isLockedSale && Number(record?.reprintCount || 0) > 0
-    ? `Copy of Original – ${Number(record.reprintCount)}`
-    : '';
+  const reprintLabel = getIrdReprintLabel(record);
 
   const trackReprintAfterPrint = async () => {
-    if (!isSale || !id || !isLockedSale) return;
+    if (!id || !isLockedInvoice) return;
     try {
-      const updated = await api.recordSaleReprint(id);
+      const updated = isSale
+        ? await api.recordSaleReprint(id)
+        : await api.recordPurchaseReprint(id);
       setRecord(updated);
     } catch {
       // Printing already happened; tracking failure should not block the user.

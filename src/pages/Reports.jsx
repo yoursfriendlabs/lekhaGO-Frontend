@@ -12,6 +12,7 @@ import {
   Users,
   WalletCards,
   TrendingUp,
+  TrendingDown,
   PieChart as PieIcon,
   BarChart2,
   TableProperties,
@@ -20,7 +21,10 @@ import {
   Coffee,
   BookOpen,
   Loader2,
+  ShoppingCart,
+  Wallet,
 } from "lucide-react";
+import StatsCard, { STATS_GRID_CLASS } from "../components/StatsCard.jsx";
 import PageHeader from "../components/PageHeader";
 import Notice from "../components/Notice";
 import BarGraph from "../components/BarGraph";
@@ -1262,15 +1266,14 @@ function ExpenseCategoryAnalyticsSection({
         </div>
       ) : (
         <ReportResultsShell loading={loading} t={t} className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="card">
-              <p className="text-xs uppercase text-secondary-400">
-                {t("analytics.expenses")}
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-ink">
-                {formatMoney(analytics.totals.total)}
-              </p>
-              <div className="mt-3 space-y-1 text-xs text-secondary-500">
+          <div className={STATS_GRID_CLASS}>
+            <StatsCard
+              title={t("analytics.expenses")}
+              value={formatMoney(analytics.totals.total)}
+              icon={Wallet}
+              tone="info"
+            >
+              <div className="mt-2 space-y-1 text-xs text-secondary-500">
                 <p className="flex items-center justify-between gap-3">
                   <span>{t("analytics.expenseCount")}</span>
                   <span className="font-medium text-ink">
@@ -1290,16 +1293,15 @@ function ExpenseCategoryAnalyticsSection({
                   </span>
                 </p>
               </div>
-            </div>
+            </StatsCard>
 
-            <div className="card">
-              <p className="text-xs uppercase text-secondary-400">
-                {t("analytics.totalCategories")}
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-ink">
-                {formatQuantityValue(analytics.summary.totalCategories)}
-              </p>
-              <div className="mt-3 space-y-1 text-xs text-secondary-500">
+            <StatsCard
+              title={t("analytics.totalCategories")}
+              value={formatQuantityValue(analytics.summary.totalCategories)}
+              icon={TableProperties}
+              tone="default"
+            >
+              <div className="mt-2 space-y-1 text-xs text-secondary-500">
                 <p className="flex items-center justify-between gap-3">
                   <span>{t("analytics.categorizedCategories")}</span>
                   <span className="font-medium text-ink">
@@ -1313,40 +1315,36 @@ function ExpenseCategoryAnalyticsSection({
                   </span>
                 </p>
               </div>
-            </div>
+            </StatsCard>
 
-            <div className="card">
-              <p className="text-xs uppercase text-secondary-400">
-                {t("analytics.categorizedAmount")}
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-ink">
-                {formatMoney(analytics.summary.categorizedAmount)}
-              </p>
-              <p className="mt-3 text-xs text-secondary-500">
-                {t("analytics.shareOfTotal")}:{" "}
-                {formatPercentValue(
-                  analytics.summary.categorizedAmount > 0 &&
-                    analytics.summary.categorizedAmount +
-                      analytics.summary.uncategorizedAmount >
-                      0
-                    ? analytics.summary.categorizedAmount /
-                        (analytics.summary.categorizedAmount +
-                          analytics.summary.uncategorizedAmount)
-                    : 0,
-                )}
-              </p>
-            </div>
+            <StatsCard
+              title={t("analytics.categorizedAmount")}
+              value={formatMoney(analytics.summary.categorizedAmount)}
+              icon={PieIcon}
+              tone="success"
+              hint={`${t("analytics.shareOfTotal")}: ${formatPercentValue(
+                analytics.summary.categorizedAmount > 0 &&
+                  analytics.summary.categorizedAmount +
+                    analytics.summary.uncategorizedAmount >
+                    0
+                  ? analytics.summary.categorizedAmount /
+                      (analytics.summary.categorizedAmount +
+                        analytics.summary.uncategorizedAmount)
+                  : 0,
+              )}`}
+            />
 
-            <div className="card">
-              <p className="text-xs uppercase text-secondary-400">
-                {t("analytics.topCategory")}
-              </p>
-              <p className="mt-2 text-lg font-semibold text-ink">
-                {topCategory
+            <StatsCard
+              title={t("analytics.topCategory")}
+              value={
+                topCategory
                   ? resolveExpenseCategoryName(topCategory, t)
-                  : t("common.notAvailable")}
-              </p>
-              <div className="mt-3 space-y-1 text-xs text-secondary-500">
+                  : t("common.notAvailable")
+              }
+              icon={BarChart2}
+              tone="default"
+            >
+              <div className="mt-2 space-y-1 text-xs text-secondary-500">
                 <p className="flex items-center justify-between gap-3">
                   <span>{t("common.total")}</span>
                   <span className="font-medium text-ink">
@@ -1360,7 +1358,7 @@ function ExpenseCategoryAnalyticsSection({
                   </span>
                 </p>
               </div>
-            </div>
+            </StatsCard>
           </div>
 
           {hasUncategorizedAmount ? (
@@ -2571,10 +2569,6 @@ export default function Reports() {
     ],
   );
 
-  const profitLossValueClass = metricToneClasses(
-    "net",
-    profitLoss.summary.profitLoss.amount,
-  );
   const isBusy = analyticsLoading || analyticsRefreshing;
   const isLedgerBusy = ledgerLoading || ledgerRefreshing;
 
@@ -2684,14 +2678,13 @@ export default function Reports() {
 
           <ReportResultsShell loading={isBusy} t={t} className="space-y-8">
           {/* Core Stat Cards */}
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="card border border-primary-50 bg-gradient-to-br from-white to-primary-50/10">
-              <p className="text-xs uppercase text-secondary-400 font-semibold tracking-wider">
-                {t("analytics.salesAndServices")}
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-ink">
-                {formatMoney(summary.totals.sales.total)}
-              </p>
+          <div className={STATS_GRID_CLASS}>
+            <StatsCard
+              title={t("analytics.salesAndServices")}
+              value={formatMoney(summary.totals.sales.total)}
+              icon={TrendingUp}
+              tone="success"
+            >
               {renderSummaryLines([
                 {
                   label: t("analytics.directSales"),
@@ -2704,14 +2697,13 @@ export default function Reports() {
                   tone: "info",
                 },
               ])}
-            </div>
-            <div className="card">
-              <p className="text-xs uppercase text-secondary-400 font-semibold tracking-wider">
-                {t("analytics.purchaseSpend")}
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-ink">
-                {formatMoney(summary.totals.purchases.total)}
-              </p>
+            </StatsCard>
+            <StatsCard
+              title={t("analytics.purchaseSpend")}
+              value={formatMoney(summary.totals.purchases.total)}
+              icon={ShoppingCart}
+              tone="default"
+            >
               {renderSummaryLines([
                 {
                   label: t("analytics.paid"),
@@ -2724,14 +2716,13 @@ export default function Reports() {
                   tone: "danger",
                 },
               ])}
-            </div>
-            <div className="card">
-              <p className="text-xs uppercase text-secondary-400 font-semibold tracking-wider">
-                {t("analytics.expenses")}
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-ink">
-                {formatMoney(summary.totals.expenses.total)}
-              </p>
+            </StatsCard>
+            <StatsCard
+              title={t("analytics.expenses")}
+              value={formatMoney(summary.totals.expenses.total)}
+              icon={Wallet}
+              tone="info"
+            >
               {renderSummaryLines([
                 {
                   label: t("analytics.paid"),
@@ -2744,14 +2735,19 @@ export default function Reports() {
                   tone: "danger",
                 },
               ])}
-            </div>
-            <div className="card">
-              <p className="text-xs uppercase text-secondary-400 font-semibold tracking-wider">
-                {t("analytics.profitLoss")}
-              </p>
-              <p className={`mt-2 text-2xl font-semibold ${profitLossValueClass}`}>
-                {formatMoney(profitLoss.summary.profitLoss.amount)}
-              </p>
+            </StatsCard>
+            <StatsCard
+              title={t("analytics.profitLoss")}
+              value={formatMoney(profitLoss.summary.profitLoss.amount)}
+              icon={BarChart2}
+              tone={
+                Number(profitLoss.summary.profitLoss.amount) < 0
+                  ? "danger"
+                  : Number(profitLoss.summary.profitLoss.amount) > 0
+                    ? "success"
+                    : "default"
+              }
+            >
               {renderSummaryLines([
                 {
                   label: t("analytics.salesAndServices"),
@@ -2764,7 +2760,7 @@ export default function Reports() {
                   tone: "warning",
                 },
               ])}
-            </div>
+            </StatsCard>
           </div>
 
           {/* Charts Row */}
@@ -3061,30 +3057,24 @@ export default function Reports() {
 
               <ReportResultsShell loading={isLedgerBusy} t={t} className="space-y-6">
               {/* Stats summary cards */}
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {summaryCards.map((card) => {
-                  const Icon = card.icon;
-                  return (
-                    <div
-                      key={card.key}
-                      className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/50"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.2em] text-secondary-400">
-                            {card.label}
-                          </p>
-                          <p className={`mt-3 text-lg font-semibold ${card.valueClassName}`}>
-                            {card.value}
-                          </p>
-                        </div>
-                        <span className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${card.accentClassName}`}>
-                          <Icon size={18} />
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className={STATS_GRID_CLASS}>
+                {summaryCards.map((card) => (
+                  <StatsCard
+                    key={card.key}
+                    title={card.label}
+                    value={card.value}
+                    icon={card.icon}
+                    tone={
+                      card.key === 'debit'
+                        ? 'danger'
+                        : card.key === 'credit'
+                          ? 'success'
+                          : card.key === 'balance'
+                            ? 'default'
+                            : 'info'
+                    }
+                  />
+                ))}
               </div>
 
               {/* Transactions Table */}
@@ -3407,76 +3397,44 @@ export default function Reports() {
             </button>
           </div>
 
-          {/* Cafe KPI Metrics Row */}
-          {cafeSalesLoading ? (
-            <div className="grid gap-4 md:grid-cols-5">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <div key={n} className="card h-28 bg-mist animate-pulse border border-secondary-100" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-5">
-              <div className="card bg-gradient-to-br from-white to-primary-50/5 p-5 border border-secondary-100 shadow-sm relative overflow-hidden group hover:shadow transition">
-                <p className="text-[10px] uppercase text-secondary-400 font-bold tracking-wider">
-                  {t("analytics.totalSalesRevenue") || "Total Sales Revenue"}
-                </p>
-                <p className="mt-2 text-2xl font-black text-primary">
-                  {formatMoney(cafeStats.totalSales)}
-                </p>
-                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-primary-50/20 text-primary flex items-center justify-center">
-                  <TrendingUp size={16} />
-                </div>
-              </div>
-
-              <div className="card bg-white p-5 border border-secondary-100 shadow-sm relative overflow-hidden group hover:shadow transition">
-                <p className="text-[10px] uppercase text-secondary-400 font-bold tracking-wider">
-                  {t("analytics.totalOrders") || "Total Orders"}
-                </p>
-                <p className="mt-2 text-2xl font-black text-ink">
-                  {cafeStats.orderCount}
-                </p>
-                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-mist text-secondary-500 flex items-center justify-center">
-                  <Users size={16} />
-                </div>
-              </div>
-
-              <div className="card bg-white p-5 border border-secondary-100 shadow-sm relative overflow-hidden group hover:shadow transition">
-                <p className="text-[10px] uppercase text-secondary-400 font-bold tracking-wider">
-                  {t("analytics.avgTicketSize") || "Average Ticket Size"}
-                </p>
-                <p className="mt-2 text-2xl font-black text-ink">
-                  {formatMoney(cafeStats.avgOrderValue)}
-                </p>
-                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-mist text-secondary-500 flex items-center justify-center">
-                  <WalletCards size={16} />
-                </div>
-              </div>
-
-              <div className="card bg-white p-5 border border-secondary-100 shadow-sm relative overflow-hidden group hover:shadow transition">
-                <p className="text-[10px] uppercase text-secondary-400 font-bold tracking-wider">
-                  {t("analytics.openBills") || "Open Bills (Unpaid)"}
-                </p>
-                <p className="mt-2 text-2xl font-black text-rose-600">
-                  {formatMoney(cafeStats.dueSales)}
-                </p>
-                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center text-xs font-bold">
-                  {cafeStats.dueCount}
-                </div>
-              </div>
-
-              <div className="card bg-white p-5 border border-secondary-100 shadow-sm relative overflow-hidden group hover:shadow transition">
-                <p className="text-[10px] uppercase text-secondary-400 font-bold tracking-wider">
-                  {t("analytics.totalDiscount") || "Total Discount"}
-                </p>
-                <p className="mt-2 text-2xl font-black text-rose-600">
-                  {formatMoney(cafeStats.totalDiscount)}
-                </p>
-                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
-                  <TrendingUp size={16} className="rotate-180" />
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5 lg:gap-4">
+            <StatsCard
+              title={t("analytics.totalSalesRevenue") || "Total Sales Revenue"}
+              value={formatMoney(cafeStats.totalSales)}
+              icon={TrendingUp}
+              tone="success"
+              loading={cafeSalesLoading}
+            />
+            <StatsCard
+              title={t("analytics.totalOrders") || "Total Orders"}
+              value={cafeStats.orderCount}
+              icon={Users}
+              tone="default"
+              loading={cafeSalesLoading}
+            />
+            <StatsCard
+              title={t("analytics.avgTicketSize") || "Average Ticket Size"}
+              value={formatMoney(cafeStats.avgOrderValue)}
+              icon={WalletCards}
+              tone="info"
+              loading={cafeSalesLoading}
+            />
+            <StatsCard
+              title={t("analytics.openBills") || "Open Bills (Unpaid)"}
+              value={formatMoney(cafeStats.dueSales)}
+              hint={`${cafeStats.dueCount} ${t("parties.unpaid") || "unpaid"}`}
+              icon={ScrollText}
+              tone="danger"
+              loading={cafeSalesLoading}
+            />
+            <StatsCard
+              title={t("analytics.totalDiscount") || "Total Discount"}
+              value={formatMoney(cafeStats.totalDiscount)}
+              icon={TrendingDown}
+              tone="danger"
+              loading={cafeSalesLoading}
+            />
+          </div>
 
           {/* Cafe Visual Insights Grid */}
           <div className="grid gap-6 xl:grid-cols-2">

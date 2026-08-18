@@ -22,7 +22,7 @@ import FlexibleDateInput from './FlexibleDateInput.jsx';
 import { Dialog } from './ui/Dialog.tsx';
 import TeamSeatUsagePanel from './subscription/TeamSeatUsagePanel.jsx';
 import { api, invalidateApiCache } from '../lib/api';
-import StatsCard from './StatsCard.jsx';
+import StatsCard, { STATS_GRID_CLASS } from './StatsCard.jsx';
 import PageHeader from './PageHeader';
 import {
   applyPermissionChange,
@@ -1019,7 +1019,7 @@ export default function StaffManagement({ businessId }) {
         }
       />
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className={STATS_GRID_CLASS}>
         <StatsCard
           title={t('staffManagement.summary.totalUsers')}
           value={staffOverview.totalUsers}
@@ -1483,7 +1483,7 @@ function SalaryAdvanceDialog({ isOpen, member, t, onClose }) {
       <div className="space-y-6">
         {error ? <Notice title={error} tone="error" /> : null}
 
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className={STATS_GRID_CLASS}>
           <StatsCard
             title={t('staffManagement.salaryRecords.totalSalary')}
             value={t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.monthlySalary.toFixed(2) })}

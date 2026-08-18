@@ -27,7 +27,7 @@ import dayjs, { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useSaleStore } from '../stores/sales';
 import { useProductStore } from '../stores/products';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
-import StatsCard from '../components/StatsCard.jsx';
+import StatsCard, { STATS_GRID_CLASS } from '../components/StatsCard.jsx';
 import RefreshButton from '../components/RefreshButton.jsx';
 import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
 import DateDisplay from '../components/DateDisplay.jsx';
@@ -977,7 +977,7 @@ export default function Sales() {
           </div>
         </div>
 
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className={STATS_GRID_CLASS}>
           <StatsCard
             title={t('sales.totalRevenue') || 'Total Revenue'}
             value={money(stats?.totalAmount ?? 0)}
