@@ -30,10 +30,12 @@ import {
   enforcePermissionDependencies,
   getPermissionKeyForFeature,
   getStaffPermissionUiFeatures,
+  groupStaffPermissionUiFeatures,
   hasInventoryDependentAccess,
 } from '../lib/accessControl';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useAuth } from '../lib/auth';
+import { useBusinessSettings } from '../lib/businessSettings';
 import { useI18n } from '../lib/i18n.jsx';
 import {
   EMPTY_STAFF_SUMMARY,
@@ -210,12 +212,21 @@ function StaffFormDialog({
   t,
 }) {
   const [activeTab, setActiveTab] = useState('general');
+  const { businessProfile } = useBusinessSettings();
   const isCreate = mode === 'create';
   const readOnly = mode === 'view';
   const levels = meta.accessLevels;
+  const includeCafeModules = businessProfile?.modules?.orders === true
+    || businessProfile?.type === 'cafe'
+    || businessProfile?.type === 'hospitality'
+    || Boolean(businessProfile?.settings?.enabledModules?.includes('tables'));
   const visibleFeatures = useMemo(
-    () => getStaffPermissionUiFeatures(meta.features),
-    [meta.features]
+    () => getStaffPermissionUiFeatures(meta.features, { includeCafeModules }),
+    [meta.features, includeCafeModules]
+  );
+  const permissionGroups = useMemo(
+    () => groupStaffPermissionUiFeatures(visibleFeatures),
+    [visibleFeatures]
   );
   const inventoryRequired = hasInventoryDependentAccess(form.permissions);
   const isDetailsStep = activeTab === 'general';
@@ -575,39 +586,60 @@ function StaffFormDialog({
                         <p className="mt-1 text-xs opacity-80">{t('staffManagement.permissionDependencyHint')}</p>
                       </div>
 
-                      <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                        {visibleFeatures.map((feature) => {
-                          const permissionKey = getPermissionKeyForFeature(feature.key) || feature.key;
-                          const isInventory = permissionKey === 'inventory';
-                          const featureLabel = permissionKey === 'reports'
-                            ? t('staffManagement.permissionFeatures.reports')
-                            : feature.label;
-
-                          return (
-                            <div key={permissionKey} className="rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
-                              <div className="flex h-full flex-col gap-4">
-                                <div className="min-w-0">
-                                  <p className="font-medium text-ink">{featureLabel}</p>
-                                  <p className="mt-1 text-xs leading-5 text-secondary-500">
-                                    {isInventory && inventoryRequired
-                                      ? t('staffManagement.permissionInventoryRequiredHint')
-                                      : feature.description || t('staffManagement.permissionDescriptionFallback')}
-                                  </p>
-                                </div>
-                                <div className="w-full">
-                                  <PermissionSelector
-                                    value={form.permissions[permissionKey] || 'none'}
-                                    levels={levels}
-                                    disabled={readOnly}
-                                    hideLevels={isInventory && inventoryRequired ? ['none'] : []}
-                                    onChange={(value) => onPermissionChange(permissionKey, value)}
-                                    t={t}
-                                  />
-                                </div>
-                              </div>
+                      <div className="mt-5 space-y-6">
+                        {permissionGroups.map((group) => (
+                          <div key={group.id} className="space-y-3">
+                            <div>
+                              <h4 className="text-sm font-semibold text-ink">
+                                {t(`staffManagement.permissionGroups.${group.id}`) || group.id}
+                              </h4>
+                            {(() => {
+                              const hintKey = `staffManagement.permissionGroupHints.${group.id}`;
+                              const hint = t(hintKey);
+                              return hint && hint !== hintKey ? (
+                                <p className="mt-1 text-xs text-secondary-500">{hint}</p>
+                              ) : null;
+                            })()}
                             </div>
-                          );
-                        })}
+                            <div className="grid gap-4 xl:grid-cols-2">
+                              {group.features.map((feature) => {
+                                const permissionKey = getPermissionKeyForFeature(feature.key) || feature.key;
+                                const isInventory = permissionKey === 'inventory';
+                                const labelKey = `staffManagement.permissionFeatures.${permissionKey}`;
+                                const translatedLabel = t(labelKey);
+                                const featureLabel = translatedLabel !== labelKey ? translatedLabel : feature.label;
+                                const hintKey = `staffManagement.permissionFeatureHints.${permissionKey}`;
+                                const translatedHint = t(hintKey);
+                                const featureHint = isInventory && inventoryRequired
+                                  ? t('staffManagement.permissionInventoryRequiredHint')
+                                  : (translatedHint !== hintKey ? translatedHint : (feature.description || t('staffManagement.permissionDescriptionFallback')));
+
+                                return (
+                                  <div key={permissionKey} className="rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
+                                    <div className="flex h-full flex-col gap-4">
+                                      <div className="min-w-0">
+                                        <p className="font-medium text-ink">{featureLabel}</p>
+                                        <p className="mt-1 text-xs leading-5 text-secondary-500">
+                                          {featureHint}
+                                        </p>
+                                      </div>
+                                      <div className="w-full">
+                                        <PermissionSelector
+                                          value={form.permissions[permissionKey] || 'none'}
+                                          levels={levels}
+                                          disabled={readOnly}
+                                          hideLevels={isInventory && inventoryRequired ? ['none'] : []}
+                                          onChange={(value) => onPermissionChange(permissionKey, value)}
+                                          t={t}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -1173,7 +1205,7 @@ export default function StaffManagement({ businessId }) {
               {/* Desktop table */}
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[980px] text-sm">
-                  <thead className="text-left text-xs uppercase tracking-[0.18em] text-secondary-400">
+                  <thead className="text-left text-xs uppercase tracking-[0.18em] text-ink">
                     <tr>
                       <th className="py-2 pr-4">{t('staffManagement.employee', 'Employee')}</th>
                       <th className="py-2 pr-4">{t('staffManagement.contact', 'Contact')}</th>
@@ -1562,7 +1594,7 @@ function SalaryAdvanceDialog({ isOpen, member, t, onClose }) {
           ) : (
             <div className="overflow-x-auto rounded-2xl border border-secondary-200/60 dark:border-slate-800/60">
               <table className="w-full text-sm text-secondary-700">
-                <thead className="border-b border-secondary-200/60 bg-mist text-left text-[10px] uppercase tracking-[0.18em] text-secondary-400 dark:border-slate-800/60 dark:bg-slate-900/40">
+                <thead className="border-b border-secondary-200/60 bg-mist text-left text-[10px] uppercase tracking-[0.18em] text-ink dark:border-slate-800/60 dark:bg-slate-900/40">
                   <tr>
                     <th className="p-3">{t('staffManagement.salaryRecords.date')}</th>
                     <th className="p-3">{t('staffManagement.salaryRecords.monthYear')}</th>

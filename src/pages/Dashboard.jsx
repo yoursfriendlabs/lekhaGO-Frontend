@@ -378,14 +378,20 @@ export default function Dashboard() {
               <Package size={18} className="text-secondary-400" />
             </div>
             <div id="quick-actions" className="mt-4 grid gap-2 sm:grid-cols-2">
-              <Link id='quick-sale'  className="btn-primary w-full justify-center" to={businessProfile?.salesFlow?.route || '/app/pos'}>{t('dashboard.quickSale')}</Link>
-              <Link id='new-purchase' className="btn-ghost w-full justify-center" to="/app/purchases?create=1&entry=expense">{t('dashboard.newPurchase')}</Link>
+              {canViewFeature('quickPos') || canViewFeature('sales') ? (
+                <Link id='quick-sale' className="btn-primary w-full justify-center" to={canViewFeature('quickPos') ? (businessProfile?.salesFlow?.route || '/app/pos') : '/app/sales'}>{t('dashboard.quickSale')}</Link>
+              ) : null}
+              {canViewFeature('purchases') ? (
+                <Link id='new-purchase' className="btn-ghost w-full justify-center" to="/app/purchases?create=1&entry=expense">{t('dashboard.newPurchase')}</Link>
+              ) : null}
               {tasksEnabled ? (
                 <Link className="btn-ghost w-full justify-center" to={canManageTasks ? '/app/tasks?create=1' : '/app/tasks'}>
                   {canManageTasks ? t('tasks.actions.newTask') : t('tasks.notifications.viewAll')}
                 </Link>
               ) : null}
-              <Link id='manage-banks' className="btn-ghost w-full justify-center" to="/app/banks">{t('dashboard.manageBanks')}</Link>
+              {canViewFeature('banks') ? (
+                <Link id='manage-banks' className="btn-ghost w-full justify-center" to="/app/banks">{t('dashboard.manageBanks')}</Link>
+              ) : null}
             </div>
           </div>
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Dialog } from './ui/Dialog.tsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
+import { useAuth } from '../lib/auth';
 import DateDisplay from './DateDisplay.jsx';
 import { formatDateBoth } from '../lib/nepaliDate.js';
 import { History, Layers, Package, Pencil, Plus } from 'lucide-react';
@@ -69,6 +70,8 @@ export default function ProductDetailDialog({
   onRestock,
 }) {
   const { t } = useI18n();
+  const { canViewFeature } = useAuth();
+  const canViewPurchasePrice = canViewFeature('purchasePrice');
   const [tab, setTab] = useState(initialTab);
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -239,9 +242,11 @@ export default function ProductDetailDialog({
             <DetailRow label={t('products.salePrice')}>
               {t('currency.formatted', { symbol: t('currency.symbol'), amount: salePrice.toFixed(2) })}
             </DetailRow>
-            <DetailRow label={t('products.purchasePrice')}>
-              {t('currency.formatted', { symbol: t('currency.symbol'), amount: purchasePrice.toFixed(2) })}
-            </DetailRow>
+            {canViewPurchasePrice ? (
+              <DetailRow label={t('products.purchasePrice')}>
+                {t('currency.formatted', { symbol: t('currency.symbol'), amount: purchasePrice.toFixed(2) })}
+              </DetailRow>
+            ) : null}
             <DetailRow label={t('inventory.quantity')}>
               {formatQuantity(stock)}{unitLabel ? ` ${unitLabel}` : ''}
             </DetailRow>
@@ -344,7 +349,7 @@ export default function ProductDetailDialog({
                 {/* Desktop history table */}
                 <div className="hidden overflow-x-auto md:block">
                   <table className="w-full text-sm text-secondary-700">
-                    <thead className="text-xs uppercase text-secondary-400">
+                    <thead className="text-xs uppercase text-ink">
                       <tr className="border-b border-secondary-100 dark:border-slate-800">
                         <th className="py-2 text-left font-medium">{t('common.date') || 'Date'}</th>
                         <th className="py-2 text-left font-medium">{t('inventory.detail.action') || 'Action'}</th>

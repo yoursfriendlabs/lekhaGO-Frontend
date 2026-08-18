@@ -201,7 +201,9 @@ export default function QuickPos() {
 
   const { t } = useI18n();
   const { showError } = useSnackbar();
-  const { businessId, user } = useAuth();
+  const { businessId, user, canViewFeature, canManageFeature } = useAuth();
+  const canViewSales = canViewFeature("sales");
+  const canManageInventory = canManageFeature("inventory");
   const { businessProfile } = useBusinessSettings();
   const isTablesEnabled = useMemo(() => {
     return businessProfile?.settings?.enabledModules?.includes("tables");
@@ -1460,12 +1462,14 @@ return (
                   ← {queryRef === "orders" ? "Seating Map" : "Billing Counter"}
                 </button>
               )}
-              <Link
-                className="btn-ghost h-11 justify-center rounded-[18px]"
-                to="/app/sales"
-              >
-                {t("quickPos.detailedSales")}
-              </Link>
+              {canViewSales ? (
+                <Link
+                  className="btn-ghost h-11 justify-center rounded-[18px]"
+                  to="/app/sales"
+                >
+                  {t("quickPos.detailedSales")}
+                </Link>
+              ) : null}
             </div>
           }
         />
@@ -1722,12 +1726,14 @@ return (
               </button>
             )}
 
-            <Link
-              className="btn-ghost h-11 justify-center rounded-[18px]"
-              to="/app/sales"
-            >
-              {t("quickPos.detailedSales")}
-            </Link>
+            {canViewSales ? (
+              <Link
+                className="btn-ghost h-11 justify-center rounded-[18px]"
+                to="/app/sales"
+              >
+                {t("quickPos.detailedSales")}
+              </Link>
+            ) : null}
           </div>
         }
       />
@@ -1833,12 +1839,14 @@ return (
                       ))}
                     </select>
                   )}
-                  <Link
-                    className="btn-secondary h-12 justify-center rounded-2xl text-xs font-bold px-4 shrink-0"
-                    to="/app/inventory"
-                  >
-                    + {t("quickPos.addNewItem")}
-                  </Link>
+                  {canManageInventory ? (
+                    <Link
+                      className="btn-secondary h-12 justify-center rounded-2xl text-xs font-bold px-4 shrink-0"
+                      to="/app/inventory"
+                    >
+                      + {t("quickPos.addNewItem")}
+                    </Link>
+                  ) : null}
                 </div>
               </div>
 

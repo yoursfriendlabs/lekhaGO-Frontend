@@ -70,7 +70,7 @@ function RoleGuard({ children, allowedRoles = OWNER_AND_STAFF_ROLES, redirectTo 
   return children;
 }
 
-export function SubscriptionFeatureRoute({ children, featureKey, redirectTo = buildSettingsTabPath(SUBSCRIPTION_SETTINGS_TAB) }) {
+export function SubscriptionFeatureRoute({ children, featureKey, featureKeys, redirectTo = buildSettingsTabPath(SUBSCRIPTION_SETTINGS_TAB) }) {
   const location = useLocation();
   const {
     accessControl,
@@ -80,14 +80,18 @@ export function SubscriptionFeatureRoute({ children, featureKey, redirectTo = bu
     subscription,
   } = useAuth();
   const { t } = useI18n();
+  const keys = featureKeys || (featureKey ? [featureKey] : []);
 
-  if (canViewFeature(featureKey)) {
+  if (keys.some((key) => canViewFeature(key))) {
     return children;
   }
 
-  const permissionLevel = getPermissionAccessLevel(accessControl, featureKey, role);
+  const blockedByPermission = keys.some((key) => {
+    const permissionLevel = getPermissionAccessLevel(accessControl, key, role);
+    return permissionLevel === 'none' && hasSubscriptionFeatureAccess(key);
+  });
 
-  if (permissionLevel === 'none' && hasSubscriptionFeatureAccess(featureKey)) {
+  if (blockedByPermission) {
     return (
       <Navigate
         to="/app"
@@ -95,7 +99,7 @@ export function SubscriptionFeatureRoute({ children, featureKey, redirectTo = bu
         state={{
           notice: {
             title: t('appAccess.permissionRedirectTitle'),
-            description: t('appAccess.permissionRedirectDescription', { feature: humanizeKey(featureKey) }),
+            description: t('appAccess.permissionRedirectDescription', { feature: humanizeKey(keys[0]) }),
             tone: 'warn',
             from: `${location.pathname}${location.search}`,
           },
@@ -114,7 +118,7 @@ export function SubscriptionFeatureRoute({ children, featureKey, redirectTo = bu
     }
     : {
       title: t('settingsPage.subscription.redirectTitle'),
-      description: t('settingsPage.subscription.redirectDescription', { feature: humanizeKey(featureKey) }),
+      description: t('settingsPage.subscription.redirectDescription', { feature: humanizeKey(keys[0]) }),
       tone: 'warn',
       from: `${location.pathname}${location.search}`,
     };
@@ -169,11 +173,11 @@ function LedgerRedirect() {
 function InvoiceAccessRoute({ children }) {
   const { type } = useParams();
   const allowedRoles = OWNER_AND_STAFF_ROLES;
-  const featureKey = type === 'purchases' ? 'purchases' : 'sales';
+  const featureKeys = type === 'purchases' ? ['purchases'] : ['sales', 'quickPos'];
 
   return (
     <RoleGuard allowedRoles={allowedRoles}>
-      <SubscriptionFeatureRoute featureKey={featureKey}>
+      <SubscriptionFeatureRoute featureKeys={featureKeys}>
         {children}
       </SubscriptionFeatureRoute>
     </RoleGuard>
@@ -345,7 +349,7 @@ function AppShell() {
                     )}
                   />
                   <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="sales"><Sales /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="pos" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="sales">{posPageElement}</SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="pos" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="quickPos">{posPageElement}</SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route
                     path="services"
                     element={(
@@ -360,7 +364,7 @@ function AppShell() {
                   />
                   <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="parties"><Parties /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="tables" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="tables"><Tables /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="billing" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="sales"><CashierBilling /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="billing" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKeys={['billing', 'sales', 'quickPos']}><CashierBilling /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route
                     path="tasks"
                     element={(

@@ -42,6 +42,10 @@ describe('access control helpers', () => {
     expect(withSales.sales).toBe('manage');
     expect(withSales.inventory).toBe('view');
 
+    const withQuickPos = applyPermissionChange({}, 'quickPos', 'manage');
+    expect(withQuickPos.quickPos).toBe('manage');
+    expect(withQuickPos.inventory).toBe('view');
+
     const withServices = applyPermissionChange({}, 'services', 'view');
     expect(withServices.services).toBe('view');
     expect(withServices.inventory).toBe('view');
@@ -67,6 +71,7 @@ describe('access control helpers', () => {
 
     expect(next.inventory).toBe('none');
     expect(next.sales).toBe('none');
+    expect(next.quickPos).toBe('none');
     expect(next.services).toBe('none');
     expect(next.purchases).toBe('none');
     expect(next.orders).toBe('none');
@@ -78,6 +83,8 @@ describe('access control helpers', () => {
       { key: 'dashboard', label: 'Dashboard' },
       { key: 'inventory', label: 'Inventory' },
       { key: 'sales', label: 'Sales' },
+      { key: 'quickPos', label: 'Quick POS' },
+      { key: 'purchasePrice', label: 'Purchase price' },
       { key: 'analytics', label: 'Analytics' },
       { key: 'tables', label: 'Tables' },
       { key: 'orders', label: 'Orders' },
@@ -88,11 +95,27 @@ describe('access control helpers', () => {
     const keys = features.map((feature) => feature.key);
     expect(keys).toContain('reports');
     expect(keys).toContain('sales');
+    expect(keys).toContain('quickPos');
+    expect(keys).toContain('purchasePrice');
     expect(keys).not.toContain('analytics');
     expect(keys).not.toContain('tables');
     expect(keys).not.toContain('orders');
     expect(keys).not.toContain('billing');
     expect(keys.filter((key) => key === 'reports')).toHaveLength(1);
+  });
+
+  it('inherits Quick POS from legacy sales manage without exposing purchase price', () => {
+    const accessControl = normalizeAccessControl({
+      role: 'staff',
+      permissions: {
+        sales: 'manage',
+        dashboard: 'view',
+      },
+    });
+
+    expect(getFeatureAccessLevel(accessControl, 'quickPos', 'staff')).toBe('manage');
+    expect(getFeatureAccessLevel(accessControl, 'purchasePrice', 'staff')).toBe('none');
+    expect(getFeatureAccessLevel(accessControl, 'inventory', 'staff')).toBe('view');
   });
 
   it('blocks sales and services access at runtime without inventory view', () => {

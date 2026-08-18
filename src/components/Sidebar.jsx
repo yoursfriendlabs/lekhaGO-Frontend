@@ -3,6 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { getNavigationForBusinessType } from '../lib/businessTypeConfig.js';
+import { expandNavigationForPermissions, getNavItemPermissionKey } from '../lib/accessControl';
 import BrandLogo from './BrandLogo.jsx';
 import UpgradeSubscriptionCta from './subscription/UpgradeSubscriptionCta.jsx';
 
@@ -10,6 +11,7 @@ const NAV_ROLE_MAP = {
   dashboard: ['owner', 'staff', 'admin', 'super_admin'],
   orders: ['owner', 'staff', 'admin', 'super_admin'],
   inventory: ['owner', 'staff', 'admin', 'super_admin'],
+  quickPos: ['owner', 'staff', 'admin', 'super_admin'],
   sales: ['owner', 'staff', 'admin', 'super_admin'],
   services: ['owner', 'staff', 'admin', 'super_admin'],
   purchases: ['owner', 'staff', 'admin', 'super_admin'],
@@ -67,6 +69,10 @@ export default function Sidebar() {
     if (item?.key === 'purchases') return { ...item, label: t('nav.expenses') };
     if (item?.key === 'attendance') return { ...item, label: t('nav.attendance') };
     if (item?.key === 'staff') return { ...item, label: t('nav.staff') };
+    if (item?.key === 'quickPos') return { ...item, label: t('nav.quickPos') || item.label };
+    if (item?.key === 'sales' && String(item?.route || '').includes('/sales')) {
+      return { ...item, label: t('nav.salesInvoices') };
+    }
     return item;
   });
 
@@ -80,9 +86,12 @@ export default function Sidebar() {
       { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
     ];
   } else {
-    visibleNavItems = navigation
-      .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
-      .filter((item) => hasFeatureAccess(item.key));
+    visibleNavItems = expandNavigationForPermissions(navigation, hasFeatureAccess)
+      .filter((item) => {
+        const permissionKey = getNavItemPermissionKey(item);
+        return (NAV_ROLE_MAP[permissionKey] || NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role);
+      })
+      .filter((item) => hasFeatureAccess(getNavItemPermissionKey(item)));
   }
 
   return (

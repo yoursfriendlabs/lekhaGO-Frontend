@@ -66,7 +66,7 @@ const toDateInputValue = (value) => {
   return match ? match[0] : '';
 };
 
-const buildProductPayload = (form) => ({
+const buildProductPayload = (form, { includePurchasePrice = true } = {}) => ({
   name: form.name,
   companyName: String(form.companyName || '').trim() || null,
   sku: form.itemCode.trim(),
@@ -79,7 +79,7 @@ const buildProductPayload = (form) => ({
   secondaryUnit: form.secondaryUnit,
   conversionRate: parseNumber(form.conversionRate),
   salePrice: parseNumber(form.salePrice),
-  purchasePrice: parseNumber(form.purchasePrice),
+  ...(includePurchasePrice ? { purchasePrice: parseNumber(form.purchasePrice) } : {}),
   secondarySalePrice: parseNumber(form.secondarySalePrice),
   mrpPrice: parseNumber(form.mrpPrice),
   wholesalePrice: parseNumber(form.wholesalePrice),
@@ -226,9 +226,11 @@ function getItemTypeLabel(itemType, itemTypeOptions, t) {
 
 export default function Inventory() {
   const { t } = useI18n();
-  const { canManageFeature, businessId } = useAuth();
+  const { canManageFeature, canViewFeature, businessId } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const canManageInventory = canManageFeature('inventory');
+  const canViewPurchasePrice = canViewFeature('purchasePrice');
+  const canManagePurchasePrice = canManageFeature('purchasePrice');
   // Selecting only what this page renders. Subscribing to the whole store also
   // subscribed to its internal `lists` cache, so every fetch for any query
   // re-rendered the entire page.
@@ -280,6 +282,12 @@ export default function Inventory() {
   const [sortKey, setSortKey] = useState('name');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  useEffect(() => {
+    if (!canViewPurchasePrice && sortKey === 'purchasePrice') {
+      setSortKey('name');
+    }
+  }, [canViewPurchasePrice, sortKey]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -835,7 +843,7 @@ export default function Inventory() {
     setStatus({ type: 'info', message: '' });
 
     try {
-      const payload = buildProductPayload(form);
+      const payload = buildProductPayload(form, { includePurchasePrice: canManagePurchasePrice });
       const optimisticCategory = selectedCategory
         ? {
           id: selectedCategory.id,
@@ -1118,7 +1126,9 @@ export default function Inventory() {
             <option value="name">{t('inventory.sortByName') || 'Sort by Name'}</option>
             <option value="quantity">{t('inventory.sortByQuantity') || 'Sort by Stock'}</option>
             <option value="salePrice">{t('inventory.sortBySalePrice') || 'Sort by Sale Price'}</option>
-            <option value="purchasePrice">{t('inventory.sortByPurchasePrice') || 'Sort by Purchase Price'}</option>
+            {canViewPurchasePrice ? (
+              <option value="purchasePrice">{t('inventory.sortByPurchasePrice') || 'Sort by Purchase Price'}</option>
+            ) : null}
             <option value="expiryDate">{t('inventory.sortByExpiryDate') || 'Sort by Expiry Date'}</option>
           </select>
         </div>
@@ -1200,7 +1210,9 @@ export default function Inventory() {
                 )}
                 <div className="mt-2.5 flex items-center justify-between gap-2 text-xs text-secondary-500 border-t border-secondary-100 pt-2.5 dark:border-slate-800">
                   <span className="min-w-0 truncate">{t('products.salePrice')}: <strong className="text-ink-light dark:text-secondary-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.salePrice.toFixed(2) })}</strong></span>
-                  <span className="min-w-0 truncate text-right">{t('products.purchasePrice')}: <strong className="text-ink-light dark:text-secondary-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.purchasePrice.toFixed(2) })}</strong></span>
+                  {canViewPurchasePrice ? (
+                    <span className="min-w-0 truncate text-right">{t('products.purchasePrice')}: <strong className="text-ink-light dark:text-secondary-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(item.purchasePrice || 0).toFixed(2) })}</strong></span>
+                  ) : null}
                 </div>
                 <div className="mt-2.5 flex items-center gap-2 border-t border-secondary-100 pt-2.5 dark:border-slate-800">
                   <button
@@ -1265,7 +1277,7 @@ export default function Inventory() {
         {/* Desktop table */}
         <div id="inventory-desktop-table" className="mt-4 overflow-x-auto hidden md:block">
           <table className="w-full text-sm text-secondary-700">
-            <thead className="text-xs uppercase text-secondary-400">
+            <thead className="text-xs uppercase text-ink">
               <tr>
                 <th className="py-2 text-left">{t('inventory.itemName')}</th>
                 <th className="py-2 text-left">{t('inventory.brand')}</th>
@@ -1273,7 +1285,9 @@ export default function Inventory() {
                 <th className="py-2 text-left">{t('inventory.itemCode')}</th>
                 <th className="py-2 text-left">{t('inventory.expiryDate') || 'Expiry Date'}</th>
                 <th className="py-2 text-right">{t('products.salePrice')}</th>
-                <th className="py-2 text-right">{t('products.purchasePrice')}</th>
+                {canViewPurchasePrice ? (
+                  <th className="py-2 text-right">{t('products.purchasePrice')}</th>
+                ) : null}
                 <th className="py-2 text-right">{t('inventory.quantity')}</th>
                 <th className="py-2 text-right">{t('common.actions')}</th>
               </tr>
@@ -1281,11 +1295,11 @@ export default function Inventory() {
             <tbody>
               {productsLoading && products.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-3 text-secondary-500">{t('common.loading')}</td>
+                  <td colSpan={canViewPurchasePrice ? 10 : 9} className="py-3 text-secondary-500">{t('common.loading')}</td>
                 </tr>
               ) : pagedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-3 text-secondary-500">{t('inventory.noItems')}</td>
+                  <td colSpan={canViewPurchasePrice ? 10 : 9} className="py-3 text-secondary-500">{t('inventory.noItems')}</td>
                 </tr>
               ) : (
                 pagedItems.map((item) => (
@@ -1343,9 +1357,11 @@ export default function Inventory() {
                     <td className="py-3 text-right">
                       {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.salePrice.toFixed(2) })}
                     </td>
-                    <td className="py-3 text-right">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.purchasePrice.toFixed(2) })}
-                    </td>
+                    {canViewPurchasePrice ? (
+                      <td className="py-3 text-right">
+                        {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(item.purchasePrice || 0).toFixed(2) })}
+                      </td>
+                    ) : null}
                     <td className="py-3 text-right">
                       {item.quantity.toFixed(2)} {item.unit || ''}
                     </td>
@@ -1920,10 +1936,22 @@ export default function Inventory() {
                   <label className="label">{t('products.salePrice')}</label>
                   <input id="inventory-sale-price" className="input mt-1" name="salePrice" type="number" step="0.1" value={form.salePrice} onChange={handleFormChange} />
                 </div>
-                <div>
-                  <label className="label">{t('products.purchasePrice')}</label>
-                  <input id="inventory-purchase-price" className="input mt-1" name="purchasePrice" type="number" step="0.1" value={form.purchasePrice} onChange={handleFormChange} />
-                </div>
+                {canViewPurchasePrice ? (
+                  <div>
+                    <label className="label">{t('products.purchasePrice')}</label>
+                    <input
+                      id="inventory-purchase-price"
+                      className="input mt-1"
+                      name="purchasePrice"
+                      type="number"
+                      step="0.1"
+                      value={form.purchasePrice}
+                      onChange={handleFormChange}
+                      readOnly={!canManagePurchasePrice}
+                      disabled={!canManagePurchasePrice}
+                    />
+                  </div>
+                ) : null}
                 <div>
                   <label className="label">{t('inventory.mrpPrice')}</label>
                   <input id="inventory-mrp-price" className="input mt-1" name="mrpPrice" type="number" step="0.1" value={form.mrpPrice} onChange={handleFormChange} />
