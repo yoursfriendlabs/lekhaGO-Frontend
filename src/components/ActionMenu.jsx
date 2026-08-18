@@ -89,7 +89,7 @@ export default function ActionMenu({
     open && menuStyle ? (
       <div
         ref={dropdownRef}
-        className="fixed w-44 rounded-xl border border-slate-200 bg-white py-1 text-left shadow-xl shadow-slate-900/15 dark:border-slate-800 dark:bg-slate-950 z-[9999]"
+        className="fixed w-44 rounded-xl border border-secondary-200 bg-white py-1 text-left shadow-xl shadow-slate-900/15 dark:border-slate-800 dark:bg-slate-950 z-[9999]"
         style={menuStyle}
       >
         {enabledActions.map((action) => {
@@ -101,7 +101,7 @@ export default function ActionMenu({
           const tone =
             action.tone === 'danger'
               ? 'text-rose-600 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40'
-              : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-900';
+              : 'text-ink-light hover:bg-mist dark:text-slate-200 dark:hover:bg-slate-900';
 
           const className = `${base} ${tone}`;
 
@@ -148,7 +148,7 @@ export default function ActionMenu({
       <button
         ref={buttonRef}
         type="button"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-secondary-500 transition hover:bg-secondary-100 hover:text-ink-light dark:hover:bg-slate-800"
         title={label}
         aria-haspopup="menu"
         aria-expanded={open}

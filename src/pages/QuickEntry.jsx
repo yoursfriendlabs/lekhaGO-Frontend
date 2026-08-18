@@ -298,9 +298,9 @@ export default function QuickEntry() {
       {!isInstantForm ? (
         <div className="rounded-[32px] border border-secondary-200/70 bg-white/90 p-6 shadow-sm">
           <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">{t('quickEntry.fastRoute')}</p>
-            <h3 className="mt-3 font-serif text-3xl text-slate-900">{launcherCard.title}</h3>
-            <p className="mt-3 text-base leading-7 text-slate-600">{launcherCard.description}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-secondary-400">{t('quickEntry.fastRoute')}</p>
+            <h3 className="mt-3 font-serif text-3xl text-ink">{launcherCard.title}</h3>
+            <p className="mt-3 text-base leading-7 text-secondary-700">{launcherCard.description}</p>
           </div>
 
           <div className="mt-6 grid gap-3 md:grid-cols-2">
@@ -319,8 +319,8 @@ export default function QuickEntry() {
               <div className="rounded-[32px] border border-secondary-200/70 bg-white/90 p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t('quickEntry.category')}</p>
-                    <p className="mt-1 text-sm text-slate-500">{t('quickEntry.categoryHelper')}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-secondary-400">{t('quickEntry.category')}</p>
+                    <p className="mt-1 text-sm text-secondary-500">{t('quickEntry.categoryHelper')}</p>
                   </div>
                   <div className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
                     {selectedCategoryLabel || t('quickEntry.chooseCategory')}
@@ -341,7 +341,7 @@ export default function QuickEntry() {
                         className={`rounded-[20px] border px-3 py-3 text-left text-sm font-semibold transition ${
                           isActive
                             ? 'border-primary-300 bg-primary-50 text-primary-800 shadow-sm'
-                            : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-primary-200 hover:bg-primary-50/40'
+                            : 'border-secondary-200 bg-mist text-ink-light hover:border-primary-200 hover:bg-primary-50/40'
                         }`}
                       >
                         {category.label}
@@ -366,19 +366,19 @@ export default function QuickEntry() {
                     <button
                       type="button"
                       onClick={() => setPartySelectorOpen(true)}
-                      className="w-full rounded-[24px] border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-left transition hover:border-primary-200 hover:bg-primary-50/40"
+                      className="w-full rounded-[24px] border border-secondary-200/80 bg-mist/80 px-4 py-3 text-left transition hover:border-primary-200 hover:bg-primary-50/40"
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t('quickExpense.linkPartyOptional')}</p>
-                          <p className="mt-2 text-base font-semibold text-slate-900">
+                          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-secondary-400">{t('quickExpense.linkPartyOptional')}</p>
+                          <p className="mt-2 text-base font-semibold text-ink">
                             {selectedParty?.name || t('quickExpense.selectPayee')}
                           </p>
-                          <p className="mt-1 text-sm text-slate-500">
+                          <p className="mt-1 text-sm text-secondary-500">
                             {selectedParty?.phone || t('quickExpense.payeeHelper')}
                           </p>
                         </div>
-                        <ChevronRight className="text-slate-400" size={20} />
+                        <ChevronRight className="text-secondary-400" size={20} />
                       </div>
                     </button>
                     {selectedParty ? (
@@ -401,11 +401,11 @@ export default function QuickEntry() {
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t('quickEntry.party')}</p>
-                    <p className="mt-2 text-lg font-semibold text-slate-900">{selectedParty?.name || t('quickEntry.selectParty')}</p>
-                    <p className="mt-1 text-sm text-slate-500">{selectedParty?.phone || t('quickEntry.selectPartyHint')}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-secondary-400">{t('quickEntry.party')}</p>
+                    <p className="mt-2 text-lg font-semibold text-ink">{selectedParty?.name || t('quickEntry.selectParty')}</p>
+                    <p className="mt-1 text-sm text-secondary-500">{selectedParty?.phone || t('quickEntry.selectPartyHint')}</p>
                   </div>
-                  <ChevronRight className="text-slate-400" size={20} />
+                  <ChevronRight className="text-secondary-400" size={20} />
                 </div>
               </button>
             )}

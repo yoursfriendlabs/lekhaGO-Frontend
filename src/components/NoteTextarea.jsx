@@ -88,7 +88,7 @@ const NoteTextarea = forwardRef(function NoteTextarea(
       />
       <span
         className={`pointer-events-none absolute bottom-2 right-3 rounded-md bg-white/90 px-1.5 py-0.5 text-[11px] font-semibold shadow-sm ring-1 ring-slate-200/70 ${
-          isAtLimit ? 'text-amber-600' : 'text-slate-400'
+          isAtLimit ? 'text-amber-600' : 'text-secondary-400'
         } ${counterClassName}`}
       >
         {wordCount}/{maxWords} {t('common.words')}

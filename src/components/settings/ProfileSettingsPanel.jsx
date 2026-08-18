@@ -89,13 +89,13 @@ export default function ProfileSettingsPanel({ isOwner = false }) {
     <div className="space-y-6">
       <div className="card space-y-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-400">
             {t('settingsPage.profile.eyebrow')}
           </p>
-          <h2 className="mt-2 font-serif text-xl text-slate-900 dark:text-white">
+          <h2 className="mt-2 font-serif text-xl text-ink">
             {t('settingsPage.tabs.profile')}
           </h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-2 text-sm text-secondary-500">
             {t('settingsPage.profile.subtitle')}
           </p>
         </div>
@@ -143,7 +143,7 @@ export default function ProfileSettingsPanel({ isOwner = false }) {
               placeholder={t('settingsPage.profile.businessPlaceholder')}
               disabled={!isOwner}
             />
-            <p className="text-xs text-slate-400">{businessFieldHint}</p>
+            <p className="text-xs text-secondary-400">{businessFieldHint}</p>
           </div>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

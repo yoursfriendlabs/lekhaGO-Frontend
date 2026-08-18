@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { Building2, CheckCircle, Package2, ShieldCheck, Upload, Users, X } from 'lucide-react';
+import StatsCard, { STATS_GRID_CLASS } from '../components/StatsCard.jsx';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import AccountSecurityPanel from '../components/account/AccountSecurityPanel.jsx';
@@ -8,6 +9,7 @@ import BanksSettingsPanel from '../components/settings/BanksSettingsPanel.jsx';
 import CategoriesSettingsPanel from '../components/settings/CategoriesSettingsPanel.jsx';
 import ExpensesCategoriesSettingsPanel from '../components/settings/ExpensesCategoriesSettingsPanel.jsx';
 import OrderAttributesSettingsPanel from '../components/settings/OrderAttributesSettingsPanel.jsx';
+import AppearanceSettingsPanel from '../components/settings/AppearanceSettingsPanel.jsx';
 import ProfileSettingsPanel from '../components/settings/ProfileSettingsPanel.jsx';
 import SubscriptionSettingsPanel from '../components/settings/SubscriptionSettingsPanel.jsx';
 import UnitsSettingsPanel from '../components/settings/UnitsSettingsPanel.jsx';
@@ -20,6 +22,7 @@ import { EMPTY_STAFF_SUMMARY } from '../lib/staff';
 import { getSubscriptionGuard, getSubscriptionStatusState, humanizeKey } from '../lib/subscription';
 import {
   ACCOUNT_SETTINGS_TAB,
+  APPEARANCE_SETTINGS_TAB,
   BANKS_SETTINGS_TAB,
   CATEGORIES_SETTINGS_TAB,
   EXPENSE_CATEGORIES_SETTINGS_TAB,
@@ -45,7 +48,7 @@ const EMPTY = {
   cbmsPasswordSet: false,
 };
 
-const PROFILE_TAB_KEYS = [PROFILE_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB, ACCOUNT_SETTINGS_TAB];
+const PROFILE_TAB_KEYS = [PROFILE_SETTINGS_TAB, APPEARANCE_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB, ACCOUNT_SETTINGS_TAB];
 
 function scrollToGrowthPlan() {
   if (typeof document === 'undefined') return;
@@ -55,23 +58,6 @@ function scrollToGrowthPlan() {
       block: 'start',
     });
   }, 0);
-}
-
-function SettingsStatCard({ label, value, hint, icon: Icon }) {
-  return (
-    <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-5 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</p>
-          <p className="mt-3 break-words text-2xl font-semibold text-slate-900 dark:text-white">{value}</p>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{hint}</p>
-        </div>
-        <div className="rounded-2xl bg-slate-100 p-3 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
-          <Icon size={20} />
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export default function Settings() {
@@ -125,6 +111,11 @@ export default function Settings() {
         key: PROFILE_SETTINGS_TAB,
         label: t('settingsPage.tabs.profile'),
         description: t('settingsPage.descriptions.profile'),
+      },
+      {
+        key: APPEARANCE_SETTINGS_TAB,
+        label: t('settingsPage.tabs.appearance'),
+        description: t('settingsPage.descriptions.appearance'),
       },
       {
         key: ACCOUNT_SETTINGS_TAB,
@@ -458,30 +449,31 @@ export default function Settings() {
     <div className="min-w-0 max-w-6xl space-y-6 overflow-x-hidden">
       <PageHeader title={t('settingsPage.title')} subtitle={activeTabMeta?.description || t('settingsPage.subtitle')} />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className={STATS_GRID_CLASS}>
         {overviewCards.map((card) => (
-          <SettingsStatCard
+          <StatsCard
             key={card.key}
-            label={card.label}
+            title={card.label}
             value={card.value}
             hint={card.hint}
             icon={card.icon}
+            tone="default"
           />
         ))}
       </section>
 
-      <div className="flex flex-wrap items-end gap-8 border-b border-slate-200/80 pb-1 dark:border-slate-800">
+      <div className="flex flex-wrap items-end gap-8 border-b border-secondary-200/80 pb-1">
         <button
           type="button"
           onClick={handleCompanySettingClick}
           aria-pressed={!isProfileSection}
           className={`relative pb-3 text-lg font-semibold transition-colors after:absolute after:left-0 after:-bottom-[1px] after:h-0.5 after:w-full after:origin-left after:rounded-full after:transition-transform after:duration-200 after:content-[''] ${
             !isProfileSection
-              ? 'text-primary-600 after:scale-x-100 after:bg-primary-600 dark:text-primary-300 dark:after:bg-primary-300'
-              : 'text-slate-500 after:scale-x-0 after:bg-transparent hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+              ? 'text-primary-600 after:scale-x-100 after:bg-primary-600'
+              : 'text-secondary-500 after:scale-x-0 after:bg-transparent hover:text-ink-light'
           }`}
         >
-          Company Setting
+          {t('settingsPage.sections.company')}
         </button>
         <button
           type="button"
@@ -489,20 +481,20 @@ export default function Settings() {
           aria-pressed={isProfileSection}
           className={`relative pb-3 text-lg font-semibold transition-colors after:absolute after:left-0 after:-bottom-[1px] after:h-0.5 after:w-full after:origin-left after:rounded-full after:transition-transform after:duration-200 after:content-[''] ${
             isProfileSection
-              ? 'text-primary-600 after:scale-x-100 after:bg-primary-600 dark:text-primary-300 dark:after:bg-primary-300'
-              : 'text-slate-500 after:scale-x-0 after:bg-transparent hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+              ? 'text-primary-600 after:scale-x-100 after:bg-primary-600'
+              : 'text-secondary-500 after:scale-x-0 after:bg-transparent hover:text-ink-light'
           }`}
         >
-          Profile Setting
+          {t('settingsPage.sections.profile')}
         </button>
       </div>
 
       <div className="card space-y-4">
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-secondary-400">
             {t('settingsPage.title')}
           </p>
-          <h2 className="break-words font-serif text-xl text-slate-900 dark:text-white">{activeTabMeta?.label}</h2>
+          <h2 className="break-words font-serif text-xl text-ink">{activeTabMeta?.label}</h2>
         </div>
 
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:flex-wrap">
@@ -517,8 +509,8 @@ export default function Settings() {
                   onClick={() => handleTabChange(tab.key)}
                   className={`min-w-0 rounded-2xl px-3 py-3 text-center text-sm font-semibold leading-tight transition lg:w-auto lg:px-4 lg:py-2.5 lg:text-left ${
                     isActive
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'
                   }`}
                 >
                   {tab.label}
@@ -541,10 +533,10 @@ export default function Settings() {
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
                   {t('settingsPage.general.lockedEyebrow')}
                 </p>
-                <h3 className="font-serif text-xl text-slate-900 dark:text-white">
+                <h3 className="font-serif text-xl text-ink">
                   {t('settingsPage.general.lockedTitle')}
                 </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
+                <p className="text-sm text-secondary-700">
                   {subscriptionGuard.description || t('settingsPage.general.lockedDescription')}
                 </p>
               </div>
@@ -564,7 +556,7 @@ export default function Settings() {
           {error ? <Notice title={error} tone="error" /> : null}
 
           {settingsLoading && !form.companyName ? (
-            <div className="flex items-center gap-3 py-8 text-sm text-slate-500">
+            <div className="flex items-center gap-3 py-8 text-sm text-secondary-500">
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
               {t('settingsPage.general.loading')}
             </div>
@@ -572,9 +564,9 @@ export default function Settings() {
             <form onSubmit={handleSave} className="space-y-6">
               <fieldset className="space-y-6" disabled={generalLocked || saving || logoUploading}>
                 <div className="card space-y-4">
-                  <h2 className="font-serif text-lg text-slate-900 dark:text-white">{t('settingsPage.general.logoTitle')}</h2>
+                  <h2 className="font-serif text-lg text-ink">{t('settingsPage.general.logoTitle')}</h2>
                   <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                    <div className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900/40">
+                    <div className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-secondary-200 bg-mist dark:border-slate-700 dark:bg-slate-900/40">
                       {logoUploading ? (
                         <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
                       ) : logoSrc ? (
@@ -586,7 +578,7 @@ export default function Settings() {
                           />
                           <button
                             type="button"
-                            className="absolute right-1 top-1 rounded-full bg-white/80 p-0.5 text-slate-500 shadow-sm hover:text-rose-600"
+                            className="absolute right-1 top-1 rounded-full bg-white/80 p-0.5 text-secondary-500 shadow-sm hover:text-rose-600"
                             onClick={() => {
                               handleChange('logoUrl', '');
                               if (fileRef.current) fileRef.current.value = '';
@@ -597,12 +589,12 @@ export default function Settings() {
                           </button>
                         </>
                       ) : (
-                        <Building2 size={28} className="text-slate-300 dark:text-slate-600" />
+                        <Building2 size={28} className="text-secondary-300 dark:text-secondary-700" />
                       )}
                     </div>
 
                     <div className="flex-1 space-y-2">
-                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                      <p className="text-sm text-secondary-700 dark:text-secondary-400">
                         {t('settingsPage.general.logoHelp')}
                       </p>
                       <button
@@ -629,7 +621,7 @@ export default function Settings() {
                 </div>
 
                 <div className="card space-y-5">
-                  <h2 className="font-serif text-lg text-slate-900 dark:text-white">{t('settingsPage.general.detailsTitle')}</h2>
+                  <h2 className="font-serif text-lg text-ink">{t('settingsPage.general.detailsTitle')}</h2>
 
                   <div className="space-y-1">
                     <label className="label" htmlFor="companyName">{t('settingsPage.general.companyName')}</label>
@@ -690,14 +682,14 @@ export default function Settings() {
                       <option value="ad">{t('settingsPage.general.calendarAd') || 'English (AD)'}</option>
                       <option value="bs">{t('settingsPage.general.calendarBs') || 'Nepali (BS)'}</option>
                     </select>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-secondary-400">
                       {t('settingsPage.general.defaultCalendarHint') || 'Choose whether dates are displayed in English (AD) or Nepali (BS) by default across the dashboard.'}
                     </p>
                   </div>
                 </div>
 
                 <div className="card space-y-5">
-                  <h2 className="font-serif text-lg text-slate-900 dark:text-white">{t('settingsPage.general.taxTitle')}</h2>
+                  <h2 className="font-serif text-lg text-ink">{t('settingsPage.general.taxTitle')}</h2>
                   <div className="space-y-1">
                     <label className="label" htmlFor="panVat">{t('settingsPage.general.panVat')}</label>
                     <input
@@ -707,18 +699,18 @@ export default function Settings() {
                       value={form.panVat}
                       onChange={(event) => handleChange('panVat', event.target.value)}
                     />
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-xs text-secondary-400">
                       {t('settingsPage.general.panVatHint')}
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-700/80">
+                  <div className="rounded-2xl border border-secondary-200/80 p-4 dark:border-slate-700/80">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <label className="label" htmlFor="irdModeEnabled">
                           {t('settingsPage.general.irdModeTitle')}
                         </label>
-                        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        <p className="mt-1 text-sm text-secondary-500">
                           {t('settingsPage.general.irdModeHint')}
                         </p>
                       </div>
@@ -750,13 +742,13 @@ export default function Settings() {
                   </div>
 
                   {form.irdModeEnabled ? (
-                    <div className="rounded-2xl border border-slate-200/80 p-4 space-y-4 dark:border-slate-700/80">
+                    <div className="rounded-2xl border border-secondary-200/80 p-4 space-y-4 dark:border-slate-700/80">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <label className="label" htmlFor="cbmsSyncEnabled">
                             {t('settingsPage.general.cbmsSyncTitle')}
                           </label>
-                          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                          <p className="mt-1 text-sm text-secondary-500">
                             {t('settingsPage.general.cbmsSyncHint')}
                           </p>
                         </div>
@@ -816,7 +808,7 @@ export default function Settings() {
                           />
                         </div>
                       </div>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-secondary-400">
                         {t('settingsPage.general.cbmsSyncWarning')}
                       </p>
                     </div>
@@ -840,6 +832,7 @@ export default function Settings() {
       ) : null}
 
       {activeTab === PROFILE_SETTINGS_TAB ? <ProfileSettingsPanel isOwner={isOwner} /> : null}
+      {activeTab === APPEARANCE_SETTINGS_TAB ? <AppearanceSettingsPanel /> : null}
       {activeTab === SUBSCRIPTION_SETTINGS_TAB ? <SubscriptionSettingsPanel isOwner={isOwner} /> : null}
       {activeTab === ACCOUNT_SETTINGS_TAB ? <AccountSecurityPanel /> : null}
       {activeTab === CATEGORIES_SETTINGS_TAB ? <CategoriesSettingsPanel /> : null}

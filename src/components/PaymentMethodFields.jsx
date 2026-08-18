@@ -140,13 +140,13 @@ export default function PaymentMethodFields({
   );
 
   const fieldClassName =
-    'h-10 w-full rounded-2xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 shadow-sm transition focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100';
+    'h-10 w-full rounded-2xl border border-secondary-200 bg-white px-3 text-sm font-medium text-ink-light shadow-sm transition focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100';
 
   const noteFieldClassName =
-    'min-h-[88px] w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100';
+    'min-h-[88px] w-full resize-none rounded-2xl border border-secondary-200 bg-white px-3 py-2 text-sm font-medium text-ink-light shadow-sm transition focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100';
 
   const labelClassName =
-    'mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400';
+    'mb-1 block text-[11px] font-semibold uppercase tracking-wide text-secondary-400';
 
   const helperClassName = 'text-[11px] leading-5';
 
@@ -198,7 +198,7 @@ export default function PaymentMethodFields({
 
           <div className="mt-1.5 space-y-1">
             {selectedBank && (
-              <p className={`${helperClassName} text-slate-500`}>
+              <p className={`${helperClassName} text-secondary-500`}>
                 {t('payments.bankBalanceHint', {
                   amount: formatMoney(selectedBank.currentBalance),
                 })}

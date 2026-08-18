@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
+  Ban,
   Pencil,
   FileText,
   Package,
@@ -25,7 +26,7 @@ import MobileFormStepper from "../components/MobileFormStepper.jsx";
 import PaymentTypeSummary from "../components/PaymentTypeSummary.jsx";
 import QuickPaymentButtons from "../components/QuickPaymentButtons.jsx";
 import PartySearchCreateField from "../components/PartySearchCreateField.jsx";
-import StatsCard from "../components/StatsCard.jsx";
+import StatsCard, { STATS_GRID_CLASS } from "../components/StatsCard.jsx";
 import FlexibleDateInput from "../components/FlexibleDateInput.jsx";
 import DateDisplay from "../components/DateDisplay.jsx";
 import { api } from "../lib/api";
@@ -57,25 +58,37 @@ import {
   normalizeLookupProduct,
   toProductLookupOption,
 } from "../lib/lookups.js";
+import { getIrdReprintLabel, isIrdCancelled, isIrdLocked } from "../lib/ird";
 import QuickExpense from "../components/quickExpenses.jsx";
 
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
-function StatusBadge({ status }) {
+function StatusBadge({ status, locked = false }) {
+  const normalized = String(status || "").toLowerCase();
   const map = {
     received:
       "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
     ordered:
       "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
     due: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+    cancelled: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
+    canceled: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
+    void: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
   };
   const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : "—";
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[status] || "bg-slate-100 text-slate-600"}`}
-    >
-      {label}
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[normalized] || "bg-secondary-100 text-secondary-700"}`}
+      >
+        {label}
+      </span>
+      {locked && !["cancelled", "canceled", "void"].includes(normalized) ? (
+        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+          Locked
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -202,6 +215,9 @@ export default function Purchases() {
   const [deletedItemIds, setDeletedItemIds] = useState([]);
   const quantityInputRef = useRef(null);
   const [deletePurchase, setDeletePurchase] = useState(null);
+  const [cancelPurchase, setCancelPurchase] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancellingPurchaseId, setCancellingPurchaseId] = useState("");
   const [deletingPurchaseId, setDeletingPurchaseId] = useState("");
   const [savingPurchase, setSavingPurchase] = useState(false);
   const [recordingPaymentId, setRecordingPaymentId] = useState("");
@@ -236,6 +252,7 @@ const [mobileStep, setMobileStep] = useState("details");
 
   // ── Invoice / Bill modal ──
   const { settings: bizSettings } = useBusinessSettings();
+  const irdModeEnabled = Boolean(bizSettings?.irdModeEnabled);
   const [invoiceOrder, setInvoiceOrder] = useState(null);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [isThermalInvoice, setIsThermalInvoice] = useState(false);
@@ -680,6 +697,10 @@ const [mobileStep, setMobileStep] = useState("details");
       setStatus({ type: "info", message: "" });
       setPayDialog(null);
       const purchase = await api.getPurchase(purchaseId);
+      if (isIrdLocked(purchase) || isIrdCancelled(purchase)) {
+        setStatus({ type: "error", message: t("purchases.messages.lockedEditBlocked") });
+        return;
+      }
       const purchaseItems = purchase?.PurchaseItems || [];
       const entryType = purchase.entryType || purchase.type || "purchase";
       const party = normalizeLookupParty({
@@ -893,8 +914,13 @@ const [mobileStep, setMobileStep] = useState("details");
           ...deletedItemIds.map((id) => ({ id, _delete: true })),
         ],
       };
-      if (manualInvoiceNo) payload.invoiceNo = manualInvoiceNo;
-      else delete payload.invoiceNo;
+      if (irdModeEnabled && formMode !== "edit") {
+        delete payload.invoiceNo;
+      } else if (manualInvoiceNo) {
+        payload.invoiceNo = manualInvoiceNo;
+      } else {
+        delete payload.invoiceNo;
+      }
       const successMsg =
         formMode === "edit" && editingId
           ? t("purchases.messages.updated")
@@ -925,6 +951,12 @@ const [mobileStep, setMobileStep] = useState("details");
     if (deletePurchase && deletingPurchaseId === deletePurchase.id) return;
     setDeletePurchase(null);
   };
+
+  const closeCancelDialog = () => {
+    if (cancelPurchase && cancellingPurchaseId === cancelPurchase.id) return;
+    setCancelPurchase(null);
+    setCancelReason("");
+  };
   const handleDeletePurchase = async () => {
     if (
       !canManagePurchases ||
@@ -953,8 +985,39 @@ const [mobileStep, setMobileStep] = useState("details");
     }
   };
 
+  const handleCancelPurchase = async () => {
+    if (!cancelPurchase) return;
+    if (cancellingPurchaseId === cancelPurchase.id) return;
+
+    const reason = cancelReason.trim();
+    if (!reason) {
+      setStatus({ type: "error", message: t("purchases.cancelReasonRequired") });
+      return;
+    }
+
+    setCancellingPurchaseId(cancelPurchase.id);
+    setStatus({ type: "info", message: "" });
+    try {
+      await api.cancelPurchase(cancelPurchase.id, { reason });
+      setStatus({ type: "success", message: t("purchases.messages.cancelled") });
+      useProductStore.getState().invalidate();
+      invalidatePurchases(listParams);
+      await fetchPurchases(listParams, true);
+      setCancelPurchase(null);
+      setCancelReason("");
+    } catch (err) {
+      setStatus({
+        type: "error",
+        message: err.message || t("purchases.messages.cancelFailed"),
+      });
+    } finally {
+      setCancellingPurchaseId("");
+    }
+  };
+
   const openPayDialog = (purchase) => {
     if (!canManagePurchases) return;
+    if (isIrdCancelled(purchase)) return;
     setPayDialog(purchase);
     setPayAmount("");
     setPayPaymentMethod("cash");
@@ -987,11 +1050,82 @@ setInvoiceOrder(purchase);
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     printElement(invoicePrintRef.current);
+    await trackPurchaseReprint();
   };
-  const handlePrintThermal = () => {
+  const handlePrintThermal = async () => {
     printThermalReceipt(thermalInvoicePrintRef.current);
+    await trackPurchaseReprint();
+  };
+
+  const trackPurchaseReprint = async () => {
+    if (!invoiceOrder?.id || !isIrdLocked(invoiceOrder)) return;
+    try {
+      const updated = await api.recordPurchaseReprint(invoiceOrder.id);
+      setInvoiceOrder(updated);
+    } catch {
+      // Printing already happened; tracking failure should not block the user.
+    }
+  };
+
+  const invoiceReprintLabel = getIrdReprintLabel(invoiceOrder);
+
+  const buildPurchaseActions = (purchase) => {
+    const locked = isIrdLocked(purchase);
+    const cancelled = isIrdCancelled(purchase);
+    const actions = [];
+
+    if (canManagePurchases && !locked && !cancelled) {
+      actions.push({
+        label: t("common.edit"),
+        icon: Pencil,
+        onClick: () => openEdit(purchase.id),
+      });
+    }
+
+    actions.push(
+      {
+        label: "View Bill",
+        icon: FileText,
+        onClick: () => openInvoiceModal(purchase),
+      },
+      {
+        label: "Print Bill",
+        icon: Printer,
+        onClick: () => openInvoiceModal(purchase),
+      },
+      {
+        label: "Print Thermal",
+        icon: Printer,
+        onClick: () => openInvoiceModal(purchase, { thermal: true }),
+      },
+    );
+
+    if (canManagePurchases && locked && !cancelled) {
+      actions.push({
+        label: t("purchases.cancelInvoice"),
+        icon: Ban,
+        tone: "danger",
+        disabled: cancellingPurchaseId === purchase.id,
+        onClick: () => {
+          setCancelReason("");
+          setCancelPurchase(purchase);
+        },
+      });
+    }
+
+    if (canManagePurchases && !locked && !cancelled) {
+      actions.push({
+        label: t("common.delete"),
+        icon: Trash2,
+        tone: "danger",
+        disabled: deletingPurchaseId === purchase.id,
+        onClick: () => setDeletePurchase(purchase),
+      });
+    }
+
+    return actions;
   };
 
   const handleRecordPayment = async (event) => {
@@ -1238,7 +1372,7 @@ setInvoiceOrder(purchase);
                     key={et}
                     type="button"
                     aria-pressed={isActive}
-                    className={`rounded-[22px] border px-4 py-4 text-left transition ${isActive ? om.panelClassName : "border-slate-200/80 bg-white/90 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700/80 dark:bg-slate-950/40 dark:hover:border-slate-600 dark:hover:bg-slate-900/40"}`}
+                    className={`rounded-[22px] border px-4 py-4 text-left transition ${isActive ? om.panelClassName : "border-secondary-200/80 bg-white/90 hover:border-secondary-300 hover:bg-mist dark:border-slate-700/80 dark:bg-slate-950/40 dark:hover:border-slate-600 dark:hover:bg-slate-900/40"}`}
                     onClick={() => handleEntryTypeChange(et)}
                   >
                     <div className="flex items-center gap-3">
@@ -1248,10 +1382,10 @@ setInvoiceOrder(purchase);
                         <OI size={18} />
                       </div>
                       <div>
-                        <p className="font-semibold text-slate-900 dark:text-white">
+                        <p className="font-semibold text-ink">
                           {om.label}
                         </p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                        <p className="text-xs text-secondary-500">
                           {t("purchases.items")}
                         </p>
                       </div>
@@ -1267,13 +1401,13 @@ setInvoiceOrder(purchase);
               <FormSectionCard
                 title={t("common.details")}
                 hint={t("purchases.supplierOptional")}
-                className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
               >
                 <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
                   <div className="xl:col-span-2">
                     <div className="flex items-center justify-between">
                       <label className="label">{t("purchases.supplier")}</label>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-secondary-400">
                         {t("common.optional")}
                       </span>
                     </div>
@@ -1309,6 +1443,7 @@ setInvoiceOrder(purchase);
                       name="invoiceNo"
                       value={header.invoiceNo}
                       onChange={handleHeaderChange}
+                      disabled={irdModeEnabled}
                       placeholder={
                         formMode === "create" ? suggestedInvoiceNo : ""
                       }
@@ -1344,7 +1479,7 @@ setInvoiceOrder(purchase);
               </FormSectionCard>
               <FormSectionCard
                 title={t("purchases.notes")}
-                className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
               >
                 <NoteTextarea
                   className="input h-28 resize-none"
@@ -1362,7 +1497,7 @@ setInvoiceOrder(purchase);
               hint={t("purchases.itemComposerHint")}
               action={
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <span className="text-sm font-semibold text-slate-500">
+                  <span className="text-sm font-semibold text-secondary-500">
                     {items.length} {t("purchases.items")}
                   </span>
                   <button
@@ -1377,7 +1512,7 @@ setInvoiceOrder(purchase);
                   </button>
                 </div>
               }
-              className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+              className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
             >
               {items.length > 0 ? (
                 <div className="space-y-3">
@@ -1400,7 +1535,7 @@ setInvoiceOrder(purchase);
                     return (
                       <div
                         key={item.id || `pi-${idx}`}
-                        className="rounded-[24px] border border-slate-200/70 bg-slate-50/60 p-3.5 dark:border-slate-800/60 dark:bg-slate-900/40"
+                        className="rounded-[24px] border border-secondary-200/70 bg-mist/60 p-3.5 dark:border-slate-800/60 dark:bg-slate-900/40"
                       >
                         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                           <div className="min-w-0 flex-1">
@@ -1417,43 +1552,43 @@ setInvoiceOrder(purchase);
                                   >
                                     {lm.label}
                                   </span>
-                                  <p className="truncate font-semibold text-slate-900 dark:text-white">
+                                  <p className="truncate font-semibold text-ink">
                                     {dn}
                                   </p>
                                 </div>
                                 {item.description &&
                                   product?.name &&
                                   item.description !== product.name && (
-                                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                    <p className="mt-1 text-sm text-secondary-500">
                                       {item.description}
                                     </p>
                                   )}
                                 <div className="mt-2 flex flex-wrap gap-2">
-                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                     {t("purchases.qty")}: {item.quantity}
                                     {ul ? ` ${ul}` : ""}
                                   </span>
-                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                     {t("purchases.unitPrice")}:{" "}
                                     {money(item.unitPrice)}
                                   </span>
                                   {item.batchNumber ? (
-                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                       {t("purchases.batchNumber") || "Batch"}:{" "}
                                       {item.batchNumber}
                                     </span>
                                   ) : null}
                                   {item.expiryDate ? (
-                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                       {t("purchases.expiryDate") || "Expiry"}:{" "}
                                       {formatMaybeDate(item.expiryDate, "D MMM YYYY")}
                                     </span>
                                   ) : null}
-                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                     {t("purchases.tax")}:{" "}
                                     {Number(item.taxRate || 0).toFixed(2)}%
                                   </span>
-                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                     {t("purchases.taxTotal")}: {money(ivat)}
                                   </span>
                                   <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white dark:bg-primary-900/70">
@@ -1488,8 +1623,8 @@ setInvoiceOrder(purchase);
                   })}
                 </div>
               ) : (
-                <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50/70 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-900/30">
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                <div className="rounded-[24px] border border-dashed border-slate-300 bg-mist/70 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-900/30">
+                  <p className="text-sm text-secondary-500">
                     {t("purchases.addFirstItem")}
                   </p>
                   <button
@@ -1510,6 +1645,7 @@ setInvoiceOrder(purchase);
           <Dialog
             isOpen={showItemDialog}
             onClose={closeItemDialog}
+            closeOnOverlayClick={false}
             title={
               editingItemIdx !== null
                 ? t("common.edit")
@@ -1517,7 +1653,7 @@ setInvoiceOrder(purchase);
                   ? t("purchases.addExpenseLine")
                   : t("common.addItem")
             }
-            size="xl"
+            size="full"
             footer={
               <>
                 <button
@@ -1546,7 +1682,7 @@ setInvoiceOrder(purchase);
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-200">
                     {t("purchases.itemComposerTitle")}
                   </p>
-                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  <p className="mt-2 text-sm text-secondary-700">
                     {t("purchases.itemComposerHint")}
                   </p>
                 </div>
@@ -1607,9 +1743,9 @@ setInvoiceOrder(purchase);
                         renderOption={(option) => (
                           <div className="flex items-center gap-2">
                             {option.entity?.imageUrl ? (
-                              <img src={option.entity.imageUrl} alt={option.label} className="h-6 w-6 rounded object-cover border border-slate-200 dark:border-slate-800" />
+                              <img src={option.entity.imageUrl} alt={option.label} className="h-6 w-6 rounded object-cover border border-secondary-200 dark:border-slate-800" />
                             ) : (
-                              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-400 dark:bg-slate-800">
+                              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-secondary-100 text-[10px] font-bold text-secondary-400 dark:bg-slate-800">
                                 {option.entity?.name?.charAt(0).toUpperCase() || 'P'}
                               </div>
                             )}
@@ -1635,7 +1771,7 @@ setInvoiceOrder(purchase);
                         }
                       />
                       {itemDraftProduct && (
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        <p className="mt-1 text-xs text-secondary-500">
                           {getUnitLabel(itemDraftProduct, itemDraft.unitType)}
                         </p>
                       )}
@@ -1725,7 +1861,7 @@ setInvoiceOrder(purchase);
                   </div>
                 </div>
               </div>
-              <div className="rounded-[24px] border border-slate-200/80 bg-slate-50/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
+              <div className="rounded-[24px] border border-secondary-200/80 bg-mist/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/40">
                 <div className="flex items-center gap-3">
                   <div
                     className={`flex h-11 w-11 items-center justify-center rounded-2xl ${draftLineMeta.iconWrapClassName}`}
@@ -1733,48 +1869,48 @@ setInvoiceOrder(purchase);
                     <DraftLineIcon size={18} />
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-400">
                       {t("purchases.transactionType")}
                     </p>
-                    <p className="font-semibold text-slate-900 dark:text-white">
+                    <p className="font-semibold text-ink">
                       {draftLineMeta.label}
                     </p>
                   </div>
                 </div>
                 <div className="mt-4 space-y-3">
                   <div className="rounded-[20px] bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-950/50 dark:ring-slate-700/70">
-                    <p className="truncate font-semibold text-slate-900 dark:text-white">
+                    <p className="truncate font-semibold text-ink">
                       {itemDraftProduct?.name ||
                         itemDraft.description ||
                         draftLineMeta.label}
                     </p>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 text-sm text-secondary-500">
                       {t("purchases.qty")}:{" "}
                       {Number(itemDraft.quantity || 0).toFixed(2)}
                     </p>
                   </div>
                   <div className="space-y-2 rounded-[20px] bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-950/50 dark:ring-slate-700/70">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500 dark:text-slate-400">
+                      <span className="text-secondary-500">
                         {t("purchases.unitPrice")}
                       </span>
-                      <span className="font-semibold text-slate-900 dark:text-white">
+                      <span className="font-semibold text-ink">
                         {money(itemDraft.unitPrice)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500 dark:text-slate-400">
+                      <span className="text-secondary-500">
                         {t("purchases.taxTotal")}
                       </span>
-                      <span className="font-semibold text-slate-900 dark:text-white">
+                      <span className="font-semibold text-ink">
                         {money(itemDraftVatAmount)}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-sm dark:border-slate-700">
-                      <span className="font-medium text-slate-600 dark:text-slate-300">
+                    <div className="flex items-center justify-between border-t border-secondary-200 pt-3 text-sm dark:border-slate-700">
+                      <span className="font-medium text-secondary-700">
                         {t("common.total")}
                       </span>
-                      <span className="text-lg font-bold text-slate-900 dark:text-white">
+                      <span className="text-lg font-bold text-ink">
                         {money(
                           Number(itemDraft.lineTotal || 0) + itemDraftVatAmount,
                         )}
@@ -1789,59 +1925,59 @@ setInvoiceOrder(purchase);
           {showPaymentStep && (
             <FormSectionCard
               title={t("payments.summaryTitle")}
-              className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+              className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
             >
               <div className="grid gap-3 text-sm sm:grid-cols-3">
                 {isExpense ? (
                   <>
-                    <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
-                      <span className="text-slate-500">
+                    <div className="rounded-[22px] bg-mist/90 p-4 dark:bg-slate-900/40">
+                      <span className="text-secondary-500">
                         {t("purchases.normalExpense")}
                       </span>
-                      <p className="mt-2 font-semibold text-slate-800 dark:text-slate-200">
+                      <p className="mt-2 font-semibold text-ink dark:text-slate-200">
                         {money(expenseTotals.expense)}
                       </p>
                     </div>
-                    <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
-                      <span className="text-slate-500">
+                    <div className="rounded-[22px] bg-mist/90 p-4 dark:bg-slate-900/40">
+                      <span className="text-secondary-500">
                         {t("purchases.labor")}
                       </span>
-                      <p className="mt-2 font-semibold text-slate-800 dark:text-slate-200">
+                      <p className="mt-2 font-semibold text-ink dark:text-slate-200">
                         {money(expenseTotals.labor)}
                       </p>
                     </div>
-                    <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
-                      <span className="text-slate-500">
+                    <div className="rounded-[22px] bg-mist/90 p-4 dark:bg-slate-900/40">
+                      <span className="text-secondary-500">
                         {t("purchases.part")}
                       </span>
-                      <p className="mt-2 font-semibold text-slate-800 dark:text-slate-200">
+                      <p className="mt-2 font-semibold text-ink dark:text-slate-200">
                         {money(expenseTotals.part)}
                       </p>
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
-                      <span className="text-slate-500">
+                    <div className="rounded-[22px] bg-mist/90 p-4 dark:bg-slate-900/40">
+                      <span className="text-secondary-500">
                         {t("purchases.subTotal")}
                       </span>
-                      <p className="mt-2 font-semibold text-slate-800 dark:text-slate-200">
+                      <p className="mt-2 font-semibold text-ink dark:text-slate-200">
                         {money(totals.subTotal)}
                       </p>
                     </div>
-                    <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
-                      <span className="text-slate-500">
+                    <div className="rounded-[22px] bg-mist/90 p-4 dark:bg-slate-900/40">
+                      <span className="text-secondary-500">
                         {t("purchases.taxTotal")}
                       </span>
-                      <p className="mt-2 font-semibold text-slate-800 dark:text-slate-200">
+                      <p className="mt-2 font-semibold text-ink dark:text-slate-200">
                         {money(totals.taxTotal)}
                       </p>
                     </div>
-                    <div className="rounded-[22px] bg-slate-50/90 p-4 dark:bg-slate-900/40">
-                      <span className="text-slate-500">
+                    <div className="rounded-[22px] bg-mist/90 p-4 dark:bg-slate-900/40">
+                      <span className="text-secondary-500">
                         {t("purchases.grandTotal")}
                       </span>
-                      <p className="mt-2 text-lg font-bold text-slate-900 dark:text-white">
+                      <p className="mt-2 text-lg font-bold text-ink">
                         {money(totals.grandTotal)}
                       </p>
                     </div>
@@ -1849,16 +1985,16 @@ setInvoiceOrder(purchase);
                 )}
               </div>
               {isExpense && (
-                <div className="mt-3 flex justify-between border-t border-slate-200/70 pt-3 text-sm dark:border-slate-700/60">
-                  <span className="font-medium text-slate-500">
+                <div className="mt-3 flex justify-between border-t border-secondary-200/70 pt-3 text-sm dark:border-slate-700/60">
+                  <span className="font-medium text-secondary-500">
                     {t("purchases.grandTotal")}
                   </span>
-                  <span className="text-lg font-bold text-slate-900 dark:text-slate-100">
+                  <span className="text-lg font-bold text-ink">
                     {money(totals.grandTotal)}
                   </span>
                 </div>
               )}
-              <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-700/60">
+              <div className="mt-4 border-t border-secondary-200/70 pt-4 dark:border-slate-700/60">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div className="flex-1">
                     <label className="label">{t("purchases.totalPaid")}</label>
@@ -1894,7 +2030,7 @@ setInvoiceOrder(purchase);
                       }
                     />
                   </div>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800/40">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-secondary-200/70 px-3 py-2.5 text-sm text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:text-secondary-300 dark:hover:bg-slate-800/40">
                     <input
                       type="checkbox"
                       className="h-4 w-4 rounded accent-primary-600"
@@ -1914,7 +2050,7 @@ setInvoiceOrder(purchase);
                     </span>
                   </div>
                 )}
-                <div className="mt-4 border-t border-slate-200/70 pt-4 dark:border-slate-700/60">
+                <div className="mt-4 border-t border-secondary-200/70 pt-4 dark:border-slate-700/60">
                   <PaymentMethodFields
                     value={header}
                     onChange={(patch) => setHeader((p) => ({ ...p, ...patch }))}
@@ -1996,17 +2132,17 @@ setInvoiceOrder(purchase);
                 </button>
               </div>
             ) : null}
-            <div className="rounded-[22px] bg-slate-50 p-4 text-sm dark:bg-slate-900/60">
-              <p className="font-semibold text-slate-800 dark:text-slate-200">
+            <div className="rounded-[22px] bg-mist p-4 text-sm dark:bg-slate-900/60">
+              <p className="font-semibold text-ink dark:text-slate-200">
                 {payDialog.invoiceNo || payDialog.id.slice(0, 8)}
               </p>
               {getSupplierName(payDialog) && (
-                <p className="text-slate-500 dark:text-slate-400">
+                <p className="text-secondary-500">
                   {getSupplierName(payDialog)}
                 </p>
               )}
               <div className="mt-3 flex items-center justify-between gap-3 text-xs">
-                <span className="text-slate-500 dark:text-slate-400">
+                <span className="text-secondary-500">
                   {t("common.total")}: {money(payDialog.grandTotal)}
                 </span>
                 <span className="font-semibold text-rose-600 dark:text-rose-400">
@@ -2066,7 +2202,7 @@ setInvoiceOrder(purchase);
 
       {/* QUICK STATS */}
       {!isOpen && (
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className={STATS_GRID_CLASS}>
           <StatsCard
             title={t("purchases.totalPurchases") || "Total Purchases"}
             value={money(stats?.totalPurchases ?? 0)}
@@ -2144,9 +2280,9 @@ setInvoiceOrder(purchase);
         {/* Mobile */}
         <div className="mt-4 space-y-3 md:hidden">
           {purchasesLoading && filteredPurchases.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">{t("common.loading")}</p>
+            <p className="py-3 text-sm text-secondary-500">{t("common.loading")}</p>
           ) : pagedPurchases.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">
+            <p className="py-3 text-sm text-secondary-500">
               {t("purchases.noPurchases")}
             </p>
           ) : (
@@ -2158,7 +2294,7 @@ setInvoiceOrder(purchase);
               return (
                 <div
                   key={purchase.id}
-                  className="rounded-[24px] border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60"
+                  className="rounded-[24px] border border-secondary-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -2169,15 +2305,15 @@ setInvoiceOrder(purchase);
                           <PI size={12} />
                           {pm.label}
                         </span>
-                        <StatusBadge status={purchase.status} />
+                        <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} />
                       </div>
-                      <p className="mt-2 truncate font-semibold text-slate-800 dark:text-slate-100">
+                      <p className="mt-2 truncate font-semibold text-ink">
                         {purchase.invoiceNo || purchase.id.slice(0, 8)}
                       </p>
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="mt-0.5 text-xs text-secondary-500">
                         <DateDisplay date={purchase.purchaseDate} format="ddd DD, MMM" />
                       </p>
-                      <p className="mt-1 truncate text-xs text-slate-500">
+                      <p className="mt-1 truncate text-xs text-secondary-500">
                         {sn || "—"}
                       </p>
                       <PaymentTypeSummary
@@ -2188,10 +2324,10 @@ setInvoiceOrder(purchase);
                       />
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="font-semibold text-slate-800 dark:text-slate-200">
+                      <p className="font-semibold text-ink dark:text-slate-200">
                         {money(purchase.grandTotal)}
                       </p>
-                      {due > 0 ? (
+                      {due > 0 && !isIrdCancelled(purchase) ? (
                         <button
                           type="button"
                           className="mt-1 inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60"
@@ -2206,47 +2342,8 @@ setInvoiceOrder(purchase);
                       )}
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-end border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
-                    <ActionMenu
-                      actions={[
-                        ...(canManagePurchases
-                          ? [
-                              {
-                                label: t("common.edit"),
-                                icon: Pencil,
-                                onClick: () => openEdit(purchase.id),
-                              },
-                            ]
-                          : []),
-{
-                          label: "View Bill",
-                          icon: FileText,
-                          onClick: () => openInvoiceModal(purchase),
-                        },
-                        {
-                          label: "Print Bill",
-                          icon: Printer,
-                          onClick: () => openInvoiceModal(purchase),
-                        },
-                        {
-                          label: "Print Thermal",
-                          icon: Printer,
-                          onClick: () =>
-                            openInvoiceModal(purchase, { thermal: true }),
-                        },
-                        ...(canManagePurchases
-                          ? [
-                              {
-                                label: t("common.delete"),
-                                icon: Trash2,
-                                tone: "danger",
-                                disabled: deletingPurchaseId === purchase.id,
-                                onClick: () => setDeletePurchase(purchase),
-                              },
-                            ]
-                          : []),
-                      ]}
-                    />
+                  <div className="mt-3 flex items-center justify-end border-t border-secondary-200/50 pt-2.5 dark:border-slate-700/40">
+                    <ActionMenu actions={buildPurchaseActions(purchase)} />
                   </div>
                 </div>
               );
@@ -2257,7 +2354,7 @@ setInvoiceOrder(purchase);
         {/* Desktop */}
         <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-slate-400">
+            <thead className="text-xs uppercase text-ink">
               <tr>
                 <th className="py-2 pr-4 text-left">{t("common.invoice")}</th>
                 <th className="py-2 pr-4 text-left">
@@ -2282,13 +2379,13 @@ setInvoiceOrder(purchase);
             <tbody>
               {purchasesLoading && filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-3 text-slate-500">
+                  <td colSpan={10} className="py-3 text-secondary-500">
                     {t("common.loading")}
                   </td>
                 </tr>
               ) : pagedPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-3 text-slate-500">
+                  <td colSpan={10} className="py-3 text-secondary-500">
                     {t("purchases.noPurchases")}
                   </td>
                 </tr>
@@ -2301,9 +2398,9 @@ setInvoiceOrder(purchase);
                   return (
                     <tr
                       key={purchase.id}
-                      className="border-t border-slate-200/70 dark:border-slate-800/70"
+                      className="border-t border-secondary-200/70"
                     >
-                      <td className="py-2.5 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                      <td className="py-2.5 pr-4 font-medium text-ink dark:text-slate-200">
                         {purchase.invoiceNo || purchase.id.slice(0, 8)}
                       </td>
                       <td className="py-2.5 pr-4">
@@ -2314,26 +2411,26 @@ setInvoiceOrder(purchase);
                           {pm.label}
                         </span>
                       </td>
-                      <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
+                      <td className="py-2.5 pr-4 text-ink-light dark:text-secondary-300">
                         <DateDisplay date={purchase.purchaseDate} format="ddd DD, MMM" />
                       </td>
                       <td className="py-2.5 pr-4">
-                        <StatusBadge status={purchase.status} />
+                        <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} />
                       </td>
-                      <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
-                        {sn || <span className="text-slate-400">—</span>}
+                      <td className="py-2.5 pr-4 text-ink-light dark:text-secondary-300">
+                        {sn || <span className="text-secondary-400">—</span>}
                       </td>
                       <td className="py-2.5 pr-4">
                         <PaymentTypeSummary source={purchase} />
                       </td>
-                      <td className="py-2.5 pr-4 text-right font-semibold text-slate-800 dark:text-slate-200">
+                      <td className="py-2.5 pr-4 text-right font-semibold text-ink dark:text-slate-200">
                         {money(purchase.grandTotal)}
                       </td>
                       <td className="py-2.5 pr-4 text-right text-emerald-700 dark:text-emerald-400">
                         {money(purchase.amountReceived)}
                       </td>
                       <td className="py-2.5 pr-4 text-right">
-                        {due > 0 ? (
+                        {due > 0 && !isIrdCancelled(purchase) ? (
                           <button
                             type="button"
                             className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60"
@@ -2348,47 +2445,7 @@ setInvoiceOrder(purchase);
                         )}
                       </td>
                       <td className="py-2.5 text-right">
-                        <ActionMenu
-                          actions={[
-                            ...(canManagePurchases
-                              ? [
-                                  {
-                                    label: t("common.edit"),
-                                    icon: Pencil,
-                                    onClick: () => openEdit(purchase.id),
-                                  },
-                                ]
-                              : []),
-{
-                              label: "View Bill",
-                              icon: FileText,
-                              onClick: () => openInvoiceModal(purchase),
-                            },
-                            {
-                              label: "Print Bill",
-                              icon: Printer,
-                              onClick: () => openInvoiceModal(purchase),
-                            },
-                            {
-                              label: "Print Thermal",
-                              icon: Printer,
-                              onClick: () =>
-                                openInvoiceModal(purchase, { thermal: true }),
-                            },
-                            ...(canManagePurchases
-                              ? [
-                                  {
-                                    label: t("common.delete"),
-                                    icon: Trash2,
-                                    tone: "danger",
-                                    disabled:
-                                      deletingPurchaseId === purchase.id,
-                                    onClick: () => setDeletePurchase(purchase),
-                                  },
-                                ]
-                              : []),
-                          ]}
-                        />
+                        <ActionMenu actions={buildPurchaseActions(purchase)} />
                       </td>
                     </tr>
                   );
@@ -2455,7 +2512,7 @@ setInvoiceOrder(purchase);
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
               </div>
             ) : isThermalInvoice ? (
-              <div className="mx-auto max-w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm">
+              <div className="mx-auto max-w-[340px] overflow-hidden rounded-2xl border border-secondary-200 bg-white p-6 text-black shadow-sm">
                 <div ref={thermalInvoicePrintRef}>
                   <ThermalReceipt
                     biz={bizSettings}
@@ -2479,13 +2536,14 @@ setInvoiceOrder(purchase);
                       dueAmount: getPurchaseDueAmount(invoiceOrder),
                     }}
                     notes={invoiceOrder.notes}
+                    reprintLabel={invoiceReprintLabel}
                   />
                 </div>
               </div>
             ) : (
               <div
                 ref={invoicePrintRef}
-                className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950"
+                className="print-area overflow-hidden rounded-3xl border border-secondary-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950"
               >
                 {/* ── Header ── */}
                 <div className="px-4 pt-0 sm:px-8">
@@ -2496,37 +2554,38 @@ setInvoiceOrder(purchase);
                     date={<DateDisplay date={invoiceOrder.purchaseDate} format="MMMM D, YYYY" mode="inline" />}
                     status={invoiceOrder.status}
                     statusColor="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    reprintLabel={invoiceReprintLabel}
                   />
                 </div>
 
                 {/* ── Supplier + Notes ── */}
-                <div className="border-b border-slate-200/70 bg-slate-50/60 px-4 py-5 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
+                <div className="border-b border-secondary-200/70 bg-mist/60 px-4 py-5 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-ink">
                         Supplier / Payee
                       </p>
-                      <p className="font-semibold text-slate-900 dark:text-white">
+                      <p className="font-semibold text-ink">
                         {getSupplierName(invoiceOrder) || "—"}
                       </p>
                       {invoiceOrder.partyPhone && (
-                        <p className="mt-0.5 text-sm text-slate-500">
+                        <p className="mt-0.5 text-sm text-secondary-500">
                           {invoiceOrder.partyPhone}
                         </p>
                       )}
-                      <p className="mt-2 text-sm text-slate-500">
+                      <p className="mt-2 text-sm text-secondary-500">
                         Created By:{" "}
-                        <span className="font-medium text-slate-900 dark:text-white">
+                        <span className="font-medium text-ink">
                           {getCreatorDisplayName(invoiceOrder)}
                         </span>
                       </p>
                     </div>
                     {invoiceOrder.notes && (
                       <div>
-                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">
+                        <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-ink">
                           Notes
                         </p>
-                        <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-400">
+                        <p className="whitespace-pre-wrap text-sm text-secondary-700 dark:text-secondary-400">
                           {invoiceOrder.notes}
                         </p>
                       </div>
@@ -2538,7 +2597,7 @@ setInvoiceOrder(purchase);
                 <div className="overflow-x-auto px-4 py-6 sm:px-8">
                   <table className="w-full min-w-[540px] text-sm">
                     <thead>
-                      <tr className="border-b-2 border-slate-200/70 dark:border-slate-700/70">
+                      <tr className="border-b-2 border-secondary-200/70 dark:border-slate-700/70">
                         <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">
                           Item
                         </th>
@@ -2562,7 +2621,7 @@ setInvoiceOrder(purchase);
                           <td className="py-3 pr-4 font-medium text-black">
                             {item.Product?.name || item.description || "—"}
                           </td>
-                          <td className="py-3 text-right text-slate-900">
+                          <td className="py-3 text-right text-ink">
                             {Number(item.quantity || 0).toFixed(2)}
                           </td>
                           <td className="py-3 text-right text-black">
@@ -2583,7 +2642,7 @@ setInvoiceOrder(purchase);
                 </div>
 
                 {/* ── Totals ── */}
-                <div className="border-t border-slate-200/70 px-4 py-6 dark:border-slate-800/70 sm:px-8">
+                <div className="border-t border-secondary-200/70 px-4 py-6 dark:border-slate-800/70 sm:px-8">
                   <div className="ml-auto max-w-xs space-y-2 text-sm">
                     {Number(invoiceOrder.subTotal || 0) > 0 && (
                       <div className="flex justify-between text-black">
@@ -2603,7 +2662,7 @@ setInvoiceOrder(purchase);
                         <span>-{money(invoiceOrder.discountTotal || invoiceOrder.discount)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between border-t border-slate-200/70 pt-3 font-bold text-black dark:border-slate-700 dark:text-white">
+                    <div className="flex justify-between border-t border-secondary-200/70 pt-3 font-bold text-black dark:border-slate-700 dark:text-white">
                       <span className="text-base">Grand Total</span>
                       <span className="text-lg">{money(invoiceOrder.grandTotal)}</span>
                     </div>
@@ -2621,7 +2680,7 @@ setInvoiceOrder(purchase);
                 </div>
 
                 {/* ── Footer ── */}
-                <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-4 py-4 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
+                <div className="flex items-center justify-between border-t border-secondary-200/70 bg-mist/60 px-4 py-4 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
                   <p className="text-xs text-black">Thank you for your business!</p>
                   <p className="text-xs text-black">
                     Printed {dayjs().format("D MMM YYYY")}
@@ -2648,6 +2707,60 @@ setInvoiceOrder(purchase);
           Boolean(deletePurchase) && deletingPurchaseId === deletePurchase.id
         }
       />
+
+      <Dialog
+        isOpen={Boolean(cancelPurchase)}
+        onClose={closeCancelDialog}
+        title={t("purchases.cancelInvoice")}
+        size="sm"
+        showCloseButton={!(cancelPurchase && cancellingPurchaseId === cancelPurchase.id)}
+        closeOnOverlayClick={!(cancelPurchase && cancellingPurchaseId === cancelPurchase.id)}
+        footer={(
+          <>
+            <button
+              type="button"
+              className="btn-secondary w-full sm:w-auto"
+              onClick={closeCancelDialog}
+              disabled={Boolean(cancelPurchase && cancellingPurchaseId === cancelPurchase.id)}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="button"
+              className="w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              onClick={handleCancelPurchase}
+              disabled={Boolean(cancelPurchase && cancellingPurchaseId === cancelPurchase.id)}
+            >
+              {cancelPurchase && cancellingPurchaseId === cancelPurchase.id
+                ? t("common.loading")
+                : t("purchases.confirmCancelInvoice")}
+            </button>
+          </>
+        )}
+      >
+        <div className="space-y-3">
+          <p className="text-sm leading-6 text-secondary-700">
+            {cancelPurchase
+              ? t("purchases.cancelConfirm", {
+                  name: cancelPurchase.invoiceNo || cancelPurchase.id.slice(0, 8),
+                })
+              : ""}
+          </p>
+          <div className="space-y-1">
+            <label className="label" htmlFor="purchase-cancel-reason">
+              {t("purchases.cancelReason")}
+            </label>
+            <textarea
+              id="purchase-cancel-reason"
+              className="input min-h-[96px] resize-none"
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              placeholder={t("purchases.cancelReasonPlaceholder")}
+              disabled={Boolean(cancelPurchase && cancellingPurchaseId === cancelPurchase.id)}
+            />
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

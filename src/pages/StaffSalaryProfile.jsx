@@ -21,6 +21,7 @@ import {
 
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
+import { isOwnStaffMembership } from "../lib/accessControl";
 import { useI18n } from "../lib/i18n.jsx";
 import { formatMaybeDate, formatMaybeDateTime } from "../lib/datetime";
 import { formatMoney, parseMonthYear, toInitials } from "../lib/formatting";
@@ -30,9 +31,13 @@ import dayjs from "../lib/datetime";
 import FlexibleDateInput from "../components/FlexibleDateInput.jsx";
 import DateDisplay from "../components/DateDisplay.jsx";
 
+import StatsCard, { STATS_GRID_CLASS } from "../components/StatsCard.jsx";
 import Notice from "../components/Notice";
+import PageHeader from "../components/PageHeader";
 import ActionMenu from "../components/ActionMenu";
 import ConfirmDialog from "../components/ui/ConfirmDialog.jsx";
+import AccountSecurityPanel from "../components/account/AccountSecurityPanel.jsx";
+import ProfileSettingsPanel from "../components/settings/ProfileSettingsPanel.jsx";
 import { useSnackbar } from "../lib/snackbar.jsx";
 import { Badge } from "../components/Badge";
 import { useLoadingState } from "../hooks/useLoadingState";
@@ -117,7 +122,7 @@ function Skeleton({ className = "", lines = 1 }) {
       {Array.from({ length: lines }).map((_, i) => (
         <div
           key={i}
-          className={`h-3 rounded-md bg-slate-200 dark:bg-slate-700 ${
+          className={`h-3 rounded-md bg-secondary-200 dark:bg-slate-700 ${
             className || (i === lines - 1 ? "w-3/4" : "w-full")
           }`}
         />
@@ -128,14 +133,14 @@ function Skeleton({ className = "", lines = 1 }) {
 
 function CardSkeleton() {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div className="rounded-2xl border border-secondary-100 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 space-y-3">
           <Skeleton className="h-3 w-1/3" />
           <Skeleton className="h-6 w-2/3" />
           <Skeleton className="h-3 w-1/4" />
         </div>
-        <div className="h-10 w-10 shrink-0 rounded-xl bg-slate-200 dark:bg-slate-700" />
+        <div className="h-10 w-10 shrink-0 rounded-xl bg-secondary-200 dark:bg-slate-700" />
       </div>
     </div>
   );
@@ -161,7 +166,7 @@ function TableSkeleton({ rows = 4 }) {
 
 function HoursBadge({ duration }) {
   if (!duration) {
-    return <span className="text-slate-300 dark:text-slate-600">—</span>;
+    return <span className="text-secondary-300 dark:text-secondary-700">—</span>;
   }
   return (
     <Badge variant="success" size="sm" icon={<Timer size={11} />}>
@@ -190,73 +195,10 @@ function AttendancePill({ status }) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
-function MetricCard({ label, value, sub, icon: Icon, accent = false }) {
-  return (
-    <div
-      className={`group relative overflow-hidden rounded-2xl p-5 transition-all duration-300 ${
-        accent
-          ? "bg-gradient-to-br from-[#9c5f22] to-[#b87a3a] shadow-lg shadow-amber-900/10"
-          : "border border-slate-100 bg-white shadow-sm hover:shadow-md hover:border-slate-200 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
-      }`}
-    >
-      {accent && (
-        <div className="pointer-events-none absolute -inset-20 bg-gradient-to-tr from-white/5 via-transparent to-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-      )}
-      <div className="relative flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p
-            className={`text-[11px] font-semibold uppercase tracking-widest ${
-              accent
-                ? "text-amber-200/80"
-                : "text-slate-400 dark:text-slate-500"
-            }`}
-          >
-            {label}
-          </p>
-          <p
-            className={`mt-2.5 text-2xl font-bold tabular-nums tracking-tight ${
-              accent ? "text-white" : "text-slate-900 dark:text-white"
-            }`}
-          >
-            {value}
-          </p>
-          {sub && (
-            <p
-              className={`mt-1 text-xs ${
-                accent
-                  ? "text-amber-200/70"
-                  : "text-slate-400 dark:text-slate-500"
-              }`}
-            >
-              {sub}
-            </p>
-          )}
-        </div>
-        <div
-          className={`shrink-0 rounded-xl p-2.5 transition-all duration-200 group-hover:scale-110 ${
-            accent
-              ? "bg-white/15"
-              : "bg-slate-50 dark:bg-slate-800 group-hover:bg-slate-100 dark:group-hover:bg-slate-700"
-          }`}
-        >
-          <Icon
-            size={16}
-            className={
-              accent
-                ? "text-white"
-                : "text-slate-400 dark:text-slate-500"
-            }
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function Card({ children, className = "" }) {
   return (
     <div
-      className={`rounded-2xl border border-slate-100 bg-white shadow-sm transition-all duration-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 ${className}`}
+      className={`rounded-2xl border border-secondary-100 bg-white shadow-sm transition-all duration-200 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 ${className}`}
     >
       {children}
     </div>
@@ -265,13 +207,13 @@ function Card({ children, className = "" }) {
 
 function CardHeader({ title, description, right }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4 dark:border-slate-800">
+    <div className="flex items-start justify-between gap-4 border-b border-secondary-100 px-6 py-4 dark:border-slate-800">
       <div>
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+        <h3 className="text-sm font-semibold text-ink">
           {title}
         </h3>
         {description && (
-          <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+          <p className="mt-0.5 text-xs text-secondary-400">
             {description}
           </p>
         )}
@@ -284,12 +226,12 @@ function CardHeader({ title, description, right }) {
 function Field({ label, value, icon: Icon, full = false }) {
   return (
     <div className={full ? "col-span-full" : ""}>
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-secondary-400">
         {label}
       </p>
       <div className="mt-1 flex items-center gap-1.5">
-        {Icon && <Icon size={12} className="shrink-0 text-slate-400" />}
-        <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+        {Icon && <Icon size={12} className="shrink-0 text-secondary-400" />}
+        <p className="text-sm font-medium text-ink dark:text-slate-200">
           {value || "—"}
         </p>
       </div>
@@ -298,19 +240,19 @@ function Field({ label, value, icon: Icon, full = false }) {
 }
 
 function Divider() {
-  return <hr className="border-slate-100 dark:border-slate-800" />;
+  return <hr className="border-secondary-100 dark:border-slate-800" />;
 }
 
 function Empty({ title, description, action }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-12 text-center transition-all duration-200 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/40 dark:hover:border-slate-700">
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-secondary-200 bg-mist/50 px-6 py-12 text-center transition-all duration-200 hover:border-secondary-300 dark:border-slate-800 dark:bg-slate-900/40 dark:hover:border-slate-700">
       {title && (
-        <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+        <p className="text-sm font-semibold text-ink-light dark:text-secondary-300">
           {title}
         </p>
       )}
       {description && (
-        <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+        <p className="mt-1 text-xs text-secondary-400">
           {description}
         </p>
       )}
@@ -331,7 +273,7 @@ function Empty({ title, description, action }) {
 
 function TabBar({ value, onChange, tabs }) {
   return (
-    <div className="flex gap-1 rounded-xl bg-slate-100 p-1 shadow-inner dark:bg-slate-800/60">
+    <div className="flex gap-1 rounded-xl bg-secondary-100 p-1 shadow-inner dark:bg-slate-800/60">
       {tabs.map((tab) => (
         <button
           key={tab.key}
@@ -339,8 +281,8 @@ function TabBar({ value, onChange, tabs }) {
           onClick={() => onChange(tab.key)}
           className={`flex-1 rounded-lg px-4 py-2 text-xs font-semibold transition-all duration-200 ${
             value === tab.key
-              ? "bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white"
-              : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              ? "bg-white text-ink shadow-sm dark:bg-slate-900 dark:text-white"
+              : "text-secondary-500 hover:text-ink-light dark:text-secondary-400 dark:hover:text-slate-200"
           }`}
           role="tab"
           aria-selected={value === tab.key}
@@ -373,7 +315,7 @@ function LocationDisplay({ record }) {
       : null);
 
   if (!inLoc && !outLoc) {
-    return <span className="text-slate-400">—</span>;
+    return <span className="text-secondary-400">—</span>;
   }
 
   return (
@@ -383,7 +325,7 @@ function LocationDisplay({ record }) {
           href={googleMapsUrl(inLoc.lat, inLoc.lng)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-primary-600 dark:text-slate-400 dark:hover:text-primary-400 transition-colors"
+          className="inline-flex items-center gap-1 text-[11px] text-secondary-500 hover:text-primary-600 dark:text-secondary-400 dark:hover:text-primary-400 transition-colors"
           title={`Punch-in: ${inLoc.lat.toFixed(4)}, ${inLoc.lng.toFixed(4)}`}
           aria-label="View punch-in location on Google Maps"
         >
@@ -398,7 +340,7 @@ function LocationDisplay({ record }) {
           href={googleMapsUrl(outLoc.lat, outLoc.lng)}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-primary-600 dark:text-slate-500 dark:hover:text-primary-400 transition-colors"
+          className="inline-flex items-center gap-1 text-[11px] text-secondary-400 hover:text-primary-600 dark:text-secondary-500 dark:hover:text-primary-400 transition-colors"
           title={`Punch-out: ${outLoc.lat.toFixed(4)}, ${outLoc.lng.toFixed(4)}`}
           aria-label="View punch-out location on Google Maps"
         >
@@ -421,7 +363,7 @@ function StaffProfileCard({ meta, loading }) {
     <Card>
       {/* Avatar + name */}
       <div className="flex items-center gap-4 px-6 py-5">
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#9c5f22]/10 text-lg font-bold text-[#9c5f22] dark:bg-[#9c5f22]/20 dark:text-[#dca060]">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-lg font-bold text-primary dark:bg-primary/20 dark:text-primary-300">
           {loading ? <Skeleton className="h-8 w-8 rounded-lg" /> : ini}
         </div>
         <div className="min-w-0 flex-1">
@@ -433,10 +375,10 @@ function StaffProfileCard({ meta, loading }) {
             </div>
           ) : (
             <>
-              <p className="truncate text-base font-bold text-slate-900 dark:text-white">
+              <p className="truncate text-base font-bold text-ink">
                 {meta.name}
               </p>
-              <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+              <p className="mt-0.5 text-xs text-secondary-400">
                 {meta.jobTitle !== "—" ? meta.jobTitle : "No title set"}
               </p>
               <div className="mt-2">
@@ -451,7 +393,7 @@ function StaffProfileCard({ meta, loading }) {
 
       {/* Contact */}
       <div className="px-6 py-5">
-        <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-secondary-400">
           Contact
         </p>
         {loading ? (
@@ -465,7 +407,7 @@ function StaffProfileCard({ meta, loading }) {
             {meta.email && (
               <a
                 href={`mailto:${meta.email}`}
-                className="flex items-start gap-2 text-sm text-slate-700 hover:text-primary-600 dark:text-slate-300"
+                className="flex items-start gap-2 text-sm text-ink-light hover:text-primary-600 dark:text-secondary-300"
                 aria-label={`Email ${meta.email}`}
               >
                 <span aria-hidden="true">✉</span>
@@ -475,7 +417,7 @@ function StaffProfileCard({ meta, loading }) {
             {meta.phone && (
               <a
                 href={`tel:${meta.phone}`}
-                className="flex items-start gap-2 text-sm text-slate-700 hover:text-primary-600 dark:text-slate-300"
+                className="flex items-start gap-2 text-sm text-ink-light hover:text-primary-600 dark:text-secondary-300"
                 aria-label={`Call ${meta.phone}`}
               >
                 <span aria-hidden="true">☎</span>
@@ -483,7 +425,7 @@ function StaffProfileCard({ meta, loading }) {
               </a>
             )}
             {meta.address && (
-              <div className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+              <div className="flex items-start gap-2 text-sm text-ink-light dark:text-secondary-300">
                 <span aria-hidden="true">📍</span>
                 {meta.address}
               </div>
@@ -496,7 +438,7 @@ function StaffProfileCard({ meta, loading }) {
 
       {/* Employment */}
       <div className="px-6 py-5">
-        <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-widest text-secondary-400">
           Employment
         </p>
         {loading ? (
@@ -511,38 +453,38 @@ function StaffProfileCard({ meta, loading }) {
         ) : (
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-xs text-slate-400"># Employee ID</span>
-              <span className="text-right text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <span className="flex items-center gap-2 text-xs text-secondary-400"># Employee ID</span>
+              <span className="text-right text-xs font-semibold text-ink dark:text-slate-200">
                 {meta.employeeId || "—"}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-xs text-slate-400">Department</span>
-              <span className="text-right text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <span className="flex items-center gap-2 text-xs text-secondary-400">Department</span>
+              <span className="text-right text-xs font-semibold text-ink dark:text-slate-200">
                 {meta.category || "—"}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-xs text-slate-400">Shift</span>
-              <span className="text-right text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <span className="flex items-center gap-2 text-xs text-secondary-400">Shift</span>
+              <span className="text-right text-xs font-semibold text-ink dark:text-slate-200">
                 {meta.shift || "—"}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-xs text-slate-400">Shift Started</span>
-              <span className="text-right text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <span className="flex items-center gap-2 text-xs text-secondary-400">Shift Started</span>
+              <span className="text-right text-xs font-semibold text-ink dark:text-slate-200">
                 {meta.shiftStarted ? String(meta.shiftStarted).slice(0, 5) : "—"}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-xs text-slate-400">Shift Ended</span>
-              <span className="text-right text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <span className="flex items-center gap-2 text-xs text-secondary-400">Shift Ended</span>
+              <span className="text-right text-xs font-semibold text-ink dark:text-slate-200">
                 {meta.shiftEnded ? String(meta.shiftEnded).slice(0, 5) : "—"}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-xs text-slate-400">Joined</span>
-              <span className="text-right text-xs font-semibold text-slate-800 dark:text-slate-200">
+              <span className="flex items-center gap-2 text-xs text-secondary-400">Joined</span>
+              <span className="text-right text-xs font-semibold text-ink dark:text-slate-200">
                 <DateDisplay date={meta.joinedAt} />
               </span>
             </div>
@@ -596,7 +538,7 @@ function InlineSalaryEditor({ value, onSave, membershipId }) {
     return (
       <div className="flex items-center gap-1">
         <div className="relative">
-          <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-xs text-slate-400">
+          <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-xs text-secondary-400">
             $
           </span>
           <input
@@ -628,7 +570,7 @@ function InlineSalaryEditor({ value, onSave, membershipId }) {
           type="button"
           onClick={handleCancel}
           disabled={saving}
-          className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 dark:hover:bg-slate-800"
+          className="rounded-lg p-1.5 text-secondary-400 transition hover:bg-secondary-100 dark:hover:bg-slate-800"
           aria-label="Cancel salary edit"
         >
           <X size={14} />
@@ -639,13 +581,13 @@ function InlineSalaryEditor({ value, onSave, membershipId }) {
 
   return (
     <div className="group flex items-center gap-2">
-      <span className="text-sm font-medium text-slate-800 dark:text-slate-200">
+      <span className="text-sm font-medium text-ink dark:text-slate-200">
         ${Number(value || 0).toFixed(2)}
       </span>
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="rounded-lg p-1 text-slate-300 opacity-0 transition hover:text-primary-600 group-hover:opacity-100 dark:text-slate-600 dark:hover:text-primary-400"
+        className="rounded-lg p-1 text-secondary-300 opacity-0 transition hover:text-primary-600 group-hover:opacity-100 dark:text-secondary-700 dark:hover:text-primary-400"
         aria-label="Edit base salary"
       >
         <Pencil size={12} />
@@ -769,7 +711,7 @@ function PayrollEntryPanel({
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
             <div className="sm:col-span-2">
               <label
-                className="text-[10px] font-semibold uppercase tracking-widest text-slate-400"
+                className="text-[10px] font-semibold uppercase tracking-widest text-secondary-400"
                 htmlFor="sal-type"
               >
                 Type
@@ -787,7 +729,7 @@ function PayrollEntryPanel({
 
             <div>
               <label
-                className="text-[10px] font-semibold uppercase tracking-widest text-slate-400"
+                className="text-[10px] font-semibold uppercase tracking-widest text-secondary-400"
                 htmlFor="sal-amount"
               >
                 Amount
@@ -809,7 +751,7 @@ function PayrollEntryPanel({
 
             <div>
               <label
-                className="text-[10px] font-semibold uppercase tracking-widest text-slate-400"
+                className="text-[10px] font-semibold uppercase tracking-widest text-secondary-400"
                 htmlFor="sal-date"
               >
                 Date
@@ -826,7 +768,7 @@ function PayrollEntryPanel({
 
             <div className="sm:col-span-2">
               <label
-                className="text-[10px] font-semibold uppercase tracking-widest text-slate-400"
+                className="text-[10px] font-semibold uppercase tracking-widest text-secondary-400"
                 htmlFor="sal-month"
               >
                 Applies to month
@@ -844,10 +786,10 @@ function PayrollEntryPanel({
 
             <div className="sm:col-span-2 md:col-span-4">
               <label
-                className="text-[10px] font-semibold uppercase tracking-widest text-slate-400"
+                className="text-[10px] font-semibold uppercase tracking-widest text-secondary-400"
                 htmlFor="sal-note"
               >
-                Note <span className="normal-case font-normal text-slate-300">(optional)</span>
+                Note <span className="normal-case font-normal text-secondary-300">(optional)</span>
               </label>
               <input
                 id="sal-note"
@@ -891,12 +833,14 @@ function PayrollEntryPanel({
 export default function StaffSalaryProfile() {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const { membershipId } = useParams();
-  const { canViewFeature, canManageFeature } = useAuth();
+  const { membershipId: membershipIdParam } = useParams();
+  const { canViewFeature, canManageFeature, accessControl, user } = useAuth();
   const { showSuccess, showError } = useSnackbar();
 
-  const canView = canViewFeature("staff") || canViewFeature("attendance") || canViewFeature("ledger");
-  const canManage = canManageFeature("staff");
+  const membershipId = membershipIdParam || accessControl?.membershipId || "";
+  const isSelf = isOwnStaffMembership(accessControl, membershipId);
+  const canView = isSelf || canViewFeature("staff") || canViewFeature("attendance") || canViewFeature("ledger");
+  const canManage = canManageFeature("staff") && !isSelf;
 
   // Loading state
   const loading = useLoadingState({ meta: true });
@@ -953,9 +897,9 @@ export default function StaffSalaryProfile() {
       const m = await api.getStaffMember(membershipId);
       if (m) {
         setEmployeeMeta({
-          name: m.user?.name || m.user?.email || "",
-          email: m.user?.email || m.email || "",
-          phone: m.phone || m.user?.phone || "",
+          name: m.user?.name || m.user?.email || user?.name || "",
+          email: m.user?.email || m.email || user?.email || "",
+          phone: m.phone || m.user?.phone || user?.phone || "",
           jobTitle: m.jobTitle || "",
           category: m.category?.label || m.category || "",
           shift: m.shift || "",
@@ -974,7 +918,7 @@ export default function StaffSalaryProfile() {
     } finally {
       loading.setLoading("meta", false);
     }
-  }, [membershipId, loading]);
+  }, [membershipId, loading, user?.email, user?.name, user?.phone]);
 
   const loadSalaryRecords = useCallback(async () => {
     if (!membershipId) return;
@@ -1094,6 +1038,16 @@ export default function StaffSalaryProfile() {
     setEmployeeMeta((prev) => ({ ...prev, baseSalary: newAmount }));
   };
 
+  useEffect(() => {
+    if (!isSelf) return;
+    setEmployeeMeta((prev) => ({
+      ...prev,
+      name: user?.name || prev.name,
+      phone: user?.phone || prev.phone,
+      email: user?.email || prev.email,
+    }));
+  }, [isSelf, user?.email, user?.name, user?.phone]);
+
   const menuActions = useMemo(
     () =>
       [
@@ -1105,38 +1059,50 @@ export default function StaffSalaryProfile() {
             setPayrollAdding(true);
           },
         },
-        {
+        !isSelf && {
           label: "Export records",
           icon: Download,
           onClick: () => showError("Export is not wired to backend in this build."),
         },
       ].filter(Boolean),
-    [canManage, membershipId, showError],
+    [canManage, isSelf, membershipId, showError],
   );
 
   const tabs = [
     { key: "overview", label: "Overview" },
     { key: "attendance", label: "Attendance" },
     { key: "history", label: "Payroll" },
+    ...(isSelf ? [{ key: "account", label: t("staffProfile.account") }] : []),
   ];
+
+  if (!membershipId) {
+    return <Notice title={t("staffProfile.missingMembership")} tone="error" />;
+  }
 
   if (!canView) return null;
 
   return (
     <div className="space-y-5">
-      {/* ── Page top bar ── */}
-      <div className="flex items-center justify-between gap-4">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-xs font-medium text-slate-400 transition hover:text-slate-700 dark:hover:text-slate-200"
-          aria-label="Go back to staff list"
-        >
-          <ArrowLeft size={13} />
-          Back to staff
-        </button>
-        <ActionMenu actions={menuActions} label="Actions" />
-      </div>
+      {isSelf ? (
+        <PageHeader
+          title={t("staffProfile.title")}
+          subtitle={t("staffProfile.subtitle")}
+          action={menuActions.length ? <ActionMenu actions={menuActions} label="Actions" /> : null}
+        />
+      ) : (
+        <div className="flex items-center justify-between gap-4">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1.5 text-xs font-medium text-secondary-400 transition hover:text-ink-light dark:hover:text-slate-200"
+            aria-label={t("staffProfile.backToStaff")}
+          >
+            <ArrowLeft size={13} />
+            {t("staffProfile.backToStaff")}
+          </button>
+          <ActionMenu actions={menuActions} label="Actions" />
+        </div>
+      )}
 
       {error && (
         <Notice title={error} tone="error" onDismiss={() => setError("")} />
@@ -1159,7 +1125,7 @@ export default function StaffSalaryProfile() {
           {activeTab === "overview" && (
             <div className="space-y-4">
               {/* Salary metrics */}
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className={STATS_GRID_CLASS}>
                 {loading.meta ? (
                   <>
                     <CardSkeleton />
@@ -1169,30 +1135,33 @@ export default function StaffSalaryProfile() {
                   </>
                 ) : (
                   <>
-                    <MetricCard
-                      label="Monthly salary"
+                    <StatsCard
+                      title="Monthly salary"
                       value={formatMoney(t, stats.monthlySalary)}
-                      sub="Base pay"
+                      hint="Base pay"
                       icon={DollarSign}
-                      accent
+                      tone="default"
                     />
-                    <MetricCard
-                      label="Balance due"
+                    <StatsCard
+                      title="Balance due"
                       value={formatMoney(t, stats.netRemaining)}
-                      sub="Remaining this month"
+                      hint="Remaining this month"
                       icon={Clock}
+                      tone={Number(stats.netRemaining) < 0 ? "danger" : "warning"}
                     />
-                    <MetricCard
-                      label="Advances taken"
+                    <StatsCard
+                      title="Advances taken"
                       value={formatMoney(t, stats.totalAdvanceThisMonth)}
-                      sub={currentMonthYear}
+                      hint={currentMonthYear}
                       icon={FileText}
+                      tone="info"
                     />
-                    <MetricCard
-                      label="Salary paid"
+                    <StatsCard
+                      title="Salary paid"
                       value={formatMoney(t, stats.totalPaidThisMonth)}
-                      sub={currentMonthYear}
+                      hint={currentMonthYear}
                       icon={ShieldCheck}
+                      tone="success"
                     />
                   </>
                 )}
@@ -1214,7 +1183,7 @@ export default function StaffSalaryProfile() {
                 ) : (
                   <div className="grid grid-cols-2 gap-x-8 gap-y-5 px-6 py-5">
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-secondary-400">
                         Base salary
                       </p>
                       {canManage ? (
@@ -1224,7 +1193,7 @@ export default function StaffSalaryProfile() {
                           membershipId={membershipId}
                         />
                       ) : (
-                        <p className="mt-1 text-sm font-medium text-slate-800 dark:text-slate-200">
+                        <p className="mt-1 text-sm font-medium text-ink dark:text-slate-200">
                           {formatMoney(t, stats.monthlySalary)}
                         </p>
                       )}
@@ -1245,47 +1214,38 @@ export default function StaffSalaryProfile() {
                   description="Last 30 days."
                 />
                 {loading.meta ? (
-                  <div className="grid grid-cols-4 gap-4 p-5">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <div key={i} className="text-center">
-                        <Skeleton className="mx-auto h-6 w-12" />
-                        <Skeleton className="mx-auto mt-1 h-3 w-14" />
-                      </div>
-                    ))}
+                  <div className={`${STATS_GRID_CLASS} p-5`}>
+                    <CardSkeleton />
+                    <CardSkeleton />
+                    <CardSkeleton />
+                    <CardSkeleton />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-4 divide-x divide-slate-100 dark:divide-slate-800">
-                    {[
-                      {
-                        label: "Present",
-                        value: attendanceSummary.present,
-                        color: "text-emerald-600 dark:text-emerald-400",
-                      },
-                      {
-                        label: "Late",
-                        value: attendanceSummary.late,
-                        color: "text-amber-600 dark:text-amber-400",
-                      },
-                      {
-                        label: "Absent",
-                        value: attendanceSummary.absent,
-                        color: "text-rose-600 dark:text-rose-400",
-                      },
-                      {
-                        label: "Hours",
-                        value: attendanceSummary.totalHours,
-                        color: "text-indigo-600 dark:text-indigo-400",
-                      },
-                    ].map(({ label, value, color }) => (
-                      <div key={label} className="py-5 text-center">
-                        <p className={`text-2xl font-bold tabular-nums ${color}`}>
-                          {value}
-                        </p>
-                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
-                          {label}
-                        </p>
-                      </div>
-                    ))}
+                  <div className={`${STATS_GRID_CLASS} p-5`}>
+                    <StatsCard
+                      title="Present"
+                      value={attendanceSummary.present}
+                      icon={Users}
+                      tone="success"
+                    />
+                    <StatsCard
+                      title="Late"
+                      value={attendanceSummary.late}
+                      icon={Clock}
+                      tone="warning"
+                    />
+                    <StatsCard
+                      title="Absent"
+                      value={attendanceSummary.absent}
+                      icon={Calendar}
+                      tone="danger"
+                    />
+                    <StatsCard
+                      title="Hours"
+                      value={attendanceSummary.totalHours}
+                      icon={Timer}
+                      tone="info"
+                    />
                   </div>
                 )}
               </Card>
@@ -1298,31 +1258,34 @@ export default function StaffSalaryProfile() {
           {activeTab === "attendance" && (
             <div className="space-y-4">
               {/* Summary row */}
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <MetricCard
-                  label="Present"
+              <div className={STATS_GRID_CLASS}>
+                <StatsCard
+                  title="Present"
                   value={attendanceSummary.present}
-                  sub={`${attendanceDateFrom} → ${attendanceDateTo}`}
+                  hint={`${attendanceDateFrom} → ${attendanceDateTo}`}
                   icon={Users}
+                  tone="success"
                 />
-                <MetricCard
-                  label="Late arrivals"
+                <StatsCard
+                  title="Late arrivals"
                   value={attendanceSummary.late}
-                  sub="In selected range"
+                  hint="In selected range"
                   icon={Clock}
+                  tone="warning"
                 />
-                <MetricCard
-                  label="Absent"
+                <StatsCard
+                  title="Absent"
                   value={attendanceSummary.absent}
-                  sub="In selected range"
+                  hint="In selected range"
                   icon={Calendar}
+                  tone="danger"
                 />
-                <MetricCard
-                  label="Total hours"
+                <StatsCard
+                  title="Total hours"
                   value={attendanceSummary.totalHours}
-                  sub="In selected range"
+                  hint="In selected range"
                   icon={Timer}
-                  accent
+                  tone="info"
                 />
               </div>
 
@@ -1342,7 +1305,7 @@ export default function StaffSalaryProfile() {
                     </div>
                     <div>
                       <label
-                        className="text-[10px] font-semibold uppercase tracking-widest text-slate-400"
+                        className="text-[10px] font-semibold uppercase tracking-widest text-secondary-400"
                         htmlFor="att-from"
                       >
                         From
@@ -1356,7 +1319,7 @@ export default function StaffSalaryProfile() {
                     </div>
                     <div>
                       <label
-                        className="text-[10px] font-semibold uppercase tracking-widest text-slate-400"
+                        className="text-[10px] font-semibold uppercase tracking-widest text-secondary-400"
                         htmlFor="att-to"
                       >
                         To
@@ -1404,12 +1367,12 @@ export default function StaffSalaryProfile() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/60">
+                        <tr className="border-b border-secondary-100 bg-mist dark:border-slate-800 dark:bg-slate-900/60">
                           {["Date", "Punch in", "Punch out", "Hours", "Location", "Status"].map(
                             (h) => (
                               <th
                                 key={h}
-                                className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500"
+                                className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-ink"
                               >
                                 {h}
                               </th>
@@ -1421,14 +1384,14 @@ export default function StaffSalaryProfile() {
                         {attendance.map((record) => (
                           <tr
                             key={record.id}
-                            className="bg-white transition hover:bg-slate-50/60 dark:bg-slate-900 dark:hover:bg-slate-800/30"
+                            className="bg-white transition hover:bg-mist/60 dark:bg-slate-900 dark:hover:bg-slate-800/30"
                           >
-                            <td className="p-3 font-medium text-slate-800 dark:text-slate-200">
+                            <td className="p-3 font-medium text-ink dark:text-slate-200">
                               <DateDisplay date={record.date} format="YYYY-MM-DD" />
                             </td>
                             <td className="p-3 tabular-nums">
                               <div className="flex flex-col items-start gap-1">
-                                <span className={record.shiftStarted || record.shift ? (record.isLatePunchIn ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-slate-800 dark:text-slate-200'}>
+                                <span className={record.shiftStarted || record.shift ? (record.isLatePunchIn ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-ink dark:text-slate-200'}>
                                   {formatMaybeDateTime(record.punchInTime, "hh:mm A") || "—"}
                                 </span>
                                 {record.isLatePunchIn && (
@@ -1440,7 +1403,7 @@ export default function StaffSalaryProfile() {
                             </td>
                             <td className="p-3 tabular-nums">
                               <div className="flex flex-col items-start gap-1">
-                                <span className={record.punchOutTime ? (record.shiftEnded || record.shift ? (record.isEarlyPunchOut ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-slate-800 dark:text-slate-200') : 'text-slate-500 dark:text-slate-400'}>
+                                <span className={record.punchOutTime ? (record.shiftEnded || record.shift ? (record.isEarlyPunchOut ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-ink dark:text-slate-200') : 'text-secondary-500'}>
                                   {formatMaybeDateTime(record.punchOutTime, "hh:mm A") || "—"}
                                 </span>
                                 {record.isEarlyPunchOut && (
@@ -1485,14 +1448,14 @@ export default function StaffSalaryProfile() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  <h2 className="text-sm font-semibold text-ink">
                     Payroll records
                   </h2>
-                  <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+                  <p className="mt-0.5 text-xs text-secondary-400">
                     All salary payments and advances for this employee.
                   </p>
                 </div>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-secondary-400">
                   {records.length} records
                 </span>
               </div>
@@ -1504,7 +1467,11 @@ export default function StaffSalaryProfile() {
               ) : records.length === 0 ? (
                 <Empty
                   title="No payroll records yet"
-                  description="Add the first entry using the form below."
+                  description={
+                    canManage
+                      ? "Add the first entry using the form below."
+                      : "Payroll entries added by your employer will show up here."
+                  }
                   action={
                     canManage
                       ? {
@@ -1520,20 +1487,20 @@ export default function StaffSalaryProfile() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/60">
-                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                        <tr className="border-b border-secondary-100 bg-mist dark:border-slate-800 dark:bg-slate-900/60">
+                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-ink">
                             Date
                           </th>
-                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-ink">
                             Period
                           </th>
-                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-ink">
                             Type
                           </th>
-                          <th className="p-3 text-right text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                          <th className="p-3 text-right text-[10px] font-semibold uppercase tracking-widest text-ink">
                             Amount
                           </th>
-                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
+                          <th className="p-3 text-left text-[10px] font-semibold uppercase tracking-widest text-ink">
                             Note
                           </th>
                           <th className="p-3" />
@@ -1543,22 +1510,22 @@ export default function StaffSalaryProfile() {
                         {records.map((r) => (
                           <tr
                             key={r.id}
-                            className="bg-white transition hover:bg-slate-50/60 dark:bg-slate-900 dark:hover:bg-slate-800/30"
+                            className="bg-white transition hover:bg-mist/60 dark:bg-slate-900 dark:hover:bg-slate-800/30"
                           >
-                            <td className="p-3 text-slate-600 dark:text-slate-400">
+                            <td className="p-3 text-secondary-700 dark:text-secondary-400">
                               <DateDisplay date={r.date} />
                             </td>
-                            <td className="p-3 tabular-nums text-slate-600 dark:text-slate-400">
+                            <td className="p-3 tabular-nums text-secondary-700 dark:text-secondary-400">
                               {r.monthYear || parseMonthYear(r.date) || "—"}
                             </td>
                             <td className="p-3">
                               <TypePill type={r.type} />
                             </td>
-                            <td className="p-3 text-right font-semibold tabular-nums text-slate-900 dark:text-white">
+                            <td className="p-3 text-right font-semibold tabular-nums text-ink">
                               {formatMoney(t, r.amount)}
                             </td>
                             <td
-                              className="max-w-[160px] truncate p-3 text-slate-400 dark:text-slate-500"
+                              className="max-w-[160px] truncate p-3 text-secondary-400"
                               title={r.note}
                             >
                               {r.note || "—"}
@@ -1567,7 +1534,7 @@ export default function StaffSalaryProfile() {
                               {canManage && (
                                 <button
                                   type="button"
-                                  className="text-xs font-medium text-slate-300 transition hover:text-rose-500 dark:text-slate-600 dark:hover:text-rose-400"
+                                  className="text-xs font-medium text-secondary-300 transition hover:text-rose-500 dark:text-secondary-700 dark:hover:text-rose-400"
                                   onClick={() =>
                                     setDeleteDialog({
                                       open: true,
@@ -1601,6 +1568,13 @@ export default function StaffSalaryProfile() {
               )}
             </div>
           )}
+
+          {activeTab === "account" && isSelf ? (
+            <div className="space-y-4">
+              <ProfileSettingsPanel isOwner={false} />
+              <AccountSecurityPanel />
+            </div>
+          ) : null}
         </div>
       </div>
 

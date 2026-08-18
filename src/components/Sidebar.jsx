@@ -3,6 +3,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useAuth } from '../lib/auth.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { getNavigationForBusinessType } from '../lib/businessTypeConfig.js';
+import { expandNavigationForPermissions, getNavItemPermissionKey, withOwnProfileNavItem } from '../lib/accessControl';
 import BrandLogo from './BrandLogo.jsx';
 import UpgradeSubscriptionCta from './subscription/UpgradeSubscriptionCta.jsx';
 
@@ -10,6 +11,7 @@ const NAV_ROLE_MAP = {
   dashboard: ['owner', 'staff', 'admin', 'super_admin'],
   orders: ['owner', 'staff', 'admin', 'super_admin'],
   inventory: ['owner', 'staff', 'admin', 'super_admin'],
+  quickPos: ['owner', 'staff', 'admin', 'super_admin'],
   sales: ['owner', 'staff', 'admin', 'super_admin'],
   services: ['owner', 'staff', 'admin', 'super_admin'],
   purchases: ['owner', 'staff', 'admin', 'super_admin'],
@@ -67,26 +69,36 @@ export default function Sidebar() {
     if (item?.key === 'purchases') return { ...item, label: t('nav.expenses') };
     if (item?.key === 'attendance') return { ...item, label: t('nav.attendance') };
     if (item?.key === 'staff') return { ...item, label: t('nav.staff') };
+    if (item?.key === 'quickPos') return { ...item, label: t('nav.quickPos') || item.label };
+    if (item?.key === 'sales' && String(item?.route || '').includes('/sales')) {
+      return { ...item, label: t('nav.salesInvoices') };
+    }
     return item;
   });
 
   const membershipId = accessControl?.membershipId;
   let visibleNavItems;
   if (isGeneralStaff) {
-    const salaryRoute = membershipId ? `/app/staff-salary/${encodeURIComponent(membershipId)}` : '/app/staff';
     visibleNavItems = [
-      { key: 'staff-salary', label: t('nav.staff'), route: salaryRoute },
       { key: 'attendance', label: t('nav.attendance'), route: '/app/attendance' },
       { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
     ];
   } else {
-    visibleNavItems = navigation
-      .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
-      .filter((item) => hasFeatureAccess(item.key));
+    visibleNavItems = expandNavigationForPermissions(navigation, hasFeatureAccess)
+      .filter((item) => {
+        const permissionKey = getNavItemPermissionKey(item);
+        return (NAV_ROLE_MAP[permissionKey] || NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role);
+      })
+      .filter((item) => hasFeatureAccess(getNavItemPermissionKey(item)));
   }
+  visibleNavItems = withOwnProfileNavItem(visibleNavItems, {
+    role,
+    membershipId,
+    label: t('nav.profile'),
+  });
 
   return (
-    <aside className="hidden h-full w-64 flex-col gap-6 border-r border-slate-200/70 bg-white/80 p-6 dark:border-slate-800/70 dark:bg-slate-950/70 md:fixed md:inset-y-0 md:left-0 md:flex md:overflow-y-auto">
+    <aside className="hidden h-full w-64 flex-col gap-6 border-r border-secondary-200/70 bg-surface/80 p-6 md:fixed md:inset-y-0 md:left-0 md:flex md:overflow-y-auto">
       <div className="space-y-3">
         <BrandLogo className="h-10 w-full" />
       </div>
@@ -99,8 +111,8 @@ export default function Sidebar() {
             className={({ isActive }) =>
               `rounded-xl px-3 py-2 text-sm font-semibold transition ${
                 isActive
-                  ? 'bg-[#9c5f22] text-white'
-                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/70'
+                  ? 'bg-primary text-white'
+                  : 'text-ink-light hover:bg-primary/10'
               }`
             }
           >
@@ -110,7 +122,7 @@ export default function Sidebar() {
       </nav>
       <div className="mt-auto space-y-3">
         <UpgradeSubscriptionCta variant="sidebar" />
-        <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-4 text-xs text-slate-500 dark:border-slate-800/60 dark:bg-slate-900/60 dark:text-slate-400">
+        <div className="rounded-2xl border border-secondary-200/70 bg-surface/70 p-4 text-xs text-secondary-500">
           {/* {t('notices.businessRequiredDesc')} */}
         </div>
       </div>

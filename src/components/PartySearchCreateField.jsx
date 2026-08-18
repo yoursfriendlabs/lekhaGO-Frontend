@@ -213,16 +213,16 @@ export default function PartySearchCreateField({
             {getInitials(selected.name)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold text-slate-800 dark:text-slate-100">{selected.name || placeholder || '—'}</p>
+            <p className="truncate font-semibold text-ink">{selected.name || placeholder || '—'}</p>
             {selected.phone ? (
               <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                <p className="text-xs text-slate-500">{selected.phone}</p>
+                <p className="text-xs text-secondary-500">{selected.phone}</p>
                 {!hasDue && whatsappLink ? (
                   <a
                     href={whatsappLink}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700"
+                    className="inline-flex items-center gap-1 rounded-full bg-secondary-100 px-2 py-0.5 text-[11px] font-semibold text-secondary-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-secondary-200 dark:bg-slate-900 dark:text-secondary-300 dark:ring-slate-700"
                     aria-label={`Open WhatsApp chat for ${selected.phone}`}
                   >
                     <MessageCircle size={12} />
@@ -258,7 +258,7 @@ export default function PartySearchCreateField({
           <button
             type="button"
             onClick={handleClear}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600 dark:hover:bg-slate-800"
+            className="rounded-lg p-1.5 text-secondary-400 hover:bg-white hover:text-secondary-700 dark:hover:bg-slate-800"
             aria-label={t('common.clear')}
           >
             <X size={16} />
@@ -266,10 +266,10 @@ export default function PartySearchCreateField({
         </div>
       ) : (
         <div>
-          <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-white px-3 py-2.5 dark:border-slate-700/60 dark:bg-slate-900/60 focus-within:border-primary-300">
-            <Search size={16} className="shrink-0 text-slate-400" />
+          <div className="flex items-center gap-2 rounded-2xl border border-secondary-200/70 bg-white px-3 py-2.5 dark:border-slate-700/60 dark:bg-slate-900/60 focus-within:border-primary-300">
+            <Search size={16} className="shrink-0 text-secondary-400" />
             <input
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400 dark:text-slate-200"
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-secondary-400 dark:text-slate-200"
               placeholder={searchPlaceholder || placeholder}
               value={query}
               onChange={(event) => {
@@ -289,7 +289,7 @@ export default function PartySearchCreateField({
                   setShowCreate(false);
                   setMessage('');
                 }}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-secondary-400 hover:text-secondary-700"
                 aria-label={t('common.clear')}
               >
                 <X size={14} />
@@ -300,7 +300,7 @@ export default function PartySearchCreateField({
           {open && query.trim() && dropdownStyle ? createPortal(
             <div
               ref={dropdownRef}
-              className="fixed z-[1000] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+              className="fixed z-[1000] overflow-y-auto rounded-2xl border border-secondary-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
               style={dropdownStyle}
             >
               {visibleResults.length > 0 ? (
@@ -308,20 +308,20 @@ export default function PartySearchCreateField({
                   <button
                     key={party.id || party.name}
                     type="button"
-                    className="flex w-full items-center gap-3 border-b border-slate-100/80 px-4 py-3 text-left text-sm hover:bg-slate-50 dark:border-slate-800/50 dark:hover:bg-slate-800/60 last:border-b-0"
+                    className="flex w-full items-center gap-3 border-b border-secondary-100/80 px-4 py-3 text-left text-sm hover:bg-mist dark:border-slate-800/50 dark:hover:bg-slate-800/60 last:border-b-0"
                     onClick={() => handleSelect(party)}
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary-100 text-xs font-bold text-secondary-700 dark:bg-slate-800 dark:text-secondary-300">
                       {getInitials(party.name)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-slate-800 dark:text-slate-200">{party.name}</p>
-                      {party.phone ? <p className="text-xs text-slate-500">{party.phone}</p> : null}
+                      <p className="truncate font-semibold text-ink dark:text-slate-200">{party.name}</p>
+                      {party.phone ? <p className="text-xs text-secondary-500">{party.phone}</p> : null}
                     </div>
                   </button>
                 ))
               ) : (
-                <p className="px-4 py-3 text-sm text-slate-500">{t('common.noData')}</p>
+                <p className="px-4 py-3 text-sm text-secondary-500">{t('common.noData')}</p>
               )}
 
               {!showCreate ? (
@@ -337,11 +337,11 @@ export default function PartySearchCreateField({
                   {t('common.add')} &ldquo;{query.trim()}&rdquo;{entityLabel ? ` ${entityLabel.toLowerCase()}` : ''}
                 </button>
               ) : (
-                <div className="rounded-b-2xl border-t border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
-                    <Phone size={13} className="shrink-0 text-slate-400" />
+                <div className="rounded-b-2xl border-t border-secondary-100 bg-mist p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                  <div className="flex items-center gap-2 rounded-xl border border-secondary-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                    <Phone size={13} className="shrink-0 text-secondary-400" />
                     <input
-                      className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                      className="flex-1 bg-transparent text-sm outline-none placeholder:text-secondary-400"
                       type="tel"
                       inputMode="numeric"
                       placeholder={t('parties.phonePlaceholder')}

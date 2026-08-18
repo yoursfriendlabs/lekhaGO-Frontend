@@ -128,7 +128,7 @@ export default function ResetPassword() {
           <Link className="btn-primary w-full justify-center" to="/login">
             {t('auth.returnToLogin')}
           </Link>
-          <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-center text-sm text-secondary-500">
             {t('auth.passwordResetSuccessFooter')}
           </p>
         </div>

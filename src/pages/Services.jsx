@@ -30,7 +30,7 @@ import { printElement, printThermalReceipt } from "../lib/print.js";
 import FileUpload from "../components/FileUpload";
 import DynamicAttributes from "../components/DynamicAttributes";
 import ThermalReceipt from "../components/ThermalReceipt";
-import StatsCard from "../components/StatsCard.jsx";
+import StatsCard, { STATS_GRID_CLASS } from "../components/StatsCard.jsx";
 import {
   getJewelleryBreakdown,
   getPurityOptionsForMetal,
@@ -60,6 +60,7 @@ import {
   MessageCircle,
   Printer,
   Trash2,
+  Ban,
 } from "lucide-react";
 import { usePartyStore } from "../stores/parties";
 import { useServiceStore } from "../stores/services";
@@ -86,6 +87,7 @@ import dayjs, {
   toDateInputValue,
 } from "../lib/datetime";
 import { getPartyBalanceMeta } from "../lib/partyBalances.js";
+import { getIrdReprintLabel, isIrdCancelled, isIrdLocked } from "../lib/ird";
 
 const emptyItem = {
   itemType: "labor",
@@ -168,11 +170,11 @@ function AttachmentPreview({ url, onOpen, size = "sm" }) {
   return (
     <button
       type="button"
-      className={`overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:opacity-80 dark:border-slate-800 dark:bg-slate-900 ${sizeClass}`}
+      className={`overflow-hidden rounded-2xl border border-secondary-200 bg-white shadow-sm transition hover:opacity-80 dark:border-slate-800 dark:bg-slate-900 ${sizeClass}`}
       onClick={() => onOpen(url)}
     >
       {isPdfAttachment(url) ? (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-slate-900/90 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white dark:bg-slate-100 dark:text-slate-900">
+        <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-slate-900/90 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white dark:bg-secondary-100 dark:text-ink">
           <FileText size={14} />
           PDF
         </div>
@@ -207,7 +209,7 @@ function AttachmentStrip({ urls = [], onOpen, maxVisible = 3, size = "sm" }) {
       {hiddenCount > 0 ? (
         <button
           type="button"
-          className="inline-flex h-9 min-w-9 items-center justify-center rounded-2xl bg-slate-100 px-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 hover:text-slate-800 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+          className="inline-flex h-9 min-w-9 items-center justify-center rounded-2xl bg-secondary-100 px-2 text-xs font-semibold text-secondary-700 transition hover:bg-secondary-200 hover:text-ink dark:bg-slate-800 dark:text-secondary-300 dark:hover:bg-slate-700 dark:hover:text-white"
           onClick={() => onOpen(urls, visibleUrls.length)}
           title="Open more attachments"
         >
@@ -226,62 +228,71 @@ function getDeliveryDaysLeft(deliveryDate) {
   return d.diff(today, "day");
 }
 
-function DeliveryBadge({ date, isGym }) {
-  if (!date) return <span className="text-slate-400">—</span>;
-  const days = getDeliveryDaysLeft(date);
-  const label = <DateDisplay date={date} format="D MMM YYYY" />;
-  const base =
-    "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold";
-  if (days === null) {
-    return (
-      <span className="text-xs text-slate-600 dark:text-slate-400">
-        {label}
-      </span>
-    );
-  }
-  if (days < 0) {
-    return (
-      <span
-        className={`${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`}
-      >
-        <Clock size={10} /> {label} · {isGym ? "Expired" : "Overdue"}
-      </span>
-    );
-  }
-  if (days < 3) {
-    return (
-      <span
-        className={`${base} bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300`}
-      >
-        <Clock size={10} /> {label} · {days}d left
-      </span>
-    );
-  }
-  if (days < 8) {
-    return (
-      <span
-        className={`${base} bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300`}
-      >
-        <Clock size={10} /> {label} · {days}d left
-      </span>
-    );
-  }
-  return (
-    <span
-      className={`${base} bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300`}
-    >
-      <Clock size={10} /> {label} · {days}d left
-    </span>
-  );
-}
-
-function ClosedDeliveryLabel({ isGym }) {
+function DeliveryBadge({ date, isGym, isClosed, createdAt }) {
   const { t } = useI18n();
 
+  if (isClosed) {
+    return (
+      <div className="leading-snug text-emerald-600 dark:text-emerald-400 font-semibold text-xs md:text-sm">
+        {date ? (
+          <DateDisplay date={date} format="D MMM YYYY" />
+        ) : createdAt ? (
+          <DateDisplay date={createdAt} format="D MMM YYYY" />
+        ) : (
+          <span className="text-secondary-400">—</span>
+        )}
+        <div className="text-[10px] md:text-xs font-bold mt-0.5 text-emerald-600/80 dark:text-emerald-400/80">
+          {isGym ? "Completed / Inactive" : t("services.closed") || "Completed"}
+        </div>
+      </div>
+    );
+  }
+
+  if (!date) {
+    if (createdAt) {
+      return (
+        <div className="leading-snug text-secondary-500 text-xs md:text-sm">
+          <DateDisplay date={createdAt} format="D MMM YYYY" />
+          <div className="text-[10px] md:text-xs font-bold mt-0.5 text-secondary-400">
+            {t("services.created") || "Created"}
+          </div>
+        </div>
+      );
+    }
+    return <span className="text-secondary-400">—</span>;
+  }
+
+  const days = getDeliveryDaysLeft(date);
+  const label = <DateDisplay date={date} format="D MMM YYYY" />;
+
+  if (days === null) {
+    return (
+      <div className="leading-snug text-secondary-500 text-xs md:text-sm">
+        {label}
+      </div>
+    );
+  }
+
+  let colorClass = "text-emerald-600 dark:text-emerald-400 font-semibold text-xs md:text-sm";
+  let remainingText = `${days}d left`;
+
+  if (days < 3) {
+    colorClass = "text-rose-600 dark:text-rose-400 font-semibold text-xs md:text-sm";
+  } else if (days < 8) {
+    colorClass = "text-amber-600 dark:text-amber-400 font-semibold text-xs md:text-sm";
+  }
+
+  if (days < 0) {
+    remainingText = isGym ? "Expired" : "Overdue";
+  } else if (days === 0) {
+    remainingText = isGym ? "Expires today" : "Due today";
+  }
+
   return (
-    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-      {isGym ? "Completed / Inactive" : t("services.closed")}
-    </span>
+    <div className="leading-snug">
+      <div className={colorClass}>{label}</div>
+      <div className="text-[10px] md:text-xs font-bold mt-0.5 text-secondary-500">{remainingText}</div>
+    </div>
   );
 }
 
@@ -425,7 +436,7 @@ function FilterChip({ label, active, onClick }) {
       className={`inline-flex min-w-0 items-center justify-center rounded-full border px-2.5 py-1.5 text-xs font-semibold leading-tight transition sm:px-4 sm:py-2 sm:text-sm ${
         active
           ? "border-primary-300 bg-primary-50 text-primary-700 shadow-sm dark:border-primary-700/70 dark:bg-primary-900/30 dark:text-primary-200"
-          : "border-slate-200/80 bg-white/80 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-700"
+          : "border-secondary-200/80 bg-white/80 text-secondary-700 hover:border-secondary-300 hover:bg-mist dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-secondary-300 dark:hover:border-slate-700"
       }`}
     >
       {label}
@@ -444,27 +455,39 @@ function isPlaceholderItem(item) {
   );
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, locked = false }) {
   const { t } = useI18n();
+  const normalized = String(status || "").toLowerCase();
   const map = {
     open: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
     in_progress:
       "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
     closed:
       "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    cancelled: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
+    canceled: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
+    void: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
   };
   const label =
     status === "in_progress"
       ? t("services.inProgress")
-      : // : status === 'open' ? t('services.open')
-        status === "closed"
+      : status === "closed"
         ? t("services.closed")
-        : "—";
+        : ["cancelled", "canceled", "void"].includes(normalized)
+          ? t("services.cancelled")
+          : "—";
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[status] || "bg-slate-100 text-slate-600"}`}
-    >
-      {label}
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[normalized] || "bg-secondary-100 text-secondary-700"}`}
+      >
+        {label}
+      </span>
+      {locked && !["cancelled", "canceled", "void"].includes(normalized) ? (
+        <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+          {t("common.locked")}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -498,6 +521,7 @@ export default function Services() {
   const partyPickerRef = useRef(null);
   const partyDropdownRef = useRef(null);
   const { settings: bizSettings, businessProfile } = useBusinessSettings();
+  const irdModeEnabled = Boolean(bizSettings?.irdModeEnabled);
   const businessType = String(businessProfile?.type || "").toLowerCase();
   const isGym = businessType === "gym";
   const showGoldJewelleryDetails = businessType === "gold";
@@ -616,6 +640,9 @@ export default function Services() {
   const [editLoading, setEditLoading] = useState(false);
   const [deletingServiceId, setDeletingServiceId] = useState("");
   const [deleteService, setDeleteService] = useState(null);
+  const [cancelService, setCancelService] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancellingServiceId, setCancellingServiceId] = useState("");
 
   // ── Lightbox ──
   const [lightboxState, setLightboxState] = useState(null);
@@ -678,6 +705,7 @@ export default function Services() {
   const [newPartyPhone, setNewPartyPhone] = useState("");
   const [creatingParty, setCreatingParty] = useState(false);
   const [header, setHeader] = useState(() => makeEmptyHeader());
+  const [hasDeliveryDate, setHasDeliveryDate] = useState(true);
   const [vacantTables, setVacantTables] = useState([]);
   const [items, setItems] = useState([]);
   const quantityInputRef = useRef(null);
@@ -1332,6 +1360,7 @@ export default function Services() {
   // ── Reset & open/close dialog ──
   const resetForm = () => {
     setHeader({ ...makeEmptyHeader(), orderNo: "" });
+    setHasDeliveryDate(true);
     setItems([]);
     setDiscount("0");
     setPartyQuery("");
@@ -1406,6 +1435,13 @@ export default function Services() {
 
   const openEditDialog = async (order) => {
     if (!canManageServices) return;
+    if (isIrdLocked(order) || isIrdCancelled(order)) {
+      setListNotice({
+        type: "error",
+        message: t("services.messages.lockedEditBlocked"),
+      });
+      return;
+    }
     resetForm();
     setEditingId(order.id);
     setDialogOpen(true);
@@ -1445,6 +1481,7 @@ export default function Services() {
         attributes: normalizeJewelleryAttributes(full.attributes || {}),
         tableId: currentTableId,
       });
+      setHasDeliveryDate(!!full.deliveryDate);
       cacheProducts(hydratedProducts);
       setSuggestedOrderNo(full.orderNo || "");
       setAmountReceived(String(full.receivedTotal ?? 0));
@@ -1605,6 +1642,7 @@ export default function Services() {
       );
       const payload = {
         ...headerFields,
+        deliveryDate: hasDeliveryDate ? (header.deliveryDate || todayISODate()) : null,
         tableId: header.tableId || null,
         storeType,
         attributes: normalizedAttributes,
@@ -1633,7 +1671,9 @@ export default function Services() {
           lineTotal: Number(item.lineTotal),
         })),
       };
-      if (manualOrderNo) {
+      if (irdModeEnabled && !editingId) {
+        delete payload.orderNo;
+      } else if (manualOrderNo) {
         payload.orderNo = manualOrderNo;
       } else {
         delete payload.orderNo;
@@ -1675,6 +1715,7 @@ export default function Services() {
   // ── Status dialog ──
   const openStatusDialog = (order) => {
     if (!canManageServices) return;
+    if (isIrdCancelled(order)) return;
     setStatusDialog(order);
     setNewStatus(order.status || "open");
     setStatusError("");
@@ -1710,6 +1751,7 @@ export default function Services() {
   // ── Record payment ──
   const openPayDialog = (order) => {
     if (!canManageServices) return;
+    if (isIrdCancelled(order)) return;
     setPayDialog(order);
     setPayAmount("");
     setPayNotes("");
@@ -1803,6 +1845,12 @@ export default function Services() {
     setDeleteService(null);
   };
 
+  const closeCancelDialog = () => {
+    if (cancelService && cancellingServiceId === cancelService.id) return;
+    setCancelService(null);
+    setCancelReason("");
+  };
+
   const handleDeleteService = async () => {
     if (!canManageServices) return;
     if (!deleteService) return;
@@ -1833,6 +1881,41 @@ export default function Services() {
     }
   };
 
+  const handleCancelService = async () => {
+    if (!canManageServices || !cancelService) return;
+    if (cancellingServiceId === cancelService.id) return;
+
+    const reason = cancelReason.trim();
+    if (!reason) {
+      setListNotice({
+        type: "error",
+        message: t("services.cancelReasonRequired"),
+      });
+      return;
+    }
+
+    setCancellingServiceId(cancelService.id);
+    setListNotice({ type: "", message: "" });
+    try {
+      await api.cancelService(cancelService.id, { reason });
+      useProductStore.getState().invalidate();
+      setListNotice({
+        type: "success",
+        message: t("services.messages.cancelled"),
+      });
+      await loadServices();
+      setCancelService(null);
+      setCancelReason("");
+    } catch (err) {
+      setListNotice({
+        type: "error",
+        message: err.message || t("services.messages.cancelFailed"),
+      });
+    } finally {
+      setCancellingServiceId("");
+    }
+  };
+
   const money = (val) =>
     t("currency.formatted", {
       symbol: t("currency.symbol"),
@@ -1842,12 +1925,86 @@ export default function Services() {
   const formScrollRef = useRef(null);
   const invoicePrintRef = useRef(null);
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     printElement(invoicePrintRef.current);
+    await trackServiceReprint();
   };
 
-  const handlePrintThermal = () => {
+  const handlePrintThermal = async () => {
     printThermalReceipt(thermalInvoicePrintRef.current);
+    await trackServiceReprint();
+  };
+
+  const trackServiceReprint = async () => {
+    if (!invoiceOrder?.id || !isIrdLocked(invoiceOrder)) return;
+    try {
+      const updated = normalizeServiceOrder(
+        await api.recordServiceReprint(invoiceOrder.id),
+      );
+      setInvoiceOrder(updated);
+      patchService(updated.id, updated);
+    } catch {
+      // Printing already happened; tracking failure should not block the user.
+    }
+  };
+
+  const invoiceReprintLabel = getIrdReprintLabel(invoiceOrder);
+
+  const buildServiceActions = (order) => {
+    const locked = isIrdLocked(order);
+    const cancelled = isIrdCancelled(order);
+    const actions = [];
+
+    if (canManageServices && !locked && !cancelled) {
+      actions.push({
+        label: t("common.edit"),
+        icon: Pencil,
+        onClick: () => openEditDialog(order),
+      });
+    }
+
+    actions.push(
+      {
+        label: "View Bill",
+        icon: FileText,
+        onClick: () => openInvoiceModal(order),
+      },
+      {
+        label: "Print Bill",
+        icon: Printer,
+        onClick: () => openInvoiceModal(order, { print: true }),
+      },
+      {
+        label: "Print Thermal",
+        icon: Printer,
+        onClick: () => openInvoiceModal(order, { print: true, thermal: true }),
+      },
+    );
+
+    if (canManageServices && locked && !cancelled) {
+      actions.push({
+        label: t("services.cancelInvoice"),
+        icon: Ban,
+        tone: "danger",
+        disabled: cancellingServiceId === order.id,
+        onClick: () => {
+          setCancelReason("");
+          setCancelService(order);
+        },
+      });
+    }
+
+    if (canManageServices && !locked && !cancelled) {
+      actions.push({
+        label: t("common.delete"),
+        icon: Trash2,
+        tone: "danger",
+        disabled: deletingServiceId === order.id,
+        onClick: () => setDeleteService(order),
+      });
+    }
+
+    return actions;
   };
 
   const showDetailsStep = mobileStep === "details";
@@ -1890,18 +2047,18 @@ export default function Services() {
       <button
         type="button"
         onClick={() => setStoreDropdownOpen((o) => !o)}
-        className="flex items-center gap-1.5 whitespace-nowrap rounded-[24px] border border-slate-200/70 bg-white px-3 py-3 text-sm font-medium text-slate-700 dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-200"
+        className="flex items-center gap-1.5 whitespace-nowrap rounded-[24px] border border-secondary-200/70 bg-white px-3 py-3 text-sm font-medium text-ink-light dark:border-slate-700/60 dark:bg-slate-900/60 dark:text-slate-200"
       >
         <selectedStore.icon size={15} />
         {selectedStore.value === "physical" ? "Physical" : "Online"}
         <ChevronDown
           size={13}
-          className={`text-slate-400 transition-transform ${storeDropdownOpen ? "rotate-180" : ""}`}
+          className={`text-secondary-400 transition-transform ${storeDropdownOpen ? "rotate-180" : ""}`}
         />
       </button>
 
       {storeDropdownOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-900">
+        <div className="absolute right-0 top-full z-50 mt-1.5 w-44 overflow-hidden rounded-2xl border border-secondary-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-900">
           {storeOptions.map((opt) => (
             <button
               key={opt.value}
@@ -1910,14 +2067,14 @@ export default function Services() {
                 setStoreType(opt.value);
                 setStoreDropdownOpen(false);
               }}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-mist dark:hover:bg-slate-800"
             >
-              <opt.icon size={15} className="shrink-0 text-slate-400" />
+              <opt.icon size={15} className="shrink-0 text-secondary-400" />
               <div className="flex-1">
-                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                <p className="text-sm font-medium text-ink dark:text-slate-200">
                   {opt.label}
                 </p>
-                <p className="text-[11px] text-slate-400">{opt.sub}</p>
+                <p className="text-[11px] text-secondary-400">{opt.sub}</p>
               </div>
               {storeType === opt.value && (
                 <Check size={13} className="shrink-0 text-emerald-500" />
@@ -1949,7 +2106,7 @@ export default function Services() {
         }
       />
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className={STATS_GRID_CLASS}>
         <StatsCard
           title={t("services.totalOrders")}
           value={stats?.totalOrders ?? 0}
@@ -1987,13 +2144,13 @@ export default function Services() {
 
       {/* ── Orders Table ── */}
       <div className="card !p-0 overflow-hidden">
-        <div className="border-b border-slate-200/70 px-4 py-4 dark:border-slate-800/70 md:px-6 md:py-5">
+        <div className="border-b border-secondary-200/70 px-4 py-4 dark:border-slate-800/70 md:px-6 md:py-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-2xl">
-              <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
+              <h3 className="font-serif text-2xl text-ink">
                 {t("services.recentOrders")}
               </h3>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm text-secondary-500">
                 {t("services.browseOrdersHint")}
               </p>
             </div>
@@ -2022,7 +2179,7 @@ export default function Services() {
               <div>
                 <label className="label">Store Type</label>
                 <select
-                  className="input mt-1 min-h-[44px] w-full rounded-[24px] border border-slate-200/70 bg-white/80 px-3 py-2 text-sm text-slate-700 outline-none focus:border-primary-300 dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-300"
+                  className="input mt-1 min-h-[44px] w-full rounded-[24px] border border-secondary-200/70 bg-white/80 px-3 py-2 text-sm text-ink-light outline-none focus:border-primary-300 dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-secondary-300"
                   value={storeTypeFilter}
                   onChange={(e) => setStoreTypeFilter(e.target.value)}
                 >
@@ -2055,11 +2212,11 @@ export default function Services() {
         <div className="px-4 py-4 md:px-6 md:py-6">
           <div className="space-y-3 md:hidden">
             {listLoading && safeServiceList.length === 0 ? (
-              <p className="py-4 text-sm text-slate-500">
+              <p className="py-4 text-sm text-secondary-500">
                 {t("common.loading")}
               </p>
             ) : pagedServices.length === 0 ? (
-              <p className="py-4 text-sm text-slate-500">
+              <p className="py-4 text-sm text-secondary-500">
                 {t("services.noOrders")}
               </p>
             ) : (
@@ -2080,13 +2237,13 @@ export default function Services() {
                     className={`rounded-[26px] border p-4 text-sm shadow-sm ${
                       isUrgent
                         ? "border-red-200/70 bg-red-50/60 dark:border-red-900/30 dark:bg-red-950/10"
-                        : "border-slate-200/70 bg-white/90 dark:border-slate-800/60 dark:bg-slate-900/70"
+                        : "border-secondary-200/70 bg-white/90 dark:border-slate-800/60 dark:bg-slate-900/70"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <p className="truncate text-base font-semibold text-slate-900 dark:text-white">
+                          <p className="truncate text-base font-semibold text-ink">
                             {order.orderNo || order.id.slice(0, 8)}
                           </p>
                           {canManageServices ? (
@@ -2095,31 +2252,31 @@ export default function Services() {
                               className="transition hover:opacity-75"
                               onClick={() => openStatusDialog(order)}
                             >
-                              <StatusBadge status={order.status} />
+                              <StatusBadge status={order.status} locked={isIrdLocked(order)} />
                             </button>
                           ) : (
-                            <StatusBadge status={order.status} />
+                            <StatusBadge status={order.status} locked={isIrdLocked(order)} />
                           )}
                           {order.storeType === "online" ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                               <Globe size={11} /> Online
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-secondary-100 px-2 py-0.5 text-xs font-semibold text-ink-light dark:bg-slate-800 dark:text-secondary-300">
                               <Building2 size={11} /> Physical
                             </span>
                           )}
                         </div>
 
-                        <div className="mt-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                        <div className="mt-3 flex items-center gap-2 text-sm text-secondary-700">
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200">
                             <UserRound size={16} />
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate font-medium text-slate-800 dark:text-slate-100">
+                            <p className="truncate font-medium text-ink">
                               {order.Party?.name || order.partyName || "—"}
                             </p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                            <p className="text-xs text-secondary-500">
                               Created by {getCreatorDisplayName(order)}
                             </p>
                             {(order.Table || order.table || order.tableId) && (
@@ -2133,28 +2290,29 @@ export default function Services() {
                         </div>
 
                         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                          {order.status !== "closed" ? (
-                            <DeliveryBadge date={order.deliveryDate} isGym={isGym} />
-                          ) : (
-                            <ClosedDeliveryLabel isGym={isGym} />
-                          )}
+                          <DeliveryBadge
+                            date={order.deliveryDate}
+                            isGym={isGym}
+                            isClosed={order.status === "closed"}
+                            createdAt={order.createdAt}
+                          />
                           <PaymentTypeSummary
                             source={order}
-                            className="rounded-full bg-slate-100/80 px-2.5 py-1 dark:bg-slate-800/80"
+                            className="rounded-full bg-secondary-100/80 px-2.5 py-1 dark:bg-slate-800/80"
                             labelClassName="text-[11px] font-semibold"
                             metaClassName="text-[11px]"
                           />
                         </div>
                       </div>
 
-                      <div className="min-w-[96px] rounded-[22px] border border-slate-200/70 bg-slate-50/80 p-3 text-right dark:border-slate-800/70 dark:bg-slate-950/40">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      <div className="min-w-[96px] rounded-[22px] border border-secondary-200/70 bg-mist/80 p-3 text-right dark:border-slate-800/70 dark:bg-slate-950/40">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-500">
                           {t("services.summaryTotal")}
                         </p>
-                        <p className="mt-2 text-base font-semibold text-slate-900 dark:text-white">
+                        <p className="mt-2 text-base font-semibold text-ink">
                           {money(order.grandTotal)}
                         </p>
-                        {due > 0 ? (
+                        {due > 0 && !isIrdCancelled(order) ? (
                           <button
                             type="button"
                             className="mt-2 inline-flex items-center justify-center rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
@@ -2170,53 +2328,13 @@ export default function Services() {
                       </div>
                     </div>
 
-                    <div className="mt-4 flex justify-end border-t border-slate-200/70 pt-3 dark:border-slate-800/70">
-                      <ActionMenu
-                        actions={[
-                          ...(canManageServices
-                            ? [
-                                {
-                                  label: t("common.edit"),
-                                  icon: Pencil,
-                                  onClick: () => openEditDialog(order),
-                                },
-                              ]
-                            : []),
-                          {
-                            label: "View Bill",
-                            icon: FileText,
-                            onClick: () => openInvoiceModal(order),
-                          },
-                          {
-                            label: "Print Bill",
-                            icon: Printer,
-                            onClick: () =>
-                              openInvoiceModal(order, { print: true }),
-                          },
-                          {
-                            label: "Print Thermal",
-                            icon: Printer,
-                            onClick: () =>
-                              openInvoiceModal(order, { print: true, thermal: true }),
-                          },
-                          ...(canManageServices
-                            ? [
-                                {
-                                  label: t("common.delete"),
-                                  icon: Trash2,
-                                  tone: "danger",
-                                  disabled: deletingServiceId === order.id,
-                                  onClick: () => setDeleteService(order),
-                                },
-                              ]
-                            : []),
-                        ]}
-                      />
+                    <div className="mt-4 flex justify-end border-t border-secondary-200/70 pt-3 dark:border-slate-800/70">
+                      <ActionMenu actions={buildServiceActions(order)} />
                     </div>
 
                     {attachmentUrls.length > 0 ? (
                       <div className="mt-3">
-                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                           {t("services.attachment")}
                         </p>
                         <AttachmentStrip
@@ -2234,7 +2352,7 @@ export default function Services() {
 
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-sm">
-              <thead className="text-xs uppercase tracking-[0.18em] text-slate-400">
+              <thead className="text-xs uppercase tracking-[0.18em] text-ink">
                 <tr>
                   <th className="py-2 pr-4 text-left">
                     {t("services.orderNo")}
@@ -2268,13 +2386,13 @@ export default function Services() {
               <tbody>
                 {listLoading && safeServiceList.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-4 text-slate-500">
+                    <td colSpan={11} className="py-4 text-secondary-500">
                       {t("common.loading")}
                     </td>
                   </tr>
                 ) : pagedServices.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-4 text-slate-500">
+                    <td colSpan={11} className="py-4 text-secondary-500">
                       {t("services.noOrders")}
                     </td>
                   </tr>
@@ -2292,7 +2410,7 @@ export default function Services() {
                       ? "border-t border-red-200/60 bg-red-50/40 dark:border-red-900/30 dark:bg-red-950/10"
                       : isWarning
                         ? "border-t border-amber-200/60 bg-amber-50/40 dark:border-amber-900/30 dark:bg-amber-950/10"
-                        : "border-t border-slate-200/70 dark:border-slate-800/70";
+                        : "border-t border-secondary-200/70";
                     const due = Math.max(
                       Number(order.grandTotal || 0) -
                         Number(order.receivedTotal || 0),
@@ -2302,16 +2420,16 @@ export default function Services() {
 
                     return (
                       <tr key={order.id} className={rowClass}>
-                        <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                        <td className="py-3 pr-4 font-medium text-ink dark:text-slate-200">
                           {order.orderNo || order.id.slice(0, 8)}
                         </td>
-                        <td className="py-3 pr-4 text-slate-700 dark:text-slate-300">
+                        <td className="py-3 pr-4 text-ink-light dark:text-secondary-300">
                           <div>
                             {order.Party?.name || order.partyName || (
-                              <span className="text-slate-400">—</span>
+                              <span className="text-secondary-400">—</span>
                             )}
                           </div>
-                          <div className="text-xs text-slate-400">
+                          <div className="text-xs text-secondary-400">
                             Created by {getCreatorDisplayName(order)}
                           </div>
                           {(order.Table || order.table || order.tableId) && (
@@ -2323,11 +2441,12 @@ export default function Services() {
                           )}
                         </td>
                         <td className="py-3 pr-4">
-                          {order.status !== "closed" ? (
-                            <DeliveryBadge date={order.deliveryDate} isGym={isGym} />
-                          ) : (
-                            <ClosedDeliveryLabel isGym={isGym} />
-                          )}
+                          <DeliveryBadge
+                            date={order.deliveryDate}
+                            isGym={isGym}
+                            isClosed={order.status === "closed"}
+                            createdAt={order.createdAt}
+                          />
                         </td>
                         <td className="py-3 pr-4">
                           <button
@@ -2335,7 +2454,7 @@ export default function Services() {
                             className="transition hover:opacity-75"
                             onClick={() => openStatusDialog(order)}
                           >
-                            <StatusBadge status={order.status} />
+                            <StatusBadge status={order.status} locked={isIrdLocked(order)} />
                           </button>
                         </td>
                         <td className="py-3 pr-4">
@@ -2344,7 +2463,7 @@ export default function Services() {
                               <Globe size={11} /> Online
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-secondary-100 px-2 py-0.5 text-xs font-semibold text-ink-light dark:bg-slate-800 dark:text-secondary-300">
                               <Building2 size={11} /> Physical
                             </span>
                           )}
@@ -2360,17 +2479,17 @@ export default function Services() {
                               maxVisible={2}
                             />
                           ) : (
-                            <span className="text-slate-300">—</span>
+                            <span className="text-secondary-300">—</span>
                           )}
                         </td>
-                        <td className="py-3 pr-4 text-right font-semibold text-slate-800 dark:text-slate-200">
+                        <td className="py-3 pr-4 text-right font-semibold text-ink dark:text-slate-200">
                           {money(order.grandTotal)}
                         </td>
                         <td className="py-3 pr-4 text-right text-emerald-700 dark:text-emerald-400">
                           {money(order.receivedTotal)}
                         </td>
                         <td className="py-3 pr-4 text-right">
-                          {due > 0 ? (
+                          {due > 0 && !isIrdCancelled(order) ? (
                             <button
                               type="button"
                               className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60"
@@ -2385,47 +2504,7 @@ export default function Services() {
                           )}
                         </td>
                         <td className="py-3 text-right">
-                          <ActionMenu
-                            actions={[
-                              ...(canManageServices
-                                ? [
-                                    {
-                                      label: t("common.edit"),
-                                      icon: Pencil,
-                                      onClick: () => openEditDialog(order),
-                                    },
-                                  ]
-                                : []),
-                              {
-                                label: "View Bill",
-                                icon: FileText,
-                                onClick: () => openInvoiceModal(order),
-                              },
-                              {
-                                label: "Print Bill",
-                                icon: Printer,
-                                onClick: () =>
-                                  openInvoiceModal(order, { print: true }),
-                              },
-                              {
-                                label: "Print Thermal",
-                                icon: Printer,
-                                onClick: () =>
-                                  openInvoiceModal(order, { print: true, thermal: true }),
-                              },
-                              ...(canManageServices
-                                ? [
-                                    {
-                                      label: t("common.delete"),
-                                      icon: Trash2,
-                                      tone: "danger",
-                                      disabled: deletingServiceId === order.id,
-                                      onClick: () => setDeleteService(order),
-                                    },
-                                  ]
-                                : []),
-                            ]}
-                          />
+                          <ActionMenu actions={buildServiceActions(order)} />
                         </td>
                       </tr>
                     );
@@ -2461,20 +2540,20 @@ export default function Services() {
           }}
         >
           <div className="flex h-full items-end justify-center md:items-center md:p-5 xl:p-6">
-            <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#fcfaf6] shadow-2xl dark:bg-slate-950 md:h-[calc(100dvh-2.5rem)] md:max-h-[calc(100dvh-2.5rem)] md:max-w-[1440px] md:rounded-[32px] md:border md:border-slate-200/70 md:dark:border-slate-800/70">
-              <div className="flex items-center gap-3 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-8">
+            <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-mist shadow-2xl dark:bg-slate-950 md:h-[calc(100dvh-2.5rem)] md:max-h-[calc(100dvh-2.5rem)] md:max-w-[1440px] md:rounded-[32px] md:border md:border-secondary-200/70 md:dark:border-slate-800/70">
+              <div className="flex items-center gap-3 border-b border-secondary-200/70 bg-white/85 px-4 py-3 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-8">
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary-700 dark:text-primary-200">
                     {t("services.workspaceLabel")}
                   </p>
-                  <h2 className="mt-1 truncate font-serif text-xl text-slate-900 dark:text-white md:text-2xl">
+                  <h2 className="mt-1 truncate font-serif text-xl text-ink md:text-2xl">
                     {dialogTitle}
                   </h2>
                 </div>
                 <button
                   type="button"
                   onClick={closeDialog}
-                  className="rounded-2xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  className="rounded-2xl p-2 text-secondary-400 transition hover:bg-secondary-100 hover:text-ink-light dark:hover:bg-slate-800 dark:hover:text-slate-200"
                 >
                   <X size={20} />
                 </button>
@@ -2522,12 +2601,12 @@ export default function Services() {
 
                     {showDetailsStep ? (
                       <>
-                        <FormSectionCard className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40">
+                        <FormSectionCard className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40">
                           <div className="flex items-center justify-between">
                             <label className="label">
                               {t("services.customer")}
                             </label>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-secondary-400">
                               {t("common.optional")}
                             </span>
                           </div>
@@ -2538,12 +2617,12 @@ export default function Services() {
                                   {selectedParty.name.slice(0, 2).toUpperCase()}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate font-semibold text-slate-800 dark:text-slate-100">
+                                  <p className="truncate font-semibold text-ink">
                                     {selectedParty.name}
                                   </p>
                                   {selectedParty.phone ? (
                                     <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                                      <p className="text-xs text-slate-500">
+                                      <p className="text-xs text-secondary-500">
                                         {selectedParty.phone}
                                       </p>
                                       {!selectedPartyHasDue &&
@@ -2552,7 +2631,7 @@ export default function Services() {
                                           href={selectedPartyWhatsAppLink}
                                           target="_blank"
                                           rel="noreferrer"
-                                          className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 transition hover:bg-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700"
+                                          className="inline-flex items-center gap-1 rounded-full bg-secondary-100 px-2 py-0.5 text-[11px] font-semibold text-secondary-700 shadow-sm ring-1 ring-slate-200 transition hover:bg-secondary-200 dark:bg-slate-900 dark:text-secondary-300 dark:ring-slate-700"
                                           aria-label={`Open WhatsApp chat for ${selectedParty.phone}`}
                                         >
                                           <MessageCircle size={12} />
@@ -2595,7 +2674,7 @@ export default function Services() {
                                 <button
                                   type="button"
                                   onClick={clearParty}
-                                  className="rounded-xl p-2 text-slate-400 transition hover:bg-white hover:text-slate-700 dark:hover:bg-slate-800"
+                                  className="rounded-xl p-2 text-secondary-400 transition hover:bg-white hover:text-ink-light dark:hover:bg-slate-800"
                                 >
                                   <X size={16} />
                                 </button>
@@ -2604,13 +2683,13 @@ export default function Services() {
                               <div>
                                 <div className="flex items-center gap-2">
                                   {/* existing search input */}
-                                  <div className="flex items-center gap-2 rounded-[24px] border border-slate-200/70 bg-white px-3 py-3 shadow-sm shadow-slate-200/10 dark:border-slate-700/60 dark:bg-slate-900/60 focus-within:border-primary-300 flex-1">
+                                  <div className="flex items-center gap-2 rounded-[24px] border border-secondary-200/70 bg-white px-3 py-3 shadow-sm shadow-slate-200/10 dark:border-slate-700/60 dark:bg-slate-900/60 focus-within:border-primary-300 flex-1">
                                     <Search
                                       size={16}
-                                      className="shrink-0 text-slate-400"
+                                      className="shrink-0 text-secondary-400"
                                     />
                                     <input
-                                      className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400 dark:text-slate-200"
+                                      className="flex-1 bg-transparent text-sm outline-none placeholder:text-secondary-400 dark:text-slate-200"
                                       placeholder={t("services.customerSearch")}
                                       value={partyQuery}
                                       onChange={handlePartySearch}
@@ -2620,7 +2699,7 @@ export default function Services() {
                                       <button
                                         type="button"
                                         onClick={clearParty}
-                                        className="text-slate-400 transition hover:text-slate-600"
+                                        className="text-secondary-400 transition hover:text-secondary-700"
                                       >
                                         <X size={14} />
                                       </button>
@@ -2636,7 +2715,7 @@ export default function Services() {
                                   ? createPortal(
                                       <div
                                         ref={partyDropdownRef}
-                                        className="fixed z-[1000] overflow-y-auto rounded-[24px] border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+                                        className="fixed z-[1000] overflow-y-auto rounded-[24px] border border-secondary-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
                                         style={partyDropdownStyle}
                                       >
                                         {filteredParties.length > 0
@@ -2644,22 +2723,22 @@ export default function Services() {
                                               <button
                                                 key={party.id}
                                                 type="button"
-                                                className="flex w-full items-center gap-3 border-b border-slate-100/80 px-4 py-3 text-left text-sm transition hover:bg-slate-50 dark:border-slate-800/50 dark:hover:bg-slate-800/60 last:border-b-0"
+                                                className="flex w-full items-center gap-3 border-b border-secondary-100/80 px-4 py-3 text-left text-sm transition hover:bg-mist dark:border-slate-800/50 dark:hover:bg-slate-800/60 last:border-b-0"
                                                 onClick={() =>
                                                   selectParty(party)
                                                 }
                                               >
-                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-secondary-100 text-xs font-bold text-secondary-700 dark:bg-slate-800 dark:text-secondary-300">
                                                   {party.name
                                                     .slice(0, 2)
                                                     .toUpperCase()}
                                                 </div>
                                                 <div className="min-w-0 flex-1">
-                                                  <p className="truncate font-semibold text-slate-800 dark:text-slate-200">
+                                                  <p className="truncate font-semibold text-ink dark:text-slate-200">
                                                     {party.name}
                                                   </p>
                                                   {party.phone ? (
-                                                    <p className="truncate text-xs text-slate-500">
+                                                    <p className="truncate text-xs text-secondary-500">
                                                       {party.phone}
                                                     </p>
                                                   ) : null}
@@ -2679,20 +2758,20 @@ export default function Services() {
                                             &rdquo; as customer
                                           </button>
                                         ) : (
-                                          <div className="border-t border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/60">
-                                            <p className="mb-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                          <div className="border-t border-secondary-100 bg-mist p-4 dark:border-slate-800 dark:bg-slate-900/60">
+                                            <p className="mb-2 text-xs font-semibold text-secondary-700">
                                               New:{" "}
                                               <span className="text-primary-700">
                                                 {partyQuery.trim()}
                                               </span>
                                             </p>
-                                            <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
+                                            <div className="flex items-center gap-2 rounded-xl border border-secondary-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-900">
                                               <Phone
                                                 size={13}
-                                                className="shrink-0 text-slate-400"
+                                                className="shrink-0 text-secondary-400"
                                               />
                                               <input
-                                                className="flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
+                                                className="flex-1 bg-transparent text-sm outline-none placeholder:text-secondary-400"
                                                 type="tel"
                                                 inputMode="numeric"
                                                 placeholder={t(
@@ -2749,6 +2828,7 @@ export default function Services() {
                                 name="orderNo"
                                 value={header.orderNo}
                                 onChange={handleHeaderChange}
+                                disabled={irdModeEnabled}
                                 placeholder={!editingId ? suggestedOrderNo : ""}
                               />
                             </div>
@@ -2770,39 +2850,62 @@ export default function Services() {
                                 </option>
                               </select>
                             </div>
-                             <div>
+
+                            <div>
                               <label className="label">
-                                {isGym ? "Subscription End Date" : t("services.deliveryDate")}
+                                {isGym ? "Subscription End" : t("services.deliveryDate") || "Delivery Date"}
                               </label>
-                              <FlexibleDateInput
-                                className="input mt-1"
-                                name="deliveryDate"
-                                value={header.deliveryDate}
-                                onChange={handleHeaderChange}
-                              />
-                              {isGym && (
-                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                  {[
-                                    { label: "+1 Month", days: 30 },
-                                    { label: "+3 Months", days: 90 },
-                                    { label: "+6 Months", days: 180 },
-                                    { label: "+1 Year", days: 365 },
-                                  ].map((opt) => (
-                                    <button
-                                      key={opt.label}
-                                      type="button"
-                                      onClick={() => {
-                                        const nextDate = dayjs().add(opt.days, "day").format("YYYY-MM-DD");
-                                        setHeader((prev) => ({ ...prev, deliveryDate: nextDate }));
-                                      }}
-                                      className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:border-[#9c5f22] text-xs font-bold text-slate-600 bg-white hover:bg-[#9c5f22]/5 transition shadow-sm"
-                                    >
-                                      {opt.label}
-                                    </button>
-                                  ))}
-                                </div>
-                              )}
+                              <div className="flex h-11 items-center justify-between rounded-xl border border-secondary-200 bg-secondary-50/20 px-3.5 mt-1 dark:border-slate-800 dark:bg-slate-900/50">
+                                <span className="text-xs font-bold text-secondary-500 dark:text-secondary-400">
+                                  {hasDeliveryDate ? t("common.yes") : t("common.no")}
+                                </span>
+                                <label className="relative inline-flex cursor-pointer items-center text-xs">
+                                  <input
+                                    type="checkbox"
+                                    className="peer sr-only"
+                                    checked={hasDeliveryDate}
+                                    onChange={(e) => setHasDeliveryDate(e.target.checked)}
+                                  />
+                                  <div className="peer h-6 w-11 rounded-full bg-secondary-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-secondary-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:bg-slate-700"></div>
+                                </label>
+                              </div>
                             </div>
+
+                            {hasDeliveryDate && (
+                              <div>
+                                <label className="label">
+                                  {isGym ? "Subscription End Date" : t("services.deliveryDate")}
+                                </label>
+                                <FlexibleDateInput
+                                  className="input mt-1"
+                                  name="deliveryDate"
+                                  value={header.deliveryDate}
+                                  onChange={handleHeaderChange}
+                                />
+                                {isGym && (
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {[
+                                      { label: "+1 Month", days: 30 },
+                                      { label: "+3 Months", days: 90 },
+                                      { label: "+6 Months", days: 180 },
+                                      { label: "+1 Year", days: 365 },
+                                    ].map((opt) => (
+                                      <button
+                                        key={opt.label}
+                                        type="button"
+                                        onClick={() => {
+                                          const nextDate = dayjs().add(opt.days, "day").format("YYYY-MM-DD");
+                                          setHeader((prev) => ({ ...prev, deliveryDate: nextDate }));
+                                        }}
+                                        className="px-2.5 py-1.5 rounded-xl border border-secondary-200 hover:border-primary text-xs font-bold text-secondary-700 bg-white hover:bg-primary/5 transition shadow-sm"
+                                      >
+                                        {opt.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             {businessProfile?.settings?.enabledModules?.includes('tables') && (
                               <div>
                                 <label className="label">{t('tables.tableName') || 'Table'}</label>
@@ -2827,7 +2930,7 @@ export default function Services() {
                         <FormSectionCard
                           title={t("services.notesSectionTitle")}
                           hint={t("services.notesSectionHint")}
-                          className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                          className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                         >
                           <div className="grid gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                             <div>
@@ -2842,7 +2945,7 @@ export default function Services() {
                                 placeholder={t("services.notesPlaceholder")}
                               />
                             </div>
-                            <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
+                            <div className="rounded-[24px] border border-secondary-200/70 bg-mist/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
                               <FileUpload
                                 label={t("services.attachment")}
                                 multiple
@@ -2866,7 +2969,7 @@ export default function Services() {
                         {/* <FormSectionCard
                           title="Jewellery details"
                           hint="Track metal purity, wastage, total weight, and simple diamond charges for jewellery orders."
-                          className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                          className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                         >
                           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                             <div>
@@ -2932,7 +3035,7 @@ export default function Services() {
                             <div>
                               <label className="label">Wastage weight</label>
                               <input
-                                className="input mt-1 bg-slate-50"
+                                className="input mt-1 bg-mist"
                                 value={jewelleryAttributes.wastageWeight}
                                 placeholder="Auto calculated"
                                 readOnly
@@ -2941,7 +3044,7 @@ export default function Services() {
                             <div>
                               <label className="label">Total weight</label>
                               <input
-                                className="input mt-1 bg-slate-50"
+                                className="input mt-1 bg-mist"
                                 value={jewelleryAttributes.totalWeight}
                                 placeholder="Actual + wastage"
                                 readOnly
@@ -3018,7 +3121,7 @@ export default function Services() {
 
                         <FormSectionCard
                           title={t("services.orderInformation")}
-                          className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                          className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                         >
                           <DynamicAttributes
                             entityType="service"
@@ -3041,7 +3144,7 @@ export default function Services() {
                         hint={t("services.itemsSectionHint")}
                         action={
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <span className="text-sm font-semibold text-slate-500">
+                            <span className="text-sm font-semibold text-secondary-500">
                               {visibleItems.length} {t("services.items")}
                             </span>
                             <button
@@ -3053,7 +3156,7 @@ export default function Services() {
                             </button>
                           </div>
                         }
-                        className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                        className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                       >
                         {visibleItems.length > 0 ? (
                           <div className="mb-4 space-y-3">
@@ -3074,7 +3177,7 @@ export default function Services() {
                               return (
                                 <div
                                   key={`item-row-${idx}`}
-                                  className="rounded-[24px] border border-slate-200/70 bg-slate-50/60 p-3.5 dark:border-slate-800/60 dark:bg-slate-900/40"
+                                  className="rounded-[24px] border border-secondary-200/70 bg-mist/60 p-3.5 dark:border-slate-800/60 dark:bg-slate-900/40"
                                 >
                                   <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                                     <div className="min-w-0 flex-1">
@@ -3097,7 +3200,7 @@ export default function Services() {
                                                 ? t("services.serviceLine")
                                                 : t("services.productLine")}
                                             </span>
-                                            <p className="truncate font-semibold text-slate-900 dark:text-white">
+                                            <p className="truncate font-semibold text-ink">
                                               {displayName}
                                             </p>
                                           </div>
@@ -3105,13 +3208,13 @@ export default function Services() {
                                           item.description &&
                                           product?.name &&
                                           item.description !== product.name ? (
-                                            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                            <p className="mt-1 text-sm text-secondary-500">
                                               {item.description}
                                             </p>
                                           ) : null}
                                           <div className="mt-2 flex flex-wrap gap-2">
                                             {item.itemType === "part" && (
-                                              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                                 {t("services.qty")}:{" "}
                                                 {item.quantity}
                                                 {unitLabel
@@ -3119,13 +3222,13 @@ export default function Services() {
                                                   : ""}
                                               </span>
                                             )}
-                                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                               {item.itemType === "labor"
                                                 ? t("common.total")
                                                 : t("services.unitPrice")}
                                               : {money(item.unitPrice)}
                                             </span>
-                                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                               {t("services.tax")}:{" "}
                                               {Number(
                                                 item.taxRate || 0,
@@ -3170,8 +3273,8 @@ export default function Services() {
                             })}
                           </div>
                         ) : (
-                          <div className="mb-4 rounded-[24px] border border-dashed border-slate-300 bg-slate-50/70 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-900/30">
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                          <div className="mb-4 rounded-[24px] border border-dashed border-slate-300 bg-mist/70 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-900/30">
+                            <p className="text-sm text-secondary-500">
                               {t("services.addFirstItem")}
                             </p>
                             <button
@@ -3224,7 +3327,7 @@ export default function Services() {
                             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-200">
                               {t("services.itemComposerTitle")}
                             </p>
-                            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                            <p className="mt-2 text-sm text-secondary-700">
                               {t("services.itemComposerHint")}
                             </p>
                           </div>
@@ -3240,7 +3343,7 @@ export default function Services() {
                                   className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
                                     itemDraft.itemType === "labor"
                                       ? "bg-primary-600 text-white shadow-md ring-2 ring-primary-600 ring-offset-2 dark:ring-offset-slate-900"
-                                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                                      : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200 dark:bg-slate-800 dark:text-secondary-400 dark:hover:bg-slate-700"
                                   }`}
                                   onClick={() =>
                                     handleDraftChange("itemType", "labor")
@@ -3253,7 +3356,7 @@ export default function Services() {
                                   className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
                                     itemDraft.itemType === "part"
                                       ? "bg-primary-600 text-white shadow-md ring-2 ring-primary-600 ring-offset-2 dark:ring-offset-slate-900"
-                                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                                      : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200 dark:bg-slate-800 dark:text-secondary-400 dark:hover:bg-slate-700"
                                   }`}
                                   onClick={() =>
                                     handleDraftChange("itemType", "part")
@@ -3308,9 +3411,9 @@ export default function Services() {
                                     renderOption={(option) => (
                                       <div className="flex items-center gap-2">
                                         {option.entity?.imageUrl ? (
-                                          <img src={option.entity.imageUrl} alt={option.label} className="h-6 w-6 rounded object-cover border border-slate-200 dark:border-slate-800" />
+                                          <img src={option.entity.imageUrl} alt={option.label} className="h-6 w-6 rounded object-cover border border-secondary-200 dark:border-slate-800" />
                                         ) : (
-                                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-400 dark:bg-slate-800">
+                                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-secondary-100 text-[10px] font-bold text-secondary-400 dark:bg-slate-800">
                                             {option.entity?.name?.charAt(0).toUpperCase() || 'P'}
                                           </div>
                                         )}
@@ -3368,7 +3471,7 @@ export default function Services() {
                                     </button>
                                   </div>
                                   {itemDraftProduct.conversionRate > 0 ? (
-                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                    <p className="mt-2 text-xs text-secondary-500">
                                       1 {itemDraftProduct.primaryUnit} ={" "}
                                       {itemDraftProduct.conversionRate}{" "}
                                       {itemDraftProduct.secondaryUnit}
@@ -3398,7 +3501,7 @@ export default function Services() {
                                     }
                                   />
                                   {itemDraft.itemType === "part" ? (
-                                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                    <p className="mt-1 text-xs text-secondary-500">
                                       {getUnitLabel(
                                         itemDraftProduct,
                                         itemDraft.unitType,
@@ -3450,33 +3553,33 @@ export default function Services() {
                           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-200">
                             {t("common.total")}
                           </p>
-                          <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
+                          <p className="mt-2 text-2xl font-semibold text-ink">
                             {money(itemDraft.lineTotal)}
                           </p>
                           <div className="mt-4 space-y-3">
                             <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                                 {t("services.taxTotal")}
                               </p>
-                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                              <p className="mt-1 text-sm font-semibold text-ink dark:text-slate-200">
                                 {money(itemDraftVatAmount)}
                               </p>
                             </div>
                             <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                                 {t("services.type")}
                               </p>
-                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                              <p className="mt-1 text-sm font-semibold text-ink dark:text-slate-200">
                                 {itemDraft.itemType === "labor"
                                   ? t("services.serviceLine")
                                   : t("services.productLine")}
                               </p>
                             </div>
                             <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                                 {t("services.description")}
                               </p>
-                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                              <p className="mt-1 text-sm font-semibold text-ink dark:text-slate-200">
                                 {itemDraft.itemType === "part"
                                   ? itemDraftProduct?.name ||
                                     itemDraft.description ||
@@ -3485,10 +3588,10 @@ export default function Services() {
                               </p>
                             </div>
                             <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                                 {t("products.unitType")}
                               </p>
-                              <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                              <p className="mt-1 text-sm font-semibold text-ink dark:text-slate-200">
                                 {getUnitLabel(
                                   itemDraftProduct,
                                   itemDraft.unitType,
@@ -3504,65 +3607,65 @@ export default function Services() {
                       <FormSectionCard
                         title={t("services.paymentSectionTitle")}
                         hint={t("services.paymentSectionHint")}
-                        className="rounded-[28px] border-slate-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                        className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
                       >
                         <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                          <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
+                          <div className="rounded-[24px] border border-secondary-200/70 bg-mist/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
                             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                                   {t("services.subTotal")}
                                 </p>
-                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                <p className="mt-1 text-lg font-semibold text-ink">
                                   {money(totals.subTotal)}
                                 </p>
                               </div>
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                                   Service Total
                                 </p>
-                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                <p className="mt-1 text-lg font-semibold text-ink">
                                   {money(totals.laborTotal)}
                                 </p>
                               </div>
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                                   Product Total
                                 </p>
-                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                <p className="mt-1 text-lg font-semibold text-ink">
                                   {money(totals.partsTotal)}
                                 </p>
                               </div>
                               {showGoldJewelleryDetails ? (
                                 <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                                     Diamond Charge
                                   </p>
-                                  <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                  <p className="mt-1 text-lg font-semibold text-ink">
                                     {money(totals.diamondCharge)}
                                   </p>
                                 </div>
                               ) : null}
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                                   {t("services.taxTotal")}
                                 </p>
-                                <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                <p className="mt-1 text-lg font-semibold text-ink">
                                   {money(totals.taxTotal)}
                                 </p>
                               </div>
                               {showGoldJewelleryDetails ? (
                                 <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                                     Additional Tax
                                   </p>
-                                  <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+                                  <p className="mt-1 text-lg font-semibold text-ink">
                                     {money(totals.additionalTax)}
                                   </p>
                                 </div>
                               ) : null}
                               <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
                                   {t("services.discount")}
                                 </p>
                                 <p className="mt-1 text-lg font-semibold text-rose-700 dark:text-rose-300">
@@ -3636,7 +3739,7 @@ export default function Services() {
                                   }
                                 />
                               </div>
-                              <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200/70 bg-slate-50/70 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-slate-300 dark:hover:bg-slate-800/60">
+                              <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-secondary-200/70 bg-mist/70 px-4 py-3 text-sm font-semibold text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-secondary-300 dark:hover:bg-slate-800/60">
                                 <input
                                   type="checkbox"
                                   className="h-4 w-4 rounded accent-primary-600"
@@ -3664,7 +3767,7 @@ export default function Services() {
                               </div>
                             )}
 
-                            <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
+                            <div className="rounded-[24px] border border-secondary-200/70 bg-mist/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
                               <PaymentMethodFields
                                 value={header}
                                 onChange={(patch) =>
@@ -3679,16 +3782,16 @@ export default function Services() {
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200/70 bg-white/90 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-8">
+                <div className="border-t border-secondary-200/70 bg-white/90 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-8">
                   <div className="mx-auto w-full max-w-[1320px]">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="flex items-center gap-4 rounded-2xl bg-slate-100/90 px-4 py-2.5 text-sm dark:bg-slate-900/70 lg:min-w-[520px]">
+                      <div className="flex items-center gap-4 rounded-2xl bg-secondary-100/90 px-4 py-2.5 text-sm dark:bg-slate-900/70 lg:min-w-[520px]">
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-bold text-slate-800 dark:text-slate-200">
+                          <p className="truncate font-bold text-ink dark:text-slate-200">
                             {formSteps[mobileStepIndex]?.label ||
                               t("services.detailStep")}
                           </p>
-                          <p className="mt-0.5 truncate text-[11px] text-slate-500">
+                          <p className="mt-0.5 truncate text-[11px] text-secondary-500">
                             Order: {summaryOrderNo}
                           </p>
                         </div>
@@ -3698,7 +3801,7 @@ export default function Services() {
                           >
                             {money(totals.due)}
                           </p>
-                          <p className="text-[10px] uppercase tracking-wider text-slate-500">
+                          <p className="text-[10px] uppercase tracking-wider text-secondary-500">
                             {t("services.summaryDue")}
                           </p>
                         </div>
@@ -3801,7 +3904,7 @@ export default function Services() {
               href={lightboxState.urls[lightboxState.index]}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-xl bg-white px-6 py-4 text-slate-800 font-semibold"
+              className="rounded-xl bg-white px-6 py-4 text-ink font-semibold"
               onClick={(e) => e.stopPropagation()}
             >
               Open PDF in new tab
@@ -3858,7 +3961,7 @@ export default function Services() {
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
               </div>
             ) : isThermalInvoice ? (
-              <div className="mx-auto max-w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 text-black shadow-sm">
+              <div className="mx-auto max-w-[340px] overflow-hidden rounded-2xl border border-secondary-200 bg-white p-6 text-black shadow-sm">
                 <div ref={thermalInvoicePrintRef}>
                   <ThermalReceipt
                     biz={bizSettings}
@@ -3903,13 +4006,14 @@ export default function Services() {
                         return { label: attrLabel, value: String(val || "—") };
                       }),
                     ]}
+                    reprintLabel={invoiceReprintLabel}
                   />
                 </div>
               </div>
             ) : (
               <div
                 ref={invoicePrintRef}
-                className="print-area overflow-hidden rounded-3xl border border-slate-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950"
+                className="print-area overflow-hidden rounded-3xl border border-secondary-200/70 bg-white shadow-sm dark:border-slate-800/70 dark:bg-slate-950"
               >
                 {/* ── Header ── */}
                 <div className="px-4 pt-0 sm:px-8">
@@ -3937,29 +4041,30 @@ export default function Services() {
                           ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
                           : "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
                     }
+                    reprintLabel={invoiceReprintLabel}
                   />
                 </div>
 
                 {/* ── Customer + Attributes ── */}
-                <div className="border-b border-slate-200/70 bg-slate-50/60 px-4 py-5 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
+                <div className="border-b border-secondary-200/70 bg-mist/60 px-4 py-5 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
                   <div className="grid gap-5 sm:grid-cols-2">
                     <div>
-                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-900">
+                      <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-ink">
                         Bill To
                       </p>
-                      <p className="font-semibold text-slate-900 dark:text-white">
+                      <p className="font-semibold text-ink">
                         {invoiceOrder.Party?.name ||
                           invoiceOrder.partyName ||
                           "—"}
                       </p>
                       {invoiceOrder.Party?.phone && (
-                        <p className="mt-0.5 text-sm text-slate-900 dark:text-white">
+                        <p className="mt-0.5 text-sm text-ink">
                           {invoiceOrder.Party?.phone}
                         </p>
                       )}
-                      <p className="mt-2 text-sm text-slate-900 dark:text-white">
+                      <p className="mt-2 text-sm text-ink">
                         Created By:{" "}
-                        <span className="font-medium text-slate-900 dark:text-white">
+                        <span className="font-medium text-ink">
                           {getCreatorDisplayName(invoiceOrder)}
                         </span>
                       </p>
@@ -4002,7 +4107,7 @@ export default function Services() {
                         ) : null}
                         {invoiceJewellery.wastagePercent ? (
                           <div className="text-sm">
-                            <span className="text-slate-900">Wastage: </span>
+                            <span className="text-ink">Wastage: </span>
                             <span className="font-medium text-black">
                               {invoiceJewellery.wastagePercent}% (
                               {invoiceJewellery.wastageWeight || "0"})
@@ -4011,7 +4116,7 @@ export default function Services() {
                         ) : null}
                         {invoiceJewellery.totalWeight ? (
                           <div className="text-sm">
-                            <span className="text-slate-900">
+                            <span className="text-ink">
                               Total weight:{" "}
                             </span>
                             <span className="font-medium text-black">
@@ -4021,7 +4126,7 @@ export default function Services() {
                         ) : null}
                         {invoiceJewellery.diamondType ? (
                           <div className="text-sm">
-                            <span className="text-slate-900">Diamond: </span>
+                            <span className="text-ink">Diamond: </span>
                             <span className="font-medium text-black">
                               {[
                                 invoiceJewellery.diamondType,
@@ -4051,7 +4156,7 @@ export default function Services() {
                             .replace(/\b\w/g, (c) => c.toUpperCase());
                         return (
                           <div key={key} className="text-sm">
-                            <span className="text-slate-900">
+                            <span className="text-ink">
                               {attrLabel}:{" "}
                             </span>
                             <span className="font-mediblack">
@@ -4068,7 +4173,7 @@ export default function Services() {
                 <div className="overflow-x-auto px-4 py-6 sm:px-8">
                   <table className="w-full min-w-[540px] text-sm">
                     <thead>
-                      <tr className="border-b-2 border-slate-200/70 dark:border-slate-700/70">
+                      <tr className="border-b-2 border-secondary-200/70 dark:border-slate-700/70">
                         <th className="pb-3 text-left text-[10px] font-bold uppercase tracking-wider text-black">
                           Item
                         </th>
@@ -4107,14 +4212,14 @@ export default function Services() {
                                 {item.productName &&
                                   item.description &&
                                   item.description !== item.productName && (
-                                    <p className="truncate text-xs text-slate-500">
+                                    <p className="truncate text-xs text-secondary-500">
                                       {item.productName}
                                     </p>
                                   )}
                               </div>
                             </div>
                           </td>
-                          <td className="py-3 text-right text-slate-900">
+                          <td className="py-3 text-right text-ink">
                             {Number(item.quantity || 0).toFixed(
                               item.quantity % 1 ? 3 : 0,
                             )}
@@ -4135,7 +4240,7 @@ export default function Services() {
                 </div>
 
                 {/* ── Totals ── */}
-                <div className="border-t border-slate-200/70 dark:border-slate-800/70 px-4 py-6 sm:px-8">
+                <div className="border-t border-secondary-200/70 px-4 py-6 sm:px-8">
                   <div className="ml-auto max-w-xs space-y-2 text-sm">
                     <div className="flex justify-between text-black">
                       <span>{t("services.subTotal")}</span>
@@ -4177,7 +4282,7 @@ export default function Services() {
                         <span>-{money(invoiceTotals.discountTotal)}</span>
                       </div>
                     ) : null}
-                    <div className="flex justify-between border-t border-slate-200/70 pt-3 font-bold text-black dark:border-slate-700 dark:text-white">
+                    <div className="flex justify-between border-t border-secondary-200/70 pt-3 font-bold text-black dark:border-slate-700 dark:text-white">
                       <span className="text-base">
                         {t("services.grandTotal")}
                       </span>
@@ -4216,7 +4321,7 @@ export default function Services() {
 
                 {/* ── Attachment ── */}
                 {invoiceAttachmentUrls.length > 0 && (
-                  <div className="border-t border-slate-200/70 px-4 py-5 dark:border-slate-800/70 sm:px-8">
+                  <div className="border-t border-secondary-200/70 px-4 py-5 dark:border-slate-800/70 sm:px-8">
                     <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-black">
                       Attachment
                     </p>
@@ -4230,7 +4335,7 @@ export default function Services() {
                 )}
 
                 {/* ── Footer ── */}
-                <div className="flex items-center justify-between border-t border-slate-200/70 bg-slate-50/60 px-4 py-4 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
+                <div className="flex items-center justify-between border-t border-secondary-200/70 bg-mist/60 px-4 py-4 dark:border-slate-800/70 dark:bg-slate-900/30 sm:px-8">
                   <p className="text-xs text-black">
                     Thank you for your business!
                   </p>
@@ -4253,26 +4358,26 @@ export default function Services() {
           }}
         >
           <div className="w-full max-w-sm rounded-t-3xl bg-white shadow-2xl dark:bg-slate-950 sm:rounded-3xl">
-            <div className="flex items-center justify-between border-b border-slate-200/70 px-6 py-4 dark:border-slate-800/70">
-              <h2 className="font-serif text-xl text-slate-900 dark:text-white">
+            <div className="flex items-center justify-between border-b border-secondary-200/70 px-6 py-4 dark:border-slate-800/70">
+              <h2 className="font-serif text-xl text-ink">
                 {t("services.updateStatus")}
               </h2>
               <button
                 type="button"
                 onClick={closeStatusDialog}
-                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="rounded-xl p-2 text-secondary-400 hover:bg-secondary-100 dark:hover:bg-slate-800"
               >
                 <X size={18} />
               </button>
             </div>
             <div className="space-y-4 p-6">
               {statusError ? <Notice title={statusError} tone="error" /> : null}
-              <div className="rounded-xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-900/60">
-                <p className="font-semibold text-slate-800 dark:text-slate-200">
+              <div className="rounded-xl bg-mist px-4 py-3 text-sm dark:bg-slate-900/60">
+                <p className="font-semibold text-ink dark:text-slate-200">
                   {statusDialog.orderNo || statusDialog.id.slice(0, 8)}
                 </p>
                 {statusDialog.Party?.name ? (
-                  <p className="text-slate-500">{statusDialog.partyName}</p>
+                  <p className="text-secondary-500">{statusDialog.partyName}</p>
                 ) : null}
               </div>
               <div className="space-y-2">
@@ -4283,16 +4388,16 @@ export default function Services() {
                       key={step.value}
                       type="button"
                       onClick={() => setNewStatus(step.value)}
-                      className={`flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition ${isSelected ? step.selectedClass : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"}`}
+                      className={`flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition ${isSelected ? step.selectedClass : "border-secondary-200 bg-white hover:border-secondary-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600"}`}
                     >
                       <span
                         className={`h-3 w-3 shrink-0 rounded-full ${step.dotClass}`}
                       />
                       <div className="flex-1">
-                        <p className="font-semibold text-slate-800 dark:text-slate-200">
+                        <p className="font-semibold text-ink dark:text-slate-200">
                           {step.label}
                         </p>
-                        <p className="text-xs text-slate-500">{step.desc}</p>
+                        <p className="text-xs text-secondary-500">{step.desc}</p>
                       </div>
                       {isSelected && (
                         <Check size={16} className={step.checkClass} />
@@ -4332,14 +4437,14 @@ export default function Services() {
           }}
         >
           <div className="w-full max-w-sm rounded-t-3xl bg-white shadow-2xl dark:bg-slate-950 sm:rounded-3xl">
-            <div className="flex items-center justify-between border-b border-slate-200/70 px-6 py-4 dark:border-slate-800/70">
-              <h2 className="font-serif text-xl text-slate-900 dark:text-white">
+            <div className="flex items-center justify-between border-b border-secondary-200/70 px-6 py-4 dark:border-slate-800/70">
+              <h2 className="font-serif text-xl text-ink">
                 {t("services.recordPayment")}
               </h2>
               <button
                 type="button"
                 onClick={() => setPayDialog(null)}
-                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="rounded-xl p-2 text-secondary-400 hover:bg-secondary-100 dark:hover:bg-slate-800"
               >
                 <X size={18} />
               </button>
@@ -4357,15 +4462,15 @@ export default function Services() {
                   </button>
                 </div>
               ) : null}
-              <div className="rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-900/60">
-                <p className="font-semibold text-slate-800 dark:text-slate-200">
+              <div className="rounded-xl bg-mist p-3 text-sm dark:bg-slate-900/60">
+                <p className="font-semibold text-ink dark:text-slate-200">
                   {payDialog.orderNo || payDialog.id.slice(0, 8)}
                 </p>
                 {payDialog.partyName ? (
-                  <p className="text-slate-500">{payDialog.partyName}</p>
+                  <p className="text-secondary-500">{payDialog.partyName}</p>
                 ) : null}
                 <div className="mt-2 flex items-center justify-between text-xs">
-                  <span className="text-slate-500">
+                  <span className="text-secondary-500">
                     Total: {money(payDialog.grandTotal)}
                   </span>
                   <span className="font-semibold text-rose-600 dark:text-rose-400">
@@ -4441,6 +4546,60 @@ export default function Services() {
           Boolean(deleteService) && deletingServiceId === deleteService.id
         }
       />
+
+      <Dialog
+        isOpen={Boolean(cancelService)}
+        onClose={closeCancelDialog}
+        title={t("services.cancelInvoice")}
+        size="sm"
+        showCloseButton={!(cancelService && cancellingServiceId === cancelService.id)}
+        closeOnOverlayClick={!(cancelService && cancellingServiceId === cancelService.id)}
+        footer={(
+          <>
+            <button
+              type="button"
+              className="btn-secondary w-full sm:w-auto"
+              onClick={closeCancelDialog}
+              disabled={Boolean(cancelService && cancellingServiceId === cancelService.id)}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="button"
+              className="w-full rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              onClick={handleCancelService}
+              disabled={Boolean(cancelService && cancellingServiceId === cancelService.id)}
+            >
+              {cancelService && cancellingServiceId === cancelService.id
+                ? t("common.loading")
+                : t("services.confirmCancelInvoice")}
+            </button>
+          </>
+        )}
+      >
+        <div className="space-y-3">
+          <p className="text-sm leading-6 text-secondary-700">
+            {cancelService
+              ? t("services.cancelConfirm", {
+                  name: cancelService.orderNo || cancelService.id.slice(0, 8),
+                })
+              : ""}
+          </p>
+          <div className="space-y-1">
+            <label className="label" htmlFor="service-cancel-reason">
+              {t("services.cancelReason")}
+            </label>
+            <textarea
+              id="service-cancel-reason"
+              className="input min-h-[96px] resize-none"
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              placeholder={t("services.cancelReasonPlaceholder")}
+              disabled={Boolean(cancelService && cancellingServiceId === cancelService.id)}
+            />
+          </div>
+        </div>
+      </Dialog>
     </div>
   );
 }

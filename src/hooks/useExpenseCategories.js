@@ -39,9 +39,9 @@ const CATEGORY_STYLES = [
     badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
   },
   {
-    activeColor: 'border-slate-400 bg-slate-50 dark:border-slate-500/50 dark:bg-slate-900/20',
-    iconWrap: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
-    badge: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+    activeColor: 'border-secondary-400 bg-mist',
+    iconWrap: 'bg-secondary-100 text-ink-light',
+    badge: 'bg-secondary-100 text-ink-light',
   },
 ];
 

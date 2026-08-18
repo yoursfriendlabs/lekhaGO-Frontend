@@ -1,14 +1,16 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Boxes, Users, ShoppingCart, Briefcase, Settings2, ClipboardList, Clock, Receipt, Coffee } from 'lucide-react';
+import { LayoutDashboard, Boxes, Users, ShoppingCart, Briefcase, Settings2, ClipboardList, Clock, Receipt, Coffee, UserRound } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { getNavigationForBusinessType } from '../lib/businessTypeConfig.js';
+import { expandNavigationForPermissions, getNavItemPermissionKey, withOwnProfileNavItem } from '../lib/accessControl';
 
 const NAV_ROLE_MAP = {
   dashboard: ['owner', 'staff', 'admin', 'super_admin'],
   orders: ['owner', 'staff', 'admin', 'super_admin'],
   inventory: ['owner', 'staff', 'admin', 'super_admin'],
+  quickPos: ['owner', 'staff', 'admin', 'super_admin'],
   sales: ['owner', 'staff', 'admin', 'super_admin'],
   services: ['owner', 'staff', 'admin', 'super_admin'],
   purchases: ['owner', 'staff', 'admin', 'super_admin'],
@@ -27,6 +29,7 @@ const ICON_MAP = {
   orders: ClipboardList,
   inventory: Boxes,
   sales: Briefcase,
+  quickPos: Receipt,
   services: Briefcase,
   purchases: ShoppingCart,
   parties: Users,
@@ -36,6 +39,7 @@ const ICON_MAP = {
   attendance: Clock,
   staff: Users,
   'staff-salary': Users,
+  profile: UserRound,
   reports: ClipboardList,
   settings: Settings2,
 };
@@ -84,26 +88,33 @@ export default function MobileNav() {
     if (item?.key === 'purchases') return { ...item, label: t('nav.expenses') };
     if (item?.key === 'attendance') return { ...item, label: t('nav.attendance') };
     if (item?.key === 'staff') return { ...item, label: t('nav.staff') };
+    if (item?.key === 'quickPos') return { ...item, label: t('nav.quickPos') || t('quickPos.title') || item.label };
     return item;
   });
 
   const membershipId = accessControl?.membershipId;
   let visibleNavItems;
   if (isGeneralStaff) {
-    const salaryRoute = membershipId ? `/app/staff-salary/${encodeURIComponent(membershipId)}` : '/app/staff';
     visibleNavItems = [
-      { key: 'staff-salary', label: t('nav.staff'), route: salaryRoute },
       { key: 'attendance', label: t('nav.attendance'), route: '/app/attendance' },
       { key: 'settings', label: t('nav.settings'), route: '/app/settings' },
     ];
   } else {
-    visibleNavItems = navigation
-      .filter((item) => (NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role))
-      .filter((item) => hasFeatureAccess(item.key));
+    visibleNavItems = expandNavigationForPermissions(navigation, hasFeatureAccess)
+      .filter((item) => {
+        const permissionKey = getNavItemPermissionKey(item);
+        return (NAV_ROLE_MAP[permissionKey] || NAV_ROLE_MAP[item.key] || ['owner', 'staff']).includes(role);
+      })
+      .filter((item) => hasFeatureAccess(getNavItemPermissionKey(item)));
   }
+  visibleNavItems = withOwnProfileNavItem(visibleNavItems, {
+    role,
+    membershipId,
+    label: t('nav.profile'),
+  });
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-200/70 bg-white/95 px-2 py-2 shadow-lg backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/90 md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-secondary-200/70 bg-surface/95 px-2 py-2 shadow-lg backdrop-blur md:hidden">
       <div className="flex items-stretch gap-2 overflow-x-auto no-scrollbar scroll-smooth pb-[max(env(safe-area-inset-bottom),0px)]">
         {visibleNavItems.map((item) => {
           const Icon = ICON_MAP[item.key] || Briefcase;
@@ -116,8 +127,8 @@ export default function MobileNav() {
               className={({ isActive }) =>
                 `flex min-w-[82px] shrink-0 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2.5 text-center transition-all ${
                   isActive
-                    ? 'bg-primary-50 text-primary-700 shadow-sm dark:bg-primary-900/30 dark:text-primary-300'
-                    : 'text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/60'
+                    ? 'bg-primary-50 text-primary-700 shadow-sm'
+                    : 'text-secondary-500 hover:bg-primary/10'
                 }`
               }
             >

@@ -286,17 +286,17 @@ export default function Banks() {
               </div>
 
               <div className="grid gap-3">
-                <div className="rounded-[28px] border border-slate-200 bg-slate-50 px-4 py-4">
+                <div className="rounded-[28px] border border-secondary-200 bg-mist px-4 py-4">
                   <div className="flex items-center gap-3">
                     <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-primary-700 shadow-sm">
                       <WalletCards size={20} />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{t('common.selected')}</p>
-                      <p className="mt-1 font-semibold text-slate-900">{selectedBank?.name || t('banks.unnamed')}</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-secondary-400">{t('common.selected')}</p>
+                      <p className="mt-1 font-semibold text-ink">{selectedBank?.name || t('banks.unnamed')}</p>
                     </div>
                   </div>
-                  <p className="mt-4 text-sm text-slate-500">{selectedBank?.accountNumber || selectedBank?.accountName || '—'}</p>
+                  <p className="mt-4 text-sm text-secondary-500">{selectedBank?.accountNumber || selectedBank?.accountName || '—'}</p>
                   <p className="mt-2 text-xl font-semibold text-primary-700">{formatMoney(selectedBank?.currentBalance)}</p>
                 </div>
                 {canManageBanks ? (
@@ -313,7 +313,7 @@ export default function Banks() {
           </div>
 
           <div className="rounded-[32px] border border-secondary-200/70 bg-white/90 p-5 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">{t('common.filters')}</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-secondary-400">{t('common.filters')}</p>
             <div className="mt-4 grid gap-3">
               <div>
                 <label className="label">{t('common.search')}</label>
@@ -343,8 +343,8 @@ export default function Banks() {
         <div className="card space-y-4">
           <div className="hidden items-center justify-between md:flex">
             <div>
-              <p className="text-lg font-semibold text-slate-900">{t('banks.allAccounts')}</p>
-              <p className="mt-1 text-sm text-slate-500">{t('banks.subtitle')}</p>
+              <p className="text-lg font-semibold text-ink">{t('banks.allAccounts')}</p>
+              <p className="mt-1 text-sm text-secondary-500">{t('banks.subtitle')}</p>
             </div>
             {canManageBanks ? (
               <button className="btn-secondary" type="button" onClick={openCreate}>
@@ -356,9 +356,9 @@ export default function Banks() {
 
           <div className="space-y-3 md:hidden">
             {listLoading && banks.length === 0 ? (
-              <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+              <p className="py-3 text-sm text-secondary-500">{t('common.loading')}</p>
             ) : banks.length === 0 ? (
-              <p className="py-3 text-sm text-slate-500">{t('banks.noBanks')}</p>
+              <p className="py-3 text-sm text-secondary-500">{t('banks.noBanks')}</p>
             ) : (
               banks.map((bank) => {
                 const isSelected = bank.id === selectedBank?.id;
@@ -371,30 +371,30 @@ export default function Banks() {
                     className={`w-full rounded-[28px] border px-4 py-4 text-left transition ${
                       isSelected
                         ? 'border-primary-300 bg-primary-50 shadow-sm'
-                        : 'border-slate-200/70 bg-white/90'
+                        : 'border-secondary-200/70 bg-white/90'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${bank.isActive ? 'bg-primary-100 text-primary-700' : 'bg-slate-100 text-slate-500'}`}>
+                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${bank.isActive ? 'bg-primary-100 text-primary-700' : 'bg-secondary-100 text-secondary-500'}`}>
                           <Landmark size={20} />
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-lg font-semibold text-slate-900">{bank.name || t('banks.unnamed')}</p>
-                          <p className="mt-1 text-sm text-slate-500">{bank.accountNumber || bank.accountName || '-'}</p>
+                          <p className="truncate text-lg font-semibold text-ink">{bank.name || t('banks.unnamed')}</p>
+                          <p className="mt-1 text-sm text-secondary-500">{bank.accountNumber || bank.accountName || '-'}</p>
                         </div>
                       </div>
-                      <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${bank.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                      <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${bank.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-secondary-100 text-secondary-700'}`}>
                         {bank.isActive ? t('banks.filters.active') : t('banks.filters.inactive')}
                       </span>
                     </div>
 
                     <div className="mt-4 flex items-end justify-between gap-3">
                       <div>
-                        <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{t('banks.currentBalance')}</p>
+                        <p className="text-xs uppercase tracking-[0.18em] text-secondary-400">{t('banks.currentBalance')}</p>
                         <p className="mt-1 text-2xl font-semibold text-primary-800">{formatMoney(bank.currentBalance)}</p>
                       </div>
-                      <div className="text-right text-xs text-slate-500">
+                      <div className="text-right text-xs text-secondary-500">
                         <p>{bank.branchName || '—'}</p>
                         <p className="mt-1">{t('banks.openingBalance')}: {formatMoney(bank.openingBalance)}</p>
                       </div>
@@ -423,8 +423,8 @@ export default function Banks() {
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-              <thead className="text-xs uppercase text-slate-400">
+            <table className="w-full text-sm text-secondary-700">
+              <thead className="text-xs uppercase text-ink">
                 <tr>
                   <th className="py-2 text-left">{t('banks.name')}</th>
                   <th className="py-2 text-left">{t('banks.accountNumber')}</th>
@@ -438,25 +438,25 @@ export default function Banks() {
               <tbody>
                 {listLoading && banks.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-3 text-slate-500">{t('common.loading')}</td>
+                    <td colSpan={7} className="py-3 text-secondary-500">{t('common.loading')}</td>
                   </tr>
                 ) : banks.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-3 text-slate-500">{t('banks.noBanks')}</td>
+                    <td colSpan={7} className="py-3 text-secondary-500">{t('banks.noBanks')}</td>
                   </tr>
                 ) : (
                   banks.map((bank) => (
-                    <tr key={bank.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
+                    <tr key={bank.id} className="border-t border-secondary-200/70">
                       <td className="py-2">
-                        <div className="font-semibold text-slate-900 dark:text-white">{bank.name || t('banks.unnamed')}</div>
-                        <div className="text-xs text-slate-500">{bank.accountName || '-'}</div>
+                        <div className="font-semibold text-ink">{bank.name || t('banks.unnamed')}</div>
+                        <div className="text-xs text-secondary-500">{bank.accountName || '-'}</div>
                       </td>
                       <td className="py-2">{bank.accountNumber || '-'}</td>
                       <td className="py-2">{bank.branchName || '-'}</td>
                       <td className="py-2 text-right">{formatMoney(bank.openingBalance)}</td>
-                      <td className="py-2 text-right font-semibold text-slate-900 dark:text-white">{formatMoney(bank.currentBalance)}</td>
+                      <td className="py-2 text-right font-semibold text-ink">{formatMoney(bank.currentBalance)}</td>
                       <td className="py-2">
-                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${bank.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${bank.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-secondary-100 text-secondary-700 dark:bg-slate-800 dark:text-secondary-300'}`}>
                           {bank.isActive ? t('banks.filters.active') : t('banks.filters.inactive')}
                         </span>
                       </td>
@@ -474,7 +474,7 @@ export default function Banks() {
                             </button>
                           </div>
                         ) : (
-                          <span className="text-xs font-medium text-slate-400">{t('common.view')}</span>
+                          <span className="text-xs font-medium text-secondary-400">{t('common.view')}</span>
                         )}
                       </td>
                     </tr>
@@ -550,7 +550,7 @@ export default function Banks() {
             />
           </div>
 
-          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-slate-700/60 dark:text-slate-300 dark:hover:bg-slate-800/40">
+          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-secondary-200/70 px-3 py-2.5 text-sm text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:text-secondary-300 dark:hover:bg-slate-800/40">
             <input
               type="checkbox"
               className="h-4 w-4 rounded accent-primary-600"

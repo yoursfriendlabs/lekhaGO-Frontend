@@ -28,11 +28,11 @@ export default function PaymentTypeSummary({
 
   return (
     <div className={`min-w-0 ${className}`}>
-      <p className={`truncate text-sm font-medium text-slate-700 dark:text-slate-300 ${align === 'right' ? 'text-right' : ''} ${labelClassName}`}>
+      <p className={`truncate text-sm font-medium text-ink-light dark:text-secondary-300 ${align === 'right' ? 'text-right' : ''} ${labelClassName}`}>
         {payment.label}
       </p>
       {payment.balanceText ? (
-        <p className={`truncate text-xs text-slate-500 dark:text-slate-400 ${align === 'right' ? 'text-right' : ''} ${metaClassName}`}>
+        <p className={`truncate text-xs text-secondary-500 ${align === 'right' ? 'text-right' : ''} ${metaClassName}`}>
           {payment.balanceText}
         </p>
       ) : null}

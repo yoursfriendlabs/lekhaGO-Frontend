@@ -166,7 +166,7 @@ function OtpInput({ digits, onChange, disabled }) {
           ref={(element) => {
             inputRefs.current[index] = element;
           }}
-          className="h-14 rounded-2xl border border-slate-200 bg-white px-0 text-center text-3xl font-semibold leading-none text-slate-900 shadow-sm outline-none transition [font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation_Mono,Courier_New,monospace] [font-variant-numeric:lining-nums_tabular-nums] focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          className="h-14 rounded-2xl border border-secondary-200 bg-white px-0 text-center text-3xl font-semibold leading-none text-ink shadow-sm outline-none transition [font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation_Mono,Courier_New,monospace] [font-variant-numeric:lining-nums_tabular-nums] focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-secondary-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
           inputMode="numeric"
           pattern="[0-9]*"
           lang="en"
@@ -355,7 +355,7 @@ export default function VerifyEmail() {
 
   return (
     <div className="min-h-screen gradient-bg flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-2xl overflow-hidden rounded-[32px] border border-slate-200/80 bg-white/90 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85">
+      <div className="w-full max-w-2xl overflow-hidden rounded-[32px] border border-secondary-200/80 bg-white/90 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85">
         <div className="grid gap-0 md:grid-cols-[0.95fr_1.05fr]">
           <div className="bg-gradient-to-br from-primary/10 via-amber-50 to-white p-8 dark:from-primary/15 dark:via-slate-900 dark:to-slate-950">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-lg shadow-primary/25">
@@ -364,23 +364,23 @@ export default function VerifyEmail() {
             <p className="mt-6 text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
               {t('auth.verifyTitle')}
             </p>
-            <h1 className="mt-3 font-serif text-4xl leading-tight text-slate-900 dark:text-white">
+            <h1 className="mt-3 font-serif text-4xl leading-tight text-ink">
               Secure your sign in.
             </h1>
-            <p className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
+            <p className="mt-4 text-sm leading-6 text-secondary-700">
               {subtitle}
             </p>
             {email ? (
-              <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-white/80 px-4 py-2 text-sm font-medium text-slate-700 shadow-sm dark:border-primary/30 dark:bg-slate-900/70 dark:text-slate-200">
+              <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-white/80 px-4 py-2 text-sm font-medium text-ink-light shadow-sm dark:border-primary/30 dark:bg-slate-900/70 dark:text-slate-200">
                 <MailCheck size={16} className="text-primary" />
                 {email}
               </div>
             ) : null}
-            <div className="mt-8 rounded-3xl border border-slate-200/80 bg-white/75 p-5 dark:border-slate-800/70 dark:bg-slate-900/70">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">
+            <div className="mt-8 rounded-3xl border border-secondary-200/80 bg-white/75 p-5 dark:border-slate-800/70 dark:bg-slate-900/70">
+              <p className="text-sm font-semibold text-ink">
                 {t('auth.verificationTipsTitle')}
               </p>
-              <ul className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+              <ul className="mt-3 space-y-2 text-sm text-secondary-700">
                 <li>{t('auth.verificationTipInbox')}</li>
                 <li>{t('auth.verificationTipSpam')}</li>
                 <li>{t('auth.verificationTipSingleUse')}</li>
@@ -389,7 +389,7 @@ export default function VerifyEmail() {
           </div>
 
           <div className="p-8 md:p-10">
-            <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-2 text-sm text-secondary-500">
               <ArrowLeft size={16} />
               <Link className="hover:text-primary" to="/login">
                 {t('auth.backToLogin')}
@@ -399,8 +399,8 @@ export default function VerifyEmail() {
             <form className="mt-8 space-y-6" onSubmit={handleVerify}>
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <label className="label !text-slate-700 dark:!text-slate-200">{t('auth.otpCode')}</label>
-                  <span  className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                  <label className="label !text-ink-light dark:!text-slate-200">{t('auth.otpCode')}</label>
+                  <span  className="text-xs font-medium uppercase tracking-[0.18em] text-secondary-400">
                     {OTP_LENGTH} digits
                   </span>
                 </div>
@@ -415,7 +415,7 @@ export default function VerifyEmail() {
                 <Notice title={t('auth.verificationContextMissing')} tone="warn" />
               ) : null}
 
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+              <div className="rounded-2xl border border-dashed border-secondary-200 bg-mist/70 px-4 py-3 text-sm text-secondary-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-secondary-300">
                 {sendingCode
                   ? t('auth.sendingCode')
                   : resendCountdown > 0

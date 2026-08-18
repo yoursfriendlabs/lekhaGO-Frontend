@@ -2,19 +2,22 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../lib/auth.jsx';
 import { I18nProvider } from '../lib/i18n.jsx';
+import { ThemeProvider } from '../lib/theme.jsx';
 import { BusinessSettingsProvider } from '../lib/businessSettings.jsx';
 import Topbar from './Topbar.jsx';
 
 function renderTopbar() {
   return render(
     <MemoryRouter>
-      <I18nProvider>
-        <AuthProvider>
-          <BusinessSettingsProvider>
-            <Topbar />
-          </BusinessSettingsProvider>
-        </AuthProvider>
-      </I18nProvider>
+      <ThemeProvider>
+        <I18nProvider>
+          <AuthProvider>
+            <BusinessSettingsProvider>
+              <Topbar />
+            </BusinessSettingsProvider>
+          </AuthProvider>
+        </I18nProvider>
+      </ThemeProvider>
     </MemoryRouter>
   );
 }

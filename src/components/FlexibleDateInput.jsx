@@ -216,8 +216,8 @@ export default function FlexibleDateInput({
 
   return (
     <div ref={containerRef} className={wrapperClassName}>
-      <div className="flex w-full min-w-0 flex-wrap items-stretch gap-2">
-        <div className="min-w-[12.5rem] flex-1">
+      <div className="flex w-full min-w-0 flex-nowrap items-stretch gap-1.5">
+        <div className="min-w-0 flex-1">
           {calendar === 'ad' ? (
             <input
               id={id}
@@ -251,10 +251,10 @@ export default function FlexibleDateInput({
             type="button"
             disabled={disabled}
             onClick={() => handleCalendarChange('ad')}
-            className={`rounded-lg transition font-bold uppercase h-full px-3 text-[10px] ${
+            className={`rounded-lg transition font-bold uppercase h-full px-2.5 text-[10px] ${
               calendar === 'ad'
                 ? 'bg-primary text-white shadow-sm hover:bg-primary-600'
-                : 'text-secondary-600 hover:text-secondary-900 dark:text-slate-400 dark:hover:text-white'
+                : 'text-secondary-600 hover:text-secondary-900 dark:text-secondary-400 dark:hover:text-white'
             }`}
           >
             AD
@@ -263,10 +263,10 @@ export default function FlexibleDateInput({
             type="button"
             disabled={disabled}
             onClick={() => handleCalendarChange('bs')}
-            className={`rounded-lg transition font-bold uppercase h-full px-3 text-[10px] ${
+            className={`rounded-lg transition font-bold uppercase h-full px-2.5 text-[10px] ${
               calendar === 'bs'
                 ? 'bg-primary text-white shadow-sm hover:bg-primary-600'
-                : 'text-secondary-600 hover:text-secondary-900 dark:text-slate-400 dark:hover:text-white'
+                : 'text-secondary-600 hover:text-secondary-900 dark:text-secondary-400 dark:hover:text-white'
             }`}
           >
             BS
@@ -278,7 +278,7 @@ export default function FlexibleDateInput({
       {error ? (
         <p className="text-[10px] font-medium text-rose-600 mt-1 pl-1 leading-none">{error}</p>
       ) : convertedHint ? (
-        <p className="text-[10px] font-medium text-secondary-500 dark:text-slate-400 mt-1 pl-1 leading-none">
+        <p className="text-[10px] font-medium text-secondary-500 dark:text-secondary-400 mt-1 pl-1 leading-none">
           {convertedHint}
         </p>
       ) : null}
@@ -288,10 +288,10 @@ export default function FlexibleDateInput({
         <div
           ref={dropdownRef}
           style={dropdownStyle}
-          className="fixed z-[1000] min-w-0 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900/95 backdrop-blur-md"
+          className="fixed z-[1000] min-w-0 rounded-2xl border border-secondary-200 bg-white/95 p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900/95 backdrop-blur-md"
         >
           {/* Header */}
-          <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between pb-2 mb-3 border-b border-secondary-100 dark:border-slate-800">
             <span className="text-sm font-semibold text-secondary-800 dark:text-slate-200">
               {t('dates.nepaliBs') || 'Nepali (BS)'}
             </span>
@@ -373,7 +373,7 @@ export default function FlexibleDateInput({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex items-center justify-between pt-3 border-t border-secondary-100 dark:border-slate-800">
             <div className="flex gap-2">
               <button
                 type="button"
@@ -381,7 +381,7 @@ export default function FlexibleDateInput({
                   const today = todayBsParts();
                   commitBsParts(today.year, today.month, today.day);
                 }}
-                className="text-xs px-2.5 py-1 bg-secondary-100 dark:bg-slate-800 text-secondary-700 dark:text-slate-300 rounded-lg hover:bg-secondary-200 dark:hover:bg-slate-700 transition font-medium"
+                className="text-xs px-2.5 py-1 bg-secondary-100 dark:bg-slate-800 text-secondary-700 dark:text-secondary-300 rounded-lg hover:bg-secondary-200 dark:hover:bg-slate-700 transition font-medium"
               >
                 {t('dates.today') || (language === 'ne' ? 'आज' : 'Today')}
               </button>

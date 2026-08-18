@@ -1,5 +1,6 @@
 export const GENERAL_SETTINGS_TAB = 'general';
 export const PROFILE_SETTINGS_TAB = 'profile';
+export const APPEARANCE_SETTINGS_TAB = 'appearance';
 export const SUBSCRIPTION_SETTINGS_TAB = 'subscription';
 export const ACCOUNT_SETTINGS_TAB = 'account';
 export const CATEGORIES_SETTINGS_TAB = 'categories';
@@ -12,6 +13,7 @@ export const TABLES_FLOORS_SETTINGS_TAB = 'tables-floors';
 export const SETTINGS_TABS = [
   GENERAL_SETTINGS_TAB,
   PROFILE_SETTINGS_TAB,
+  APPEARANCE_SETTINGS_TAB,
   SUBSCRIPTION_SETTINGS_TAB,
   ACCOUNT_SETTINGS_TAB,
   CATEGORIES_SETTINGS_TAB,

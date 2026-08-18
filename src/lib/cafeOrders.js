@@ -4,7 +4,7 @@ export const CAFE_ORDER_STATUSES = [
   {
     value: 'new',
     label: 'New',
-    tone: 'border-slate-200 bg-slate-50 text-slate-700',
+    tone: 'border-secondary-200 bg-mist text-ink-light',
     accent: 'bg-slate-900',
   },
   {
@@ -22,7 +22,7 @@ export const CAFE_ORDER_STATUSES = [
   {
     value: 'completed',
     label: 'Completed',
-    tone: 'border-slate-200 bg-slate-100 text-slate-600',
+    tone: 'border-secondary-200 bg-secondary-100 text-secondary-700',
     accent: 'bg-slate-400',
   },
 ];

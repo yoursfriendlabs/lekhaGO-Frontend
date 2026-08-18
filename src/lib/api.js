@@ -1032,6 +1032,27 @@ export const api = {
         "banks",
       ]),
     ),
+  cancelPurchase: (id, data = {}) =>
+    request(
+      `/api/purchases/${id}/cancel`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("purchase", id),
+        "purchases",
+        "products",
+        "reports",
+        "dashboard",
+        "parties",
+        "party-statements",
+        "banks",
+      ]),
+    ),
+  recordPurchaseReprint: (id) =>
+    request(
+      `/api/purchases/${id}/reprint`,
+      { method: "POST" },
+      mutationConfig([detailTags("purchase", id), "purchases"]),
+    ),
   deletePurchase: (id) =>
     request(
       `/api/purchases/${id}`,
@@ -1172,6 +1193,27 @@ export const api = {
         "party-statements",
         "banks",
       ]),
+    ),
+  cancelService: (id, data = {}) =>
+    request(
+      `/api/services/${id}/cancel`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("service", id),
+        "services",
+        "products",
+        "reports",
+        "dashboard",
+        "parties",
+        "party-statements",
+        "banks",
+      ]),
+    ),
+  recordServiceReprint: (id) =>
+    request(
+      `/api/services/${id}/reprint`,
+      { method: "POST" },
+      mutationConfig([detailTags("service", id), "services"]),
     ),
   deleteService: (id) =>
     request(

@@ -32,7 +32,7 @@ export function formatSubscriptionDaysRemainingLabel(daysRemaining, t) {
 
 function MetaPill({ icon: Icon, label, tone = 'default' }) {
   const tones = {
-    default: 'border-white/70 bg-white/80 text-slate-700 dark:border-slate-700/70 dark:bg-slate-950/60 dark:text-slate-200',
+    default: 'border-white/70 bg-white/80 text-ink-light dark:border-slate-700/70 dark:bg-slate-950/60 dark:text-slate-200',
     warn: 'border-amber-200/80 bg-amber-50/90 text-amber-800 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100',
     danger: 'border-rose-200/80 bg-rose-50/90 text-rose-800 dark:border-rose-400/30 dark:bg-rose-500/10 dark:text-rose-100',
   };
@@ -49,15 +49,15 @@ export function SubscriptionStatusBannerSkeleton() {
   return (
     <div
       aria-hidden
-      className="mb-6 overflow-hidden rounded-3xl border border-slate-200/80 bg-white/90 p-5 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/70"
+      className="mb-6 overflow-hidden rounded-3xl border border-secondary-200/80 bg-white/90 p-5 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/70"
     >
       <div className="animate-pulse space-y-4">
-        <div className="h-3 w-24 rounded-full bg-slate-200 dark:bg-slate-800" />
-        <div className="h-8 w-3/4 rounded-2xl bg-slate-200 dark:bg-slate-800" />
-        <div className="h-4 w-full rounded-2xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-3 w-24 rounded-full bg-secondary-200 dark:bg-slate-800" />
+        <div className="h-8 w-3/4 rounded-2xl bg-secondary-200 dark:bg-slate-800" />
+        <div className="h-4 w-full rounded-2xl bg-secondary-200 dark:bg-slate-800" />
         <div className="flex flex-wrap gap-3">
-          <div className="h-10 w-44 rounded-full bg-slate-200 dark:bg-slate-800" />
-          <div className="h-10 w-36 rounded-full bg-slate-200 dark:bg-slate-800" />
+          <div className="h-10 w-44 rounded-full bg-secondary-200 dark:bg-slate-800" />
+          <div className="h-10 w-36 rounded-full bg-secondary-200 dark:bg-slate-800" />
         </div>
       </div>
     </div>
@@ -129,7 +129,7 @@ export default function SubscriptionStatusBanner({ subscription }) {
         container: 'border-primary/20 bg-gradient-to-r from-primary/10 via-white to-white dark:border-primary/30 dark:from-primary/15 dark:via-slate-950 dark:to-slate-950',
         eyebrow: 'text-primary-700 dark:text-primary-100',
         title: 'text-slate-950 dark:text-white',
-        body: 'text-slate-700 dark:text-slate-200',
+        body: 'text-ink-light',
         pill: 'default',
         iconBg: 'bg-primary/15 text-primary-700 dark:bg-primary/20 dark:text-primary-100',
       };

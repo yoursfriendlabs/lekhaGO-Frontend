@@ -12,11 +12,11 @@ const features = [
 
 export default function Landing() {
   return (
-    <div className="min-h-screen gradient-bg bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div className="min-h-screen gradient-bg bg-mist text-ink">
       <header className="flex flex-wrap items-center justify-between gap-4 px-6 py-6">
         <div className="space-y-3">
           <BrandLogo className="h-10 w-full max-w-[240px]" />
-          <p className="text-sm text-slate-500 dark:text-slate-400">Inventory, sales, purchases, service</p>
+          <p className="text-sm text-secondary-500">Inventory, sales, purchases, service</p>
         </div>
         <div className="flex items-center gap-3">
           <Link className="btn-ghost" to="/login">Log in</Link>
@@ -27,11 +27,11 @@ export default function Landing() {
       <main className="px-6 pb-16">
         <section className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="card">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">All-in-one operations</p>
-            <h2 className="mt-4 font-serif text-4xl text-slate-900 dark:text-white">
+            <p className="text-xs uppercase tracking-[0.3em] text-secondary-500">All-in-one operations</p>
+            <h2 className="mt-4 font-serif text-4xl text-ink">
               Run your shop like a pro — from your phone.
             </h2>
-            <p className="mt-4 text-slate-600 dark:text-slate-300">
+            <p className="mt-4 text-secondary-700">
               Manage products, purchases, sales, and service orders in one place. Mobile-first layouts help your team
               update stock on the go.
             </p>
@@ -41,8 +41,8 @@ export default function Landing() {
             </div>
           </div>
           <div className="card">
-            <h3 className="font-serif text-2xl text-slate-900 dark:text-white">What you can do</h3>
-            <ul className="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
+            <h3 className="font-serif text-2xl text-ink">What you can do</h3>
+            <ul className="mt-4 space-y-3 text-sm text-secondary-700">
               <li>Fast item creation with unit conversions.</li>
               <li>Smart sales + purchase forms with automatic totals.</li>
               <li>Service tickets that combine labor and parts.</li>
@@ -55,8 +55,8 @@ export default function Landing() {
         <section className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {features.map((feature) => (
             <div key={feature.title} className="card">
-              <h4 className="font-serif text-xl text-slate-900 dark:text-white">{feature.title}</h4>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{feature.desc}</p>
+              <h4 className="font-serif text-xl text-ink">{feature.title}</h4>
+              <p className="mt-2 text-sm text-secondary-700">{feature.desc}</p>
             </div>
           ))}
         </section>
@@ -64,8 +64,8 @@ export default function Landing() {
         <section className="mt-10 card">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h3 className="font-serif text-2xl text-slate-900 dark:text-white">Ready to streamline your shop?</h3>
-              <p className="text-slate-600 dark:text-slate-300">Create your workspace in minutes.</p>
+              <h3 className="font-serif text-2xl text-ink">Ready to streamline your shop?</h3>
+              <p className="text-secondary-700">Create your workspace in minutes.</p>
             </div>
             <Link className="btn-primary" to="/register">Create your account</Link>
           </div>

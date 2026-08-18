@@ -152,7 +152,7 @@ export default function ForgotPasswordOtp() {
         t('auth.verificationTipSingleUse'),
       ]}
       footer={(
-        <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-center text-sm text-secondary-500">
           {t('auth.needDifferentEmail')}{' '}
           <Link className="font-medium text-primary hover:text-primary/80" to="/forgot-password">
             {t('auth.tryAnotherEmail')}
@@ -163,8 +163,8 @@ export default function ForgotPasswordOtp() {
       <form className="space-y-6" onSubmit={handleVerify}>
         <div>
           <div className="flex items-center justify-between gap-3">
-            <label className="label !text-slate-700 dark:!text-slate-200">{t('auth.otpCode')}</label>
-            <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+            <label className="label !text-ink-light dark:!text-slate-200">{t('auth.otpCode')}</label>
+            <span className="text-xs font-medium uppercase tracking-[0.18em] text-secondary-400">
               {OTP_LENGTH} {t('auth.digitsLabel')}
             </span>
           </div>
@@ -175,7 +175,7 @@ export default function ForgotPasswordOtp() {
 
         {status.message ? <Notice title={status.message} tone={status.type === 'error' ? 'error' : status.type === 'success' ? 'success' : status.type === 'warn' ? 'warn' : 'info'} /> : null}
 
-        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300">
+        <div className="rounded-2xl border border-dashed border-secondary-200 bg-mist/70 px-4 py-3 text-sm text-secondary-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-secondary-300">
           {sendingCode
             ? t('auth.sendingResetCode')
             : resendCountdown > 0
