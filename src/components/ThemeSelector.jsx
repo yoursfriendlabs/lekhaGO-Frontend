@@ -83,7 +83,7 @@ export default function ThemeSelector({ variant = 'cards' }) {
   );
 }
 
-function CustomHexField({ t, customHex, colorTheme, selected, setCustomColor, compact = false }) {
+function CustomHexField({ t, customHex, colorTheme, selected, setCustomColor }) {
   const [value, setValue] = useState(customHex || colorTheme?.sourceHex || colorTheme?.swatch || '');
   const [error, setError] = useState('');
 
@@ -106,24 +106,24 @@ function CustomHexField({ t, customHex, colorTheme, selected, setCustomColor, co
 
   return (
     <form
-      className={compact ? 'mt-3 space-y-2' : 'rounded-3xl border border-secondary-200 bg-surface p-4'}
+      className="rounded-3xl border border-secondary-200 bg-surface p-4"
       onSubmit={(event) => {
         event.preventDefault();
         applyValue(value);
       }}
     >
-      <div className={compact ? '' : 'mb-3'}>
+      <div className="mb-3">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-500">
           {t('theme.customHexLabel')}
         </p>
-        {compact ? null : <p className="mt-1 text-sm text-secondary-600">{t('theme.customHexHint')}</p>}
+        <p className="mt-1 text-sm text-secondary-600">{t('theme.customHexHint')}</p>
       </div>
 
       <div className="flex items-center gap-2">
         <label className="relative shrink-0">
-          <span className="sr-only">{t('theme.customHexLabel')}</span>
+          <span className="sr-only">{t('theme.customPickerLabel')}</span>
           <span
-            className={`block h-10 w-10 rounded-2xl border shadow-sm ${
+            className={`block h-10 w-10 overflow-hidden rounded-2xl border shadow-sm ${
               selected ? 'border-ink ring-2 ring-primary/30' : 'border-secondary-200'
             }`}
             style={{ backgroundColor: pickerValue }}
@@ -157,7 +157,7 @@ function CustomHexField({ t, customHex, colorTheme, selected, setCustomColor, co
               applyValue(pasted);
             }
           }}
-          className={`input min-w-0 flex-1 font-mono text-sm ${compact ? 'h-10 py-2' : ''}`}
+          className="input min-w-0 flex-1 font-mono text-sm"
         />
 
         <button type="submit" className="btn-primary h-10 shrink-0 px-3 text-xs">
@@ -167,6 +167,27 @@ function CustomHexField({ t, customHex, colorTheme, selected, setCustomColor, co
 
       {error ? <p className="text-xs text-rose-600">{error}</p> : null}
     </form>
+  );
+}
+
+function CompactColorPicker({ t, customHex, colorTheme, setCustomColor }) {
+  const pickerValue = parseHexColor(customHex) || colorTheme?.swatch || '#9b6835';
+
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary-500">
+        {t('theme.customPickerLabel')}
+      </p>
+      <label className="block">
+        <span className="sr-only">{t('theme.customPickerLabel')}</span>
+        <input
+          type="color"
+          value={pickerValue}
+          onChange={(event) => setCustomColor(event.target.value)}
+          className="h-10 w-full cursor-pointer rounded-xl border border-secondary-200 bg-surface p-1 [&::-moz-color-swatch]:rounded-lg [&::-moz-color-swatch]:border-0 [&::-webkit-color-swatch]:rounded-lg [&::-webkit-color-swatch]:border-0 [&::-webkit-color-swatch-wrapper]:p-0"
+        />
+      </label>
+    </div>
   );
 }
 
@@ -247,12 +268,10 @@ function CompactThemeSelector({ themes, themeId, setThemeId, setCustomColor, cus
               />
             ) : null}
           </div>
-          <CustomHexField
-            compact
+          <CompactColorPicker
             t={t}
             customHex={customHex}
             colorTheme={colorTheme}
-            selected={customSelected}
             setCustomColor={setCustomColor}
           />
         </div>

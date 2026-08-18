@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { BarChart3, BellRing, Boxes, Clock, ClipboardList, Package, ShoppingCart, TrendingUp, UserCheck, Wallet } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import { useTaskNotifications } from '../hooks/useTaskNotifications';
@@ -8,6 +9,7 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import StatsCard from '../components/StatsCard.jsx';
+import { formatCurrency } from '../lib/currency';
 import { useI18n } from '../lib/i18n.jsx';
 import dayjs, { formatMaybeDate } from '../lib/datetime';
 
@@ -170,6 +172,104 @@ function formatDate(dateStr) {
   return formatMaybeDate(dateStr, 'D MMM YYYY');
 }
 
+function compactMoney(value) {
+  return formatCurrency(value, { compact: true });
+}
+
+function CashFlowChart({
+  title,
+  caption,
+  formatMoney,
+  mixData,
+  trendData,
+  loading,
+  emptyLabel,
+  incomingLabel,
+  outgoingLabel,
+}) {
+  const showTrend = !loading && trendData.length > 1;
+  const chartData = showTrend ? trendData : mixData;
+  const hasValues = chartData.some((row) => asNumber(row.incoming ?? row.value) > 0 || asNumber(row.outgoing) > 0);
+  const tickInterval = showTrend ? Math.max(0, Math.ceil(chartData.length / 6) - 1) : 0;
+
+  return (
+    <div className="rounded-3xl border border-secondary-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-ink">{title}</p>
+          {caption ? <p className="mt-1 text-xs text-secondary-500">{caption}</p> : null}
+        </div>
+        <BarChart3 size={18} className="shrink-0 text-secondary-400" />
+      </div>
+
+      {showTrend ? (
+        <div className="mt-3 flex flex-wrap gap-3 text-[11px] font-medium text-secondary-500">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            {incomingLabel}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-amber-500" />
+            {outgoingLabel}
+          </span>
+        </div>
+      ) : null}
+
+      <div className="mt-4 h-56">
+        {loading ? (
+          <div className="h-full animate-pulse rounded-2xl bg-mist dark:bg-slate-800/60" />
+        ) : !hasValues ? (
+          <p className="flex h-full items-center text-sm text-secondary-500">{emptyLabel}</p>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 8, right: 4, left: 0, bottom: showTrend ? 8 : 4 }} barGap={6}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--color-secondary-200))" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 10, fill: 'rgb(var(--color-secondary-500))' }}
+                axisLine={{ stroke: 'rgb(var(--color-secondary-200))' }}
+                tickLine={false}
+                interval={tickInterval}
+              />
+              <YAxis
+                tick={{ fontSize: 10, fill: 'rgb(var(--color-secondary-500))' }}
+                axisLine={false}
+                tickLine={false}
+                width={52}
+                tickFormatter={compactMoney}
+              />
+              <Tooltip
+                formatter={(value, name, item) => [
+                  formatMoney(value),
+                  showTrend ? name : (item?.payload?.label || name),
+                ]}
+                contentStyle={{
+                  backgroundColor: 'rgb(var(--color-surface))',
+                  border: '1px solid rgb(var(--color-secondary-200))',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                }}
+              />
+              {showTrend ? (
+                <>
+                  <Bar dataKey="incoming" name={incomingLabel} fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={18} />
+                  <Bar dataKey="outgoing" name={outgoingLabel} fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={18} />
+                </>
+              ) : (
+                <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={36}>
+                  {chartData.map((row) => (
+                    <Cell key={row.label} fill={row.color} />
+                  ))}
+                </Bar>
+              )}
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function getRangeStart(range) {
   const now = dayjs();
   if (range === 'today') return now.startOf('day');
@@ -194,6 +294,8 @@ export default function Dashboard() {
   const [summary, setSummary] = useState(() => EMPTY_SUMMARY);
   const [loadError, setLoadError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [trendData, setTrendData] = useState([]);
   const [dateRange, setDateRange] = useState('month');
 
   const rangeOptions = [
@@ -248,7 +350,64 @@ export default function Dashboard() {
     };
   }, [rangeEnd, rangeStart]);
 
+  const canViewReports = canViewFeature('reports');
+
+  useEffect(() => {
+    if (!canViewReports) {
+      setTrendData([]);
+      setTrendLoading(false);
+      return undefined;
+    }
+
+    let isActive = true;
+    setTrendLoading(true);
+
+    api.getAnalyticsSummary({
+      from: rangeStart.format('YYYY-MM-DD'),
+      to: rangeEnd.format('YYYY-MM-DD'),
+      groupBy: dateRange === 'year' ? 'month' : 'day',
+    })
+      .then((data) => {
+        if (!isActive) return;
+        const rows = Array.isArray(data?.series?.timeline) ? data.series.timeline : [];
+        setTrendData(rows.map((row) => ({
+          label: row.label,
+          incoming: asNumber(row.salesAndServicesTotal),
+          outgoing: asNumber(row.purchaseTotal) + asNumber(row.directExpenseTotal),
+        })));
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setTrendData([]);
+      })
+      .finally(() => {
+        if (!isActive) return;
+        setTrendLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [canViewReports, dateRange, rangeEnd, rangeStart]);
+
   const selectedRangeLabel = rangeOptions.find((option) => option.key === dateRange)?.label ?? '';
+  const mixData = useMemo(() => ([
+    {
+      label: t('dashboard.salesAndServices'),
+      value: summary.salesTotal,
+      color: '#10b981',
+    },
+    {
+      label: t('dashboard.purchaseSpend'),
+      value: summary.purchaseTotal,
+      color: '#f59e0b',
+    },
+    {
+      label: t('dashboard.expenses'),
+      value: summary.expenseTotal,
+      color: '#0ea5e9',
+    },
+  ]), [summary.expenseTotal, summary.purchaseTotal, summary.salesTotal, t]);
   const recentSales = summary.recentSales.slice(0, 5);
   const recentPurchases = summary.recentPurchases.slice(0, 5);
   const upcomingDeliveries = summary.upcomingServiceDeliveries.slice(0, 6);
@@ -345,9 +504,17 @@ export default function Dashboard() {
             loading={loading}
             hint={`${t('analytics.totalOutgoing')}: ${formatMoney(summary.purchaseTotal + summary.expenseTotal)}`}
           />
-          <p className="text-xs text-secondary-500">
-            {loading ? t('common.loading') : t('dashboard.filters.showing', { range: selectedRangeLabel })}
-          </p>
+          <CashFlowChart
+            title={t('dashboard.cashFlow')}
+            caption={loading || trendLoading ? t('common.loading') : t('dashboard.filters.showing', { range: selectedRangeLabel })}
+            formatMoney={formatMoney}
+            mixData={mixData}
+            trendData={trendData}
+            loading={loading || trendLoading}
+            emptyLabel={t('dashboard.noChartData')}
+            incomingLabel={t('dashboard.incoming')}
+            outgoingLabel={t('dashboard.outgoing')}
+          />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
