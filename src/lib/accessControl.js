@@ -111,6 +111,8 @@ const SUBSCRIPTION_FEATURE_ALIASES = {
   quickPos: 'sales',
   pos: 'sales',
   purchasePrice: 'inventory',
+  analytics: 'reports',
+  ledger: 'reports',
 };
 
 function asObject(value) {
@@ -259,6 +261,13 @@ export function applyPermissionChange(permissions, permissionKey, level) {
 
   next[key] = normalizeAccessLevel(level);
 
+  if (key === 'reports') {
+    next.analytics = next.reports;
+  }
+  if (key === 'analytics') {
+    next.reports = next.analytics;
+  }
+
   if (key === 'inventory' && next.inventory === 'none') {
     INVENTORY_DEPENDENT_PERMISSION_KEYS.forEach((dependentKey) => {
       next[dependentKey] = 'none';
@@ -305,8 +314,16 @@ export function normalizePermissionMap(permissions) {
     }
   }
 
-  // Legacy analytics grants now count as reports access.
-  normalized.reports = maxAccessLevel(normalized.reports, source.analytics);
+  // Reports is the single permission. Legacy analytics-only maps inherit reports.
+  // If reports is present, it wins so owners can turn reports off.
+  if (Object.prototype.hasOwnProperty.call(source, 'reports')) {
+    normalized.analytics = normalized.reports;
+  } else if (Object.prototype.hasOwnProperty.call(source, 'analytics')) {
+    normalized.reports = maxAccessLevel(normalized.reports, source.analytics);
+    normalized.analytics = normalized.reports;
+  } else {
+    normalized.analytics = normalized.reports;
+  }
   return normalized;
 }
 

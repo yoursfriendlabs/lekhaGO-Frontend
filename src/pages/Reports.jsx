@@ -1631,17 +1631,13 @@ export default function Reports() {
   // Unified Tab Resolution based on permissions
   const availableTabs = useMemo(() => {
     const list = [];
-    if (canViewFeature('analytics')) {
+    if (canViewFeature('reports')) {
       if (businessProfile?.type === 'cafe') {
         list.push({ key: 'cafe-insights', label: t('analytics.cafeInsights') || 'Cafe Sales Book', icon: Coffee });
       }
       list.push({ key: 'overview', label: t('analytics.overallMix') || 'Overview', icon: PieIcon });
       list.push({ key: 'expense', label: t('analytics.expenses') || 'Expense Analytics', icon: BarChart2 });
-    }
-    if (canViewFeature('ledger')) {
       list.push({ key: 'party', label: t('ledger.statementTitle') || 'Party Statements', icon: ScrollText });
-    }
-    if (canViewFeature('analytics')) {
       list.push({ key: 'timeline', label: t('analytics.timelineSummary') || 'Timeline', icon: TableProperties });
     }
     return list;
@@ -1725,7 +1721,7 @@ export default function Reports() {
   const [cafeTypeFilter, setCafeTypeFilter] = useState("all");
 
   useEffect(() => {
-    if (!canViewFeature("analytics") || activeTab !== "cafe-insights" || !businessId) return;
+    if (!canViewFeature("reports") || activeTab !== "cafe-insights" || !businessId) return;
 
     let isActive = true;
     setCafeSalesLoading(true);
@@ -1888,7 +1884,7 @@ export default function Reports() {
 
   // FETCH: Categories (on mount if analytics view is allowed)
   useEffect(() => {
-    if (!canViewFeature('analytics')) return;
+    if (!canViewFeature('reports')) return;
     let isActive = true;
     api.listCategories({ type: "expense", limit: 100, offset: 0 })
       .then((response) => {
@@ -1909,7 +1905,7 @@ export default function Reports() {
 
   // FETCH: Analytics Data
   useEffect(() => {
-    if (!canViewFeature('analytics') || activeTab === 'party') return;
+    if (!canViewFeature('reports') || activeTab === 'party') return;
 
     let isActive = true;
     const isRefreshRequest = refreshModeRef.current;
@@ -2063,7 +2059,7 @@ export default function Reports() {
 
   // FETCH: Ledger data (Party Statements)
   const fetchLedger = useCallback(async ({ refresh = false, force = false } = {}) => {
-    if (!canViewFeature('ledger') || activeTab !== 'party') return;
+    if (!canViewFeature('reports') || activeTab !== 'party') return;
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;

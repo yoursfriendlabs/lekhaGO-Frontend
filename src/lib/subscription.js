@@ -16,6 +16,7 @@ const ALL_FEATURES = [
   'tasks',
   'ledger',
   'analytics',
+  'reports',
   'settings',
   'admin',
   'general-settings',

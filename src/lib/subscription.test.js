@@ -55,6 +55,7 @@ describe('subscription helpers', () => {
     expect(canAccessFeature(access, 'profile')).toBe(true);
     expect(canAccessFeature(access, 'purchases')).toBe(false);
     expect(canAccessFeature(access, 'analytics')).toBe(false);
+    expect(canAccessFeature(access, 'reports')).toBe(false);
   });
 
   it('unlocks all feature-gated areas while an active trial is still running', () => {

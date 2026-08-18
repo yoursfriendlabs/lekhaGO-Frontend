@@ -193,4 +193,36 @@ describe('access control helpers', () => {
     expect(collection.members[0].category.label).toBe('Cashier');
     expect(collection.members[0].permissions.reports).toBe('view');
   });
+
+  it('lets owners turn reports off even when leftover analytics access exists', () => {
+    const next = applyPermissionChange(
+      {
+        reports: 'view',
+        analytics: 'manage',
+        dashboard: 'view',
+      },
+      'reports',
+      'none'
+    );
+
+    expect(next.reports).toBe('none');
+    expect(next.analytics).toBe('none');
+    expect(getFeatureAccessLevel({ role: 'staff', permissions: next }, 'reports', 'staff')).toBe('none');
+    expect(getFeatureAccessLevel({ role: 'staff', permissions: next }, 'analytics', 'staff')).toBe('none');
+    expect(getFeatureAccessLevel({ role: 'staff', permissions: next }, 'ledger', 'staff')).toBe('none');
+  });
+
+  it('inherits reports from legacy analytics-only permission maps', () => {
+    const accessControl = normalizeAccessControl({
+      role: 'staff',
+      permissions: {
+        analytics: 'manage',
+        dashboard: 'view',
+      },
+    });
+
+    expect(accessControl.permissions.reports).toBe('manage');
+    expect(getFeatureAccessLevel(accessControl, 'reports', 'staff')).toBe('manage');
+    expect(getFeatureAccessLevel(accessControl, 'ledger', 'staff')).toBe('manage');
+  });
 });
