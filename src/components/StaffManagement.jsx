@@ -29,6 +29,7 @@ import {
   buildEmptyPermissionMap,
   enforcePermissionDependencies,
   getPermissionKeyForFeature,
+  getRequiredPartiesAccessLevel,
   getStaffPermissionUiFeatures,
   groupStaffPermissionUiFeatures,
   hasInventoryDependentAccess,
@@ -229,6 +230,7 @@ function StaffFormDialog({
     [visibleFeatures]
   );
   const inventoryRequired = hasInventoryDependentAccess(form.permissions);
+  const requiredPartiesLevel = getRequiredPartiesAccessLevel(form.permissions);
   const isDetailsStep = activeTab === 'general';
 
   useEffect(() => {
@@ -605,6 +607,7 @@ function StaffFormDialog({
                               {group.features.map((feature) => {
                                 const permissionKey = getPermissionKeyForFeature(feature.key) || feature.key;
                                 const isInventory = permissionKey === 'inventory';
+                                const isParties = permissionKey === 'parties';
                                 const labelKey = `staffManagement.permissionFeatures.${permissionKey}`;
                                 const translatedLabel = t(labelKey);
                                 const featureLabel = translatedLabel !== labelKey ? translatedLabel : feature.label;
@@ -612,7 +615,14 @@ function StaffFormDialog({
                                 const translatedHint = t(hintKey);
                                 const featureHint = isInventory && inventoryRequired
                                   ? t('staffManagement.permissionInventoryRequiredHint')
-                                  : (translatedHint !== hintKey ? translatedHint : (feature.description || t('staffManagement.permissionDescriptionFallback')));
+                                  : isParties && requiredPartiesLevel !== 'none'
+                                    ? t('staffManagement.permissionPartiesRequiredHint')
+                                    : (translatedHint !== hintKey ? translatedHint : (feature.description || t('staffManagement.permissionDescriptionFallback')));
+                                const hideLevels = [
+                                  ...(isInventory && inventoryRequired ? ['none'] : []),
+                                  ...(isParties && requiredPartiesLevel !== 'none' ? ['none'] : []),
+                                  ...(isParties && requiredPartiesLevel === 'manage' ? ['view'] : []),
+                                ];
 
                                 return (
                                   <div key={permissionKey} className="rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
@@ -628,7 +638,7 @@ function StaffFormDialog({
                                           value={form.permissions[permissionKey] || 'none'}
                                           levels={levels}
                                           disabled={readOnly}
-                                          hideLevels={isInventory && inventoryRequired ? ['none'] : []}
+                                          hideLevels={hideLevels}
                                           onChange={(value) => onPermissionChange(permissionKey, value)}
                                           t={t}
                                         />

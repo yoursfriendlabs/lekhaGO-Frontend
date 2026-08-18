@@ -36,6 +36,18 @@ const INVENTORY_DEPENDENT_PERMISSION_KEYS = [
   'billing',
 ];
 
+/**
+ * Modules that pick or create a customer/supplier.
+ * Granting manage auto-grants parties manage (create); view auto-grants parties view (select).
+ */
+const PARTY_DEPENDENT_PERMISSION_KEYS = [
+  'quickPos',
+  'sales',
+  'services',
+  'purchases',
+  'billing',
+];
+
 const CAFE_PERMISSION_KEYS = new Set(['tables', 'orders', 'billing']);
 
 /** Permission keys hidden from the staff permission editor unless cafe modules are on. */
@@ -152,11 +164,35 @@ export function getInventoryDependentPermissionKeys() {
   return [...INVENTORY_DEPENDENT_PERMISSION_KEYS];
 }
 
+export function getPartyDependentPermissionKeys() {
+  return [...PARTY_DEPENDENT_PERMISSION_KEYS];
+}
+
 export function hasInventoryDependentAccess(permissions) {
   const source = normalizePermissionMap(permissions);
   return INVENTORY_DEPENDENT_PERMISSION_KEYS.some(
     (key) => normalizeAccessLevel(source[key]) !== 'none'
   );
+}
+
+export function hasPartyDependentAccess(permissions) {
+  const source = asObject(permissions) || {};
+  return PARTY_DEPENDENT_PERMISSION_KEYS.some(
+    (key) => normalizeAccessLevel(source[key]) !== 'none'
+  );
+}
+
+export function getRequiredPartiesAccessLevel(permissions) {
+  const source = asObject(permissions) || {};
+  let required = 'none';
+
+  for (const key of PARTY_DEPENDENT_PERMISSION_KEYS) {
+    const level = normalizeAccessLevel(source[key]);
+    if (level === 'manage') return 'manage';
+    if (level !== 'none') required = 'view';
+  }
+
+  return required;
 }
 
 /**
@@ -232,8 +268,8 @@ export function groupStaffPermissionUiFeatures(features = []) {
 }
 
 /**
- * Keep permission maps consistent with inventory dependencies.
- * Any sales/POS/services/purchases/orders/billing access ⇒ inventory at least view.
+ * Keep permission maps consistent with inventory and party dependencies.
+ * Any sales/POS/services/purchases/billing access ⇒ inventory view and parties access.
  */
 export function enforcePermissionDependencies(permissions) {
   const next = normalizePermissionMap(permissions);
@@ -242,12 +278,17 @@ export function enforcePermissionDependencies(permissions) {
     next.inventory = 'view';
   }
 
+  const requiredParties = getRequiredPartiesAccessLevel(next);
+  if (accessLevelRank(next.parties) < accessLevelRank(requiredParties)) {
+    next.parties = requiredParties;
+  }
+
   return next;
 }
 
 /**
- * Apply a single permission change, then re-enforce inventory dependencies.
- * Clearing inventory explicitly also clears dependent modules.
+ * Apply a single permission change, then re-enforce inventory and party dependencies.
+ * Clearing inventory or parties explicitly also clears dependent modules.
  */
 export function applyPermissionChange(permissions, permissionKey, level) {
   const key = String(permissionKey || '').trim();
@@ -272,7 +313,14 @@ export function applyPermissionChange(permissions, permissionKey, level) {
     INVENTORY_DEPENDENT_PERMISSION_KEYS.forEach((dependentKey) => {
       next[dependentKey] = 'none';
     });
-    return next;
+    return enforcePermissionDependencies(next);
+  }
+
+  if (key === 'parties' && next.parties === 'none') {
+    PARTY_DEPENDENT_PERMISSION_KEYS.forEach((dependentKey) => {
+      next[dependentKey] = 'none';
+    });
+    return enforcePermissionDependencies(next);
   }
 
   return enforcePermissionDependencies(next);
@@ -419,6 +467,15 @@ export function getFeatureAccessLevel(accessControl, featureKey, fallbackRole = 
     level !== 'none'
     && INVENTORY_DEPENDENT_PERMISSION_KEYS.includes(permissionKey)
     && normalizeAccessLevel(permissions.inventory) === 'none'
+  ) {
+    return 'none';
+  }
+
+  // Sales/POS/services/purchases cannot look up or create a party without parties access.
+  if (
+    level !== 'none'
+    && PARTY_DEPENDENT_PERMISSION_KEYS.includes(permissionKey)
+    && normalizeAccessLevel(permissions.parties) === 'none'
   ) {
     return 'none';
   }

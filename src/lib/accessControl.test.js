@@ -41,18 +41,22 @@ describe('access control helpers', () => {
     const withSales = applyPermissionChange({}, 'sales', 'manage');
     expect(withSales.sales).toBe('manage');
     expect(withSales.inventory).toBe('view');
+    expect(withSales.parties).toBe('manage');
 
     const withQuickPos = applyPermissionChange({}, 'quickPos', 'manage');
     expect(withQuickPos.quickPos).toBe('manage');
     expect(withQuickPos.inventory).toBe('view');
+    expect(withQuickPos.parties).toBe('manage');
 
     const withServices = applyPermissionChange({}, 'services', 'view');
     expect(withServices.services).toBe('view');
     expect(withServices.inventory).toBe('view');
+    expect(withServices.parties).toBe('view');
 
     const withPurchases = applyPermissionChange({}, 'purchases', 'manage');
     expect(withPurchases.purchases).toBe('manage');
     expect(withPurchases.inventory).toBe('view');
+    expect(withPurchases.parties).toBe('manage');
   });
 
   it('clears sales/pos/services/purchases when inventory view is removed', () => {
@@ -75,6 +79,32 @@ describe('access control helpers', () => {
     expect(next.services).toBe('none');
     expect(next.purchases).toBe('none');
     expect(next.orders).toBe('none');
+    expect(next.billing).toBe('none');
+  });
+
+  it('auto-grants party access for sales workflows and clears them when parties is removed', () => {
+    const withServices = applyPermissionChange({}, 'services', 'manage');
+    expect(withServices.services).toBe('manage');
+    expect(withServices.parties).toBe('manage');
+
+    const next = applyPermissionChange(
+      {
+        parties: 'manage',
+        sales: 'manage',
+        services: 'view',
+        purchases: 'manage',
+        quickPos: 'manage',
+        billing: 'view',
+      },
+      'parties',
+      'none'
+    );
+
+    expect(next.parties).toBe('none');
+    expect(next.sales).toBe('none');
+    expect(next.services).toBe('none');
+    expect(next.purchases).toBe('none');
+    expect(next.quickPos).toBe('none');
     expect(next.billing).toBe('none');
   });
 
