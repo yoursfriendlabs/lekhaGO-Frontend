@@ -27,11 +27,7 @@ import dayjs, { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useSaleStore } from '../stores/sales';
 import { useProductStore } from '../stores/products';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
-<<<<<<< HEAD
-import StatsCard from '../components/StatsCard.jsx';
-=======
 import StatsCard, { STATS_GRID_CLASS } from '../components/StatsCard.jsx';
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
 import RefreshButton from '../components/RefreshButton.jsx';
 import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
 import DateDisplay from '../components/DateDisplay.jsx';
