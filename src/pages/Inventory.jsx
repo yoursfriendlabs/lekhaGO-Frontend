@@ -317,10 +317,6 @@ export default function Inventory() {
     if (!businessId) return;
     try {
       setStatsLoading(true);
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
       // Low / near-expiry counts come from the same list filters the UI uses,
       // so cards always match what you see when you click/filter.
       const [lowRes, nearRes, allRes, statsRes] = await Promise.all([
@@ -336,20 +332,6 @@ export default function Inventory() {
         lowStockCount: Number(lowRes?.total ?? statsRes?.lowStockCount ?? 0),
         nearExpiryCount: Number(nearRes?.total ?? statsRes?.nearExpiryCount ?? 0),
         allCount: Number(allRes?.total ?? 0),
-<<<<<<< HEAD
-=======
-      // /api/products/stats applies the same in-stock threshold and 20-day
-      // expiry window as the `stock=low` and `stock=nearexpiry` list filters,
-      // so the cards still match what you see after clicking through. Counting
-      // via the list endpoint as well would just ask the same two questions
-      // a second time.
-      const statsRes = await api.getProductStats();
-      setStats({
-        lowStockCount: Number(statsRes?.lowStockCount || 0),
-        nearExpiryCount: Number(statsRes?.nearExpiryCount || 0),
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
-=======
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
         popularCount: Number(statsRes?.popularCount || 0),
         leastPopularCount: Number(statsRes?.leastPopularCount || 0),
       });
@@ -1071,14 +1053,7 @@ export default function Inventory() {
           icon={Layers}
           tone="info"
           loading={statsLoading}
-<<<<<<< HEAD
-<<<<<<< HEAD
-          size="sm"
-=======
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
-=======
 
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
           onClick={() => {
             setStockFilter('all');
             setSortKey('');
@@ -1099,15 +1074,7 @@ export default function Inventory() {
 
       <div id="inventory-items-card" className="card">
         <div className="flex flex-wrap items-center justify-between gap-3">
-<<<<<<< HEAD
-<<<<<<< HEAD
-          <h3 className="font-serif text-xl text-slate-900 dark:text-white sm:text-2xl animate-fade-in" key={stockFilter}>
-=======
           <h3 className="font-serif text-xl text-ink sm:text-2xl animate-fade-in" key={stockFilter}>
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
-=======
-          <h3 className="font-serif text-xl text-ink sm:text-2xl animate-fade-in" key={stockFilter}>
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
             {stockFilter === 'low'
               ? t('inventory.lowStockItems') || 'Low Stock Items'
               : stockFilter === 'nearexpiry'
@@ -1816,15 +1783,7 @@ export default function Inventory() {
 
                 {editingId && (
                   <div className="mt-4 space-y-2">
-<<<<<<< HEAD
-<<<<<<< HEAD
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-=======
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
-=======
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
                       {t('inventory.existingLots') || 'Existing open lots'}
                     </p>
                     {editBatches.length > 0 ? (
@@ -1833,50 +1792,21 @@ export default function Inventory() {
                         return (
                           <div
                             key={batch.id || `batch-${batchIndex}`}
-<<<<<<< HEAD
-<<<<<<< HEAD
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950/50"
-                          >
-                            <div className="min-w-0">
-                              <div className="font-medium text-slate-700 dark:text-slate-200">
-=======
-=======
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
                             className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-secondary-200/80 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950/50"
                           >
                             <div className="min-w-0">
                               <div className="font-medium text-ink-light">
-<<<<<<< HEAD
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
-=======
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
                                 {batch.batchNumber
                                   ? `${t('inventory.batchNumber') || 'Batch'}: ${batch.batchNumber}`
                                   : (t('inventory.noBatchNumber') || 'No batch no.')}
                               </div>
-<<<<<<< HEAD
-<<<<<<< HEAD
-                              <div className={batchExpiry ? getExpiryDateColorClass(batchExpiry) : 'text-slate-500'}>
-=======
                               <div className={batchExpiry ? getExpiryDateColorClass(batchExpiry) : 'text-secondary-500'}>
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
-=======
-                              <div className={batchExpiry ? getExpiryDateColorClass(batchExpiry) : 'text-secondary-500'}>
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
                                 {batchExpiry
                                   ? formatDateBoth(batchExpiry)
                                   : (t('inventory.noExpiry') || 'No expiry')}
                               </div>
                             </div>
-<<<<<<< HEAD
-<<<<<<< HEAD
-                            <span className="font-semibold text-slate-700 dark:text-slate-200">
-=======
                             <span className="font-semibold text-ink-light">
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
-=======
-                            <span className="font-semibold text-ink-light">
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
                               {formatQuantity(batch.quantityOnHand || 0)}
                               {form.primaryUnit ? ` ${form.primaryUnit}` : ''}
                             </span>
@@ -1913,15 +1843,7 @@ export default function Inventory() {
             </div>
           </FormSectionCard>
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-          <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6 px-1">
-=======
           <div className="flex border-b border-secondary-200 dark:border-slate-800 gap-6 px-1">
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
-=======
-          <div className="flex border-b border-secondary-200 dark:border-slate-800 gap-6 px-1">
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
             <button
               id="inventory-stock-tab"
               type="button"
@@ -1929,15 +1851,7 @@ export default function Inventory() {
               className={`pb-3 text-sm font-semibold transition-all relative ${
                 activeTab === 'stock'
                   ? 'text-primary'
-<<<<<<< HEAD
-<<<<<<< HEAD
-                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
-=======
                   : 'text-secondary-500 hover:text-ink dark:text-secondary-400 dark:hover:text-white'
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
-=======
-                  : 'text-secondary-500 hover:text-ink dark:text-secondary-400 dark:hover:text-white'
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
               }`}
             >
               {t('inventory.stockDetails')}
@@ -1952,15 +1866,7 @@ export default function Inventory() {
               className={`pb-3 text-sm font-semibold transition-all relative ${
                 activeTab === 'other'
                   ? 'text-primary'
-<<<<<<< HEAD
-<<<<<<< HEAD
-                  : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
-=======
                   : 'text-secondary-500 hover:text-ink dark:text-secondary-400 dark:hover:text-white'
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
-=======
-                  : 'text-secondary-500 hover:text-ink dark:text-secondary-400 dark:hover:text-white'
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
               }`}
             >
               {t('inventory.otherDetails')}
@@ -2092,15 +1998,7 @@ export default function Inventory() {
                 </div>
                 <div className="flex flex-col justify-end">
                   <div className="flex items-center justify-between rounded-xl border border-secondary-200 bg-secondary-50/20 px-3.5 py-2.5 dark:border-slate-800 dark:bg-slate-900/50">
-<<<<<<< HEAD
-<<<<<<< HEAD
-                    <span className="text-sm font-semibold text-secondary-700 dark:text-slate-300">
-=======
                     <span className="text-sm font-semibold text-secondary-700 dark:text-secondary-300">
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
-=======
-                    <span className="text-sm font-semibold text-secondary-700 dark:text-secondary-300">
->>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
                       {t('inventory.lowStockAlert')}
                     </span>
                     <label className="relative inline-flex cursor-pointer items-center text-xs">
