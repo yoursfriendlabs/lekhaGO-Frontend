@@ -2132,22 +2132,6 @@ export default function Inventory() {
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="label">
-                      {t("inventory.batchNumberOptional") ||
-                        "Batch No. (Optional)"}
-                    </label>
-                    <input
-                      id="inventory-opening-batch-number"
-                      className="input mt-1"
-                      name="batchNumber"
-                      value={form.batchNumber}
-                      onChange={handleFormChange}
-                      placeholder={
-                        t("inventory.batchNumberPlaceholder") || "Eg. LOT-A12"
-                      }
-                    />
-                  </div>
                 </div>
 
                 {editingId && (
