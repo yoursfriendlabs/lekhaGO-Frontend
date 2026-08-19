@@ -12,6 +12,7 @@ import {
   Users,
   WalletCards,
   TrendingUp,
+  TrendingDown,
   PieChart as PieIcon,
   BarChart2,
   TableProperties,
@@ -20,7 +21,10 @@ import {
   Coffee,
   BookOpen,
   Loader2,
+  ShoppingCart,
+  Wallet,
 } from "lucide-react";
+import StatsCard, { STATS_GRID_CLASS } from "../components/StatsCard.jsx";
 import PageHeader from "../components/PageHeader";
 import Notice from "../components/Notice";
 import BarGraph from "../components/BarGraph";
@@ -273,7 +277,7 @@ function ReportResultsShell({ loading, t, children, className = "" }) {
       </div>
       {loading ? (
         <div className="absolute inset-0 z-10 flex min-h-[8rem] items-center justify-center rounded-2xl bg-white/60 backdrop-blur-[1px] dark:bg-slate-950/50">
-          <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700">
+          <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-secondary-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700">
             <Loader2 size={16} className="animate-spin text-primary-600" />
             {t("common.loading")}
           </div>
@@ -820,7 +824,7 @@ function metricToneClasses(tone, value) {
       ? "text-rose-600 dark:text-rose-400"
       : "text-emerald-600 dark:text-emerald-400";
   }
-  return "text-slate-500 dark:text-slate-400";
+  return "text-secondary-500";
 }
 
 function formatQuantityValue(value) {
@@ -1047,13 +1051,13 @@ function CompactValueList({ items = [], maxVisible = 4 }) {
       {visibleItems.map((item) => (
         <span
           key={item}
-          className="inline-flex items-center rounded-full bg-white px-2 py-1 text-[11px] font-medium text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-800"
+          className="inline-flex items-center rounded-full bg-white px-2 py-1 text-[11px] font-medium text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-secondary-300 dark:ring-slate-800"
         >
           {item}
         </span>
       ))}
       {hiddenCount > 0 ? (
-        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+        <span className="inline-flex items-center rounded-full bg-secondary-100 px-2 py-1 text-[11px] font-medium text-secondary-500 dark:bg-slate-800 dark:text-secondary-300">
           +{hiddenCount}
         </span>
       ) : null}
@@ -1076,28 +1080,28 @@ function PopularRankingCard({
     <div className="card">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="font-serif text-xl text-slate-900 dark:text-white">
+          <h3 className="font-serif text-xl text-ink">
             {title}
           </h3>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-sm text-secondary-500">
             {subtitle}
           </p>
         </div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:bg-slate-800 dark:text-slate-300">
+        <span className="rounded-full bg-secondary-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-secondary-500 dark:bg-slate-800 dark:text-secondary-300">
           Top 10
         </span>
       </div>
 
       {loading ? (
-        <p className="mt-4 text-sm text-slate-500">{t("common.loading")}</p>
+        <p className="mt-4 text-sm text-secondary-500">{t("common.loading")}</p>
       ) : error ? (
         <Notice title={error} tone="error" />
       ) : rows.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">{emptyLabel}</p>
+        <p className="mt-4 text-sm text-secondary-500">{emptyLabel}</p>
       ) : (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[620px] text-sm text-slate-600 dark:text-slate-300">
-            <thead className="text-xs uppercase tracking-[0.14em] text-slate-400">
+          <table className="w-full min-w-[620px] text-sm text-secondary-700">
+            <thead className="text-xs uppercase tracking-[0.14em] text-ink">
               <tr>
                 <th className="py-2 text-left">{t("analytics.rank")}</th>
                 <th className="py-2 text-left">{typeLabel}</th>
@@ -1110,17 +1114,17 @@ function PopularRankingCard({
               {rows.map((row) => (
                 <tr
                   key={`${row.rank}-${row.productId || row.categoryId || row.name || row.categoryName}`}
-                  className="border-t border-slate-200/70 dark:border-slate-800/70"
+                  className="border-t border-secondary-200/70"
                 >
-                  <td className="py-3 font-semibold text-slate-900 dark:text-white">
+                  <td className="py-3 font-semibold text-ink">
                     #{row.rank}
                   </td>
                   <td className="py-3">
                     <div className="min-w-0">
-                      <p className="font-medium text-slate-900 dark:text-white">
+                      <p className="font-medium text-ink">
                         {row.name || row.categoryName || "-"}
                       </p>
-                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-secondary-500">
                         {row.sku ? (
                           <span>
                             {t("analytics.sku")}: {row.sku}
@@ -1142,13 +1146,13 @@ function PopularRankingCard({
                       ) : null}
                     </div>
                   </td>
-                  <td className="py-3 text-right font-medium text-slate-900 dark:text-white">
+                  <td className="py-3 text-right font-medium text-ink">
                     {formatQuantityValue(row.totalQuantity)}
                   </td>
                   <td className="py-3 text-right">
                     {formatQuantityValue(row.orderCount)}
                   </td>
-                  <td className="py-3 text-right font-semibold text-slate-900 dark:text-white">
+                  <td className="py-3 text-right font-semibold text-ink">
                     {formatMoney(row.totalRevenue)}
                   </td>
                 </tr>
@@ -1240,7 +1244,7 @@ function ExpenseCategoryAnalyticsSection({
             </select>
           </div>
         </div>
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-secondary-500">
           {loading ? t("common.loading") : caption}
         </p>
       </div>
@@ -1256,24 +1260,23 @@ function ExpenseCategoryAnalyticsSection({
         </div>
       ) : showEmpty ? (
         <div className="card">
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-secondary-500">
             {t("analytics.noExpenseCategories")}
           </p>
         </div>
       ) : (
         <ReportResultsShell loading={loading} t={t} className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="card">
-              <p className="text-xs uppercase text-slate-400">
-                {t("analytics.expenses")}
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-                {formatMoney(analytics.totals.total)}
-              </p>
-              <div className="mt-3 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+          <div className={STATS_GRID_CLASS}>
+            <StatsCard
+              title={t("analytics.expenses")}
+              value={formatMoney(analytics.totals.total)}
+              icon={Wallet}
+              tone="info"
+            >
+              <div className="mt-2 space-y-1 text-xs text-secondary-500">
                 <p className="flex items-center justify-between gap-3">
                   <span>{t("analytics.expenseCount")}</span>
-                  <span className="font-medium text-slate-900 dark:text-white">
+                  <span className="font-medium text-ink">
                     {formatQuantityValue(analytics.totals.count)}
                   </span>
                 </p>
@@ -1290,77 +1293,72 @@ function ExpenseCategoryAnalyticsSection({
                   </span>
                 </p>
               </div>
-            </div>
+            </StatsCard>
 
-            <div className="card">
-              <p className="text-xs uppercase text-slate-400">
-                {t("analytics.totalCategories")}
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-                {formatQuantityValue(analytics.summary.totalCategories)}
-              </p>
-              <div className="mt-3 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+            <StatsCard
+              title={t("analytics.totalCategories")}
+              value={formatQuantityValue(analytics.summary.totalCategories)}
+              icon={TableProperties}
+              tone="default"
+            >
+              <div className="mt-2 space-y-1 text-xs text-secondary-500">
                 <p className="flex items-center justify-between gap-3">
                   <span>{t("analytics.categorizedCategories")}</span>
-                  <span className="font-medium text-slate-900 dark:text-white">
+                  <span className="font-medium text-ink">
                     {formatQuantityValue(analytics.summary.categorizedCategories)}
                   </span>
                 </p>
                 <p className="flex items-center justify-between gap-3">
                   <span>{t("analytics.uncategorizedCategories")}</span>
-                  <span className="font-medium text-slate-900 dark:text-white">
+                  <span className="font-medium text-ink">
                     {formatQuantityValue(analytics.summary.uncategorizedCategories)}
                   </span>
                 </p>
               </div>
-            </div>
+            </StatsCard>
 
-            <div className="card">
-              <p className="text-xs uppercase text-slate-400">
-                {t("analytics.categorizedAmount")}
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-                {formatMoney(analytics.summary.categorizedAmount)}
-              </p>
-              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                {t("analytics.shareOfTotal")}:{" "}
-                {formatPercentValue(
-                  analytics.summary.categorizedAmount > 0 &&
-                    analytics.summary.categorizedAmount +
-                      analytics.summary.uncategorizedAmount >
-                      0
-                    ? analytics.summary.categorizedAmount /
-                        (analytics.summary.categorizedAmount +
-                          analytics.summary.uncategorizedAmount)
-                    : 0,
-                )}
-              </p>
-            </div>
+            <StatsCard
+              title={t("analytics.categorizedAmount")}
+              value={formatMoney(analytics.summary.categorizedAmount)}
+              icon={PieIcon}
+              tone="success"
+              hint={`${t("analytics.shareOfTotal")}: ${formatPercentValue(
+                analytics.summary.categorizedAmount > 0 &&
+                  analytics.summary.categorizedAmount +
+                    analytics.summary.uncategorizedAmount >
+                    0
+                  ? analytics.summary.categorizedAmount /
+                      (analytics.summary.categorizedAmount +
+                        analytics.summary.uncategorizedAmount)
+                  : 0,
+              )}`}
+            />
 
-            <div className="card">
-              <p className="text-xs uppercase text-slate-400">
-                {t("analytics.topCategory")}
-              </p>
-              <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-                {topCategory
+            <StatsCard
+              title={t("analytics.topCategory")}
+              value={
+                topCategory
                   ? resolveExpenseCategoryName(topCategory, t)
-                  : t("common.notAvailable")}
-              </p>
-              <div className="mt-3 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                  : t("common.notAvailable")
+              }
+              icon={BarChart2}
+              tone="default"
+            >
+              <div className="mt-2 space-y-1 text-xs text-secondary-500">
                 <p className="flex items-center justify-between gap-3">
                   <span>{t("common.total")}</span>
-                  <span className="font-medium text-slate-900 dark:text-white">
+                  <span className="font-medium text-ink">
                     {topCategory ? formatMoney(topCategory.total) : "—"}
                   </span>
                 </p>
                 <p className="flex items-center justify-between gap-3">
                   <span>{t("analytics.shareOfTotal")}</span>
-                  <span className="font-medium text-slate-900 dark:text-white">
+                  <span className="font-medium text-ink">
                     {topCategory ? formatPercentValue(topCategory.shareOfTotal) : "—"}
                   </span>
                 </p>
               </div>
-            </div>
+            </StatsCard>
           </div>
 
           {hasUncategorizedAmount ? (
@@ -1396,15 +1394,15 @@ function ExpenseCategoryAnalyticsSection({
 
           <div className="grid gap-6 xl:grid-cols-3">
             <div className="card xl:col-span-1">
-              <h4 className="font-serif text-xl text-slate-900 dark:text-white">
+              <h4 className="font-serif text-xl text-ink">
                 {t("analytics.expenseCategoryChart")}
               </h4>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm text-secondary-500">
                 {t("analytics.expenseCategoryChartSubtitle")}
               </p>
 
               {chartData.length === 0 ? (
-                <p className="mt-6 text-sm text-slate-500">
+                <p className="mt-6 text-sm text-secondary-500">
                   {t("analytics.noExpenseCategories")}
                 </p>
               ) : (
@@ -1421,14 +1419,14 @@ function ExpenseCategoryAnalyticsSection({
             <div className="card xl:col-span-2">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h4 className="font-serif text-xl text-slate-900 dark:text-white">
+                  <h4 className="font-serif text-xl text-ink">
                     {t("analytics.expenseCategoryRanking")}
                   </h4>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 text-sm text-secondary-500">
                     {t("analytics.expenseCategoryRankingSubtitle")}
                   </p>
                 </div>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-secondary-500">
                   {formatQuantityValue(rows.length)} {t("analytics.points")}
                 </span>
               </div>
@@ -1437,19 +1435,19 @@ function ExpenseCategoryAnalyticsSection({
                 {rows.map((row) => (
                   <div
                     key={`${row.categoryKey}-${row.rank}`}
-                    className="rounded-3xl border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40"
+                    className="rounded-3xl border border-secondary-200/70 bg-mist/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <div className="flex items-center gap-3">
-                          <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-full bg-white text-xs font-semibold text-slate-500 shadow-sm dark:bg-slate-950 dark:text-slate-300">
+                          <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-full bg-white text-xs font-semibold text-secondary-500 shadow-sm dark:bg-slate-950 dark:text-secondary-300">
                             #{row.rank}
                           </span>
                           <div className="min-w-0">
-                            <p className="truncate text-base font-semibold text-slate-900 dark:text-white">
+                            <p className="truncate text-base font-semibold text-ink">
                               {resolveExpenseCategoryName(row, t)}
                             </p>
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            <p className="mt-1 text-xs text-secondary-500">
                               {t("analytics.shareOfTotal")}:{" "}
                               {formatPercentValue(row.shareOfTotal)}
                             </p>
@@ -1458,17 +1456,17 @@ function ExpenseCategoryAnalyticsSection({
                       </div>
 
                       <div className="text-left sm:text-right">
-                        <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                        <p className="text-lg font-semibold text-ink">
                           {formatMoney(row.total)}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        <p className="mt-1 text-xs text-secondary-500">
                           {t("analytics.averageExpenseTotal")}:{" "}
                           {formatMoney(row.averageExpenseTotal)}
                         </p>
                       </div>
                     </div>
 
-                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-800">
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-secondary-200/80 dark:bg-slate-800">
                       <div
                         className="h-full rounded-full bg-primary-500"
                         style={{
@@ -1480,7 +1478,7 @@ function ExpenseCategoryAnalyticsSection({
                       />
                     </div>
 
-                    <div className="mt-4 grid gap-3 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-2 xl:grid-cols-3">
+                    <div className="mt-4 grid gap-3 text-xs text-secondary-500 sm:grid-cols-2 xl:grid-cols-3">
                       <div>
                         <p className="uppercase tracking-[0.14em]">{t("analytics.paid")}</p>
                         <p className="mt-1 font-medium text-emerald-600 dark:text-emerald-400">
@@ -1495,7 +1493,7 @@ function ExpenseCategoryAnalyticsSection({
                       </div>
                       <div>
                         <p className="uppercase tracking-[0.14em]">{t("analytics.expenseCount")}</p>
-                        <p className="mt-1 font-medium text-slate-900 dark:text-white">
+                        <p className="mt-1 font-medium text-ink">
                           {formatQuantityValue(row.expenseCount)}
                         </p>
                       </div>
@@ -1542,7 +1540,7 @@ function getLedgerTypeMeta(type, t) {
 
   return map[type] || {
     label: formatLedgerText(type),
-    className: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+    className: 'bg-secondary-100 text-secondary-700 dark:bg-slate-800 dark:text-secondary-300',
   };
 }
 
@@ -1557,15 +1555,15 @@ function getStatusToneClass(status) {
   if (['cancelled', 'void', 'failed', 'inactive'].includes(normalized)) {
     return 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300';
   }
-  return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
+  return 'bg-secondary-100 text-secondary-700 dark:bg-slate-800 dark:text-secondary-300';
 }
 
 function getBalanceToneClass(value) {
-  if (!Number.isFinite(Number(value))) return 'text-slate-700 dark:text-slate-300';
+  if (!Number.isFinite(Number(value))) return 'text-ink-light dark:text-secondary-300';
   const amount = Number(value);
   if (amount > 0) return 'text-emerald-700 dark:text-emerald-300';
   if (amount < 0) return 'text-rose-700 dark:text-rose-300';
-  return 'text-slate-700 dark:text-slate-300';
+  return 'text-ink-light dark:text-secondary-300';
 }
 
 function getBalanceLabel(value, t) {
@@ -1582,11 +1580,11 @@ function PaymentMethodCell({ paymentDisplay, align = 'left' }) {
   const alignClass = align === 'right' ? 'text-right' : '';
   return (
     <div className={`min-w-0 ${alignClass}`}>
-      <p className={`truncate text-sm font-medium text-slate-700 dark:text-slate-300 ${alignClass}`}>
+      <p className={`truncate text-sm font-medium text-ink-light dark:text-secondary-300 ${alignClass}`}>
         {paymentDisplay.label}
       </p>
       {paymentDisplay.balanceText ? (
-        <p className={`truncate text-xs text-slate-500 dark:text-slate-400 ${alignClass}`}>
+        <p className={`truncate text-xs text-secondary-500 ${alignClass}`}>
           {paymentDisplay.balanceText}
         </p>
       ) : null}
@@ -1631,17 +1629,13 @@ export default function Reports() {
   // Unified Tab Resolution based on permissions
   const availableTabs = useMemo(() => {
     const list = [];
-    if (canViewFeature('analytics')) {
+    if (canViewFeature('reports')) {
       if (businessProfile?.type === 'cafe') {
         list.push({ key: 'cafe-insights', label: t('analytics.cafeInsights') || 'Cafe Sales Book', icon: Coffee });
       }
       list.push({ key: 'overview', label: t('analytics.overallMix') || 'Overview', icon: PieIcon });
       list.push({ key: 'expense', label: t('analytics.expenses') || 'Expense Analytics', icon: BarChart2 });
-    }
-    if (canViewFeature('ledger')) {
       list.push({ key: 'party', label: t('ledger.statementTitle') || 'Party Statements', icon: ScrollText });
-    }
-    if (canViewFeature('analytics')) {
       list.push({ key: 'timeline', label: t('analytics.timelineSummary') || 'Timeline', icon: TableProperties });
     }
     return list;
@@ -1725,7 +1719,7 @@ export default function Reports() {
   const [cafeTypeFilter, setCafeTypeFilter] = useState("all");
 
   useEffect(() => {
-    if (!canViewFeature("analytics") || activeTab !== "cafe-insights" || !businessId) return;
+    if (!canViewFeature("reports") || activeTab !== "cafe-insights" || !businessId) return;
 
     let isActive = true;
     setCafeSalesLoading(true);
@@ -1876,9 +1870,9 @@ export default function Reports() {
           return (
             <span
               key={idx}
-              className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-700 border border-slate-200/50"
+              className="inline-flex items-center gap-1 rounded bg-secondary-100 px-1.5 py-0.5 text-[10px] font-bold text-ink-light border border-secondary-200/50"
             >
-              {name} <span className="text-[#9b6835] font-black">x{item.quantity}</span>
+              {name} <span className="text-primary font-black">x{item.quantity}</span>
             </span>
           );
         })}
@@ -1888,7 +1882,7 @@ export default function Reports() {
 
   // FETCH: Categories (on mount if analytics view is allowed)
   useEffect(() => {
-    if (!canViewFeature('analytics')) return;
+    if (!canViewFeature('reports')) return;
     let isActive = true;
     api.listCategories({ type: "expense", limit: 100, offset: 0 })
       .then((response) => {
@@ -1909,7 +1903,7 @@ export default function Reports() {
 
   // FETCH: Analytics Data
   useEffect(() => {
-    if (!canViewFeature('analytics') || activeTab === 'party') return;
+    if (!canViewFeature('reports') || activeTab === 'party') return;
 
     let isActive = true;
     const isRefreshRequest = refreshModeRef.current;
@@ -2063,7 +2057,7 @@ export default function Reports() {
 
   // FETCH: Ledger data (Party Statements)
   const fetchLedger = useCallback(async ({ refresh = false, force = false } = {}) => {
-    if (!canViewFeature('ledger') || activeTab !== 'party') return;
+    if (!canViewFeature('reports') || activeTab !== 'party') return;
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
@@ -2278,8 +2272,8 @@ export default function Reports() {
       label: t('ledger.totalEntries'),
       value: String(ledgerSummary.entries),
       icon: ScrollText,
-      valueClassName: 'text-slate-900 dark:text-slate-100',
-      accentClassName: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700',
+      valueClassName: 'text-ink',
+      accentClassName: 'bg-secondary-100 text-ink-light ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700',
     },
   ];
 
@@ -2451,7 +2445,7 @@ export default function Reports() {
   };
 
   const renderSummaryLines = (items) => (
-    <div className="mt-3 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+    <div className="mt-3 space-y-1 text-xs text-secondary-500">
       {items.map((item) => (
         <p
           key={item.label}
@@ -2471,7 +2465,7 @@ export default function Reports() {
           className={
             emphasize
               ? `font-semibold ${metricToneClasses("net", primary)}`
-              : "font-medium text-slate-900 dark:text-white"
+              : "font-medium text-ink"
           }
         >
           {formatMoney(primary)}
@@ -2575,10 +2569,6 @@ export default function Reports() {
     ],
   );
 
-  const profitLossValueClass = metricToneClasses(
-    "net",
-    profitLoss.summary.profitLoss.amount,
-  );
   const isBusy = analyticsLoading || analyticsRefreshing;
   const isLedgerBusy = ledgerLoading || ledgerRefreshing;
 
@@ -2625,7 +2615,7 @@ export default function Reports() {
       {analyticsStatus ? <Notice title={analyticsStatus} tone="error" /> : null}
 
       {/* Tabs Switch */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-200/80 pb-[1px] dark:border-slate-800">
+      <div className="flex flex-wrap gap-2 border-b border-secondary-200/80 pb-[1px] dark:border-slate-800">
         {availableTabs.map((tabObj) => {
           const isActive = activeTab === tabObj.key;
           const TabIcon = tabObj.icon;
@@ -2638,7 +2628,7 @@ export default function Reports() {
               className={`relative pb-3 px-2 text-sm font-semibold flex items-center gap-2 transition-colors after:absolute after:left-0 after:-bottom-[1px] after:h-0.5 after:w-full after:origin-left after:rounded-full after:transition-transform after:duration-200 after:content-[''] ${
                 isActive
                   ? 'text-primary-600 after:scale-x-100 after:bg-primary-600 dark:text-primary-300 dark:after:bg-primary-300 font-bold'
-                  : 'text-slate-500 after:scale-x-0 after:bg-transparent hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+                  : 'text-secondary-500 after:scale-x-0 after:bg-transparent hover:text-ink-light dark:text-secondary-400 dark:hover:text-slate-200'
               }`}
             >
               <TabIcon size={16} />
@@ -2681,21 +2671,20 @@ export default function Reports() {
                 />
               </div>
             </div>
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="mt-3 text-xs text-secondary-500">
               {isBusy ? t("common.loading") : seriesCaption}
             </p>
           </div>
 
           <ReportResultsShell loading={isBusy} t={t} className="space-y-8">
           {/* Core Stat Cards */}
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="card border border-primary-50 bg-gradient-to-br from-white to-primary-50/10">
-              <p className="text-xs uppercase text-slate-400 font-semibold tracking-wider">
-                {t("analytics.salesAndServices")}
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-                {formatMoney(summary.totals.sales.total)}
-              </p>
+          <div className={STATS_GRID_CLASS}>
+            <StatsCard
+              title={t("analytics.salesAndServices")}
+              value={formatMoney(summary.totals.sales.total)}
+              icon={TrendingUp}
+              tone="success"
+            >
               {renderSummaryLines([
                 {
                   label: t("analytics.directSales"),
@@ -2708,14 +2697,13 @@ export default function Reports() {
                   tone: "info",
                 },
               ])}
-            </div>
-            <div className="card">
-              <p className="text-xs uppercase text-slate-400 font-semibold tracking-wider">
-                {t("analytics.purchaseSpend")}
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-                {formatMoney(summary.totals.purchases.total)}
-              </p>
+            </StatsCard>
+            <StatsCard
+              title={t("analytics.purchaseSpend")}
+              value={formatMoney(summary.totals.purchases.total)}
+              icon={ShoppingCart}
+              tone="default"
+            >
               {renderSummaryLines([
                 {
                   label: t("analytics.paid"),
@@ -2728,14 +2716,13 @@ export default function Reports() {
                   tone: "danger",
                 },
               ])}
-            </div>
-            <div className="card">
-              <p className="text-xs uppercase text-slate-400 font-semibold tracking-wider">
-                {t("analytics.expenses")}
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900 dark:text-white">
-                {formatMoney(summary.totals.expenses.total)}
-              </p>
+            </StatsCard>
+            <StatsCard
+              title={t("analytics.expenses")}
+              value={formatMoney(summary.totals.expenses.total)}
+              icon={Wallet}
+              tone="info"
+            >
               {renderSummaryLines([
                 {
                   label: t("analytics.paid"),
@@ -2748,14 +2735,19 @@ export default function Reports() {
                   tone: "danger",
                 },
               ])}
-            </div>
-            <div className="card">
-              <p className="text-xs uppercase text-slate-400 font-semibold tracking-wider">
-                {t("analytics.profitLoss")}
-              </p>
-              <p className={`mt-2 text-2xl font-semibold ${profitLossValueClass}`}>
-                {formatMoney(profitLoss.summary.profitLoss.amount)}
-              </p>
+            </StatsCard>
+            <StatsCard
+              title={t("analytics.profitLoss")}
+              value={formatMoney(profitLoss.summary.profitLoss.amount)}
+              icon={BarChart2}
+              tone={
+                Number(profitLoss.summary.profitLoss.amount) < 0
+                  ? "danger"
+                  : Number(profitLoss.summary.profitLoss.amount) > 0
+                    ? "success"
+                    : "default"
+              }
+            >
               {renderSummaryLines([
                 {
                   label: t("analytics.salesAndServices"),
@@ -2768,7 +2760,7 @@ export default function Reports() {
                   tone: "warning",
                 },
               ])}
-            </div>
+            </StatsCard>
           </div>
 
           {/* Charts Row */}
@@ -2799,7 +2791,7 @@ export default function Reports() {
                 {
                   dataKey: "salaryExpenses",
                   label: t("staffManagement.salary"),
-                  color: "#9b6835",
+                  color: "var(--color-primary-hex)",
                   stackId: "outflows",
                 },
                 {
@@ -2812,7 +2804,7 @@ export default function Reports() {
               axisFormatter={formatCompactMoney}
             />
             <div className="card">
-              <h3 className="mb-4 font-serif text-xl text-slate-900 dark:text-white font-medium">
+              <h3 className="mb-4 font-serif text-xl text-ink font-medium">
                 {t("analytics.overallMix")}
               </h3>
               <div className="h-[350px]">
@@ -2876,66 +2868,66 @@ export default function Reports() {
           {/* Printable Statement Block */}
           <div ref={printRef} className="space-y-6">
             <div className="hidden print:block">
-              <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
+              <div className="overflow-hidden rounded-3xl border border-secondary-200 bg-white">
                 <div className="h-1.5 w-full bg-primary" />
-                <div className="flex items-start justify-between gap-6 border-b border-slate-200 px-8 pb-6 pt-6">
+                <div className="flex items-start justify-between gap-6 border-b border-secondary-200 px-8 pb-6 pt-6">
                   <div className="flex min-w-0 items-start gap-4">
                     {logoSrc ? (
                       <img
                         src={logoSrc}
                         alt="Logo"
-                        className="h-16 w-16 shrink-0 rounded-xl border border-slate-200 bg-white object-contain p-1 shadow-sm"
+                        className="h-16 w-16 shrink-0 rounded-xl border border-secondary-200 bg-white object-contain p-1 shadow-sm"
                       />
                     ) : null}
                     <div className="min-w-0">
-                      <h1 className={`font-serif font-bold leading-tight text-slate-900 ${logoSrc ? 'text-2xl' : 'text-3xl'}`}>
+                      <h1 className={`font-serif font-bold leading-tight text-ink ${logoSrc ? 'text-2xl' : 'text-3xl'}`}>
                         {biz?.companyName || 'PasalManager'}
                       </h1>
                       {(biz?.address || biz?.phone || biz?.email || biz?.panVat) ? (
                         <div className="mt-1.5 space-y-0.5">
-                          {biz?.address ? <p className="whitespace-pre-wrap text-xs leading-snug text-slate-500">{biz.address}</p> : null}
-                          {(biz?.phone || biz?.email) ? <p className="text-xs text-slate-500">{[biz.phone, biz.email].filter(Boolean).join('  ·  ')}</p> : null}
-                          {biz?.panVat ? <p className="text-xs font-semibold text-slate-600">PAN / VAT No: {biz.panVat}</p> : null}
+                          {biz?.address ? <p className="whitespace-pre-wrap text-xs leading-snug text-secondary-500">{biz.address}</p> : null}
+                          {(biz?.phone || biz?.email) ? <p className="text-xs text-secondary-500">{[biz.phone, biz.email].filter(Boolean).join('  ·  ')}</p> : null}
+                          {biz?.panVat ? <p className="text-xs font-semibold text-secondary-700">PAN / VAT No: {biz.panVat}</p> : null}
                         </div>
                       ) : null}
                     </div>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-xs font-bold uppercase tracking-widest text-primary-600">{t('ledger.statementTitle')}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">{selectedPartyLabel}</p>
-                    <p className="mt-1 text-xs text-slate-500">{timeSpanLabel}</p>
-                    <p className="mt-2 text-xs text-slate-400" data-printed-at>{dayjs().format('D MMM YYYY, HH:mm')}</p>
+                    <p className="mt-1 text-sm font-semibold text-ink">{selectedPartyLabel}</p>
+                    <p className="mt-1 text-xs text-secondary-500">{timeSpanLabel}</p>
+                    <p className="mt-2 text-xs text-secondary-400" data-printed-at>{dayjs().format('D MMM YYYY, HH:mm')}</p>
                   </div>
                 </div>
-                <div className="border-b border-slate-200 bg-slate-50 px-8 py-6">
+                <div className="border-b border-secondary-200 bg-mist px-8 py-6">
                   <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{balanceLabel}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-secondary-400">{balanceLabel}</p>
                       <p className={`mt-1.5 text-sm font-semibold ${balanceToneClass}`}>
                         {formatMoney(Math.abs(ledgerSummary.currentBalance))}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('ledger.totalDebit')}</p>
-                      <p className="mt-1.5 text-sm font-semibold text-slate-900">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-secondary-400">{t('ledger.totalDebit')}</p>
+                      <p className="mt-1.5 text-sm font-semibold text-ink">
                         {formatMoney(ledgerSummary.totalDebit)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('ledger.totalCredit')}</p>
-                      <p className="mt-1.5 text-sm font-semibold text-slate-900">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-secondary-400">{t('ledger.totalCredit')}</p>
+                      <p className="mt-1.5 text-sm font-semibold text-ink">
                         {formatMoney(ledgerSummary.totalCredit)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('ledger.totalEntries')}</p>
-                      <p className="mt-1.5 text-sm font-semibold text-slate-900">{ledgerSummary.entries}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-secondary-400">{t('ledger.totalEntries')}</p>
+                      <p className="mt-1.5 text-sm font-semibold text-ink">{ledgerSummary.entries}</p>
                     </div>
                   </div>
                 </div>
                 <div className="px-8 py-6">
-                  <table className="w-full text-sm text-slate-700">
-                    <thead className="text-xs text-slate-400 uppercase">
+                  <table className="w-full text-sm text-ink-light">
+                    <thead className="text-xs text-ink uppercase">
                       <tr className="tracking-wider border-b pb-2">
                         <th className="pb-3 text-left">{t('common.date')}</th>
                         <th className="pb-3 text-left">{t('ledger.referenceNo')}</th>
@@ -2951,7 +2943,7 @@ export default function Reports() {
                     <tbody className="divide-y divide-slate-100">
                       {statementRows.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className="py-4 text-slate-400 text-center">{t('ledger.noTransactions')}</td>
+                          <td colSpan={9} className="py-4 text-secondary-400 text-center">{t('ledger.noTransactions')}</td>
                         </tr>
                       ) : (
                         statementRows.map((row) => (
@@ -2963,8 +2955,8 @@ export default function Reports() {
                             <td className="py-3">{row.statusDisplay}</td>
                             <td className="py-3">
                               <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-slate-700">{row.paymentDisplay.label}</p>
-                                {row.paymentDisplay.balanceText ? <p className="truncate text-xs text-slate-500">{row.paymentDisplay.balanceText}</p> : null}
+                                <p className="truncate text-sm font-medium text-ink-light">{row.paymentDisplay.label}</p>
+                                {row.paymentDisplay.balanceText ? <p className="truncate text-xs text-secondary-500">{row.paymentDisplay.balanceText}</p> : null}
                               </div>
                             </td>
                             <td className="py-3 text-right text-rose-700">
@@ -2982,9 +2974,9 @@ export default function Reports() {
                     </tbody>
                   </table>
                 </div>
-                <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-8 py-4">
-                  <p className="text-xs text-slate-400">{t('ledger.totalEntries')}: {ledgerSummary.entries}</p>
-                  <p className="text-xs text-slate-400">Printed on <span data-printed-date>{dayjs().format('D MMM YYYY')}</span></p>
+                <div className="flex items-center justify-between border-t border-secondary-200 bg-mist px-8 py-4">
+                  <p className="text-xs text-secondary-400">{t('ledger.totalEntries')}: {ledgerSummary.entries}</p>
+                  <p className="text-xs text-secondary-400">Printed on <span data-printed-date>{dayjs().format('D MMM YYYY')}</span></p>
                 </div>
               </div>
             </div>
@@ -2995,10 +2987,10 @@ export default function Reports() {
               <div className="card bg-[radial-gradient(circle_at_top_left,_rgba(155,104,53,0.08),_transparent_40%)]">
                 <div className="space-y-5">
                   <div className="space-y-1">
-                    <h2 className="font-serif text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                    <h2 className="font-serif text-2xl font-semibold text-ink dark:text-slate-50">
                       {selectedPartyLabel}
                     </h2>
-                    <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    <p className="text-sm leading-6 text-secondary-700">
                       {timeSpanLabel}
                     </p>
                   </div>
@@ -3065,30 +3057,24 @@ export default function Reports() {
 
               <ReportResultsShell loading={isLedgerBusy} t={t} className="space-y-6">
               {/* Stats summary cards */}
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {summaryCards.map((card) => {
-                  const Icon = card.icon;
-                  return (
-                    <div
-                      key={card.key}
-                      className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/50"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                            {card.label}
-                          </p>
-                          <p className={`mt-3 text-lg font-semibold ${card.valueClassName}`}>
-                            {card.value}
-                          </p>
-                        </div>
-                        <span className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${card.accentClassName}`}>
-                          <Icon size={18} />
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className={STATS_GRID_CLASS}>
+                {summaryCards.map((card) => (
+                  <StatsCard
+                    key={card.key}
+                    title={card.label}
+                    value={card.value}
+                    icon={card.icon}
+                    tone={
+                      card.key === 'debit'
+                        ? 'danger'
+                        : card.key === 'credit'
+                          ? 'success'
+                          : card.key === 'balance'
+                            ? 'default'
+                            : 'info'
+                    }
+                  />
+                ))}
               </div>
 
               {/* Transactions Table */}
@@ -3099,7 +3085,7 @@ export default function Reports() {
                   <>
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[980px] text-sm">
-                        <thead className="text-xs uppercase text-slate-400">
+                        <thead className="text-xs uppercase text-ink">
                           <tr>
                             <th className="py-2.5 pr-4 text-left">
                               <button
@@ -3109,7 +3095,7 @@ export default function Reports() {
                                     order: ledgerSortOrder === 'desc' ? 'asc' : 'desc',
                                   });
                                 }}
-                                className="inline-flex items-center gap-1 font-semibold hover:text-slate-600 dark:hover:text-slate-300"
+                                className="inline-flex items-center gap-1 font-semibold hover:text-secondary-700 dark:hover:text-secondary-300"
                               >
                                 {t('common.date')}
                                 {ledgerSortOrder === 'desc' ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
@@ -3128,18 +3114,18 @@ export default function Reports() {
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                           {isLedgerBusy && statementRows.length === 0 ? (
                             <tr>
-                              <td colSpan={9} className="py-4 text-slate-400 text-center">{t('common.loading')}</td>
+                              <td colSpan={9} className="py-4 text-secondary-400 text-center">{t('common.loading')}</td>
                             </tr>
                           ) : statementRows.length === 0 ? (
                             <tr>
-                              <td colSpan={9} className="py-4 text-slate-400 text-center">{t('ledger.noTransactions')}</td>
+                              <td colSpan={9} className="py-4 text-secondary-400 text-center">{t('ledger.noTransactions')}</td>
                             </tr>
                           ) : (
                             statementRows.map((row) => (
-                              <tr key={`${row.type}-${row.id}`} className="align-top hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
-                                <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200"><DateDisplay date={row.date} format="DD/MM/YYYY" /></td>
-                                <td className="py-3 pr-4 text-slate-700 dark:text-slate-300">{row.referenceDisplay}</td>
-                                <td className="py-3 pr-4 text-slate-700 dark:text-slate-300">{row.partyDisplay}</td>
+                              <tr key={`${row.type}-${row.id}`} className="align-top hover:bg-mist/50 dark:hover:bg-slate-800/20 transition-colors">
+                                <td className="py-3 pr-4 font-medium text-ink dark:text-slate-200"><DateDisplay date={row.date} format="DD/MM/YYYY" /></td>
+                                <td className="py-3 pr-4 text-ink-light dark:text-secondary-300">{row.referenceDisplay}</td>
+                                <td className="py-3 pr-4 text-ink-light dark:text-secondary-300">{row.partyDisplay}</td>
                                 <td className="py-3 pr-4">
                                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${row.typeMeta.className}`}>
                                     {row.typeMeta.label}
@@ -3220,7 +3206,7 @@ export default function Reports() {
                 />
               </div>
             </div>
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="mt-3 text-xs text-secondary-500">
               {isBusy ? t("common.loading") : seriesCaption}
             </p>
           </div>
@@ -3268,23 +3254,23 @@ export default function Reports() {
 
           {/* Timeline detailed table */}
           <div className="card">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-200/80 pb-4 dark:border-slate-800">
-              <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
+            <div className="flex items-center justify-between gap-3 border-b border-secondary-200/80 pb-4 dark:border-slate-800">
+              <h3 className="font-serif text-2xl text-ink">
                 {t("analytics.timelineSummary")}
               </h3>
-              <span className="text-xs text-slate-500 font-medium">
+              <span className="text-xs text-secondary-500 font-medium">
                 {summary.series.timeline.length} {t("analytics.points")}
               </span>
             </div>
 
             {summary.series.timeline.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500">
+              <p className="mt-4 text-sm text-secondary-500">
                 {t("analytics.noSeries")}
               </p>
             ) : (
               <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[720px] text-sm text-slate-600 dark:text-slate-300">
-                  <thead className="text-xs uppercase text-slate-400 tracking-wider">
+                <table className="w-full min-w-[720px] text-sm text-secondary-700">
+                  <thead className="text-xs uppercase text-ink tracking-wider">
                     <tr className="border-b pb-2">
                       <th className="py-2.5 text-left">{t("analytics.period")}</th>
                       <th className="py-2.5 text-right">
@@ -3301,9 +3287,9 @@ export default function Reports() {
                     {summary.series.timeline.map((row) => (
                       <tr
                         key={row.key}
-                        className="hover:bg-slate-50/50 dark:hover:bg-slate-800/15 transition-colors align-top"
+                        className="hover:bg-mist/50 dark:hover:bg-slate-800/15 transition-colors align-top"
                       >
-                        <td className="py-3 pr-4 font-medium text-slate-800 dark:text-slate-200">{row.label}</td>
+                        <td className="py-3 pr-4 font-medium text-ink dark:text-slate-200">{row.label}</td>
                         {renderTimelineCell(row.salesTotal, [
                           {
                             label: t("analytics.directSales"),
@@ -3371,7 +3357,7 @@ export default function Reports() {
       {activeTab === 'cafe-insights' && (
         <div className="space-y-8 animate-fadeIn">
           {/* Cafe Filter Box */}
-          <div className="card bg-white p-5 border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div className="card bg-white p-5 border border-secondary-100 shadow-sm flex flex-col md:flex-row md:items-end md:justify-between gap-4">
             <div className="grid gap-4 sm:grid-cols-3 flex-1 max-w-3xl">
               <div>
                 <DatePresetSelect
@@ -3382,7 +3368,7 @@ export default function Reports() {
                 />
               </div>
               <div>
-                <label className="label text-slate-500 font-bold uppercase text-[10px] tracking-wider">{t("common.from") || "From Date"}</label>
+                <label className="label text-secondary-500 font-bold uppercase text-[10px] tracking-wider">{t("common.from") || "From Date"}</label>
                 <FlexibleDateInput
                   className="input h-10 mt-1"
                   name="fromDate"
@@ -3391,7 +3377,7 @@ export default function Reports() {
                 />
               </div>
               <div>
-                <label className="label text-slate-500 font-bold uppercase text-[10px] tracking-wider">{t("common.to") || "To Date"}</label>
+                <label className="label text-secondary-500 font-bold uppercase text-[10px] tracking-wider">{t("common.to") || "To Date"}</label>
                 <FlexibleDateInput
                   className="input h-10 mt-1"
                   name="toDate"
@@ -3404,83 +3390,51 @@ export default function Reports() {
             <button
               onClick={handleRefresh}
               disabled={cafeSalesLoading || isBusy}
-              className="btn-secondary h-10 px-4 flex items-center justify-center gap-2 rounded-xl border border-slate-200 hover:border-[#9b6835] hover:bg-[#9b6835]/5 font-semibold text-slate-700"
+              className="btn-secondary h-10 px-4 flex items-center justify-center gap-2 rounded-xl border border-secondary-200 hover:border-primary hover:bg-primary/5 font-semibold text-ink-light"
             >
               <RefreshCw size={14} className={cafeSalesLoading || isBusy ? "animate-spin" : ""} />
               {t("common.refresh") || "Refresh"}
             </button>
           </div>
 
-          {/* Cafe KPI Metrics Row */}
-          {cafeSalesLoading ? (
-            <div className="grid gap-4 md:grid-cols-5">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <div key={n} className="card h-28 bg-slate-50 animate-pulse border border-slate-100" />
-              ))}
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-5">
-              <div className="card bg-gradient-to-br from-white to-primary-50/5 p-5 border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow transition">
-                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
-                  {t("analytics.totalSalesRevenue") || "Total Sales Revenue"}
-                </p>
-                <p className="mt-2 text-2xl font-black text-[#9b6835]">
-                  {formatMoney(cafeStats.totalSales)}
-                </p>
-                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-primary-50/20 text-[#9b6835] flex items-center justify-center">
-                  <TrendingUp size={16} />
-                </div>
-              </div>
-
-              <div className="card bg-white p-5 border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow transition">
-                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
-                  {t("analytics.totalOrders") || "Total Orders"}
-                </p>
-                <p className="mt-2 text-2xl font-black text-slate-800">
-                  {cafeStats.orderCount}
-                </p>
-                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center">
-                  <Users size={16} />
-                </div>
-              </div>
-
-              <div className="card bg-white p-5 border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow transition">
-                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
-                  {t("analytics.avgTicketSize") || "Average Ticket Size"}
-                </p>
-                <p className="mt-2 text-2xl font-black text-slate-800">
-                  {formatMoney(cafeStats.avgOrderValue)}
-                </p>
-                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-slate-50 text-slate-500 flex items-center justify-center">
-                  <WalletCards size={16} />
-                </div>
-              </div>
-
-              <div className="card bg-white p-5 border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow transition">
-                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
-                  {t("analytics.openBills") || "Open Bills (Unpaid)"}
-                </p>
-                <p className="mt-2 text-2xl font-black text-rose-600">
-                  {formatMoney(cafeStats.dueSales)}
-                </p>
-                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center text-xs font-bold">
-                  {cafeStats.dueCount}
-                </div>
-              </div>
-
-              <div className="card bg-white p-5 border border-slate-100 shadow-sm relative overflow-hidden group hover:shadow transition">
-                <p className="text-[10px] uppercase text-slate-400 font-bold tracking-wider">
-                  {t("analytics.totalDiscount") || "Total Discount"}
-                </p>
-                <p className="mt-2 text-2xl font-black text-rose-600">
-                  {formatMoney(cafeStats.totalDiscount)}
-                </p>
-                <div className="absolute right-4 bottom-4 h-8 w-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
-                  <TrendingUp size={16} className="rotate-180" />
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5 lg:gap-4">
+            <StatsCard
+              title={t("analytics.totalSalesRevenue") || "Total Sales Revenue"}
+              value={formatMoney(cafeStats.totalSales)}
+              icon={TrendingUp}
+              tone="success"
+              loading={cafeSalesLoading}
+            />
+            <StatsCard
+              title={t("analytics.totalOrders") || "Total Orders"}
+              value={cafeStats.orderCount}
+              icon={Users}
+              tone="default"
+              loading={cafeSalesLoading}
+            />
+            <StatsCard
+              title={t("analytics.avgTicketSize") || "Average Ticket Size"}
+              value={formatMoney(cafeStats.avgOrderValue)}
+              icon={WalletCards}
+              tone="info"
+              loading={cafeSalesLoading}
+            />
+            <StatsCard
+              title={t("analytics.openBills") || "Open Bills (Unpaid)"}
+              value={formatMoney(cafeStats.dueSales)}
+              hint={`${cafeStats.dueCount} ${t("parties.unpaid") || "unpaid"}`}
+              icon={ScrollText}
+              tone="danger"
+              loading={cafeSalesLoading}
+            />
+            <StatsCard
+              title={t("analytics.totalDiscount") || "Total Discount"}
+              value={formatMoney(cafeStats.totalDiscount)}
+              icon={TrendingDown}
+              tone="danger"
+              loading={cafeSalesLoading}
+            />
+          </div>
 
           {/* Cafe Visual Insights Grid */}
           <div className="grid gap-6 xl:grid-cols-2">
@@ -3498,12 +3452,12 @@ export default function Reports() {
             />
 
             {/* Column 2: Seating & Seating Type Performance */}
-            <div className="card bg-white p-5 border border-slate-100 shadow-sm space-y-6">
+            <div className="card bg-white p-5 border border-secondary-100 shadow-sm space-y-6">
               <div>
-                <h3 className="font-serif text-xl font-medium text-slate-900">
+                <h3 className="font-serif text-xl font-medium text-ink">
                   {t("analytics.orderTypesPerf") || "Order Types Performance"}
                 </h3>
-                <p className="text-sm text-slate-500 mt-1">
+                <p className="text-sm text-secondary-500 mt-1">
                   {t("analytics.orderTypesPerfSubtitle") || "Revenue breakdown by Dine In, Takeaway, and Delivery."}
                 </p>
               </div>
@@ -3511,7 +3465,7 @@ export default function Reports() {
               {cafeSalesLoading ? (
                 <div className="space-y-4 animate-pulse">
                   {[1, 2, 3].map((n) => (
-                    <div key={n} className="h-10 bg-slate-50 rounded-xl" />
+                    <div key={n} className="h-10 bg-mist rounded-xl" />
                   ))}
                 </div>
               ) : (
@@ -3524,17 +3478,17 @@ export default function Reports() {
                       delivery: t("analytics.delivery") || "Delivery",
                     };
                     const tones = {
-                      dine_in: "bg-[#9b6835]",
+                      dine_in: "bg-primary",
                       takeaway: "bg-amber-500",
                       delivery: "bg-emerald-500",
                     };
                     return (
                       <div key={type} className="space-y-1.5">
-                        <div className="flex justify-between text-xs font-bold text-slate-700">
+                        <div className="flex justify-between text-xs font-bold text-ink-light">
                           <span>{labels[type]} ({data.count} {t("analytics.orderCount") || "orders"})</span>
                           <span>{formatMoney(data.total)} ({pct.toFixed(0)}%)</span>
                         </div>
-                        <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-3 w-full bg-secondary-100 rounded-full overflow-hidden">
                           <div
                             className={`h-full ${tones[type] || "bg-slate-400"} transition-all duration-500`}
                             style={{ width: `${pct}%` }}
@@ -3547,27 +3501,27 @@ export default function Reports() {
               )}
 
               {/* Seating / Table Performance */}
-              <div className="border-t border-slate-100 pt-5 space-y-3">
-                <h4 className="text-xs uppercase font-bold text-slate-400 tracking-wider">
+              <div className="border-t border-secondary-100 pt-5 space-y-3">
+                <h4 className="text-xs uppercase font-bold text-secondary-400 tracking-wider">
                   {t("analytics.seatingPerformance") || "Seating Section & Table Performance"}
                 </h4>
                 {cafeSalesLoading ? (
-                  <div className="h-28 bg-slate-50 rounded-xl animate-pulse" />
+                  <div className="h-28 bg-mist rounded-xl animate-pulse" />
                 ) : Object.keys(cafeStats.tableRevenue).length === 0 ? (
-                  <p className="text-sm text-slate-500">{t("analytics.noTableSales") || "No table sales recorded."}</p>
+                  <p className="text-sm text-secondary-500">{t("analytics.noTableSales") || "No table sales recorded."}</p>
                 ) : (
-                  <div className="max-h-56 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50">
+                  <div className="max-h-56 overflow-y-auto border border-secondary-100 rounded-xl divide-y divide-slate-50">
                     {Object.entries(cafeStats.tableRevenue)
                       .sort((a, b) => b[1] - a[1])
                       .map(([table, rev], idx) => (
-                        <div key={table} className="p-3 flex justify-between items-center text-xs font-semibold hover:bg-slate-50">
+                        <div key={table} className="p-3 flex justify-between items-center text-xs font-semibold hover:bg-mist">
                           <span className="flex items-center gap-2">
-                            <span className="h-5 w-5 bg-slate-100 rounded-md flex items-center justify-center text-[10px] text-slate-500">
+                            <span className="h-5 w-5 bg-secondary-100 rounded-md flex items-center justify-center text-[10px] text-secondary-500">
                               #{idx + 1}
                             </span>
                             {table}
                           </span>
-                          <span className="font-bold text-slate-800">{formatMoney(rev)}</span>
+                          <span className="font-bold text-ink">{formatMoney(rev)}</span>
                         </div>
                       ))}
                   </div>
@@ -3577,18 +3531,18 @@ export default function Reports() {
           </div>
 
           {/* Cafe Detailed Orders log (The Order Book) */}
-          <div className="card bg-white p-5 border border-slate-100 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
+          <div className="card bg-white p-5 border border-secondary-100 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-secondary-100 pb-4 gap-3">
               <div>
-                <h3 className="font-serif text-xl font-medium text-slate-900 flex items-center gap-2">
-                  <BookOpen size={18} className="text-[#9b6835]" />
+                <h3 className="font-serif text-xl font-medium text-ink flex items-center gap-2">
+                  <BookOpen size={18} className="text-primary" />
                   {t("analytics.cafeDetailedOrdersBook") || "Cafe Detailed Orders Book"}
                 </h3>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-secondary-500 mt-1">
                   {t("analytics.cafeDetailedOrdersSubtitle") || "Full list of guest orders with their waiter names, table numbers, and exact dishes ordered."}
                 </p>
               </div>
-              <span className="text-xs font-bold text-slate-400 bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-xl shrink-0">
+              <span className="text-xs font-bold text-secondary-400 bg-mist border border-secondary-100 px-2.5 py-1 rounded-xl shrink-0">
                 {filteredCafeOrders.length} {t("analytics.orderCount") || "orders"}
               </span>
             </div>
@@ -3631,16 +3585,16 @@ export default function Reports() {
 
             {/* Log Table */}
             {cafeSalesLoading ? (
-              <div className="py-12 flex flex-col items-center justify-center text-slate-500">
+              <div className="py-12 flex flex-col items-center justify-center text-secondary-500">
                 <span className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
                 <p className="text-sm font-semibold">{t("common.loading") || "Loading..."}</p>
               </div>
             ) : filteredCafeOrders.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-400">{t("analytics.noSeries") || "No orders found."}</p>
+              <p className="py-8 text-center text-sm text-secondary-400">{t("analytics.noSeries") || "No orders found."}</p>
             ) : (
-              <div className="overflow-x-auto border border-slate-100 rounded-2xl bg-slate-50/20">
+              <div className="overflow-x-auto border border-secondary-100 rounded-2xl bg-mist/20">
                 <table className="w-full min-w-[900px] text-xs">
-                  <thead className="text-[10px] uppercase font-bold text-slate-400 bg-slate-50 border-b border-slate-100">
+                  <thead className="text-[10px] uppercase font-bold text-ink bg-mist border-b border-secondary-100">
                     <tr>
                       <th className="p-3 text-left">{t("analytics.invoiceDate") || "Invoice / Date"}</th>
                       <th className="p-3 text-left">{t("analytics.tableWaiter") || "Table / Waiter"}</th>
@@ -3670,16 +3624,16 @@ export default function Reports() {
                       };
 
                       return (
-                        <tr key={sale.id} className="hover:bg-slate-50/50 transition align-middle">
+                        <tr key={sale.id} className="hover:bg-mist/50 transition align-middle">
                           <td className="p-3">
-                            <span className="font-bold text-slate-800 block">
+                            <span className="font-bold text-ink block">
                               {sale.invoiceNo || sale.id?.slice(0, 8)}
                             </span>
-                            <span className="text-[10px] text-slate-400">{dateText}</span>
+                            <span className="text-[10px] text-secondary-400">{dateText}</span>
                           </td>
                           <td className="p-3">
-                            <span className="font-bold text-slate-800 block">{table}</span>
-                            <span className="text-[10px] text-slate-400">{t("staff.waiter") || "Waiter"}: {waiter}</span>
+                            <span className="font-bold text-ink block">{table}</span>
+                            <span className="text-[10px] text-secondary-400">{t("staff.waiter") || "Waiter"}: {waiter}</span>
                           </td>
                           <td className="p-3">
                             <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${
@@ -3698,7 +3652,7 @@ export default function Reports() {
                           <td className="p-3 text-right text-rose-600 font-medium">
                             {Number(sale.discountTotal || sale.discount || 0) > 0 ? `-${formatMoney(sale.discountTotal || sale.discount)}` : "—"}
                           </td>
-                          <td className="p-3 text-right font-bold text-slate-800">
+                          <td className="p-3 text-right font-bold text-ink">
                             {formatMoney(sale.grandTotal)}
                           </td>
                           <td className="p-3 text-center">
@@ -3713,7 +3667,7 @@ export default function Reports() {
                           <td className="p-3 text-center">
                             <Link
                               to={`/app/invoice/sales/${sale.id}?print=1`}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:text-[#9b6835] hover:border-[#9b6835] hover:bg-[#9b6835]/5 transition"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-secondary-200 text-secondary-500 hover:text-primary hover:border-primary hover:bg-primary/5 transition"
                               title="Print Receipt"
                             >
                               <Printer size={12} />

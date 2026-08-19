@@ -146,13 +146,13 @@ export default function SearchableSelect({
         {value ? (
           <X
             size={14}
-            className="shrink-0 text-slate-400 hover:text-slate-700"
+            className="shrink-0 text-secondary-400 hover:text-ink-light"
             onClick={handleClear}
           />
         ) : (
           <ChevronDown
             size={14}
-            className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
+            className={`shrink-0 text-secondary-400 transition-transform ${open ? 'rotate-180' : ''}`}
           />
         )}
       </button>
@@ -161,16 +161,16 @@ export default function SearchableSelect({
       {open && dropdownStyle && createPortal(
         <div
           ref={dropdownRef}
-          className="fixed z-[1000] min-w-0 max-w-full rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
+          className="fixed z-[1000] min-w-0 max-w-full rounded-xl border border-secondary-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900"
           style={dropdownStyle}
         >
           {/* Search input */}
-          <div className="p-2 border-b border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-800">
-              <Search size={13} className="shrink-0 text-slate-400" />
+          <div className="p-2 border-b border-secondary-100 dark:border-slate-800">
+            <div className="flex items-center gap-2 rounded-lg border border-secondary-200 bg-mist px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-800">
+              <Search size={13} className="shrink-0 text-secondary-400" />
               <input
                 ref={searchRef}
-                className="flex-1 bg-transparent text-sm focus:border-0 focus:outline-0 focus:ring-0 border-0 text-ink outline-none ring-0 placeholder:text-slate-400"
+                className="flex-1 bg-transparent text-sm focus:border-0 focus:outline-0 focus:ring-0 border-0 text-ink outline-none ring-0 placeholder:text-secondary-400"
                 placeholder="Search…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -181,7 +181,7 @@ export default function SearchableSelect({
               />
               {query && (
                 <button type="button" onClick={() => setQuery('')}>
-                  <X size={12} className="text-slate-400" />
+                  <X size={12} className="text-secondary-400" />
                 </button>
               )}
             </div>
@@ -190,21 +190,21 @@ export default function SearchableSelect({
           {/* Options list */}
           <ul className="overflow-y-auto py-1" style={{ maxHeight: Math.max(96, dropdownStyle.maxHeight - 57) }}>
             {filtered.length === 0 ? (
-              <li className="px-3 py-2.5 text-sm text-slate-400">No results</li>
+              <li className="px-3 py-2.5 text-sm text-secondary-400">No results</li>
             ) : (
               filtered.map((opt) => (
                 <li
                   key={opt.value}
-                  className={`cursor-pointer px-3 py-2 text-sm transition hover:bg-slate-100 dark:hover:bg-slate-800 ${
+                  className={`cursor-pointer px-3 py-2 text-sm transition hover:bg-secondary-100 dark:hover:bg-slate-800 ${
                     opt.value === String(value)
                       ? 'font-semibold text-primary-700 dark:text-primary-400'
-                      : 'text-slate-700 dark:text-slate-300'
+                      : 'text-ink-light dark:text-secondary-300'
                   }`}
                   onClick={() => handleSelect(opt)}
                 >
                   <span className="block truncate">{opt.label}</span>
                   {opt.description ? (
-                    <span className="mt-0.5 block truncate text-xs font-normal text-slate-400">
+                    <span className="mt-0.5 block truncate text-xs font-normal text-secondary-400">
                       {opt.description}
                     </span>
                   ) : null}

@@ -22,6 +22,7 @@ import {
 import { api, clearApiCache } from './api';
 import {
   getFeatureAccessLevel as getFeatureAccessLevelFromAccessControl,
+  getSubscriptionFeatureKey,
   normalizeAccessControl,
 } from './accessControl';
 import { normalizeSessionPayload } from './session';
@@ -216,33 +217,10 @@ export function AuthProvider({ children }) {
   );
 
   const getFeatureAccessLevel = useCallback((featureKey) => {
-    if (featureKey === 'reports') {
-      const getBaseAccess = (key) => {
-        const level = getFeatureAccessLevelFromAccessControl(accessControl, key, role);
-        if (level && level !== 'none' && hasSubscriptionFeatureAccess(key)) {
-          return level;
-        }
-        if (!level && hasSubscriptionFeatureAccess(key)) {
-          return 'manage';
-        }
-        return 'none';
-      };
-
-      const analyticsLevel = getBaseAccess('analytics');
-      const ledgerLevel = getBaseAccess('ledger');
-
-      if (analyticsLevel === 'manage' || ledgerLevel === 'manage') {
-        return 'manage';
-      }
-      if (analyticsLevel === 'view' || ledgerLevel === 'view') {
-        return 'view';
-      }
-      return 'none';
-    }
-
     const accessLevel = getFeatureAccessLevelFromAccessControl(accessControl, featureKey, role);
+    const subscriptionKey = getSubscriptionFeatureKey(featureKey);
     if (accessLevel) {
-      if (!hasSubscriptionFeatureAccess(featureKey)) {
+      if (!hasSubscriptionFeatureAccess(subscriptionKey)) {
         return 'none';
       }
 
@@ -255,7 +233,7 @@ export function AuthProvider({ children }) {
       return 'none';
     }
 
-    return hasSubscriptionFeatureAccess(featureKey) ? 'manage' : 'none';
+    return hasSubscriptionFeatureAccess(subscriptionKey) ? 'manage' : 'none';
   }, [accessControl, hasSubscriptionFeatureAccess, role]);
 
   const canViewFeature = useCallback(

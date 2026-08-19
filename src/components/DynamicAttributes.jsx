@@ -89,7 +89,7 @@ export default function DynamicAttributes({ entityType, attributes, onChange, hi
 
         {extraKeys.map((key) => (
           <div key={key} className="relative">
-            <label className="label capitalize text-slate-500 italic">
+            <label className="label capitalize text-secondary-500 italic">
               {key.replace(/_/g, ' ')} ({t('common.manual') || 'manual'})
             </label>
             <div className="flex gap-2">
@@ -110,7 +110,7 @@ export default function DynamicAttributes({ entityType, attributes, onChange, hi
         ))}
       </div>
 
-      <div className="flex gap-2 pt-2 border-t border-slate-100 border-dashed">
+      <div className="flex gap-2 pt-2 border-t border-secondary-100 border-dashed">
         <input
           placeholder={t('services.addAttribute') || 'Add custom attribute...'}
           className="input flex-1"

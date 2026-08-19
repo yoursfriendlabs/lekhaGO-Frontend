@@ -21,7 +21,7 @@ export default function QuickActionSuccessDialog({
       <div className="relative space-y-6 px-2 py-2 text-center">
         <button
           type="button"
-          className="absolute right-0 top-0 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          className="absolute right-0 top-0 rounded-full p-2 text-secondary-400 transition hover:bg-secondary-100 hover:text-ink-light"
           onClick={onClose}
           aria-label={closeLabel}
           title={closeLabel}
@@ -36,9 +36,9 @@ export default function QuickActionSuccessDialog({
         </div>
 
         <div>
-          <h3 className="font-serif text-2xl text-slate-900">{title}</h3>
+          <h3 className="font-serif text-2xl text-ink">{title}</h3>
           {description ? (
-            <p className="mt-3 text-base leading-7 text-slate-600">{description}</p>
+            <p className="mt-3 text-base leading-7 text-secondary-700">{description}</p>
           ) : null}
         </div>
 

@@ -1,6 +1,7 @@
 const PERMISSION_KEYS = [
   'dashboard',
   'inventory',
+  'quickPos',
   'sales',
   'services',
   'purchases',
@@ -15,16 +16,19 @@ const PERMISSION_KEYS = [
   'tables',
   'orders',
   'billing',
+  'attendance',
+  'purchasePrice',
 ];
 
 const ACCESS_LEVELS = ['none', 'view', 'manage'];
 const ACCESS_LEVEL_RANK = { none: 0, view: 1, manage: 2 };
 
 /**
- * Modules that need at least inventory:view to function (POS uses `sales`).
+ * Modules that need at least inventory:view to function.
  * Granting any of these auto-grants inventory view; clearing inventory clears these.
  */
 const INVENTORY_DEPENDENT_PERMISSION_KEYS = [
+  'quickPos',
   'sales',
   'services',
   'purchases',
@@ -32,7 +36,21 @@ const INVENTORY_DEPENDENT_PERMISSION_KEYS = [
   'billing',
 ];
 
-/** Permission keys hidden from the staff permission editor (not used in standard shops). */
+/**
+ * Modules that pick or create a customer/supplier.
+ * Granting manage auto-grants parties manage (create); view auto-grants parties view (select).
+ */
+const PARTY_DEPENDENT_PERMISSION_KEYS = [
+  'quickPos',
+  'sales',
+  'services',
+  'purchases',
+  'billing',
+];
+
+const CAFE_PERMISSION_KEYS = new Set(['tables', 'orders', 'billing']);
+
+/** Permission keys hidden from the staff permission editor unless cafe modules are on. */
 const STAFF_PERMISSION_UI_HIDDEN_KEYS = new Set([
   'analytics',
   'tables',
@@ -43,9 +61,11 @@ const STAFF_PERMISSION_UI_HIDDEN_KEYS = new Set([
 /** Preferred display order for the staff permission editor. */
 const STAFF_PERMISSION_UI_ORDER = [
   'dashboard',
-  'inventory',
+  'quickPos',
   'sales',
   'services',
+  'inventory',
+  'purchasePrice',
   'purchases',
   'quickExpenses',
   'parties',
@@ -53,13 +73,27 @@ const STAFF_PERMISSION_UI_ORDER = [
   'reports',
   'banking',
   'staff',
+  'attendance',
   'settings',
+  'tables',
+  'orders',
+  'billing',
+];
+
+export const STAFF_PERMISSION_UI_GROUPS = [
+  { id: 'operations', keys: ['dashboard', 'quickPos', 'sales', 'services', 'inventory', 'purchases', 'quickExpenses', 'parties', 'tasks'] },
+  { id: 'sensitive', keys: ['purchasePrice'] },
+  { id: 'finance', keys: ['reports', 'banking'] },
+  { id: 'team', keys: ['staff', 'attendance', 'settings'] },
+  { id: 'cafe', keys: ['tables', 'orders', 'billing'] },
 ];
 
 const FEATURE_PERMISSION_MAP = {
   dashboard: 'dashboard',
   orders: 'orders',
   inventory: 'inventory',
+  pos: 'quickPos',
+  quickPos: 'quickPos',
   sales: 'sales',
   services: 'services',
   purchases: 'purchases',
@@ -81,6 +115,16 @@ const FEATURE_PERMISSION_MAP = {
   banks: 'banking',
   billing: 'billing',
   tables: 'tables',
+  attendance: 'attendance',
+  purchasePrice: 'purchasePrice',
+};
+
+const SUBSCRIPTION_FEATURE_ALIASES = {
+  quickPos: 'sales',
+  pos: 'sales',
+  purchasePrice: 'inventory',
+  analytics: 'reports',
+  ledger: 'reports',
 };
 
 function asObject(value) {
@@ -120,6 +164,10 @@ export function getInventoryDependentPermissionKeys() {
   return [...INVENTORY_DEPENDENT_PERMISSION_KEYS];
 }
 
+export function getPartyDependentPermissionKeys() {
+  return [...PARTY_DEPENDENT_PERMISSION_KEYS];
+}
+
 export function hasInventoryDependentAccess(permissions) {
   const source = normalizePermissionMap(permissions);
   return INVENTORY_DEPENDENT_PERMISSION_KEYS.some(
@@ -127,10 +175,30 @@ export function hasInventoryDependentAccess(permissions) {
   );
 }
 
+export function hasPartyDependentAccess(permissions) {
+  const source = asObject(permissions) || {};
+  return PARTY_DEPENDENT_PERMISSION_KEYS.some(
+    (key) => normalizeAccessLevel(source[key]) !== 'none'
+  );
+}
+
+export function getRequiredPartiesAccessLevel(permissions) {
+  const source = asObject(permissions) || {};
+  let required = 'none';
+
+  for (const key of PARTY_DEPENDENT_PERMISSION_KEYS) {
+    const level = normalizeAccessLevel(source[key]);
+    if (level === 'manage') return 'manage';
+    if (level !== 'none') required = 'view';
+  }
+
+  return required;
+}
+
 /**
- * Standard staff permission rows: reports (not analytics), no tables/cafe-only modules.
+ * Standard staff permission rows. Cafe modules stay hidden unless includeCafeModules is true.
  */
-export function getStaffPermissionUiFeatures(features = []) {
+export function getStaffPermissionUiFeatures(features = [], { includeCafeModules = false } = {}) {
   const byKey = new Map();
 
   (Array.isArray(features) ? features : []).forEach((feature) => {
@@ -145,9 +213,10 @@ export function getStaffPermissionUiFeatures(features = []) {
       permissionKey = 'reports';
     }
 
+    const isCafeKey = CAFE_PERMISSION_KEYS.has(permissionKey) || CAFE_PERMISSION_KEYS.has(rawKey);
     if (
-      STAFF_PERMISSION_UI_HIDDEN_KEYS.has(permissionKey)
-      || STAFF_PERMISSION_UI_HIDDEN_KEYS.has(rawKey)
+      (STAFF_PERMISSION_UI_HIDDEN_KEYS.has(permissionKey) || STAFF_PERMISSION_UI_HIDDEN_KEYS.has(rawKey))
+      && !(includeCafeModules && isCafeKey)
     ) {
       return;
     }
@@ -177,9 +246,30 @@ export function getStaffPermissionUiFeatures(features = []) {
   return [...ordered, ...extras];
 }
 
+export function groupStaffPermissionUiFeatures(features = []) {
+  const remaining = new Map((features || []).map((feature) => [feature.key, feature]));
+  const groups = STAFF_PERMISSION_UI_GROUPS
+    .map((group) => ({
+      id: group.id,
+      features: group.keys.map((key) => remaining.get(key)).filter(Boolean),
+    }))
+    .filter((group) => group.features.length);
+
+  groups.forEach((group) => {
+    group.features.forEach((feature) => remaining.delete(feature.key));
+  });
+
+  const extras = [...remaining.values()];
+  if (extras.length) {
+    groups.push({ id: 'more', features: extras });
+  }
+
+  return groups;
+}
+
 /**
- * Keep permission maps consistent with inventory dependencies.
- * Any sales/POS/services/purchases/orders/billing access ⇒ inventory at least view.
+ * Keep permission maps consistent with inventory and party dependencies.
+ * Any sales/POS/services/purchases/billing access ⇒ inventory view and parties access.
  */
 export function enforcePermissionDependencies(permissions) {
   const next = normalizePermissionMap(permissions);
@@ -188,12 +278,17 @@ export function enforcePermissionDependencies(permissions) {
     next.inventory = 'view';
   }
 
+  const requiredParties = getRequiredPartiesAccessLevel(next);
+  if (accessLevelRank(next.parties) < accessLevelRank(requiredParties)) {
+    next.parties = requiredParties;
+  }
+
   return next;
 }
 
 /**
- * Apply a single permission change, then re-enforce inventory dependencies.
- * Clearing inventory explicitly also clears dependent modules.
+ * Apply a single permission change, then re-enforce inventory and party dependencies.
+ * Clearing inventory or parties explicitly also clears dependent modules.
  */
 export function applyPermissionChange(permissions, permissionKey, level) {
   const key = String(permissionKey || '').trim();
@@ -207,11 +302,25 @@ export function applyPermissionChange(permissions, permissionKey, level) {
 
   next[key] = normalizeAccessLevel(level);
 
+  if (key === 'reports') {
+    next.analytics = next.reports;
+  }
+  if (key === 'analytics') {
+    next.reports = next.analytics;
+  }
+
   if (key === 'inventory' && next.inventory === 'none') {
     INVENTORY_DEPENDENT_PERMISSION_KEYS.forEach((dependentKey) => {
       next[dependentKey] = 'none';
     });
-    return next;
+    return enforcePermissionDependencies(next);
+  }
+
+  if (key === 'parties' && next.parties === 'none') {
+    PARTY_DEPENDENT_PERMISSION_KEYS.forEach((dependentKey) => {
+      next[dependentKey] = 'none';
+    });
+    return enforcePermissionDependencies(next);
   }
 
   return enforcePermissionDependencies(next);
@@ -225,8 +334,44 @@ export function normalizePermissionMap(permissions) {
     return accumulator;
   }, {});
 
-  // Legacy analytics grants now count as reports access.
-  normalized.reports = maxAccessLevel(normalized.reports, source.analytics);
+  const sourceHasAnyPermission = Object.keys(source).some((key) => (
+    PERMISSION_KEYS.includes(key) || key === 'analytics'
+  ));
+
+  if (sourceHasAnyPermission) {
+    if (!Object.prototype.hasOwnProperty.call(source, 'quickPos')) {
+      normalized.quickPos = maxAccessLevel(source.sales, source.billing);
+    }
+    if (!Object.prototype.hasOwnProperty.call(source, 'attendance')) {
+      normalized.attendance = 'manage';
+    }
+    if (!Object.prototype.hasOwnProperty.call(source, 'purchasePrice')) {
+      const sourceInventory = Object.prototype.hasOwnProperty.call(source, 'inventory')
+        ? normalizeAccessLevel(source.inventory)
+        : 'none';
+      const sourcePurchases = Object.prototype.hasOwnProperty.call(source, 'purchases')
+        ? normalizeAccessLevel(source.purchases)
+        : 'none';
+      if (sourceInventory === 'manage' || sourcePurchases === 'manage') {
+        normalized.purchasePrice = 'manage';
+      } else if (sourceInventory !== 'none' || sourcePurchases !== 'none') {
+        normalized.purchasePrice = 'view';
+      } else {
+        normalized.purchasePrice = 'none';
+      }
+    }
+  }
+
+  // Reports is the single permission. Legacy analytics-only maps inherit reports.
+  // If reports is present, it wins so owners can turn reports off.
+  if (Object.prototype.hasOwnProperty.call(source, 'reports')) {
+    normalized.analytics = normalized.reports;
+  } else if (Object.prototype.hasOwnProperty.call(source, 'analytics')) {
+    normalized.reports = maxAccessLevel(normalized.reports, source.analytics);
+    normalized.analytics = normalized.reports;
+  } else {
+    normalized.analytics = normalized.reports;
+  }
   return normalized;
 }
 
@@ -267,6 +412,65 @@ export function getPermissionKeyForFeature(featureKey = '') {
   return FEATURE_PERMISSION_MAP[featureKey] || null;
 }
 
+export function getSubscriptionFeatureKey(featureKey = '') {
+  const permissionKey = getPermissionKeyForFeature(featureKey) || String(featureKey || '').trim();
+  return SUBSCRIPTION_FEATURE_ALIASES[permissionKey] || permissionKey;
+}
+
+export function getNavItemPermissionKey(item = {}) {
+  const route = String(item?.route || '');
+  if (route.includes('/pos')) return 'quickPos';
+  if (item?.key === 'sales' && route.includes('/billing')) return 'billing';
+  if (item?.key === 'profile' || route.includes('/profile')) return 'profile';
+  return getPermissionKeyForFeature(item?.key) || item?.key || '';
+}
+
+export function isOwnStaffMembership(accessControl, membershipId) {
+  const ownId = String(accessControl?.membershipId || '').trim();
+  const requested = String(membershipId || '').trim();
+  return Boolean(ownId && requested && ownId === requested);
+}
+
+export function withOwnProfileNavItem(items = [], { role, membershipId, label = 'Profile' } = {}) {
+  if (role !== 'staff' || !String(membershipId || '').trim()) {
+    return Array.isArray(items) ? [...items] : [];
+  }
+
+  const next = (Array.isArray(items) ? items : []).filter(
+    (item) => item?.key !== 'profile' && item?.key !== 'staff-salary',
+  );
+  const profileItem = { key: 'profile', label, route: '/app/profile' };
+  const settingsIdx = next.findIndex((item) => item?.key === 'settings');
+  if (settingsIdx >= 0) next.splice(settingsIdx, 0, profileItem);
+  else next.push(profileItem);
+  return next;
+}
+
+export function expandNavigationForPermissions(items = [], canView) {
+  const navigation = Array.isArray(items) ? [...items] : [];
+  const hasPos = navigation.some((item) => String(item?.route || '').includes('/pos'));
+  const hasSalesList = navigation.some((item) => {
+    const route = String(item?.route || '');
+    return route.includes('/sales') && !route.includes('/pos');
+  });
+
+  if (!hasPos && canView('quickPos')) {
+    const salesIndex = navigation.findIndex((item) => item?.key === 'sales');
+    const posItem = { key: 'quickPos', label: 'Quick POS', route: '/app/pos' };
+    if (salesIndex >= 0) navigation.splice(salesIndex, 0, posItem);
+    else navigation.push(posItem);
+  }
+
+  if (!hasSalesList && canView('sales')) {
+    const posIndex = navigation.findIndex((item) => String(item?.route || '').includes('/pos'));
+    const salesItem = { key: 'sales', label: 'Sales', route: '/app/sales' };
+    if (posIndex >= 0) navigation.splice(posIndex + 1, 0, salesItem);
+    else navigation.push(salesItem);
+  }
+
+  return navigation;
+}
+
 export function getFeatureAccessLevel(accessControl, featureKey, fallbackRole = '') {
   if (isElevatedAccessRole(fallbackRole) || isElevatedAccessRole(accessControl?.role)) {
     return 'manage';
@@ -285,6 +489,15 @@ export function getFeatureAccessLevel(accessControl, featureKey, fallbackRole = 
     level !== 'none'
     && INVENTORY_DEPENDENT_PERMISSION_KEYS.includes(permissionKey)
     && normalizeAccessLevel(permissions.inventory) === 'none'
+  ) {
+    return 'none';
+  }
+
+  // Sales/POS/services/purchases cannot look up or create a party without parties access.
+  if (
+    level !== 'none'
+    && PARTY_DEPENDENT_PERMISSION_KEYS.includes(permissionKey)
+    && normalizeAccessLevel(permissions.parties) === 'none'
   ) {
     return 'none';
   }

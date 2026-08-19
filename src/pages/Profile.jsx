@@ -21,10 +21,10 @@ export default function Profile() {
       {/* Tabs navigation */}
       <div className="card space-y-4">
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-secondary-400">
             {t('settingsPage.title')}
           </p>
-          <h2 className="break-words font-serif text-xl text-slate-900 dark:text-white">
+          <h2 className="break-words font-serif text-xl text-ink">
             {activeTab === 'details' ? t('settingsPage.tabs.profile') : t('settingsPage.tabs.account')}
           </h2>
         </div>
@@ -37,7 +37,7 @@ export default function Profile() {
               className={`min-w-0 rounded-2xl px-3 py-3 text-center text-sm font-semibold leading-tight transition lg:w-auto lg:px-4 lg:py-2.5 lg:text-left ${
                 activeTab === 'details'
                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
+                  : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200 dark:bg-slate-900/60 dark:text-secondary-300 dark:hover:bg-slate-800'
               }`}
             >
               {t('settingsPage.tabs.profile')}
@@ -48,7 +48,7 @@ export default function Profile() {
               className={`min-w-0 rounded-2xl px-3 py-3 text-center text-sm font-semibold leading-tight transition lg:w-auto lg:px-4 lg:py-2.5 lg:text-left ${
                 activeTab === 'security'
                   ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
+                  : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200 dark:bg-slate-900/60 dark:text-secondary-300 dark:hover:bg-slate-800'
               }`}
             >
               {t('settingsPage.tabs.account') || 'Security'}

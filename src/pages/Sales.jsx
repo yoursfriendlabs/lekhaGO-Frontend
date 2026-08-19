@@ -27,7 +27,11 @@ import dayjs, { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useSaleStore } from '../stores/sales';
 import { useProductStore } from '../stores/products';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
+<<<<<<< HEAD
 import StatsCard from '../components/StatsCard.jsx';
+=======
+import StatsCard, { STATS_GRID_CLASS } from '../components/StatsCard.jsx';
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
 import RefreshButton from '../components/RefreshButton.jsx';
 import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
 import DateDisplay from '../components/DateDisplay.jsx';
@@ -71,9 +75,9 @@ function StatusBadge({ status, locked = false, cbmsStatus = '' }) {
   const map = {
     paid: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
     due:  'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
-    cancelled: 'bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200',
-    canceled: 'bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200',
-    void: 'bg-slate-200 text-slate-700 dark:bg-slate-700/60 dark:text-slate-200',
+    cancelled: 'bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200',
+    canceled: 'bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200',
+    void: 'bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200',
   };
   const cbmsMap = {
     synced: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
@@ -84,7 +88,7 @@ function StatusBadge({ status, locked = false, cbmsStatus = '' }) {
   const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : '—';
   return (
     <span className="inline-flex flex-wrap items-center justify-end gap-1">
-      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[normalized] || 'bg-slate-100 text-slate-600'}`}>
+      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[normalized] || 'bg-secondary-100 text-secondary-700'}`}>
         {label}
       </span>
       {locked && !['cancelled', 'canceled', 'void'].includes(normalized) ? (
@@ -93,7 +97,7 @@ function StatusBadge({ status, locked = false, cbmsStatus = '' }) {
         </span>
       ) : null}
       {cbms ? (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cbmsMap[cbms] || 'bg-slate-100 text-slate-600'}`}>
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${cbmsMap[cbms] || 'bg-secondary-100 text-secondary-700'}`}>
           CBMS {cbms.replace('_', ' ')}
         </span>
       ) : null}
@@ -946,9 +950,9 @@ export default function Sales() {
 
       {/* ── Period Selector & Analytics Cards ── */}
       <div className="space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white/40 backdrop-blur p-4 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-white/40 backdrop-blur p-4 rounded-2xl border border-secondary-100 shadow-sm">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            <span className="text-[10px] uppercase font-bold text-slate-400 mr-1.5 whitespace-nowrap shrink-0">
+            <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1.5 whitespace-nowrap shrink-0">
               Period:
             </span>
             {[
@@ -964,20 +968,20 @@ export default function Sales() {
                 onClick={() => setDateFilter(item.key)}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                   dateFilter === item.key
-                    ? 'bg-[#9c5f22] text-white shadow-sm font-bold'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    ? 'bg-primary text-white shadow-sm font-bold'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 {item.label}
               </button>
             ))}
           </div>
-          <div className="text-xs font-semibold text-slate-500">
-            Showing <strong className="text-slate-900">{stats?.totalCount ?? 0}</strong> order{(stats?.totalCount ?? 0) === 1 ? '' : 's'}
+          <div className="text-xs font-semibold text-secondary-500">
+            Showing <strong className="text-ink">{stats?.totalCount ?? 0}</strong> order{(stats?.totalCount ?? 0) === 1 ? '' : 's'}
           </div>
         </div>
 
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className={STATS_GRID_CLASS}>
           <StatsCard
             title={t('sales.totalRevenue') || 'Total Revenue'}
             value={money(stats?.totalAmount ?? 0)}
@@ -1040,7 +1044,7 @@ export default function Sales() {
                   <div className="sm:col-span-2 lg:col-span-1">
                     <div className="flex items-center justify-between">
                       <label className="label">{t('sales.customer')}</label>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('common.optional')}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-secondary-400">{t('common.optional')}</span>
                     </div>
                     <div className="mt-1">
                       <PartySearchCreateField
@@ -1126,7 +1130,7 @@ export default function Sales() {
               title={t('sales.items')}
               action={(
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <span className="text-sm font-semibold text-slate-500">{items.length} {t('sales.items')}</span>
+                  <span className="text-sm font-semibold text-secondary-500">{items.length} {t('sales.items')}</span>
                   <button className="btn-ghost w-full sm:w-auto" type="button" onClick={openItemDialogForCreate}>
                     {t('sales.addItem')}
                   </button>
@@ -1140,7 +1144,7 @@ export default function Sales() {
                   const unitLabel = getUnitLabel(product, item.unitType);
 
                   return (
-                    <div key={`item-${idx}`} className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-3.5 dark:border-slate-800/60 dark:bg-slate-900/40">
+                    <div key={`item-${idx}`} className="rounded-[24px] border border-secondary-200/70 bg-mist/70 p-3.5 dark:border-slate-800/60 dark:bg-slate-900/40">
                       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-start gap-3">
@@ -1149,21 +1153,21 @@ export default function Sales() {
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <p className="truncate font-semibold text-slate-900 dark:text-white">{itemHeading}</p>
+                                <p className="truncate font-semibold text-ink">{itemHeading}</p>
                                 {unitLabel ? (
-                                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                  <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-secondary-500 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                     {unitLabel}
                                   </span>
                                 ) : null}
                               </div>
                               <div className="mt-2 flex flex-wrap gap-2">
-                                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                   {t('sales.qty')}: {item.quantity}
                                 </span>
-                                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                   {t('sales.unitPrice')}: {money(item.unitPrice)}
                                 </span>
-                                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-slate-300 dark:ring-slate-700/70">
+                                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
                                   {t('sales.tax')}: {Number(item.taxRate || 0).toFixed(2)}%
                                 </span>
                                 <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white dark:bg-primary-900/70">
@@ -1190,8 +1194,8 @@ export default function Sales() {
                     </div>
                   );
                 }) : (
-                  <div className="rounded-[24px] border border-dashed border-slate-300 bg-slate-50/70 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-900/30">
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{t('sales.addFirstItem')}</p>
+                  <div className="rounded-[24px] border border-dashed border-slate-300 bg-mist/70 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-900/30">
+                    <p className="text-sm text-secondary-500">{t('sales.addFirstItem')}</p>
                     <button className="btn-primary mt-4 w-full sm:w-auto" type="button" onClick={openItemDialogForCreate}>
                       <Plus size={15} className="mr-1.5 inline" />
                       {t('sales.addItem')}
@@ -1224,7 +1228,7 @@ export default function Sales() {
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-200">
                     {t('sales.itemComposerTitle')}
                   </p>
-                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                  <p className="mt-2 text-sm text-secondary-700">
                     {t('sales.itemComposerHint')}
                   </p>
                 </div>
@@ -1244,9 +1248,9 @@ export default function Sales() {
                     renderOption={(option) => (
                       <div className="flex items-center gap-2">
                         {option.entity?.imageUrl ? (
-                          <img src={option.entity.imageUrl} alt={option.label} className="h-6 w-6 rounded object-cover border border-slate-200 dark:border-slate-800" />
+                          <img src={option.entity.imageUrl} alt={option.label} className="h-6 w-6 rounded object-cover border border-secondary-200 dark:border-slate-800" />
                         ) : (
-                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-slate-100 text-[10px] font-bold text-slate-400 dark:bg-slate-800">
+                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-secondary-100 text-[10px] font-bold text-secondary-400 dark:bg-slate-800">
                             {option.entity?.name?.charAt(0).toUpperCase() || 'P'}
                           </div>
                         )}
@@ -1269,7 +1273,7 @@ export default function Sales() {
                       value={itemDraft.quantity}
                       onChange={(event) => handleDraftChange('quantity', event.target.value)}
                     />
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{getUnitLabel(itemDraftProduct, itemDraft.unitType)}</p>
+                    <p className="mt-1 text-xs text-secondary-500">{getUnitLabel(itemDraftProduct, itemDraft.unitType)}</p>
                   </div>
                   <div>
                     <label className="label">{t('products.unitType')}</label>
@@ -1311,19 +1315,19 @@ export default function Sales() {
 
               <div className="rounded-[28px] border border-primary-200 bg-primary-50/60 p-4 shadow-sm dark:border-primary-900/40 dark:bg-primary-900/15">
                 <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-200">{t('common.total')}</p>
-                <p className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">{money(itemDraft.lineTotal)}</p>
+                <p className="mt-2 text-2xl font-bold text-ink">{money(itemDraft.lineTotal)}</p>
                 <div className="mt-4 flex flex-col gap-3">
                   <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('sales.taxTotal')}</p>
-                    <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-200">{money(itemDraftVatAmount)}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-secondary-400">{t('sales.taxTotal')}</p>
+                    <p className="mt-1 text-sm font-bold text-ink dark:text-slate-200">{money(itemDraftVatAmount)}</p>
                   </div>
                   <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('sales.product')}</p>
-                    <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{itemDraftProduct?.name || '—'}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-secondary-400">{t('sales.product')}</p>
+                    <p className="mt-1 text-sm font-bold text-ink dark:text-slate-200 truncate">{itemDraftProduct?.name || '—'}</p>
                   </div>
                   <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{t('products.unitType')}</p>
-                    <p className="mt-1 text-sm font-bold text-slate-800 dark:text-slate-200 truncate">{getUnitLabel(itemDraftProduct, itemDraft.unitType) || t('products.primaryUnit')}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-secondary-400">{t('products.unitType')}</p>
+                    <p className="mt-1 text-sm font-bold text-ink dark:text-slate-200 truncate">{getUnitLabel(itemDraftProduct, itemDraft.unitType) || t('products.primaryUnit')}</p>
                   </div>
                 </div>
               </div>
@@ -1334,20 +1338,20 @@ export default function Sales() {
             <FormSectionCard title={t('payments.summaryTitle')}>
               <div className="grid gap-3 text-sm">
                 <div className="flex justify-between gap-3">
-                  <span className="text-slate-500">{t('sales.subTotal')}</span>
-                  <span className="font-semibold text-slate-800">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</span>
+                  <span className="text-secondary-500">{t('sales.subTotal')}</span>
+                  <span className="font-semibold text-ink">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.subTotal.toFixed(2) })}</span>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <span className="text-slate-500">{t('sales.taxTotal')}</span>
-                  <span className="font-semibold text-slate-800">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</span>
+                  <span className="text-secondary-500">{t('sales.taxTotal')}</span>
+                  <span className="font-semibold text-ink">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.taxTotal.toFixed(2) })}</span>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <span className="text-slate-500">{t('sales.grandTotal')}</span>
-                  <span className="text-lg font-bold text-slate-900">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</span>
+                  <span className="text-secondary-500">{t('sales.grandTotal')}</span>
+                  <span className="text-lg font-bold text-ink">{t('currency.formatted', { symbol: t('currency.symbol'), amount: totals.grandTotal.toFixed(2) })}</span>
                 </div>
               </div>
 
-                <div className="mt-4 border-t border-slate-200/70 pt-4">
+                <div className="mt-4 border-t border-secondary-200/70 pt-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                     <div className="flex-1">
                       <label className="label">{t('services.amountReceived')}</label>
@@ -1367,7 +1371,7 @@ export default function Sales() {
                         onFullPayment={() => applyQuickReceivedAmount(totals.grandTotal, { markPaid: true })}
                       />
                     </div>
-                    <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200/70 px-3 py-2.5 text-sm text-slate-700 transition hover:bg-slate-100 sm:mb-0.5">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-secondary-200/70 px-3 py-2.5 text-sm text-ink-light transition hover:bg-secondary-100 sm:mb-0.5">
                       <input
                       type="checkbox"
                       className="h-4 w-4 rounded accent-primary-600"
@@ -1387,7 +1391,7 @@ export default function Sales() {
                   </div>
                 )}
 
-                <div className="mt-4 border-t border-slate-200/70 pt-4">
+                <div className="mt-4 border-t border-secondary-200/70 pt-4">
                   <PaymentMethodFields
                     value={header}
                     onChange={(patch) => setHeader((prev) => ({ ...prev, ...patch }))}
@@ -1427,7 +1431,7 @@ export default function Sales() {
         {/* Header: title + filters on left, export on right */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <h3 className="font-serif text-2xl text-slate-900 dark:text-white">{t('sales.recentSales')}</h3>
+            <h3 className="font-serif text-2xl text-ink">{t('sales.recentSales')}</h3>
             <div className="mt-3 grid gap-3 lg:grid-cols-2">
               <div>
                 <label className="label">{t('services.filterByParty')}</label>
@@ -1456,7 +1460,7 @@ export default function Sales() {
                 onClick={() => setStatusFilter('all')}
                 className={statusFilter === 'all'
                   ? 'bg-blue-50 border border-blue-500 text-blue-500 px-2 py-0.5 rounded text-sm'
-                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
+                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-secondary-700 dark:border-slate-600 dark:text-secondary-400'}
               >
                 {t('sales.allStatuses')}
               </button>
@@ -1465,7 +1469,7 @@ export default function Sales() {
                 onClick={() => setStatusFilter('paid')}
                 className={statusFilter === 'paid'
                   ? 'bg-emerald-50 border border-emerald-500 text-emerald-600 px-2 py-0.5 rounded text-sm'
-                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
+                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-secondary-700 dark:border-slate-600 dark:text-secondary-400'}
               >
                 {t('sales.paid')}
               </button>
@@ -1474,7 +1478,7 @@ export default function Sales() {
                 onClick={() => setStatusFilter('due')}
                 className={statusFilter === 'due'
                   ? 'bg-rose-50 border border-rose-500 text-rose-600 px-2 py-0.5 rounded text-sm'
-                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-slate-600 dark:border-slate-600 dark:text-slate-400'}
+                  : 'border border-gray-300 rounded px-2 py-0.5 text-sm text-secondary-700 dark:border-slate-600 dark:text-secondary-400'}
               >
                 {t('sales.due')}
               </button>
@@ -1486,29 +1490,29 @@ export default function Sales() {
         {/* ── Mobile card view ── */}
         <div className="mt-4 md:hidden space-y-3">
           {salesLoading && salesList.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+            <p className="py-3 text-sm text-secondary-500">{t('common.loading')}</p>
           ) : pagedSales.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">{t('sales.noSales')}</p>
+            <p className="py-3 text-sm text-secondary-500">{t('sales.noSales')}</p>
           ) : (
             pagedSales.map((sale) => {
               const customerName = resolveCustomerName(sale);
               const due = Number(sale.dueAmount || 0);
               return (
-                <div key={sale.id} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
+                <div key={sale.id} className="rounded-2xl border border-secondary-200/70 bg-white/80 p-4 text-sm dark:border-slate-800/60 dark:bg-slate-900/60">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">
+                      <p className="font-semibold text-ink truncate">
                         {sale.invoiceNo || sale.id.slice(0, 8)}
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5"><DateDisplay date={sale.saleDate} format="D MMM" /></p>
-                      <p className="mt-1 text-xs text-slate-500 truncate">{customerName || '—'}</p>
+                      <p className="text-xs text-secondary-500 mt-0.5"><DateDisplay date={sale.saleDate} format="D MMM" /></p>
+                      <p className="mt-1 text-xs text-secondary-500 truncate">{customerName || '—'}</p>
                       <PaymentTypeSummary
                         source={sale}
                         className="mt-1"
                         labelClassName="text-xs font-medium"
                         metaClassName="text-[11px]"
                       />
-                      <p className="mt-1 text-xs text-slate-400 truncate">Created By: {getCreatorDisplayName(sale)}</p>
+                      <p className="mt-1 text-xs text-secondary-400 truncate">Created By: {getCreatorDisplayName(sale)}</p>
                       {(sale.Table || sale.table || sale.tableId) && (
                         <div className="mt-1">
                           <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
@@ -1519,7 +1523,7 @@ export default function Sales() {
                     </div>
                     <div className="text-right shrink-0">
                       <StatusBadge status={sale.status} locked={isSaleLocked(sale)} cbmsStatus={sale.cbmsStatus} />
-                      <p className="mt-1.5 font-semibold text-slate-800 dark:text-slate-200">
+                      <p className="mt-1.5 font-semibold text-ink dark:text-slate-200">
                         {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.grandTotal || 0).toFixed(2) })}
                       </p>
                       {due > 0 ? (
@@ -1531,7 +1535,7 @@ export default function Sales() {
                       )}
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-end border-t border-slate-200/50 pt-2.5 dark:border-slate-700/40">
+                  <div className="mt-3 flex items-center justify-end border-t border-secondary-200/50 pt-2.5 dark:border-slate-700/40">
                     <ActionMenu actions={buildSaleActions(sale)} />
                   </div>
                 </div>
@@ -1543,7 +1547,7 @@ export default function Sales() {
         {/* ── Desktop table ── */}
         <div className="mt-4 overflow-x-auto hidden md:block">
           <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-slate-400">
+            <thead className="text-xs uppercase text-ink">
               <tr>
                 <th className="py-2 pr-4 text-left">{t('common.invoice')}</th>
                 <th className="py-2 pr-4 text-left">{t('common.date')}</th>
@@ -1558,23 +1562,23 @@ export default function Sales() {
             </thead>
             <tbody>
               {salesLoading && salesList.length === 0 ? (
-                <tr><td colSpan={9} className="py-3 text-slate-500">{t('common.loading')}</td></tr>
+                <tr><td colSpan={9} className="py-3 text-secondary-500">{t('common.loading')}</td></tr>
               ) : pagedSales.length === 0 ? (
-                <tr><td colSpan={9} className="py-3 text-slate-500">{t('sales.noSales')}</td></tr>
+                <tr><td colSpan={9} className="py-3 text-secondary-500">{t('sales.noSales')}</td></tr>
               ) : (
                 pagedSales.map((sale) => {
                   const customerName = resolveCustomerName(sale);
                   const due = Number(sale.dueAmount || 0);
                   return (
-                    <tr key={sale.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
+                    <tr key={sale.id} className="border-t border-secondary-200/70">
 
                       {/* Invoice No */}
-                      <td className="py-2.5 pr-4 font-medium text-slate-800 dark:text-slate-200">
+                      <td className="py-2.5 pr-4 font-medium text-ink dark:text-slate-200">
                         {sale.invoiceNo || sale.id.slice(0, 8)}
                       </td>
 
                       {/* Date — formatted like Services "22 Mar" */}
-                      <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
+                      <td className="py-2.5 pr-4 text-ink-light dark:text-secondary-300">
                         <DateDisplay date={sale.saleDate} format="D MMM" />
                       </td>
 
@@ -1584,9 +1588,9 @@ export default function Sales() {
                       </td>
 
                       {/* Customer — resolved through full fallback chain */}
-                      <td className="py-2.5 pr-4 text-slate-700 dark:text-slate-300">
-                        <div>{customerName || <span className="text-slate-400">—</span>}</div>
-                        <div className="text-xs text-slate-400">Created By: {getCreatorDisplayName(sale)}</div>
+                      <td className="py-2.5 pr-4 text-ink-light dark:text-secondary-300">
+                        <div>{customerName || <span className="text-secondary-400">—</span>}</div>
+                        <div className="text-xs text-secondary-400">Created By: {getCreatorDisplayName(sale)}</div>
                         {(sale.Table || sale.table || sale.tableId) && (
                           <div className="mt-1">
                             <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
@@ -1601,7 +1605,7 @@ export default function Sales() {
                       </td>
 
                       {/* Grand total */}
-                      <td className="py-2.5 pr-4 text-right font-semibold text-slate-800 dark:text-slate-200">
+                      <td className="py-2.5 pr-4 text-right font-semibold text-ink dark:text-slate-200">
                         {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.grandTotal || 0).toFixed(2) })}
                       </td>
 
@@ -1682,7 +1686,7 @@ export default function Sales() {
         )}
       >
         <div className="space-y-3">
-          <p className="text-sm leading-6 text-slate-600 dark:text-slate-300">
+          <p className="text-sm leading-6 text-secondary-700">
             {cancelSale
               ? t('sales.cancelConfirm', { name: cancelSale.invoiceNo || cancelSale.id.slice(0, 8) })
               : ''}

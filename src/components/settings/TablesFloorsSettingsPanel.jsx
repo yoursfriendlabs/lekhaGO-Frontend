@@ -206,10 +206,10 @@ export default function TablesFloorsSettingsPanel() {
       <div className="card space-y-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="space-y-1">
-            <h2 className="font-serif text-xl text-slate-900 dark:text-white">
+            <h2 className="font-serif text-xl text-ink">
               {t('settingsPage.tabs.tablesFloors') || 'Tables & Floors'}
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-secondary-500">
               {t('settingsPage.descriptions.tablesFloors') || 'Manage dining floors and seating area categories.'}
             </p>
           </div>
@@ -235,22 +235,22 @@ export default function TablesFloorsSettingsPanel() {
         {/* Mobile View */}
         <div className="space-y-3 md:hidden">
           {listLoading && categories.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+            <p className="py-3 text-sm text-secondary-500">{t('common.loading')}</p>
           ) : categories.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">{t('common.noData') || 'No Floors found.'}</p>
+            <p className="py-3 text-sm text-secondary-500">{t('common.noData') || 'No Floors found.'}</p>
           ) : (
             categories.map((category) => {
               const tableCount = getTableCountForFloor(category.id);
               return (
                 <div
                   key={category.id}
-                  className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60"
+                  className="rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60"
                 >
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">
-                      <p className="font-semibold text-slate-900 dark:text-white">{category.name}</p>
-                      <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-1 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 dark:bg-slate-800/30 dark:border-slate-800">
-                        <Layers size={11} className="text-[#9b6835]" />
+                      <p className="font-semibold text-ink">{category.name}</p>
+                      <div className="flex items-center gap-1.5 text-xs text-secondary-500 mt-1 bg-mist px-2 py-0.5 rounded-full border border-secondary-100 dark:bg-slate-800/30 dark:border-slate-800">
+                        <Layers size={11} className="text-primary" />
                         <span>{tableCount} {tableCount === 1 ? 'table' : 'tables'} assigned</span>
                       </div>
                     </div>
@@ -273,8 +273,8 @@ export default function TablesFloorsSettingsPanel() {
 
         {/* Desktop Table View */}
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-            <thead className="text-xs uppercase text-slate-400">
+          <table className="w-full text-sm text-secondary-700">
+            <thead className="text-xs uppercase text-ink">
               <tr>
                 <th className="py-2 text-left">{t('categories.name') || 'Floor Name'}</th>
                 <th className="py-2 text-left">Tables Count</th>
@@ -284,23 +284,23 @@ export default function TablesFloorsSettingsPanel() {
             <tbody>
               {listLoading && categories.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="py-3 text-slate-500">{t('common.loading')}</td>
+                  <td colSpan={3} className="py-3 text-secondary-500">{t('common.loading')}</td>
                 </tr>
               ) : categories.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="py-3 text-slate-500">{t('common.noData') || 'No Floor categories defined.'}</td>
+                  <td colSpan={3} className="py-3 text-secondary-500">{t('common.noData') || 'No Floor categories defined.'}</td>
                 </tr>
               ) : (
                 categories.map((category) => {
                   const tableCount = getTableCountForFloor(category.id);
                   return (
-                    <tr key={category.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                      <td className="py-3 font-semibold text-slate-900 dark:text-white">{category.name}</td>
+                    <tr key={category.id} className="border-t border-secondary-200/70">
+                      <td className="py-3 font-semibold text-ink">{category.name}</td>
                       <td className="py-3">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                           tableCount > 0
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/40 dark:bg-emerald-500/10 dark:text-emerald-400'
-                            : 'bg-slate-100 text-slate-500 border border-slate-200/40 dark:bg-slate-800 dark:text-slate-400'
+                            : 'bg-secondary-100 text-secondary-500 border border-secondary-200/40 dark:bg-slate-800 dark:text-secondary-400'
                         }`}>
                           <Layers size={12} />
                           {tableCount} {tableCount === 1 ? 'Table' : 'Tables'}

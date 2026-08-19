@@ -22,18 +22,21 @@ import FlexibleDateInput from './FlexibleDateInput.jsx';
 import { Dialog } from './ui/Dialog.tsx';
 import TeamSeatUsagePanel from './subscription/TeamSeatUsagePanel.jsx';
 import { api, invalidateApiCache } from '../lib/api';
-import StatsCard from './StatsCard.jsx';
+import StatsCard, { STATS_GRID_CLASS } from './StatsCard.jsx';
 import PageHeader from './PageHeader';
 import {
   applyPermissionChange,
   buildEmptyPermissionMap,
   enforcePermissionDependencies,
   getPermissionKeyForFeature,
+  getRequiredPartiesAccessLevel,
   getStaffPermissionUiFeatures,
+  groupStaffPermissionUiFeatures,
   hasInventoryDependentAccess,
 } from '../lib/accessControl';
 import { formatMaybeDate, todayISODate } from '../lib/datetime';
 import { useAuth } from '../lib/auth';
+import { useBusinessSettings } from '../lib/businessSettings';
 import { useI18n } from '../lib/i18n.jsx';
 import {
   EMPTY_STAFF_SUMMARY,
@@ -109,7 +112,7 @@ function FilterChip({ label, active, onClick }) {
       className={`inline-flex min-w-0 items-center justify-center rounded-full border px-2.5 py-1.5 text-xs font-semibold leading-tight transition sm:px-4 sm:py-2 sm:text-sm ${
         active
           ? 'border-primary-300 bg-primary-50 text-primary-700 shadow-sm dark:border-primary-700/70 dark:bg-primary-900/30 dark:text-primary-200'
-          : 'border-slate-200/80 bg-white/80 text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-slate-300 dark:hover:border-slate-700'
+          : 'border-secondary-200/80 bg-white/80 text-secondary-700 hover:border-secondary-300 hover:bg-mist dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-secondary-300 dark:hover:border-slate-700'
       }`}
     >
       {label}
@@ -123,7 +126,7 @@ function StatusBadge({ active, t }) {
       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
         active
           ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-          : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+          : 'bg-secondary-200 text-ink-light dark:bg-slate-800 dark:text-secondary-300'
       }`}
     >
       {active ? t('staffManagement.status.active') : t('staffManagement.status.inactive')}
@@ -171,7 +174,7 @@ function PermissionSelector({ value, levels, disabled, disabledLevels = [], hide
   const columnClass = visibleLevels.length <= 2 ? 'grid-cols-2' : 'grid-cols-3';
 
   return (
-    <div className={`grid ${columnClass} overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/80 dark:border-slate-800/70 dark:bg-slate-900/70`}>
+    <div className={`grid ${columnClass} overflow-hidden rounded-2xl border border-secondary-200/70 bg-mist/80 dark:border-slate-800/70 dark:bg-slate-900/70`}>
       {visibleLevels.map((level) => {
         const active = value === level.key;
         const levelDisabled = disabled || disabledSet.has(level.key);
@@ -184,7 +187,7 @@ function PermissionSelector({ value, levels, disabled, disabledLevels = [], hide
             className={`min-h-[2.9rem] px-3 py-2.5 text-[13px] font-semibold transition sm:text-sm ${
               active
                 ? 'bg-primary-600 text-white'
-                : 'text-slate-600 hover:bg-white dark:text-slate-300 dark:hover:bg-slate-800'
+                : 'text-secondary-700 hover:bg-white dark:text-secondary-300 dark:hover:bg-slate-800'
             } disabled:cursor-not-allowed disabled:opacity-60`}
           >
             {t(`staffManagement.permissionLevels.${level.key}`)}
@@ -210,14 +213,24 @@ function StaffFormDialog({
   t,
 }) {
   const [activeTab, setActiveTab] = useState('general');
+  const { businessProfile } = useBusinessSettings();
   const isCreate = mode === 'create';
   const readOnly = mode === 'view';
   const levels = meta.accessLevels;
+  const includeCafeModules = businessProfile?.modules?.orders === true
+    || businessProfile?.type === 'cafe'
+    || businessProfile?.type === 'hospitality'
+    || Boolean(businessProfile?.settings?.enabledModules?.includes('tables'));
   const visibleFeatures = useMemo(
-    () => getStaffPermissionUiFeatures(meta.features),
-    [meta.features]
+    () => getStaffPermissionUiFeatures(meta.features, { includeCafeModules }),
+    [meta.features, includeCafeModules]
+  );
+  const permissionGroups = useMemo(
+    () => groupStaffPermissionUiFeatures(visibleFeatures),
+    [visibleFeatures]
   );
   const inventoryRequired = hasInventoryDependentAccess(form.permissions);
+  const requiredPartiesLevel = getRequiredPartiesAccessLevel(form.permissions);
   const isDetailsStep = activeTab === 'general';
 
   useEffect(() => {
@@ -263,13 +276,13 @@ function StaffFormDialog({
       }}
     >
       <div className="flex h-full items-end justify-center md:items-center md:p-5 xl:p-6">
-        <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#fcfaf6] shadow-2xl dark:bg-slate-950 md:h-[calc(100dvh-2.5rem)] md:max-h-[calc(100dvh-2.5rem)] md:max-w-[1100px] md:rounded-[32px] md:border md:border-slate-200/70 md:dark:border-slate-800/70">
-          <div className="flex items-center gap-3 border-b border-slate-200/70 bg-white/85 px-4 py-3 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-8">
+        <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-mist shadow-2xl dark:bg-slate-950 md:h-[calc(100dvh-2.5rem)] md:max-h-[calc(100dvh-2.5rem)] md:max-w-[1100px] md:rounded-[32px] md:border md:border-secondary-200/70 md:dark:border-slate-800/70">
+          <div className="flex items-center gap-3 border-b border-secondary-200/70 bg-white/85 px-4 py-3 backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/80 md:px-8">
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary-700 dark:text-primary-200">
                 {t('staffManagement.title')}
               </p>
-              <h2 className="mt-1 truncate font-serif text-xl text-slate-900 dark:text-white md:text-2xl">
+              <h2 className="mt-1 truncate font-serif text-xl text-ink md:text-2xl">
                 {dialogTitle}
               </h2>
             </div>
@@ -277,7 +290,7 @@ function StaffFormDialog({
               type="button"
               onClick={onClose}
               disabled={saving}
-              className="rounded-2xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              className="rounded-2xl p-2 text-secondary-400 transition hover:bg-secondary-100 hover:text-ink-light dark:hover:bg-slate-800 dark:hover:text-slate-200"
             >
               <X size={20} />
             </button>
@@ -286,14 +299,14 @@ function StaffFormDialog({
           <form id="staff-management-form" className="flex min-h-0 flex-1 flex-col" onSubmit={handleFormSubmit}>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
               <div className="mx-auto w-full max-w-[920px] space-y-4">
-                <div className="flex gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
+                <div className="flex gap-2 border-b border-secondary-200 pb-3 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setActiveTab('general')}
                     className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
                       activeTab === 'general'
                         ? 'bg-primary-600 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
+                        : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200 dark:bg-slate-900/60 dark:text-secondary-300 dark:hover:bg-slate-800'
                     }`}
                   >
                     {t('staffManagement.tabs.profileInfo')}
@@ -306,7 +319,7 @@ function StaffFormDialog({
                     className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
                       activeTab === 'permissions'
                         ? 'bg-primary-600 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-900/60 dark:text-slate-300 dark:hover:bg-slate-800'
+                        : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200 dark:bg-slate-900/60 dark:text-secondary-300 dark:hover:bg-slate-800'
                     }`}
                   >
                     {t('staffManagement.tabs.accessPermissions')}
@@ -314,14 +327,14 @@ function StaffFormDialog({
                 </div>
 
                 <div className={`space-y-4 ${isDetailsStep ? '' : 'hidden'}`}>
-                    <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
-                      <div className="flex flex-col gap-3 border-b border-slate-200/50 pb-4 lg:flex-row lg:items-start lg:justify-between dark:border-slate-800/50">
+                    <div className="rounded-[28px] border border-secondary-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
+                      <div className="flex flex-col gap-3 border-b border-secondary-200/50 pb-4 lg:flex-row lg:items-start lg:justify-between dark:border-slate-800/50">
                         <div>
-                          <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('staffManagement.detailsTitle')}</h3>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.detailsSubtitle')}</p>
+                          <h3 className="font-serif text-lg text-ink">{t('staffManagement.detailsTitle')}</h3>
+                          <p className="mt-1 text-xs text-secondary-500">{t('staffManagement.detailsSubtitle')}</p>
                         </div>
                         {readOnly ? (
-                          <span className="inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          <span className="inline-flex rounded-full bg-secondary-200 px-3 py-1 text-xs font-semibold text-ink-light dark:bg-slate-800 dark:text-secondary-300">
                             {t('staffManagement.viewOnly')}
                           </span>
                         ) : null}
@@ -362,7 +375,7 @@ function StaffFormDialog({
                             <option value="staff">{t('staffManagement.roles.staff')}</option>
                             {form.role === 'owner' ? <option value="owner">{t('staffManagement.roles.owner')}</option> : null}
                           </select>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.roleHelper')}</p>
+                          <p className="mt-1 text-xs text-secondary-500">{t('staffManagement.roleHelper')}</p>
                         </div>
                         <div>
                           <label className="label" htmlFor="staff-job-title">{t('staffManagement.jobTitle')}</label>
@@ -432,7 +445,7 @@ function StaffFormDialog({
                       </div>
 
                       {!isCreate ? (
-                        <label className="mt-5 flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-sm text-slate-700 dark:border-slate-800/70 dark:bg-slate-950/50 dark:text-slate-300 cursor-pointer">
+                        <label className="mt-5 flex items-center gap-3 rounded-2xl border border-secondary-200/70 bg-white/80 p-4 text-sm text-ink-light dark:border-slate-800/70 dark:bg-slate-950/50 dark:text-secondary-300 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={form.isActive}
@@ -445,10 +458,10 @@ function StaffFormDialog({
                       ) : null}
                     </div>
 
-                    <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
-                      <div className="border-b border-slate-200/50 pb-4 dark:border-slate-800/50">
-                        <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('staffManagement.salary')}</h3>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="rounded-[28px] border border-secondary-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
+                      <div className="border-b border-secondary-200/50 pb-4 dark:border-slate-800/50">
+                        <h3 className="font-serif text-lg text-ink">{t('staffManagement.salary')}</h3>
+                        <p className="mt-1 text-xs text-secondary-500">
                           Manage payment and salary tracking parameters for this staff member.
                         </p>
                       </div>
@@ -491,26 +504,26 @@ function StaffFormDialog({
                   </div>
 
                 <div className={`space-y-4 ${isDetailsStep ? 'hidden' : ''}`}>
-                    <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
-                      <div className="border-b border-slate-200/50 pb-4 dark:border-slate-800/50">
-                        <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('staffManagement.loginAccess')}</h3>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="rounded-[28px] border border-secondary-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
+                      <div className="border-b border-secondary-200/50 pb-4 dark:border-slate-800/50">
+                        <h3 className="font-serif text-lg text-ink">{t('staffManagement.loginAccess')}</h3>
+                        <p className="mt-1 text-xs text-secondary-500">
                           Control if this staff member can log in to perform transactions or view workspace features.
                         </p>
                       </div>
 
                       <div className="mt-5 space-y-4">
-                        <div className="flex items-center justify-between rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
+                        <div className="flex items-center justify-between rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
                           <div>
-                            <p className="text-sm font-semibold text-slate-900 dark:text-white">{t('staffManagement.hasLogin')}</p>
-                            <p className="mt-1 text-xs text-slate-500">If enabled, credentials are required to sign in.</p>
+                            <p className="text-sm font-semibold text-ink">{t('staffManagement.hasLogin')}</p>
+                            <p className="mt-1 text-xs text-secondary-500">If enabled, credentials are required to sign in.</p>
                           </div>
                           <button
                             type="button"
                             disabled={readOnly}
                             onClick={() => onFieldChange('hasLogin', !form.hasLogin)}
                             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
-                              form.hasLogin ? 'bg-primary-600' : 'bg-slate-200 dark:bg-slate-800'
+                              form.hasLogin ? 'bg-primary-600' : 'bg-secondary-200 dark:bg-slate-800'
                             } disabled:cursor-not-allowed disabled:opacity-50`}
                           >
                             <span
@@ -538,10 +551,10 @@ function StaffFormDialog({
                                 />
                               </div>
                             ) : (
-                              <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{t('auth.emailAddress')}</p>
-                                <p className="mt-2 break-words text-sm font-medium text-slate-800 dark:text-slate-100">{form.email || '-'}</p>
-                                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('staffManagement.emailImmutable')}</p>
+                              <div className="rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-secondary-400">{t('auth.emailAddress')}</p>
+                                <p className="mt-2 break-words text-sm font-medium text-ink">{form.email || '-'}</p>
+                                <p className="mt-1 text-xs text-secondary-500">{t('staffManagement.emailImmutable')}</p>
                               </div>
                             )}
                             <div>
@@ -564,10 +577,10 @@ function StaffFormDialog({
                       </div>
                     </div>
 
-                    <div className="rounded-[28px] border border-slate-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
+                    <div className="rounded-[28px] border border-secondary-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
                       <div>
-                        <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('staffManagement.permissionsTitle')}</h3>
-                        <p className="mt-1 max-w-3xl text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.permissionsSubtitle')}</p>
+                        <h3 className="font-serif text-xl text-ink">{t('staffManagement.permissionsTitle')}</h3>
+                        <p className="mt-1 max-w-3xl text-sm text-secondary-500">{t('staffManagement.permissionsSubtitle')}</p>
                       </div>
 
                       <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-800/50 dark:bg-sky-950/30 dark:text-sky-100">
@@ -575,46 +588,75 @@ function StaffFormDialog({
                         <p className="mt-1 text-xs opacity-80">{t('staffManagement.permissionDependencyHint')}</p>
                       </div>
 
-                      <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                        {visibleFeatures.map((feature) => {
-                          const permissionKey = getPermissionKeyForFeature(feature.key) || feature.key;
-                          const isInventory = permissionKey === 'inventory';
-                          const featureLabel = permissionKey === 'reports'
-                            ? t('staffManagement.permissionFeatures.reports')
-                            : feature.label;
-
-                          return (
-                            <div key={permissionKey} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
-                              <div className="flex h-full flex-col gap-4">
-                                <div className="min-w-0">
-                                  <p className="font-medium text-slate-900 dark:text-white">{featureLabel}</p>
-                                  <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                                    {isInventory && inventoryRequired
-                                      ? t('staffManagement.permissionInventoryRequiredHint')
-                                      : feature.description || t('staffManagement.permissionDescriptionFallback')}
-                                  </p>
-                                </div>
-                                <div className="w-full">
-                                  <PermissionSelector
-                                    value={form.permissions[permissionKey] || 'none'}
-                                    levels={levels}
-                                    disabled={readOnly}
-                                    hideLevels={isInventory && inventoryRequired ? ['none'] : []}
-                                    onChange={(value) => onPermissionChange(permissionKey, value)}
-                                    t={t}
-                                  />
-                                </div>
-                              </div>
+                      <div className="mt-5 space-y-6">
+                        {permissionGroups.map((group) => (
+                          <div key={group.id} className="space-y-3">
+                            <div>
+                              <h4 className="text-sm font-semibold text-ink">
+                                {t(`staffManagement.permissionGroups.${group.id}`) || group.id}
+                              </h4>
+                            {(() => {
+                              const hintKey = `staffManagement.permissionGroupHints.${group.id}`;
+                              const hint = t(hintKey);
+                              return hint && hint !== hintKey ? (
+                                <p className="mt-1 text-xs text-secondary-500">{hint}</p>
+                              ) : null;
+                            })()}
                             </div>
-                          );
-                        })}
+                            <div className="grid gap-4 xl:grid-cols-2">
+                              {group.features.map((feature) => {
+                                const permissionKey = getPermissionKeyForFeature(feature.key) || feature.key;
+                                const isInventory = permissionKey === 'inventory';
+                                const isParties = permissionKey === 'parties';
+                                const labelKey = `staffManagement.permissionFeatures.${permissionKey}`;
+                                const translatedLabel = t(labelKey);
+                                const featureLabel = translatedLabel !== labelKey ? translatedLabel : feature.label;
+                                const hintKey = `staffManagement.permissionFeatureHints.${permissionKey}`;
+                                const translatedHint = t(hintKey);
+                                const featureHint = isInventory && inventoryRequired
+                                  ? t('staffManagement.permissionInventoryRequiredHint')
+                                  : isParties && requiredPartiesLevel !== 'none'
+                                    ? t('staffManagement.permissionPartiesRequiredHint')
+                                    : (translatedHint !== hintKey ? translatedHint : (feature.description || t('staffManagement.permissionDescriptionFallback')));
+                                const hideLevels = [
+                                  ...(isInventory && inventoryRequired ? ['none'] : []),
+                                  ...(isParties && requiredPartiesLevel !== 'none' ? ['none'] : []),
+                                  ...(isParties && requiredPartiesLevel === 'manage' ? ['view'] : []),
+                                ];
+
+                                return (
+                                  <div key={permissionKey} className="rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/50">
+                                    <div className="flex h-full flex-col gap-4">
+                                      <div className="min-w-0">
+                                        <p className="font-medium text-ink">{featureLabel}</p>
+                                        <p className="mt-1 text-xs leading-5 text-secondary-500">
+                                          {featureHint}
+                                        </p>
+                                      </div>
+                                      <div className="w-full">
+                                        <PermissionSelector
+                                          value={form.permissions[permissionKey] || 'none'}
+                                          levels={levels}
+                                          disabled={readOnly}
+                                          hideLevels={hideLevels}
+                                          onChange={(value) => onPermissionChange(permissionKey, value)}
+                                          t={t}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
               </div>
             </div>
 
-            <div className="border-t border-slate-200/70 bg-white/90 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-8">
+            <div className="border-t border-secondary-200/70 bg-white/90 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur dark:border-slate-800/70 dark:bg-slate-950/85 md:px-8">
               <div className="mx-auto flex w-full max-w-[920px] flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 {readOnly ? (
                   <button type="button" className="btn-secondary w-full sm:w-auto" onClick={onClose}>
@@ -977,7 +1019,7 @@ export default function StaffManagement({ businessId }) {
         }
       />
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className={STATS_GRID_CLASS}>
         <StatsCard
           title={t('staffManagement.summary.totalUsers')}
           value={staffOverview.totalUsers}
@@ -1018,13 +1060,13 @@ export default function StaffManagement({ businessId }) {
 
       {/* ── Staff table card ── */}
       <div className="card !p-0 overflow-hidden">
-        <div className="border-b border-slate-200/70 px-4 py-4 dark:border-slate-800/70 md:px-6 md:py-5">
+        <div className="border-b border-secondary-200/70 px-4 py-4 dark:border-slate-800/70 md:px-6 md:py-5">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             {/* <div className="max-w-2xl">
-              <h3 className="font-serif text-2xl text-slate-900 dark:text-white">
+              <h3 className="font-serif text-2xl text-ink">
                 {t('staffManagement.title')}
               </h3>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-sm text-secondary-500">
                 {t('staffManagement.subtitle')}
               </p>
             </div> */}
@@ -1033,7 +1075,7 @@ export default function StaffManagement({ businessId }) {
               <div>
                 <label className="label">{t('common.search')}</label>
                 <div className="relative mt-1">
-                  <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400" />
                   <input
                     className="input w-full !pl-9"
                     value={query}
@@ -1076,13 +1118,13 @@ export default function StaffManagement({ businessId }) {
 
         <div className="px-4 py-4 md:px-6 md:py-6">
           {loading ? (
-            <div className="rounded-3xl border border-dashed border-slate-300/80 bg-slate-50/80 p-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+            <div className="rounded-3xl border border-dashed border-slate-300/80 bg-mist/80 p-10 text-center text-sm text-secondary-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-secondary-400">
               {t('common.loading')}
             </div>
           ) : filteredMembers.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-slate-300/80 bg-slate-50/80 p-10 text-center dark:border-slate-700 dark:bg-slate-900/50">
-              <h3 className="font-serif text-xl text-slate-900 dark:text-white">{t('staffManagement.emptyTitle')}</h3>
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t('staffManagement.emptyDescription')}</p>
+            <div className="rounded-3xl border border-dashed border-slate-300/80 bg-mist/80 p-10 text-center dark:border-slate-700 dark:bg-slate-900/50">
+              <h3 className="font-serif text-xl text-ink">{t('staffManagement.emptyTitle')}</h3>
+              <p className="mt-2 text-sm text-secondary-500">{t('staffManagement.emptyDescription')}</p>
             </div>
           ) : (
             <>
@@ -1116,7 +1158,7 @@ export default function StaffManagement({ businessId }) {
                   return (
                     <div
                       key={member.membershipId}
-                      className="rounded-[26px] border border-slate-200/70 bg-white/90 p-4 text-sm shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70"
+                      className="rounded-[26px] border border-secondary-200/70 bg-white/90 p-4 text-sm shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 flex-1 items-start gap-3">
@@ -1124,11 +1166,11 @@ export default function StaffManagement({ businessId }) {
                             {getInitials(member.user?.name || member.name || '-')}
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate text-base font-semibold text-slate-900 dark:text-white">
+                            <p className="truncate text-base font-semibold text-ink">
                               {member.user?.name || member.name || '-'}
                             </p>
                             <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                              <span className="text-xs text-slate-500 dark:text-slate-400">
+                              <span className="text-xs text-secondary-500">
                                 {t(`staffManagement.roles.${member.role === 'owner' ? 'owner' : 'staff'}`)}
                                 {member.jobTitle ? ` • ${member.jobTitle}` : ''}
                               </span>
@@ -1137,11 +1179,11 @@ export default function StaffManagement({ businessId }) {
                           </div>
                         </div>
 
-                        <div className="min-w-[88px] rounded-[20px] border border-slate-200/70 bg-slate-50/80 p-2.5 text-right dark:border-slate-800/70 dark:bg-slate-950/40">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                        <div className="min-w-[88px] rounded-[20px] border border-secondary-200/70 bg-mist/80 p-2.5 text-right dark:border-slate-800/70 dark:bg-slate-950/40">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-secondary-500">
                             {t('staffManagement.salary')}
                           </p>
-                          <p className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
+                          <p className="mt-1 text-sm font-semibold text-ink">
                             {money(member.salary)}
                           </p>
                         </div>
@@ -1150,17 +1192,17 @@ export default function StaffManagement({ businessId }) {
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <StatusBadge active={member.user?.isActive !== false} t={t} />
                         {member.hasLogin && member.user?.email ? (
-                          <span className="text-xs text-slate-500 dark:text-slate-400">{member.user.email}</span>
+                          <span className="text-xs text-secondary-500">{member.user.email}</span>
                         ) : null}
                         {member.shiftStarted || member.shiftEnded ? (
-                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                          <span className="text-xs text-secondary-500">
                             {t('staffManagement.shift')}: {toTimeInputValue(member.shiftStarted) || '-'} - {toTimeInputValue(member.shiftEnded) || '-'}
                           </span>
                         ) : null}
                       </div>
 
-                      <div className="mt-4 flex items-center justify-between border-t border-slate-200/70 pt-3 dark:border-slate-800/70">
-                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                      <div className="mt-4 flex items-center justify-between border-t border-secondary-200/70 pt-3 dark:border-slate-800/70">
+                        <span className="text-xs text-secondary-500">
                           {t('staffManagement.joined', 'Joined')}: {formatDate(member.joinedAt || member.joinedDate)}
                         </span>
                         <ActionMenu actions={menuActions} label={t('common.actions')} />
@@ -1173,7 +1215,7 @@ export default function StaffManagement({ businessId }) {
               {/* Desktop table */}
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[980px] text-sm">
-                  <thead className="text-left text-xs uppercase tracking-[0.18em] text-slate-400">
+                  <thead className="text-left text-xs uppercase tracking-[0.18em] text-ink">
                     <tr>
                       <th className="py-2 pr-4">{t('staffManagement.employee', 'Employee')}</th>
                       <th className="py-2 pr-4">{t('staffManagement.contact', 'Contact')}</th>
@@ -1219,19 +1261,19 @@ export default function StaffManagement({ businessId }) {
                       return (
                         <tr
                           key={member.membershipId}
-                          className="border-t border-slate-200/70 transition hover:bg-slate-50/30 dark:border-slate-800/70 dark:hover:bg-slate-900/10"
+                          className="border-t border-secondary-200/70 transition hover:bg-mist/30 dark:border-slate-800/70 dark:hover:bg-slate-900/10"
                         >
-                          <td className="py-3 pr-4 font-medium text-slate-900 dark:text-white">
+                          <td className="py-3 pr-4 font-medium text-ink">
                             <div className="flex items-center gap-3">
                               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-sm font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-200">
                                 {getInitials(member.user?.name || member.name || '-')}
                               </div>
                               <div className="min-w-0">
-                                <p className="truncate font-semibold text-slate-900 dark:text-white">
+                                <p className="truncate font-semibold text-ink">
                                   {member.user?.name || member.name || '-'}
                                 </p>
                                 <div className="mt-1 flex flex-wrap items-center gap-2">
-                                  <span className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
+                                  <span className="whitespace-nowrap text-xs text-secondary-500">
                                     {t(`staffManagement.roles.${member.role === 'owner' ? 'owner' : 'staff'}`)}
                                     {member.jobTitle ? ` • ${member.jobTitle}` : ''}
                                   </span>
@@ -1244,16 +1286,16 @@ export default function StaffManagement({ businessId }) {
                             <div className="space-y-1">
                               {member.hasLogin ? (
                                 <>
-                                  <p className="truncate font-medium text-slate-800 dark:text-slate-200">
+                                  <p className="truncate font-medium text-ink dark:text-slate-200">
                                     {member.user?.email || member.email || '-'}
                                   </p>
                                   <EmailVerificationBadge emailVerified={member.user?.emailVerified} t={t} />
                                 </>
                               ) : (
-                                <p className="italic text-slate-400">{t('staffManagement.noLoginPlaceholder')}</p>
+                                <p className="italic text-secondary-400">{t('staffManagement.noLoginPlaceholder')}</p>
                               )}
                               {member.user?.phone || member.phone ? (
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                <p className="text-xs text-secondary-500">
                                   {member.user?.phone || member.phone}
                                 </p>
                               ) : null}
@@ -1261,20 +1303,20 @@ export default function StaffManagement({ businessId }) {
                           </td>
                           <td className="py-3 pr-4">
                             <div className="space-y-1">
-                              <p className="font-medium capitalize text-slate-800 dark:text-slate-200">
+                              <p className="font-medium capitalize text-ink dark:text-slate-200">
                                 {t(`staffManagement.roles.${member.role || 'staff'}`)}
                               </p>
-                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                              <p className="text-xs text-secondary-500">
                                 {t('staffManagement.joined', 'Joined')}: {formatDate(member.joinedAt || member.joinedDate)}
                               </p>
                               {member.shiftStarted || member.shiftEnded ? (
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                <p className="text-xs text-secondary-500">
                                   {t('staffManagement.shift')}: {toTimeInputValue(member.shiftStarted) || '-'} - {toTimeInputValue(member.shiftEnded) || '-'}
                                 </p>
                               ) : null}
                             </div>
                           </td>
-                          <td className="py-3 pr-4 text-right font-semibold text-slate-900 dark:text-white">
+                          <td className="py-3 pr-4 text-right font-semibold text-ink">
                             {money(member.salary)}
                           </td>
                           <td className="py-3 pr-4">
@@ -1441,7 +1483,7 @@ function SalaryAdvanceDialog({ isOpen, member, t, onClose }) {
       <div className="space-y-6">
         {error ? <Notice title={error} tone="error" /> : null}
 
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <div className={STATS_GRID_CLASS}>
           <StatsCard
             title={t('staffManagement.salaryRecords.totalSalary')}
             value={t('currency.formatted', { symbol: t('currency.symbol'), amount: stats.monthlySalary.toFixed(2) })}
@@ -1476,7 +1518,7 @@ function SalaryAdvanceDialog({ isOpen, member, t, onClose }) {
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="space-y-4 rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-5 dark:border-slate-800/60 dark:bg-slate-900/40"
+            className="space-y-4 rounded-[24px] border border-secondary-200/70 bg-mist/70 p-5 dark:border-slate-800/60 dark:bg-slate-900/40"
           >
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
@@ -1550,19 +1592,19 @@ function SalaryAdvanceDialog({ isOpen, member, t, onClose }) {
         )}
 
         <div className="space-y-3">
-          <h4 className="font-serif text-base text-slate-800 dark:text-white">
+          <h4 className="font-serif text-base text-ink dark:text-white">
             {t('staffManagement.salaryRecords.history')}
           </h4>
           {loading ? (
-            <p className="py-6 text-center text-sm text-slate-400">{t('common.loading')}</p>
+            <p className="py-6 text-center text-sm text-secondary-400">{t('common.loading')}</p>
           ) : records.length === 0 ? (
-            <p className="py-6 text-center text-sm italic text-slate-400">
+            <p className="py-6 text-center text-sm italic text-secondary-400">
               {t('staffManagement.salaryRecords.empty')}
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-slate-200/60 dark:border-slate-800/60">
-              <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-                <thead className="border-b border-slate-200/60 bg-slate-50 text-left text-[10px] uppercase tracking-[0.18em] text-slate-400 dark:border-slate-800/60 dark:bg-slate-900/40">
+            <div className="overflow-x-auto rounded-2xl border border-secondary-200/60 dark:border-slate-800/60">
+              <table className="w-full text-sm text-secondary-700">
+                <thead className="border-b border-secondary-200/60 bg-mist text-left text-[10px] uppercase tracking-[0.18em] text-ink dark:border-slate-800/60 dark:bg-slate-900/40">
                   <tr>
                     <th className="p-3">{t('staffManagement.salaryRecords.date')}</th>
                     <th className="p-3">{t('staffManagement.salaryRecords.monthYear')}</th>
@@ -1574,7 +1616,7 @@ function SalaryAdvanceDialog({ isOpen, member, t, onClose }) {
                 </thead>
                 <tbody className="divide-y divide-slate-200/60 dark:divide-slate-800/60">
                   {records.map((r) => (
-                    <tr key={r.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-900/10">
+                    <tr key={r.id} className="hover:bg-mist/40 dark:hover:bg-slate-900/10">
                       <td className="whitespace-nowrap p-3">{r.date}</td>
                       <td className="whitespace-nowrap p-3">{r.monthYear}</td>
                       <td className="whitespace-nowrap p-3">
@@ -1590,7 +1632,7 @@ function SalaryAdvanceDialog({ isOpen, member, t, onClose }) {
                             : t('staffManagement.salaryRecords.salaryAdvance')}
                         </span>
                       </td>
-                      <td className="p-3 font-semibold text-slate-900 dark:text-white">
+                      <td className="p-3 font-semibold text-ink">
                         {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(r.amount || 0).toFixed(2) })}
                       </td>
                       <td className="max-w-[200px] truncate p-3" title={r.note}>{r.note || '-'}</td>

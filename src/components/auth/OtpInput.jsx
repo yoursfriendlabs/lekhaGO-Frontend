@@ -84,7 +84,7 @@ export default function OtpInput({
           ref={(element) => {
             inputRefs.current[index] = element;
           }}
-          className="h-14 rounded-2xl border border-slate-200 bg-white px-0 text-center text-3xl font-semibold leading-none text-slate-900 shadow-sm outline-none transition [font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation_Mono,Courier_New,monospace] [font-variant-numeric:lining-nums_tabular-nums] focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          className="h-14 rounded-2xl border border-secondary-200 bg-white px-0 text-center text-3xl font-semibold leading-none text-ink shadow-sm outline-none transition [font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation_Mono,Courier_New,monospace] [font-variant-numeric:lining-nums_tabular-nums] focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-secondary-100 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
           inputMode="numeric"
           pattern="[0-9]*"
           lang="en"

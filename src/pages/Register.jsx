@@ -23,12 +23,12 @@ import { getFallbackBusinessTypes } from '../lib/businessProfile';
 import SearchableSelect from '../components/SearchableSelect.jsx';
 
 const inputCls =
-  'w-full h-12 rounded-xl border border-gray-300 bg-white px-4 text-gray-900 placeholder-gray-400 ' +
-  'transition-colors focus:outline-none focus:border-[#9b6835] focus:ring-1 focus:ring-[#9b6835]';
+  'w-full h-12 rounded-xl border border-secondary-200 bg-surface px-4 text-ink placeholder-secondary-400 ' +
+  'transition-colors focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary';
 
 const btnPrimary =
-  'inline-flex w-full h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#9b6835] to-[#af865d] ' +
-  'font-semibold text-white shadow-lg transition-all duration-300 hover:scale-[1.01] hover:from-[#8a5d2f] hover:to-[#9e7751] ' +
+  'inline-flex w-full h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-primary-400 ' +
+  'font-semibold text-white shadow-lg transition-all duration-300 hover:scale-[1.01] hover:from-primary-600 hover:to-primary-500 ' +
   'hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none';
 
 const typeIconMap = {
@@ -215,20 +215,20 @@ export default function Register() {
   const SelectedTypeIcon = getTypeIcon(selectedBusinessType?.value);
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-white">
+    <div className="flex min-h-screen bg-gradient-to-br from-mist to-surface">
       <div className="flex w-full items-center justify-center p-6 lg:w-1/2 lg:p-12">
         <div className="w-full max-w-2xl space-y-6">
           <div className="text-center lg:text-left">
-            <span className="inline-flex items-center rounded-full border border-[#9b6835]/20 bg-[#9b6835]/8 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#9b6835]">
+            <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
               {t('auth.register')}
             </span>
-            <h1  className="mt-4 text-4xl font-bold tracking-tight text-gray-900">{t('auth.registerTitle')}</h1>
-            <p className="mt-3 text-lg text-gray-600">{t('auth.registerSubtitle')}</p>
+            <h1  className="mt-4 text-4xl font-bold tracking-tight text-ink">{t('auth.registerTitle')}</h1>
+            <p className="mt-3 text-lg text-secondary-600">{t('auth.registerSubtitle')}</p>
           </div>
 
           <form
             onSubmit={handleSubmit}
-            className="space-y-6 rounded-[2rem] border border-[#9b6835]/10 bg-white/95 p-6 shadow-[0_24px_80px_-40px_rgba(155,104,53,0.45)] backdrop-blur sm:p-8"
+            className="space-y-6 rounded-[2rem] border border-primary/10 bg-surface/95 p-6 shadow-soft backdrop-blur sm:p-8"
           >
             {statusCopy ? (
               <div  id="register-error" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
@@ -241,7 +241,7 @@ export default function Register() {
 
             <div className="grid gap-5 md:grid-cols-2">
               <div className="space-y-2">
-                <label htmlFor="owner-name" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <label htmlFor="owner-name" className="flex items-center gap-2 text-sm font-medium text-ink-light">
                   <UserRound className="h-4 w-4" aria-hidden />
                   {t('auth.ownerName')}
                 </label>
@@ -258,7 +258,7 @@ export default function Register() {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="register-phone" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <label htmlFor="register-phone" className="flex items-center gap-2 text-sm font-medium text-ink-light">
                   <Phone className="h-4 w-4" aria-hidden />
                   {t('auth.phone')}
                 </label>
@@ -280,7 +280,7 @@ export default function Register() {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="register-email" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <label htmlFor="register-email" className="flex items-center gap-2 text-sm font-medium text-ink-light">
                   <Mail className="h-4 w-4" aria-hidden />
                   {t('auth.email')}
                 </label>
@@ -298,7 +298,7 @@ export default function Register() {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="register-password" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <label htmlFor="register-password" className="flex items-center gap-2 text-sm font-medium text-ink-light">
                   <Lock className="h-4 w-4" aria-hidden />
                   {t('auth.password')}
                 </label>
@@ -317,7 +317,7 @@ export default function Register() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-[#8a5d2f]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-secondary-400 transition-colors hover:text-primary-600"
                     aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -326,7 +326,7 @@ export default function Register() {
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <label htmlFor="business-name" className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <label htmlFor="business-name" className="flex items-center gap-2 text-sm font-medium text-ink-light">
                   <Building2 className="h-4 w-4" aria-hidden />
                   {t('auth.businessName')}
                 </label>
@@ -343,7 +343,7 @@ export default function Register() {
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <label className="flex items-center gap-2 text-sm font-medium text-ink-light">
                   <SelectedTypeIcon className="h-4 w-4" aria-hidden />
                   {t('auth.businessType')}
                 </label>
@@ -355,14 +355,14 @@ export default function Register() {
                     placeholder={t('auth.registerBusinessTypePlaceholder')}
                   />
                 ) : selectedBusinessType ? (
-                  <div className="rounded-2xl border border-[#9b6835]/15 bg-[#9b6835]/6 px-4 py-4">
+                  <div className="rounded-2xl border border-primary/15 bg-primary/5 px-4 py-4">
                     <div className="flex items-start gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#9b6835]/10 text-[#9b6835]">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                         <SelectedTypeIcon className="h-5 w-5" aria-hidden />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900">{selectedBusinessType.label}</p>
-                        <p className="mt-1 text-sm leading-6 text-gray-600">{selectedBusinessType.description}</p>
+                        <p className="text-sm font-semibold text-ink">{selectedBusinessType.label}</p>
+                        <p className="mt-1 text-sm leading-6 text-secondary-600">{selectedBusinessType.description}</p>
                       </div>
                     </div>
                   </div>
@@ -371,21 +371,21 @@ export default function Register() {
             </div>
 
             {selectedBusinessType ? (
-              <div className="rounded-2xl border border-[#9b6835]/15 bg-[#fcfaf7] p-5">
+              <div className="rounded-2xl border border-primary/15 bg-primary-50 p-5">
                 <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#9b6835]/10 text-[#9b6835]">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                     <SelectedTypeIcon className="h-6 w-6" aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-3">
-                      <h2 className="text-lg font-semibold text-gray-900">{t('auth.registerSetupTitle')}</h2>
+                      <h2 className="text-lg font-semibold text-ink">{t('auth.registerSetupTitle')}</h2>
                     </div>
-                    <p className="mt-2 text-sm leading-6 text-gray-600">{t('auth.registerWorkflowDescription')}</p>
+                    <p className="mt-2 text-sm leading-6 text-secondary-600">{t('auth.registerWorkflowDescription')}</p>
                     <div className="mt-4 flex flex-wrap gap-2">
                       {selectedHighlights.map((item) => (
                         <span
                           key={item}
-                          className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700"
+                          className="inline-flex items-center gap-1 rounded-full border border-secondary-200 bg-mist px-3 py-1 text-xs font-medium text-ink-light"
                         >
                           <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
                           {item}
@@ -409,10 +409,10 @@ export default function Register() {
             </button>
           </form>
 
-          <p className="text-center text-gray-600 lg:text-left">
+          <p className="text-center text-secondary-600 lg:text-left">
             {t('auth.haveAccount')}{' '}
             <Link
-              className="font-medium text-[#9b6835] transition-colors hover:text-[#8a5d2f] hover:underline"
+              className="font-medium text-primary transition-colors hover:text-primary-600 hover:underline"
               to="/login"
             >
               {t('auth.signIn')}
@@ -421,7 +421,7 @@ export default function Register() {
         </div>
       </div>
 
-      <div className="relative hidden w-1/2 overflow-hidden bg-gradient-to-br from-[#9b6835] via-[#af865d] to-[#9b6835] lg:flex lg:items-center lg:justify-center lg:p-12">
+      <div className="relative hidden w-1/2 overflow-hidden bg-gradient-to-br from-primary via-primary-400 to-primary lg:flex lg:items-center lg:justify-center lg:p-12">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute left-20 top-20 h-72 w-72 rounded-full bg-white blur-3xl" />
           <div className="absolute bottom-20 right-16 h-96 w-96 rounded-full bg-white blur-3xl" />

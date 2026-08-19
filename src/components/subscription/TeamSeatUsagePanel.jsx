@@ -3,10 +3,10 @@ import { humanizeKey } from '../../lib/subscription';
 
 function StatTile({ label, value, hint }) {
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/60">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</p>
-      <p className="mt-2 text-xl font-semibold text-slate-900 dark:text-white">{value}</p>
-      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{hint}</p>
+    <div className="rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-800/70 dark:bg-slate-950/60">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">{label}</p>
+      <p className="mt-2 text-xl font-semibold text-ink">{value}</p>
+      <p className="mt-2 text-sm text-secondary-500">{hint}</p>
     </div>
   );
 }

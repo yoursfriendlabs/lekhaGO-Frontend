@@ -6,7 +6,7 @@ function defaultValueFormatter(value) {
 }
 
 function PieChart({ data, height = 300, valueFormatter = defaultValueFormatter }) {
-  const colors = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#0f172a'];
+  const colors = ['var(--color-primary-hex)', '#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316'];
 
   const total = data.reduce((sum, item) => sum + item.value, 0);
 

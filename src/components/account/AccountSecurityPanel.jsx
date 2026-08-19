@@ -109,13 +109,13 @@ export default function AccountSecurityPanel() {
       <div className="card space-y-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-400">
               {t('auth.accountSecurityEyebrow')}
             </p>
-            <h2 className="mt-2 font-serif text-xl text-slate-900 dark:text-white">
+            <h2 className="mt-2 font-serif text-xl text-ink">
               {t('auth.accountSecurityTitle')}
             </h2>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-2 text-sm text-secondary-500">
               {t('auth.accountSecuritySubtitle')}
             </p>
           </div>
@@ -129,16 +129,16 @@ export default function AccountSecurityPanel() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/70 bg-slate-50/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/60">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+        <div className="rounded-2xl border border-secondary-200/70 bg-mist/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/60">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-400">
             {t('auth.emailAddress')}
           </p>
-          <p className="mt-2 break-all text-sm font-medium text-slate-700 dark:text-slate-200">
+          <p className="mt-2 break-all text-sm font-medium text-ink-light">
             {user?.email || t('auth.emailUnavailable')}
           </p>
           {hasUnverifiedEmail(user) ? (
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <p className="text-sm text-secondary-500">
                 {t('auth.verifyEmailPrompt')}
               </p>
               <Link className="btn-secondary justify-center" to="/app/activate-account">
@@ -156,8 +156,8 @@ export default function AccountSecurityPanel() {
 
       <div className="card space-y-5">
         <div>
-          <h2 className="font-serif text-xl text-slate-900 dark:text-white">{t('auth.changePasswordTitle')}</h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          <h2 className="font-serif text-xl text-ink">{t('auth.changePasswordTitle')}</h2>
+          <p className="mt-2 text-sm text-secondary-500">
             {t('auth.changePasswordSubtitle')}
           </p>
         </div>

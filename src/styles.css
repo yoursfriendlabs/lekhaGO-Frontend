@@ -4,6 +4,35 @@
 
 :root {
   color-scheme: light;
+  --font-sans: "IBM Plex Sans", "IBM Plex Sans Devanagari", system-ui, sans-serif;
+  --font-serif: "Outfit", "IBM Plex Sans", "IBM Plex Sans Devanagari", sans-serif;
+  --color-primary: 155 104 53;
+  --color-primary-50: 252 250 248;
+  --color-primary-100: 247 242 237;
+  --color-primary-200: 237 224 209;
+  --color-primary-300: 222 199 175;
+  --color-primary-400: 199 163 130;
+  --color-primary-500: 155 104 53;
+  --color-primary-600: 140 94 48;
+  --color-primary-700: 117 78 40;
+  --color-primary-800: 94 62 32;
+  --color-primary-900: 77 51 26;
+  --color-secondary: 107 114 128;
+  --color-secondary-50: 249 250 251;
+  --color-secondary-100: 243 244 246;
+  --color-secondary-200: 229 231 235;
+  --color-secondary-300: 209 213 219;
+  --color-secondary-400: 156 163 175;
+  --color-secondary-500: 107 114 128;
+  --color-secondary-600: 75 85 99;
+  --color-secondary-700: 55 65 81;
+  --color-secondary-800: 31 41 55;
+  --color-secondary-900: 17 24 39;
+  --color-ink: 17 24 39;
+  --color-ink-light: 75 85 99;
+  --color-mist: 247 242 237;
+  --color-surface: 255 255 255;
+  --color-primary-hex: #9b6835;
 }
 
 html,
@@ -16,12 +45,14 @@ body,
 }
 
 html {
-  background-color: #f8f5f2;
+  background-color: rgb(var(--color-mist));
   -webkit-text-size-adjust: 100%;
 }
 
 body {
-  font-family: "Space Grotesk", system-ui, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1, "ss02" 1;
+  font-variant-numeric: tabular-nums;
   @apply bg-mist text-ink;
   min-height: 100dvh;
   overscroll-behavior-x: none;
@@ -29,29 +60,29 @@ body {
 }
 
 .glass {
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(215, 188, 171, 0.3);
-  box-shadow: 0 20px 60px -40px rgba(155, 104, 53, 0.15);
-
+  background: rgb(var(--color-surface) / 0.84);
+  border: 1px solid rgb(var(--color-secondary-300) / 0.35);
+  box-shadow: 0 20px 60px -40px rgb(var(--color-primary) / 0.18);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
 
 .gradient-bg {
+  background-color: rgb(var(--color-mist));
   background-image:
     radial-gradient(
       circle at top left,
-      rgba(155, 104, 53, 0.08),
+      rgb(var(--color-primary) / 0.1),
       transparent 45%
     ),
     radial-gradient(
       circle at 35% 20%,
-      rgba(165, 119, 73, 0.08),
+      rgb(var(--color-secondary) / 0.08),
       transparent 45%
     ),
     radial-gradient(
       circle at 80% 15%,
-      rgba(199, 163, 130, 0.1),
+      rgb(var(--color-primary-400) / 0.12),
       transparent 50%
     );
 }
@@ -60,16 +91,44 @@ body {
   @apply glass rounded-2xl p-4 md:rounded-3xl md:p-8;
 }
 
+.page-title {
+  @apply font-serif text-xl text-ink sm:text-2xl;
+}
+
+.page-subtitle,
+.caption {
+  @apply mt-1 text-sm text-secondary-600 sm:text-base;
+}
+
+.caption {
+  @apply mt-0 text-xs sm:text-sm;
+}
+
+.section-title {
+  @apply font-serif text-lg text-ink;
+}
+
 .label {
-  @apply text-sm text-secondary-700;
+  @apply text-sm font-medium text-secondary-600;
+}
+
+thead,
+.table-head {
+  color: rgb(var(--color-ink));
+}
+
+thead th,
+.table-head th {
+  color: inherit;
+  font-weight: 600;
 }
 
 .input {
-  @apply w-full rounded-xl border border-secondary-200 bg-white px-3 py-2.5 text-base md:text-sm text-ink placeholder:text-secondary-400 focus:border-primary-400 focus:ring-primary-400;
+  @apply w-full rounded-xl border border-secondary-200 bg-surface px-3 py-2.5 text-base md:text-sm text-ink placeholder:text-secondary-400 focus:border-primary-400 focus:ring-primary-400;
 }
 
 .input-compact {
-  @apply rounded-xl border border-secondary-200 bg-white px-3 py-2 text-sm text-ink placeholder:text-secondary-400 focus:border-primary-400 focus:ring-primary-400;
+  @apply rounded-xl border border-secondary-200 bg-surface px-3 py-2 text-sm text-ink placeholder:text-secondary-400 focus:border-primary-400 focus:ring-primary-400;
 }
 
 .btn {

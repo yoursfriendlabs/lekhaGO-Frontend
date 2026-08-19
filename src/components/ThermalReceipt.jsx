@@ -34,7 +34,7 @@ export default function ThermalReceipt({
       
       {/* Business Details */}
       {(biz.address || biz.phone || biz.email || biz.panVat) && (
-        <div className="text-center text-[10px] text-slate-700 space-y-0.5 mb-2">
+        <div className="text-center text-[10px] text-ink-light space-y-0.5 mb-2">
           {biz.address && <div className="whitespace-pre-line">{biz.address}</div>}
           {biz.phone && <div>Tel: {biz.phone}</div>}
           {biz.email && <div>{biz.email}</div>}
@@ -82,7 +82,7 @@ export default function ThermalReceipt({
               <td className="py-1 pr-1 break-words">
                 {item.description || '—'}
                 {item.unitPrice !== undefined && (
-                  <span className="block text-[10px] text-slate-600">
+                  <span className="block text-[10px] text-secondary-700">
                     @{money(item.unitPrice)}
                   </span>
                 )}
@@ -116,7 +116,7 @@ export default function ThermalReceipt({
           </div>
         )}
         {totals.discountTotal !== undefined && Number(totals.discountTotal) > 0 && (
-          <div className="flex justify-between text-slate-800">
+          <div className="flex justify-between text-ink">
             <span>Discount:</span>
             <span>-{money(totals.discountTotal)}</span>
           </div>
@@ -147,7 +147,7 @@ export default function ThermalReceipt({
             {extraFields.map((field, idx) => (
               <div key={idx} className="flex justify-between">
                 <span className="font-medium">{field.label}:</span>
-                <span className="text-slate-700">{field.value}</span>
+                <span className="text-ink-light">{field.value}</span>
               </div>
             ))}
           </div>
@@ -158,7 +158,7 @@ export default function ThermalReceipt({
       {notes && (
         <>
           <div className="border-t border-dashed border-black my-2" />
-          <div className="text-[10px] text-slate-700 italic whitespace-pre-wrap">
+          <div className="text-[10px] text-ink-light italic whitespace-pre-wrap">
             Note: {notes}
           </div>
         </>
@@ -168,7 +168,7 @@ export default function ThermalReceipt({
       <div className="border-t border-dashed border-black my-2" />
 
       {/* Footer message */}
-      <div className="text-center text-[10px] text-slate-700 space-y-1">
+      <div className="text-center text-[10px] text-ink-light space-y-1">
         <div>Thank you for your visit!</div>
         <div>Please visit again.</div>
       </div>

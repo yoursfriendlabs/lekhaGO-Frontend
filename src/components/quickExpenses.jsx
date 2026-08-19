@@ -211,7 +211,7 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
     <>
       <form className="space-y-6" onSubmit={handleQuickExpenseSubmit}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-[26px] border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
+          <div className="rounded-[26px] border border-secondary-200/80 bg-mist/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
             <label className="label">{t('purchases.purchaseDate')}</label>
             <FlexibleDateInput
               className="input mt-2 w-full rounded-[18px]"
@@ -221,22 +221,22 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
           </div>
 
           {canViewParties ? (
-            <div className="rounded-[26px] border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
+            <div className="rounded-[26px] border border-secondary-200/80 bg-mist/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
               <label className="label">{t('quickExpense.linkPartyOptional')}</label>
               <button
                 type="button"
                 onClick={() => setPartySelectorOpen(true)}
-                className="mt-2 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-primary-200 hover:bg-primary-50/40 dark:border-slate-800 dark:bg-slate-950/50"
+                className="mt-2 flex w-full items-center justify-between rounded-2xl border border-secondary-200 bg-white px-4 py-3 text-left shadow-sm transition hover:border-primary-200 hover:bg-primary-50/40 dark:border-slate-800 dark:bg-slate-950/50"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-900 dark:text-white">
+                  <p className="truncate font-semibold text-ink">
                     {selectedParty?.name || t('quickExpense.selectPayee')}
                   </p>
-                  <p className="mt-1 truncate text-sm text-slate-500">
+                  <p className="mt-1 truncate text-sm text-secondary-500">
                     {selectedParty?.phone || t('quickExpense.payeeHelper')}
                   </p>
                 </div>
-                <ChevronRight size={18} className="text-slate-400" />
+                <ChevronRight size={18} className="text-secondary-400" />
               </button>
               {selectedParty ? (
                 <button
@@ -261,17 +261,17 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
             return (
               <div
                 key={line._key}
-                className="rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-sm dark:border-slate-800/70 dark:bg-slate-950/50 md:p-6"
+                className="rounded-[28px] border border-secondary-200/80 bg-white p-5 shadow-sm dark:border-slate-800/70 dark:bg-slate-950/50 md:p-6"
               >
                 <div className="mb-4 flex items-center gap-3">
-                  <span className={`flex h-9 w-9 items-center justify-center rounded-2xl text-sm ${catMeta ? catMeta.iconWrap : 'bg-slate-100 text-slate-400'}`}>
+                  <span className={`flex h-9 w-9 items-center justify-center rounded-2xl text-sm ${catMeta ? catMeta.iconWrap : 'bg-secondary-100 text-secondary-400'}`}>
                     <CatIcon size={13} />
                   </span>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-secondary-400">
                       {t('quickExpense.lineLabel', { number: index + 1 })}
                     </p>
-                    <p className="mt-1 text-sm text-slate-500">{t('quickEntry.categoryHelper')}</p>
+                    <p className="mt-1 text-sm text-secondary-500">{t('quickEntry.categoryHelper')}</p>
                   </div>
                 </div>
 
@@ -285,12 +285,12 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
                         key={category.id}
                         type="button"
                         onClick={() => updateLine(line._key, 'categoryId', category.id)}
-                        className={`flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-2xl border px-3 py-3 transition ${isActive ? `border-2 ${category.activeColor}` : 'border-slate-200 bg-slate-50 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900/50 dark:hover:border-slate-700'}`}
+                        className={`flex min-h-[96px] flex-col items-center justify-center gap-2 rounded-2xl border px-3 py-3 transition ${isActive ? `border-2 ${category.activeColor}` : 'border-secondary-200 bg-mist hover:border-secondary-300 dark:border-slate-800 dark:bg-slate-900/50 dark:hover:border-slate-700'}`}
                       >
-                        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${isActive ? category.iconWrap : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${isActive ? category.iconWrap : 'bg-secondary-100 text-secondary-500 dark:bg-slate-800 dark:text-secondary-400'}`}>
                           <Icon size={16} />
                         </span>
-                        <span className="text-center text-xs font-semibold leading-tight text-slate-600 dark:text-slate-300">
+                        <span className="text-center text-xs font-semibold leading-tight text-secondary-700">
                           {category.label}
                         </span>
                       </button>
@@ -312,7 +312,7 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
                 ) : null}
 
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-                  <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
+                  <div className="rounded-[24px] border border-secondary-200/70 bg-mist/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
                     <label className="label">{t('quickEntry.amount')}</label>
                     <input
                       className="input mt-2 rounded-[18px] text-lg font-semibold"
@@ -326,7 +326,7 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
                     />
                   </div>
 
-                  <div className="rounded-[24px] border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
+                  <div className="rounded-[24px] border border-secondary-200/70 bg-mist/70 p-4 dark:border-slate-800/70 dark:bg-slate-900/40">
                     <label className="label">{t('common.notes')}</label>
                     <input
                       className="input mt-2 rounded-[18px]"
@@ -339,12 +339,12 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
                 </div>
 
                 {lineAmount > 0 && catMeta && line.categoryId ? (
-                  <div className="mt-4 flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 dark:bg-slate-900/60">
+                  <div className="mt-4 flex items-center justify-between rounded-2xl bg-mist px-4 py-3 dark:bg-slate-900/60">
                     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${catMeta.badge}`}>
                       <CatIcon size={10} />
                       {resolveLineLabel(line)}
                     </span>
-                    <span className="text-base font-bold text-slate-900 dark:text-white">{money(lineAmount)}</span>
+                    <span className="text-base font-bold text-ink">{money(lineAmount)}</span>
                   </div>
                 ) : null}
               </div>
@@ -358,14 +358,14 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
               {t('purchases.grandTotal')}
             </p>
             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <p className="text-3xl font-bold text-slate-900 dark:text-white">{money(quickGrandTotal)}</p>
+              <p className="text-3xl font-bold text-ink">{money(quickGrandTotal)}</p>
               <p className="text-sm text-emerald-800/80 dark:text-emerald-200/80">{t('quickEntry.liveTotal')}</p>
             </div>
           </div>
         ) : null}
 
-        <div className="rounded-[28px] border border-slate-200/80 bg-slate-50 p-5 dark:border-slate-800/70 dark:bg-slate-900/50">
-          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+        <div className="rounded-[28px] border border-secondary-200/80 bg-mist p-5 dark:border-slate-800/70 dark:bg-slate-900/50">
+          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-secondary-400">
             {t('common.payment')}
           </p>
           <PaymentMethodFields
@@ -380,7 +380,7 @@ export default function QuickExpenseForm({ onClose, onSaved, listParams } = {}) 
 
         {quickStatus.message ? <Notice title={quickStatus.message} tone={quickStatus.type} /> : null}
 
-        <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-2 border-t border-slate-200/80 bg-white/95 px-4 py-4 backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/95 md:-mx-5 md:-mb-5 md:px-5 md:py-5">
+        <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-2 border-t border-secondary-200/80 bg-white/95 px-4 py-4 backdrop-blur dark:border-slate-800/80 dark:bg-slate-950/95 md:-mx-5 md:-mb-5 md:px-5 md:py-5">
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
               type="button"

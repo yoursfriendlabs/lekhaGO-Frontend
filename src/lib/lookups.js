@@ -63,7 +63,9 @@ export function normalizeLookupProduct(raw = {}) {
     primaryUnit,
     secondaryUnit,
     salePrice: Number(pickFirstDefined(raw.salePrice, product.salePrice, 0)),
-    purchasePrice: Number(pickFirstDefined(raw.purchasePrice, product.purchasePrice, 0)),
+    purchasePrice: pickFirstDefined(raw.purchasePrice, product.purchasePrice) == null
+      ? undefined
+      : Number(pickFirstDefined(raw.purchasePrice, product.purchasePrice, 0)),
     secondarySalePrice: Number(pickFirstDefined(raw.secondarySalePrice, product.secondarySalePrice, 0)),
     conversionRate: Number(pickFirstDefined(raw.conversionRate, product.conversionRate, 0)),
     itemType: String(pickFirstDefined(raw.itemType, product.itemType, 'goods')).trim(),

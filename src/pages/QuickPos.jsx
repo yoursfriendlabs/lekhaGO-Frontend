@@ -201,7 +201,9 @@ export default function QuickPos() {
 
   const { t } = useI18n();
   const { showError } = useSnackbar();
-  const { businessId, user } = useAuth();
+  const { businessId, user, canViewFeature, canManageFeature } = useAuth();
+  const canViewSales = canViewFeature("sales");
+  const canManageInventory = canManageFeature("inventory");
   const { businessProfile } = useBusinessSettings();
   const isTablesEnabled = useMemo(() => {
     return businessProfile?.settings?.enabledModules?.includes("tables");
@@ -1240,7 +1242,7 @@ export default function QuickPos() {
     stopPropagation = false,
   }) => (
 <div
-      className="ml-auto inline-grid w-auto grid-cols-2 gap-0.5 rounded-full border border-slate-200 bg-white px-0.5 py-0.5 text-[9px] font-semibold shadow-sm"
+      className="ml-auto inline-grid w-auto grid-cols-2 gap-0.5 rounded-full border border-secondary-200 bg-white px-0.5 py-0.5 text-[9px] font-semibold shadow-sm"
       onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
       onPointerDown={
         stopPropagation ? (event) => event.stopPropagation() : undefined
@@ -1256,9 +1258,9 @@ export default function QuickPos() {
             key={option.value}
             className={`min-w-[2.5rem] rounded-full px-1.5 py-0.5 text-center text-[9px] font-bold transition ${
               isSelected
-                ? "bg-[#9c5f22] text-white shadow-sm"
-                : "text-slate-500 hover:text-slate-800"
-            } disabled:cursor-not-allowed disabled:text-slate-300`}
+                ? "bg-primary text-white shadow-sm"
+                : "text-secondary-500 hover:text-ink"
+            } disabled:cursor-not-allowed disabled:text-secondary-300`}
             onClick={() => onChange(option.value)}
             disabled={option.disabled}
           >
@@ -1272,7 +1274,7 @@ export default function QuickPos() {
   const renderUnitSwitcher = (item) => {
     if (!item.secondaryUnit) {
 return (
-        <span className="text-xs text-slate-500">
+        <span className="text-xs text-secondary-500">
           /{" "}
           {getUnitShortcut(getProductUnitLabel(item, item.unitType)) ||
             t("products.units.unit")}
@@ -1339,12 +1341,12 @@ return (
 
   const renderFooterBar = ({ compact = false } = {}) => (
     <div className={compact ? "space-y-2.5" : "space-y-4"}>
-      <div className={`flex flex-col gap-2 rounded-[24px] bg-slate-100 ${compact ? "p-2.5" : "p-3 sm:p-4"}`}>
+      <div className={`flex flex-col gap-2 rounded-[24px] bg-secondary-100 ${compact ? "p-2.5" : "p-3 sm:p-4"}`}>
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <button
               type="button"
-              className="flex items-center gap-1.5 text-xs font-semibold text-slate-500"
+              className="flex items-center gap-1.5 text-xs font-semibold text-secondary-500"
               onClick={() => setPartySelectorOpen(true)}
             >
               <UserRound size={12} className="text-primary-600 shrink-0" />
@@ -1354,17 +1356,17 @@ return (
             </button>
           </div>
           <div className="shrink-0 text-right">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
               {t("sales.grandTotal")}
             </p>
-            <p className={`font-bold text-slate-900 ${compact ? "text-base" : "text-lg"}`}>
+            <p className={`font-bold text-ink ${compact ? "text-base" : "text-lg"}`}>
               {money(totals.grandTotal)}
             </p>
           </div>
         </div>
 
         {!compact && isMobile && (
-          <div className="flex flex-col gap-1 border-t border-slate-200/60 pt-2 text-[10px] font-medium text-slate-500">
+          <div className="flex flex-col gap-1 border-t border-secondary-200/60 pt-2 text-[10px] font-medium text-secondary-500">
             <div className="flex items-center justify-between">
               <span>
                 {t("sales.subTotal")}: {money(totals.subTotal)}
@@ -1375,10 +1377,10 @@ return (
                 </span>
               )}
             </div>
-            <div className="flex items-center justify-between border-t border-slate-200/40 pt-1">
+            <div className="flex items-center justify-between border-t border-secondary-200/40 pt-1">
               <span>
                 {t("services.amountReceived")}:{" "}
-                <span className="text-slate-900 font-bold">
+                <span className="text-ink font-bold">
                   {money(receivedAmount)}
                 </span>
               </span>
@@ -1427,9 +1429,9 @@ return (
     return (
       <div className="min-w-0 space-y-5 pb-28 md:pb-0">
         <PageHeader title={salesTitle} subtitle={t("quickPos.subtitle")} />
-        <div className="rounded-[32px] border border-dashed border-slate-200 bg-white/90 p-12 text-center text-slate-500 max-w-4xl mx-auto flex items-center justify-center h-64">
+        <div className="rounded-[32px] border border-dashed border-secondary-200 bg-white/90 p-12 text-center text-secondary-500 max-w-4xl mx-auto flex items-center justify-center h-64">
           <div className="space-y-3">
-            <span className="h-6 w-6 rounded-full border-2 border-[#9b6835] border-t-transparent animate-spin inline-block" />
+            <span className="h-6 w-6 rounded-full border-2 border-primary border-t-transparent animate-spin inline-block" />
             <p className="text-sm font-semibold">
               {t("common.loading") || "Loading POS..."}
             </p>
@@ -1460,12 +1462,14 @@ return (
                   ← {queryRef === "orders" ? "Seating Map" : "Billing Counter"}
                 </button>
               )}
-              <Link
-                className="btn-ghost h-11 justify-center rounded-[18px]"
-                to="/app/sales"
-              >
-                {t("quickPos.detailedSales")}
-              </Link>
+              {canViewSales ? (
+                <Link
+                  className="btn-ghost h-11 justify-center rounded-[18px]"
+                  to="/app/sales"
+                >
+                  {t("quickPos.detailedSales")}
+                </Link>
+              ) : null}
             </div>
           }
         />
@@ -1474,12 +1478,12 @@ return (
           <Notice title={status.message} tone={status.type} />
         ) : null}
 
-        <div className="rounded-[28px] border border-slate-200/80 bg-white/90 p-6 shadow-sm max-w-4xl mx-auto space-y-6">
+        <div className="rounded-[28px] border border-secondary-200/80 bg-white/90 p-6 shadow-sm max-w-4xl mx-auto space-y-6">
           <div className="text-center space-y-2">
-            <h2 className="text-2xl font-bold text-slate-800">
+            <h2 className="text-2xl font-bold text-ink">
               Select Order Type & Seating Area
             </h2>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-secondary-500">
               Choose one of the order options below to start adding items to order.
             </p>
           </div>
@@ -1491,20 +1495,20 @@ return (
                 setActiveSessionOption("takeaway");
                 setActiveTableId("");
               }}
-              className="rounded-3xl border-2 border-slate-200 bg-white p-6 hover:border-[#9c5f22] hover:bg-[#9c5f22]/5 transition text-left space-y-2 flex flex-col justify-between"
+              className="rounded-3xl border-2 border-secondary-200 bg-white p-6 hover:border-primary hover:bg-primary/5 transition text-left space-y-2 flex flex-col justify-between"
             >
               <div>
                 <span className="inline-flex items-center justify-center p-3 rounded-2xl bg-amber-50 text-amber-600 mb-2">
                   <ShoppingBag size={24} />
                 </span>
-                <h3 className="text-lg font-bold text-slate-800">
+                <h3 className="text-lg font-bold text-ink">
                   Takeaway / Walk-in
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-secondary-500">
                   Dine-out order, ready for direct billing and quick checkout.
                 </p>
               </div>
-              <span className="text-xs font-bold text-[#9c5f22] flex items-center gap-1 pt-2">
+              <span className="text-xs font-bold text-primary flex items-center gap-1 pt-2">
                 Start Walk-in Order <ArrowRight size={14} />
               </span>
             </button>
@@ -1512,37 +1516,37 @@ return (
             <button
               type="button"
               onClick={handleSelectDelivery}
-              className="rounded-3xl border-2 border-slate-200 bg-white p-6 hover:border-[#9c5f22] hover:bg-[#9c5f22]/5 transition text-left space-y-2 flex flex-col justify-between"
+              className="rounded-3xl border-2 border-secondary-200 bg-white p-6 hover:border-primary hover:bg-primary/5 transition text-left space-y-2 flex flex-col justify-between"
             >
               <div>
                 <span className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-50 text-blue-600 mb-2">
                   <Package2 size={24} />
                 </span>
-                <h3 className="text-lg font-bold text-slate-800">
+                <h3 className="text-lg font-bold text-ink">
                   Home Delivery
                 </h3>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-secondary-500">
                   Delivery order, reference party addresses and track runner details.
                 </p>
               </div>
-              <span className="text-xs font-bold text-[#9c5f22] flex items-center gap-1 pt-2">
+              <span className="text-xs font-bold text-primary flex items-center gap-1 pt-2">
                 Start Delivery Order <ArrowRight size={14} />
               </span>
             </button>
           </div>
 
-          <div className="border-t border-slate-100 pt-6 space-y-4">
+          <div className="border-t border-secondary-100 pt-6 space-y-4">
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-secondary-400">
                   Dine-in Floor Map
                 </h3>
               </div>
 
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border-b border-secondary-100 pb-3 dark:border-slate-800">
                 {/* Floor Filter Chips */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none max-w-full">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap">
+                  <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap">
                     Floor:
                   </span>
                   <button
@@ -1550,8 +1554,8 @@ return (
                     onClick={() => setSelectedFloorFilter("all")}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                       selectedFloorFilter === "all"
-                        ? "bg-[#9c5f22] text-white shadow-sm"
-                        : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                        ? "bg-primary text-white shadow-sm"
+                        : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                     }`}
                   >
                     All Floors
@@ -1563,8 +1567,8 @@ return (
                       onClick={() => setSelectedFloorFilter(floor.id)}
                       className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                         selectedFloorFilter === floor.id
-                          ? "bg-[#9c5f22] text-white shadow-sm"
-                          : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                          ? "bg-primary text-white shadow-sm"
+                          : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                       }`}
                     >
                       {floor.name}
@@ -1575,8 +1579,8 @@ return (
                     onClick={() => setSelectedFloorFilter("unassigned")}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                       selectedFloorFilter === "unassigned"
-                        ? "bg-[#9c5f22] text-white shadow-sm"
-                        : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                        ? "bg-primary text-white shadow-sm"
+                        : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                     }`}
                   >
                     Unassigned
@@ -1585,7 +1589,7 @@ return (
 
                 {/* Status Filter Chips */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap">
+                  <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap">
                     Status:
                   </span>
                   <button
@@ -1593,8 +1597,8 @@ return (
                     onClick={() => setSelectedStatusFilter("all")}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                       selectedStatusFilter === "all"
-                        ? "bg-[#9c5f22] text-white shadow-sm"
-                        : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                        ? "bg-primary text-white shadow-sm"
+                        : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                     }`}
                   >
                     All
@@ -1605,7 +1609,7 @@ return (
                     className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                       selectedStatusFilter === "vacant"
                         ? "bg-emerald-600 text-white shadow-sm"
-                        : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                        : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                     }`}
                   >
                     Vacant
@@ -1616,7 +1620,7 @@ return (
                     className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition whitespace-nowrap ${
                       selectedStatusFilter === "occupied"
                         ? "bg-amber-600 text-white shadow-sm"
-                        : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                        : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                     }`}
                   >
                     Occupied
@@ -1639,7 +1643,7 @@ return (
                     className={`group relative rounded-2xl border p-4 text-left transition duration-200 hover:scale-[1.02] hover:shadow-md flex flex-col justify-between h-28 ${
                       isOccupied
                         ? "border-amber-200 bg-amber-50/50 hover:bg-amber-100 text-amber-800"
-                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                        : "border-secondary-200 bg-white hover:bg-mist text-ink-light"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 w-full">
@@ -1657,11 +1661,11 @@ return (
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-slate-100 dark:border-slate-800 mt-2">
-                      <span className="text-[10px] text-slate-400">
+                    <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-secondary-100 dark:border-slate-800 mt-2">
+                      <span className="text-[10px] text-secondary-400">
                         {table.capacity ? `${table.capacity} seats` : "No limit"}
                       </span>
-                      <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium border border-slate-200/50 truncate max-w-[70px]">
+                      <span className="text-[9px] bg-secondary-100 text-secondary-700 px-1.5 py-0.5 rounded font-medium border border-secondary-200/50 truncate max-w-[70px]">
                         {table.category?.name || "No Floor"}
                       </span>
                     </div>
@@ -1685,7 +1689,7 @@ return (
             {isTablesEnabled && (
               <button
                 type="button"
-                className="btn-ghost h-11 justify-center rounded-[18px] text-slate-700 hover:text-slate-900 border border-slate-200/80 bg-white shadow-2xs font-semibold px-4"
+                className="btn-ghost h-11 justify-center rounded-[18px] text-ink-light hover:text-ink border border-secondary-200/80 bg-white shadow-2xs font-semibold px-4"
                 onClick={() => navigate(queryRef === "orders" ? "/app/orders" : "/app/billing")}
               >
                 <ArrowLeft size={16} className="mr-1.5" />
@@ -1699,8 +1703,8 @@ return (
                 onClick={() => setTableSelectorOpen(true)}
                 className={`btn-secondary h-11 justify-center rounded-[18px] px-4 font-semibold transition ${
                   activeTableId
-                    ? "bg-[#9c5f22]/10 text-[#9c5f22] border-[#9c5f22]/30"
-                    : "bg-slate-50 text-slate-700 border-slate-200"
+                    ? "bg-primary/10 text-primary border-primary/30"
+                    : "bg-mist text-ink-light border-secondary-200"
                 }`}
               >
                 {activeTableId ? (
@@ -1722,12 +1726,14 @@ return (
               </button>
             )}
 
-            <Link
-              className="btn-ghost h-11 justify-center rounded-[18px]"
-              to="/app/sales"
-            >
-              {t("quickPos.detailedSales")}
-            </Link>
+            {canViewSales ? (
+              <Link
+                className="btn-ghost h-11 justify-center rounded-[18px]"
+                to="/app/sales"
+              >
+                {t("quickPos.detailedSales")}
+              </Link>
+            ) : null}
           </div>
         }
       />
@@ -1758,12 +1764,12 @@ return (
         <div className="space-y-5">
           <div className="rounded-[28px] border border-secondary-200/70 bg-white/90 p-3 shadow-sm sm:rounded-[32px]">
             {businessProfile?.settings?.enabledModules?.includes("tables") && (
-              <div className="flex items-center justify-between bg-[#9c5f22]/5 rounded-2xl p-3 mb-3 border border-[#9c5f22]/10 md:hidden">
+              <div className="flex items-center justify-between bg-primary/5 rounded-2xl p-3 mb-3 border border-primary/10 md:hidden">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#9c5f22]/80">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-primary/80">
                     Active Order Table
                   </p>
-                  <p className="text-sm font-bold text-slate-800">
+                  <p className="text-sm font-bold text-ink">
                     {activeTableId
                       ? `${allTables.find((t) => String(t.id) === String(activeTableId))?.name || activeTableId}${editingId ? " (Active Bill)" : ""}`
                       : "No Table / Takeaway"}
@@ -1773,7 +1779,7 @@ return (
                   <button
                     type="button"
                     onClick={() => navigate(queryRef === "orders" ? "/app/orders" : "/app/billing")}
-                    className="px-2.5 py-1.5 bg-white text-slate-700 border border-slate-200 text-xs font-bold rounded-xl shadow-2xs flex items-center"
+                    className="px-2.5 py-1.5 bg-white text-ink-light border border-secondary-200 text-xs font-bold rounded-xl shadow-2xs flex items-center"
                   >
                     <ArrowLeft size={14} className="mr-1" />
                     Billing
@@ -1781,7 +1787,7 @@ return (
                   <button
                     type="button"
                     onClick={() => setTableSelectorOpen(true)}
-                    className="px-3 py-1.5 bg-[#9c5f22] text-white text-xs font-bold rounded-xl shadow"
+                    className="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-xl shadow"
                   >
                     Change Table
                   </button>
@@ -1793,12 +1799,12 @@ return (
                 <div className="relative flex-1">
                   {!search && (
                     <Search
-                      className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                      className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-secondary-400"
                       size={20}
                     />
                   )}
                   <input
-                    className={`h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 text-base font-medium text-slate-900 focus:bg-white focus:border-[#9c5f22] focus:ring-2 focus:ring-[#9c5f22]/10 transition shadow-2xs ${
+                    className={`h-12 w-full rounded-2xl border border-secondary-200 bg-mist text-base font-medium text-ink focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/10 transition shadow-2xs ${
                       search ? "px-4 pr-10" : "pl-11 pr-4"
                     }`}
                     value={search}
@@ -1809,7 +1815,7 @@ return (
                     <button
                       type="button"
                       onClick={() => setSearch("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-secondary-400 hover:text-ink-light p-1 rounded-full hover:bg-secondary-100 transition"
                     >
                       <X size={18} />
                     </button>
@@ -1820,7 +1826,7 @@ return (
                   {categoryOptions.length > 7 && (
                     <select
                       id="quick-pos-category"
-                      className="input h-12 rounded-2xl bg-slate-50 px-3 text-xs font-bold text-slate-700 focus:bg-white border-slate-200 max-w-[150px] truncate"
+                      className="input h-12 rounded-2xl bg-mist px-3 text-xs font-bold text-ink-light focus:bg-white border-secondary-200 max-w-[150px] truncate"
                       value={selectedCategory}
                       onChange={(event) => setSelectedCategory(event.target.value)}
                     >
@@ -1833,12 +1839,14 @@ return (
                       ))}
                     </select>
                   )}
-                  <Link
-                    className="btn-secondary h-12 justify-center rounded-2xl text-xs font-bold px-4 shrink-0"
-                    to="/app/inventory"
-                  >
-                    + {t("quickPos.addNewItem")}
-                  </Link>
+                  {canManageInventory ? (
+                    <Link
+                      className="btn-secondary h-12 justify-center rounded-2xl text-xs font-bold px-4 shrink-0"
+                      to="/app/inventory"
+                    >
+                      + {t("quickPos.addNewItem")}
+                    </Link>
+                  ) : null}
                 </div>
               </div>
 
@@ -1855,8 +1863,8 @@ return (
                       onClick={() => setSelectedCategory(category)}
                       className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
                         isActive
-                          ? "bg-[#9c5f22] text-white shadow-sm"
-                          : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                          ? "bg-primary text-white shadow-sm"
+                          : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                       }`}
                     >
                       {label}
@@ -1868,16 +1876,16 @@ return (
           </div>
 
           {loading ? (
-            <div className="rounded-[32px] border border-dashed border-slate-200 bg-white/70 px-5 py-12 text-center text-slate-500">
+            <div className="rounded-[32px] border border-dashed border-secondary-200 bg-white/70 px-5 py-12 text-center text-secondary-500">
               {t("common.loading")}
             </div>
           ) : filteredProducts.length === 0 ? (
-            <div className="rounded-[32px] border border-dashed border-slate-200 bg-white/70 px-5 py-12 text-center">
-              <Package2 className="mx-auto text-slate-300" size={34} />
-              <p className="mt-4 text-lg font-semibold text-slate-700">
+            <div className="rounded-[32px] border border-dashed border-secondary-200 bg-white/70 px-5 py-12 text-center">
+              <Package2 className="mx-auto text-secondary-300" size={34} />
+              <p className="mt-4 text-lg font-semibold text-ink-light">
                 {t("quickPos.noProducts")}
               </p>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-secondary-500">
                 {t("quickPos.noProductsHint")}
               </p>
             </div>
@@ -1909,7 +1917,7 @@ return (
                           ? "opacity-75 bg-red-50 border-red-200"
                           : inCart
                             ? "border-primary ring-1 ring-primary-500 shadow-sm"
-                            : "border-slate-100 hover:border-slate-300"
+                            : "border-secondary-100 hover:border-secondary-300"
                       }`}
                     >
                       <div className="flex flex-1 flex-col p-2.5">
@@ -1918,7 +1926,7 @@ return (
                             <img
                               src={product.imageUrl}
                               alt={product.name}
-                              className="h-10 w-10 shrink-0 rounded-lg object-cover border border-slate-100 dark:border-slate-800 cursor-zoom-in"
+                              className="h-10 w-10 shrink-0 rounded-lg object-cover border border-secondary-100 dark:border-slate-800 cursor-zoom-in"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setPreviewImage(product.imageUrl);
@@ -1927,12 +1935,12 @@ return (
                           ) : null}
                           <div className="min-w-0 flex-1">
                             <p
-                              className={`truncate text-xs font-bold text-slate-900 ${isOutOfStock ? "text-red-900" : ""}`}
+                              className={`truncate text-xs font-bold text-ink ${isOutOfStock ? "text-red-900" : ""}`}
                             >
                               {product.name}
                             </p>
                             <p
-                              className={`mt-0.5 truncate text-[11px] text-slate-500 ${isOutOfStock ? "text-red-600" : ""}`}
+                              className={`mt-0.5 truncate text-[11px] text-secondary-500 ${isOutOfStock ? "text-red-600" : ""}`}
                             >
                               {product.categoryName ||
                                 product.companyName ||
@@ -1961,7 +1969,7 @@ return (
                               )}
                             </p>
                             <p
-                              className={`text-[11px] font-medium ${isOutOfStock ? "text-red-400" : "text-slate-400"}`}
+                              className={`text-[11px] font-medium ${isOutOfStock ? "text-red-400" : "text-secondary-400"}`}
                             >
                               {formatStockLabel(product, selectedUnitType)}
                             </p>
@@ -2048,10 +2056,10 @@ return (
           <div className="sticky top-6 rounded-[32px] border border-secondary-200/70 bg-white/90 p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-secondary-400">
                   {t("quickPos.currentBill")}
                 </p>
-                <h3 className="mt-2 font-serif text-2xl text-slate-900">
+                <h3 className="mt-2 font-serif text-2xl text-ink">
                   {suggestedInvoiceNo || t("quickPos.draftBill")}
                 </h3>
               </div>
@@ -2064,23 +2072,23 @@ return (
               </button>
             </div>
 
-            {/* <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
+            {/* <div className="mt-5 rounded-[24px] border border-secondary-200 bg-mist px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-100 text-primary-700">
                   <UserRound size={18} />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-900">{selectedParty?.name || t('quickPos.walkInCustomer')}</p>
-                  <p className="mt-1 text-sm text-slate-500">{selectedParty?.phone || t('quickPos.walkInHint')}</p>
+                  <p className="truncate font-semibold text-ink">{selectedParty?.name || t('quickPos.walkInCustomer')}</p>
+                  <p className="mt-1 text-sm text-secondary-500">{selectedParty?.phone || t('quickPos.walkInHint')}</p>
                 </div>
               </div>
             </div> */}
 
             {activeSessionOption === "delivery" && (
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2">
+              <div className="mt-4 rounded-2xl border border-secondary-200 bg-mist/50 p-3.5 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
-                    <Truck size={14} className="text-[#9c5f22]" /> Delivery Details
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-1.5">
+                    <Truck size={14} className="text-primary" /> Delivery Details
                   </span>
                   <button
                     type="button"
@@ -2093,28 +2101,28 @@ return (
                       });
                       setDeliveryFormOpen(true);
                     }}
-                    className="text-xs font-semibold text-[#9c5f22] hover:underline"
+                    className="text-xs font-semibold text-primary hover:underline"
                   >
                     Edit
                   </button>
                 </div>
-                <div className="text-xs space-y-1 text-slate-700">
-                  <p><span className="font-semibold text-slate-900">Name:</span> {activeAttributes?.customer_name || "-"}</p>
-                  <p><span className="font-semibold text-slate-900">Phone:</span> {activeAttributes?.customer_phone || "-"}</p>
-                  <p><span className="font-semibold text-slate-900">Location:</span> {activeAttributes?.customer_address || "-"}</p>
-                  {checkoutForm?.notes && <p><span className="font-semibold text-slate-900">Notes:</span> {checkoutForm.notes}</p>}
+                <div className="text-xs space-y-1 text-ink-light">
+                  <p><span className="font-semibold text-ink">Name:</span> {activeAttributes?.customer_name || "-"}</p>
+                  <p><span className="font-semibold text-ink">Phone:</span> {activeAttributes?.customer_phone || "-"}</p>
+                  <p><span className="font-semibold text-ink">Location:</span> {activeAttributes?.customer_address || "-"}</p>
+                  {checkoutForm?.notes && <p><span className="font-semibold text-ink">Notes:</span> {checkoutForm.notes}</p>}
                 </div>
               </div>
             )}
 
             <div className="mt-5 max-h-[340px] space-y-3 overflow-y-auto pr-1">
               {cart.length === 0 ? (
-                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
-                  <ShoppingBag className="mx-auto text-slate-300" size={28} />
-                  <p className="mt-3 text-sm font-semibold text-slate-700">
+                <div className="rounded-[24px] border border-dashed border-secondary-200 bg-mist px-4 py-8 text-center">
+                  <ShoppingBag className="mx-auto text-secondary-300" size={28} />
+                  <p className="mt-3 text-sm font-semibold text-ink-light">
                     {t("quickPos.emptyCart")}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-secondary-500">
                     {t("quickPos.emptyCartHint")}
                   </p>
                 </div>
@@ -2122,21 +2130,21 @@ return (
                 cart.map((item) => (
                   <div
                     key={item.productId}
-                    className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3"
+                    className="rounded-[24px] border border-secondary-200 bg-mist px-4 py-3"
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold text-slate-900">
+                        <p className="truncate font-semibold text-ink">
                           {item.name}
                         </p>
                         <div className="mt-1 flex flex-wrap items-center gap-1">
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-secondary-500">
                             {t("currency.symbol")}
                           </span>
                           <input
                             type="number"
                             inputMode="decimal"
-                            className="w-20 border-0 bg-transparent p-0 text-xs font-medium text-slate-600 focus:outline-none focus:ring-0"
+                            className="w-20 border-0 bg-transparent p-0 text-xs font-medium text-secondary-700 focus:outline-none focus:ring-0"
                             value={item.unitPrice}
                             onChange={(e) =>
                               updateCartPrice(item.productId, e.target.value)
@@ -2153,7 +2161,7 @@ return (
                       <div className="flex items-center gap-2 rounded-full border border-primary-100 bg-white px-1">
                         <button
                           type="button"
-                          className="rounded-full bg-slate-100 p-2 text-slate-600"
+                          className="rounded-full bg-secondary-100 p-2 text-secondary-700"
                           onClick={() =>
                             updateCartQuantity(
                               item.productId,
@@ -2167,13 +2175,13 @@ return (
                           <input
                             type="number"
                             inputMode="decimal"
-                            className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
+                            className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-ink focus:outline-none focus:ring-0"
                             value={item.quantity}
                             onChange={(e) =>
                               updateCartQuantity(item.productId, e.target.value)
                             }
                           />
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-secondary-500">
                             {getUnitShortcut(
                               getProductUnitLabel(item, item.unitType),
                             )}
@@ -2207,13 +2215,13 @@ return (
               )}
             </div>
 
-            <div className="mt-5 border-t border-slate-200 pt-4 space-y-3">
-              <div className="flex items-center justify-between text-sm text-slate-500">
+            <div className="mt-5 border-t border-secondary-200 pt-4 space-y-3">
+              <div className="flex items-center justify-between text-sm text-secondary-500">
                 <span>{t("sales.subTotal")}</span>
                 <span>{money(totals.subTotal)}</span>
               </div>
 
-              <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+              <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-secondary-500">
                 <span className="min-w-0 max-w-full">
                   <span className="block">{t("Tax") || "VAT"}</span>
                   <span className="block text-[11px] font-semibold text-primary-700">
@@ -2224,7 +2232,11 @@ return (
                 </span>
                 <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
                   <div className="relative">
+<<<<<<< HEAD
                     <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+=======
+                    <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-secondary-400">
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
                       %
                     </div>
                     <input
@@ -2246,7 +2258,7 @@ return (
                 </div>
               </label>
 
-              <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+              <label className="flex flex-wrap items-center justify-between gap-2 text-sm text-secondary-500">
                 <span className="min-w-0 max-w-full">
                   <span className="block">{t("quickPos.discount")}</span>
                   <span className="block text-[11px] font-semibold text-primary-700">
@@ -2257,7 +2269,11 @@ return (
                 </span>
                 <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
                   <div className="relative">
+<<<<<<< HEAD
                     <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+=======
+                    <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-secondary-400">
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
                       {t("currency.symbol")}
                     </div>
                     <input
@@ -2280,12 +2296,16 @@ return (
               </label>
 
               {selectedParty && (
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-500">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-secondary-500">
                   <span>{t("services.amountReceived")}</span>
                   {showAmountReceivedInput && !isPaid ? (
                     <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
                       <div className="relative">
+<<<<<<< HEAD
                         <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
+=======
+                        <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-secondary-400">
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
                           {t("currency.symbol")}
                         </div>
                         <input
@@ -2340,7 +2360,7 @@ return (
                 </div>
               )}
 
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-lg font-bold text-slate-900">
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-secondary-100 pt-3 text-lg font-bold text-ink">
                 <span>{t("sales.grandTotal")}</span>
                 <span>{money(totals.grandTotal)}</span>
               </div>
@@ -2352,7 +2372,7 @@ return (
       </div>
 
       {!checkoutOpen && !successState ? (
-        <div className="fixed inset-x-0 z-30 border-t border-slate-200/80 bg-white/95 px-4 py-3 shadow-[0_-12px_40px_rgba(15,23,42,0.12)] backdrop-blur xl:hidden bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] md:bottom-0 md:left-64">
+        <div className="fixed inset-x-0 z-30 border-t border-secondary-200/80 bg-white/95 px-4 py-3 shadow-[0_-12px_40px_rgba(15,23,42,0.12)] backdrop-blur xl:hidden bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] md:bottom-0 md:left-64">
           {renderFooterBar({ compact: true })}
         </div>
       ) : null}
@@ -2394,12 +2414,12 @@ return (
           <div
             className={`grid gap-2 sm:grid-cols-2 ${businessProfile?.settings?.enabledModules?.includes("tables") ? "lg:grid-cols-3" : ""}`}
           >
-            <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 transition focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-200">
-              <span className="text-xs font-medium uppercase text-slate-500">
+            <label className="rounded-lg border border-secondary-200 bg-white px-3 py-2 transition focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-200">
+              <span className="text-xs font-medium uppercase text-secondary-500">
                 {t("quickPos.invoiceNumber")}
               </span>
               <input
-                className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-0"
+                className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-ink placeholder:text-secondary-400 focus:outline-none focus:ring-0"
                 value={checkoutForm.invoiceNo}
                 onChange={(event) =>
                   setCheckoutForm((previous) => ({
@@ -2411,12 +2431,12 @@ return (
               />
             </label>
 
-            <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 transition focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-200">
-              <span className="text-xs font-medium uppercase text-slate-500">
+            <label className="rounded-lg border border-secondary-200 bg-white px-3 py-2 transition focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-200">
+              <span className="text-xs font-medium uppercase text-secondary-500">
                 {t("common.date")}
               </span>
               <FlexibleDateInput
-                className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
+                className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-ink focus:outline-none focus:ring-0"
                 value={checkoutForm.saleDate}
                 onChange={(event) =>
                   setCheckoutForm((previous) => ({
@@ -2428,12 +2448,12 @@ return (
             </label>
 
             {businessProfile?.settings?.enabledModules?.includes("tables") && (
-              <label className="rounded-lg border border-slate-200 bg-white px-3 py-2 transition focus-within:border-[#9c5f22] focus-within:ring-1 focus-within:ring-[#9c5f22]/20">
-                <span className="text-xs font-medium uppercase text-slate-500">
+              <label className="rounded-lg border border-secondary-200 bg-white px-3 py-2 transition focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20">
+                <span className="text-xs font-medium uppercase text-secondary-500">
                   {t("tables.tableName") || "Table"}
                 </span>
                 <select
-                  className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-0"
+                  className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-ink focus:outline-none focus:ring-0"
                   value={checkoutForm.tableId || ""}
                   onChange={(event) =>
                     setCheckoutForm((previous) => ({
@@ -2454,18 +2474,18 @@ return (
             )}
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <div className="rounded-lg border border-secondary-200 bg-mist px-3 py-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary-700">
                   <UserRound size={18} />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-900">
+                  <p className="truncate text-sm font-semibold text-ink">
                     {selectedParty?.name || t("quickPos.walkInCustomer")}
                   </p>
                   {selectedParty?.phone && (
-                    <p className="truncate text-xs text-slate-500">
+                    <p className="truncate text-xs text-secondary-500">
                       {selectedParty.phone}
                     </p>
                   )}
@@ -2482,10 +2502,10 @@ return (
           </div>
 
           {activeSessionOption === "delivery" && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 space-y-1">
+            <div className="rounded-lg border border-secondary-200 bg-mist px-3 py-2.5 space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
-                  <Truck size={12} className="text-[#9c5f22]" /> Delivery Details
+                <span className="text-[10px] font-bold uppercase tracking-wider text-secondary-500 flex items-center gap-1">
+                  <Truck size={12} className="text-primary" /> Delivery Details
                 </span>
                 <button
                   type="button"
@@ -2498,23 +2518,23 @@ return (
                     });
                     setDeliveryFormOpen(true);
                   }}
-                  className="text-[10px] font-bold text-[#9c5f22] hover:underline"
+                  className="text-[10px] font-bold text-primary hover:underline"
                 >
                   Edit
                 </button>
               </div>
-              <div className="text-xs space-y-0.5 text-slate-700">
-                <p><span className="font-semibold text-slate-900">Name:</span> {activeAttributes?.customer_name || "-"}</p>
-                <p><span className="font-semibold text-slate-900">Phone:</span> {activeAttributes?.customer_phone || "-"}</p>
-                <p><span className="font-semibold text-slate-900">Location:</span> {activeAttributes?.customer_address || "-"}</p>
-                {checkoutForm?.notes && <p><span className="font-semibold text-slate-900">Notes:</span> {checkoutForm.notes}</p>}
+              <div className="text-xs space-y-0.5 text-ink-light">
+                <p><span className="font-semibold text-ink">Name:</span> {activeAttributes?.customer_name || "-"}</p>
+                <p><span className="font-semibold text-ink">Phone:</span> {activeAttributes?.customer_phone || "-"}</p>
+                <p><span className="font-semibold text-ink">Location:</span> {activeAttributes?.customer_address || "-"}</p>
+                {checkoutForm?.notes && <p><span className="font-semibold text-ink">Notes:</span> {checkoutForm.notes}</p>}
               </div>
             </div>
           )}
 
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+          <div className="rounded-lg border border-secondary-200 bg-white px-3 py-2.5">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase text-slate-600">
+              <p className="text-xs font-semibold uppercase text-secondary-700">
                 {t("quickPos.billingItems", { count: cart.length })}
               </p>
               <button
@@ -2530,19 +2550,19 @@ return (
               {cart.map((item) => (
                 <div
                   key={item.productId}
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs hover:bg-slate-50 transition"
+                  className="rounded-lg border border-secondary-200 bg-white px-2 py-1.5 text-xs hover:bg-mist transition"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-slate-900">
+                      <p className="truncate font-medium text-ink">
                         {item.name}
                       </p>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-1 text-slate-600">
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1 text-secondary-700">
                         <span>{t("currency.symbol")}</span>
                         <input
                           type="number"
                           inputMode="decimal"
-                          className="w-16 border-0 bg-transparent p-0 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-0"
+                          className="w-16 border-0 bg-transparent p-0 text-xs font-semibold text-ink-light focus:outline-none focus:ring-0"
                           value={item.unitPrice}
                           onChange={(e) =>
                             updateCartPrice(item.productId, e.target.value)
@@ -2551,10 +2571,10 @@ return (
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <div className="flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1">
+                      <div className="flex items-center gap-0.5 rounded-md border border-secondary-200 bg-white px-1">
                         <button
                           type="button"
-                          className="p-0.5 text-slate-600 hover:text-slate-900"
+                          className="p-0.5 text-secondary-700 hover:text-ink"
                           onClick={() =>
                             updateCartQuantity(
                               item.productId,
@@ -2567,7 +2587,7 @@ return (
                         <input
                           type="number"
                           inputMode="decimal"
-                          className="w-8 border-0 bg-transparent p-0 text-center text-xs font-semibold text-slate-900 focus:outline-none focus:ring-0"
+                          className="w-8 border-0 bg-transparent p-0 text-center text-xs font-semibold text-ink focus:outline-none focus:ring-0"
                           value={item.quantity}
                           onChange={(e) =>
                             updateCartQuantity(item.productId, e.target.value)
@@ -2609,7 +2629,7 @@ return (
               <div className="rounded-2xl border border-amber-200/40 bg-gradient-to-br from-amber-50/60 to-yellow-50/40 px-4 py-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-700">
                       {t("quickPos.discount")}
                     </p>
                     <p className="text-lg font-bold text-amber-700">
@@ -2635,7 +2655,7 @@ return (
                         }
                         placeholder="0"
                       />
-                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-500">
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-secondary-500">
                         {t("currency.symbol")}
                       </div>
                     </div>
@@ -2646,7 +2666,7 @@ return (
               <div className="rounded-2xl border border-blue-200/40 bg-gradient-to-br from-blue-50/60 to-cyan-50/40 px-4 py-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-700">
                       {t("tax") || "VAT"}
                     </p>
                     <p className="text-lg font-bold text-blue-700">
@@ -2672,7 +2692,7 @@ return (
                         }
                         placeholder="0"
                       />
-                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-500">
+                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-secondary-500">
                         %
                       </div>
                     </div>
@@ -2680,12 +2700,12 @@ return (
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              <div className="rounded-2xl border border-secondary-200 bg-white px-4 py-4 shadow-sm">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
                   {t("common.notes")}
                 </p>
                 <NoteTextarea
-                  className="input mt-2.5 min-h-[80px] resize-none rounded-xl text-sm border-slate-200 focus:border-primary focus:ring-primary/10"
+                  className="input mt-2.5 min-h-[80px] resize-none rounded-xl text-sm border-secondary-200 focus:border-primary focus:ring-primary/10"
                   value={checkoutForm.notes}
                   onChange={(event) =>
                     setCheckoutForm((previous) => ({
@@ -2699,43 +2719,43 @@ return (
             </div>
 
             <div className="min-w-0 space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+              <div className="rounded-lg border border-secondary-200 bg-mist px-3 py-3">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-slate-600">
+                  <div className="flex items-center justify-between text-xs text-secondary-700">
                     <span>{t("sales.subTotal")}</span>
-                    <span className="font-semibold text-slate-900">
+                    <span className="font-semibold text-ink">
                       {money(totals.subTotal)}
                     </span>
                   </div>
                   {totals.taxTotal > 0 && (
-                    <div className="flex items-center justify-between text-xs text-slate-600">
+                    <div className="flex items-center justify-between text-xs text-secondary-700">
                       <span>{t("sales.taxTotal")}</span>
-                      <span className="font-semibold text-slate-900">
+                      <span className="font-semibold text-ink">
                         {money(totals.taxTotal)}
                       </span>
                     </div>
                   )}
                   {totals.discountTotal > 0 && (
-                    <div className="flex items-center justify-between text-xs text-slate-600">
+                    <div className="flex items-center justify-between text-xs text-secondary-700">
                       <span>{t("quickPos.discount")}</span>
-                      <span className="font-semibold text-slate-900">
+                      <span className="font-semibold text-ink">
                         - {money(totals.discountTotal)}
                       </span>
                     </div>
                   )}
-                  <div className="flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-bold text-slate-900">
+                  <div className="flex items-center justify-between border-t border-secondary-200 pt-2 text-sm font-bold text-ink">
                     <span>{t("sales.grandTotal")}</span>
                     <span>{money(totals.grandTotal)}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 space-y-3 shadow-sm">
+              <div className="rounded-2xl border border-secondary-200 bg-white px-4 py-4 space-y-3 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  <span className="text-xs font-bold uppercase tracking-wider text-secondary-500">
                     {t("services.amountReceived") || "Amount Received"}
                   </span>
-                  <label className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 cursor-pointer hover:bg-slate-100 transition shrink-0">
+                  <label className="flex items-center gap-1.5 rounded-lg border border-secondary-200 bg-mist px-2.5 py-1 text-xs font-semibold text-secondary-700 cursor-pointer hover:bg-secondary-100 transition shrink-0">
                     <input
                       type="checkbox"
                       className="h-3.5 w-3.5 rounded accent-primary-600 cursor-pointer"
@@ -2760,12 +2780,12 @@ return (
                   </label>
                 </div>
 
-                <div className="flex w-full items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xs focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition">
-                  <span className="flex h-10 items-center bg-slate-100 px-3 text-xs font-bold text-slate-500 border-r border-slate-200 shrink-0">
+                <div className="flex w-full items-center overflow-hidden rounded-xl border border-secondary-200 bg-white shadow-2xs focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition">
+                  <span className="flex h-10 items-center bg-secondary-100 px-3 text-xs font-bold text-secondary-500 border-r border-secondary-200 shrink-0">
                     {t("currency.symbol") || "Rs"}
                   </span>
                   <input
-                    className="h-10 w-full bg-transparent px-3 text-sm font-bold text-slate-900 focus:outline-none"
+                    className="h-10 w-full bg-transparent px-3 text-sm font-bold text-ink focus:outline-none"
                     type="number"
                     inputMode="decimal"
                     min="0"
@@ -2793,7 +2813,7 @@ return (
                           amountReceived: String(opt.value.toFixed(2)),
                         }));
                       }}
-                      className="px-2.5 py-1 rounded-xl border border-slate-200 hover:border-primary text-xs font-bold text-slate-700 bg-slate-50 hover:bg-primary/5 transition shadow-2xs"
+                      className="px-2.5 py-1 rounded-xl border border-secondary-200 hover:border-primary text-xs font-bold text-ink-light bg-mist hover:bg-primary/5 transition shadow-2xs"
                     >
                       {opt.label}
                     </button>
@@ -2816,7 +2836,7 @@ return (
                 ) : null}
               </div>
 
-              <div className="rounded-[28px] border border-slate-200 bg-white px-4 py-4 min-w-0">
+              <div className="rounded-[28px] border border-secondary-200 bg-white px-4 py-4 min-w-0">
                 <PaymentMethodFields
                   value={checkoutForm}
                   onChange={handleCheckoutPaymentChange}
@@ -2914,8 +2934,8 @@ return (
         size="lg"
       >
         <div className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
-            <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+          <div className="flex items-center justify-between border-b border-secondary-100 pb-3 dark:border-slate-800">
+            <p className="text-xs text-secondary-400 font-semibold uppercase tracking-wider">
               Choose Table or Seating Area
             </p>
             <button
@@ -2924,23 +2944,23 @@ return (
                 setTableSelectorOpen(false);
                 navigate("/app/billing");
               }}
-              className="text-xs font-bold text-[#9c5f22] hover:underline flex items-center gap-1"
+              className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
             >
               Billing Counter Grid →
             </button>
           </div>
 
-          <div className="flex flex-col gap-3 border-b border-slate-100 pb-3 dark:border-slate-800">
+          <div className="flex flex-col gap-3 border-b border-secondary-100 pb-3 dark:border-slate-800">
             {/* Floor Filters */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap shrink-0">Floor:</span>
+              <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap shrink-0">Floor:</span>
               <button
                 type="button"
                 onClick={() => setSelectedFloorFilter('all')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   selectedFloorFilter === 'all'
-                    ? 'bg-[#9c5f22] text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 All Floors
@@ -2952,8 +2972,8 @@ return (
                   onClick={() => setSelectedFloorFilter(floor.id)}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                     selectedFloorFilter === floor.id
-                      ? 'bg-[#9c5f22] text-white shadow-sm'
-                      : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                   }`}
                 >
                   {floor.name}
@@ -2964,8 +2984,8 @@ return (
                 onClick={() => setSelectedFloorFilter('unassigned')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   selectedFloorFilter === 'unassigned'
-                    ? 'bg-[#9c5f22] text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 Unassigned
@@ -2973,15 +2993,15 @@ return (
             </div>
 
             {/* Status Filters */}
-            <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100/60 pt-2.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap shrink-0">Status:</span>
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-secondary-100/60 pt-2.5">
+              <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap shrink-0">Status:</span>
               <button
                 type="button"
                 onClick={() => setSelectedStatusFilter('all')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   selectedStatusFilter === 'all'
-                    ? 'bg-[#9c5f22] text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 All
@@ -2992,7 +3012,7 @@ return (
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   selectedStatusFilter === 'vacant'
                     ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 Vacant
@@ -3003,7 +3023,7 @@ return (
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   selectedStatusFilter === 'occupied'
                     ? 'bg-amber-600 text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 Occupied
@@ -3021,12 +3041,12 @@ return (
               }}
               className={`rounded-2xl border p-4 text-center transition flex flex-col justify-center items-center h-28 ${
                 activeSessionOption === "takeaway" && !activeTableId
-                  ? "border-[#9c5f22] bg-[#9c5f22]/5 font-bold text-[#9c5f22]"
-                  : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                  ? "border-primary bg-primary/5 font-bold text-primary"
+                  : "border-secondary-200 bg-white hover:bg-mist text-ink-light"
               }`}
             >
               <span className="text-sm font-semibold">Walk-in / Takeaway</span>
-              <span className="text-[10px] text-slate-400 mt-1">
+              <span className="text-[10px] text-secondary-400 mt-1">
                 No table reference
               </span>
             </button>
@@ -3036,12 +3056,12 @@ return (
               onClick={handleSelectDelivery}
               className={`rounded-2xl border p-4 text-center transition flex flex-col justify-center items-center h-28 ${
                 activeSessionOption === "delivery" && !activeTableId
-                  ? "border-[#9c5f22] bg-[#9c5f22]/5 font-bold text-[#9c5f22]"
-                  : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                  ? "border-primary bg-primary/5 font-bold text-primary"
+                  : "border-secondary-200 bg-white hover:bg-mist text-ink-light"
               }`}
             >
               <span className="text-sm font-semibold">Home Delivery</span>
-              <span className="text-[10px] text-slate-400 mt-1">
+              <span className="text-[10px] text-secondary-400 mt-1">
                 No table reference
               </span>
             </button>
@@ -3061,10 +3081,10 @@ return (
                   }}
                   className={`group relative rounded-2xl border p-4 text-left transition duration-200 hover:scale-[1.02] hover:shadow-md flex flex-col justify-between h-28 ${
                     isSelected
-                      ? "border-[#9c5f22] bg-[#9c5f22]/10 font-bold text-[#9c5f22] shadow-sm"
+                      ? "border-primary bg-primary/10 font-bold text-primary shadow-sm"
                       : isOccupied
                         ? "border-amber-200 bg-amber-50/50 hover:bg-amber-100 text-amber-800"
-                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                        : "border-secondary-200 bg-white hover:bg-mist text-ink-light"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 w-full">
@@ -3073,9 +3093,9 @@ return (
                       {isOccupied ? "Occupied" : "Vacant"}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-slate-100 dark:border-slate-800 mt-2">
-                    <span className="text-[10px] text-slate-400">{table.capacity ? `${table.capacity} seats` : "No limit"}</span>
-                    <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium border border-slate-200/50 truncate max-w-[70px]">
+                  <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-secondary-100 dark:border-slate-800 mt-2">
+                    <span className="text-[10px] text-secondary-400">{table.capacity ? `${table.capacity} seats` : "No limit"}</span>
+                    <span className="text-[9px] bg-secondary-100 text-secondary-700 px-1.5 py-0.5 rounded font-medium border border-secondary-200/50 truncate max-w-[70px]">
                       {table.category?.name || "No Floor"}
                     </span>
                   </div>
@@ -3084,7 +3104,7 @@ return (
             })}
           </div>
 
-          <div className="flex justify-end pt-2 border-t border-slate-100">
+          <div className="flex justify-end pt-2 border-t border-secondary-100">
             <button
               type="button"
               onClick={() => setTableSelectorOpen(false)}
@@ -3098,7 +3118,7 @@ return (
 
       {/* Image Preview Dialog */}
       <Dialog isOpen={previewImage !== null} onClose={() => setPreviewImage(null)} title={t('common.preview') || 'Image Preview'} size="lg">
-        <div className="flex justify-center items-center p-2 bg-slate-50 dark:bg-slate-900 rounded-2xl overflow-hidden">
+        <div className="flex justify-center items-center p-2 bg-mist rounded-2xl overflow-hidden">
           <img src={previewImage} alt="Preview" className="max-w-full max-h-[70vh] rounded-xl object-contain" />
         </div>
       </Dialog>
@@ -3125,46 +3145,46 @@ return (
           className="space-y-4"
         >
           <div>
-            <label className="label text-slate-700 font-semibold text-xs">Customer Name</label>
+            <label className="label text-ink-light font-semibold text-xs">Customer Name</label>
             <input
               type="text"
               required
-              className="input mt-1.5 w-full rounded-xl border border-slate-200 text-sm focus:border-primary"
+              className="input mt-1.5 w-full rounded-xl border border-secondary-200 text-sm focus:border-primary"
               placeholder="Enter customer name"
               value={deliveryFormState.customerName}
               onChange={(e) => setDeliveryFormState(prev => ({ ...prev, customerName: e.target.value }))}
             />
           </div>
           <div>
-            <label className="label text-slate-700 font-semibold text-xs">Phone Number (Optional)</label>
+            <label className="label text-ink-light font-semibold text-xs">Phone Number (Optional)</label>
             <input
               type="tel"
-              className="input mt-1.5 w-full rounded-xl border border-slate-200 text-sm focus:border-primary"
+              className="input mt-1.5 w-full rounded-xl border border-secondary-200 text-sm focus:border-primary"
               placeholder="Enter phone number"
               value={deliveryFormState.customerPhone}
               onChange={(e) => setDeliveryFormState(prev => ({ ...prev, customerPhone: e.target.value }))}
             />
           </div>
           <div>
-            <label className="label text-slate-700 font-semibold text-xs">Location / Address</label>
+            <label className="label text-ink-light font-semibold text-xs">Location / Address</label>
             <textarea
               required
-              className="input mt-1.5 w-full rounded-xl border border-slate-200 text-sm min-h-[70px] resize-none focus:border-primary"
+              className="input mt-1.5 w-full rounded-xl border border-secondary-200 text-sm min-h-[70px] resize-none focus:border-primary"
               placeholder="Enter delivery address"
               value={deliveryFormState.location}
               onChange={(e) => setDeliveryFormState(prev => ({ ...prev, location: e.target.value }))}
             />
           </div>
           <div>
-            <label className="label text-slate-700 font-semibold text-xs">Notes / Special Instructions</label>
+            <label className="label text-ink-light font-semibold text-xs">Notes / Special Instructions</label>
             <textarea
-              className="input mt-1.5 w-full rounded-xl border border-slate-200 text-sm min-h-[70px] resize-none focus:border-primary"
+              className="input mt-1.5 w-full rounded-xl border border-secondary-200 text-sm min-h-[70px] resize-none focus:border-primary"
               placeholder="Special instructions for delivery"
               value={deliveryFormState.notes}
               onChange={(e) => setDeliveryFormState(prev => ({ ...prev, notes: e.target.value }))}
             />
           </div>
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+          <div className="flex justify-end gap-2 pt-3 border-t border-secondary-100 dark:border-slate-800">
             <button
               type="button"
               onClick={() => setDeliveryFormOpen(false)}

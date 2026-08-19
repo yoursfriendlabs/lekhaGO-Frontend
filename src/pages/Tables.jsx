@@ -4,7 +4,8 @@ import Notice from '../components/Notice';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
-import { Coffee, Users, Pencil, Trash2, Plus, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Coffee, Users, Pencil, Trash2, Plus, ToggleLeft, ToggleRight, Clock, CheckCircle2 } from 'lucide-react';
+import StatsCard from '../components/StatsCard.jsx';
 
 const emptyForm = {
   name: '',
@@ -195,45 +196,33 @@ export default function Tables() {
         subtitle={t('tables.subtitle') || 'Manage seating layout, occupancy status, and table capacities.'}
       />
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Tables</p>
-            <p className="mt-1 text-2xl font-bold text-slate-800 dark:text-slate-200">{stats.total}</p>
-          </div>
-          <div className="h-10 w-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            <Coffee size={20} />
-          </div>
-        </div>
-
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Vacant Tables</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.vacant}</p>
-          </div>
-          <div className="h-10 w-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          </div>
-        </div>
-
-        <div className="card bg-white p-5 flex items-center justify-between shadow-sm">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Occupied Tables</p>
-            <p className="mt-1 text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.occupied}</p>
-          </div>
-          <div className="h-10 w-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-          </div>
-        </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
+        <StatsCard
+          title="Total Tables"
+          value={stats.total}
+          icon={Coffee}
+          tone="default"
+        />
+        <StatsCard
+          title="Vacant Tables"
+          value={stats.vacant}
+          icon={CheckCircle2}
+          tone="success"
+        />
+        <StatsCard
+          title="Occupied Tables"
+          value={stats.occupied}
+          icon={Clock}
+          tone="warning"
+        />
       </div>
 
       {/* Main Content Area */}
       <div className="grid gap-8 lg:grid-cols-3">
         {/* Form Column */}
         <div className="lg:col-span-1">
-          <form onSubmit={handleSubmit} className="card sticky top-24 space-y-4 p-6 bg-white shadow-sm border border-slate-100">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+          <form onSubmit={handleSubmit} className="card sticky top-24 space-y-4 p-6 bg-white shadow-sm border border-secondary-100">
+            <h3 className="text-lg font-bold text-ink">
               {editingId ? t('tables.editTable') || 'Edit Table' : t('tables.addTable') || 'Add Table'}
             </h3>
 
@@ -301,7 +290,7 @@ export default function Tables() {
               </div>
 
               <div className="flex items-center justify-between pt-2">
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <span className="text-sm font-semibold text-ink-light dark:text-secondary-300">
                   {t('tables.active') || 'Active / Show in lists'}
                 </span>
                 <button
@@ -309,7 +298,7 @@ export default function Tables() {
                   onClick={() => setForm((prev) => ({ ...prev, isActive: !prev.isActive }))}
                   className="text-primary hover:opacity-85 transition"
                 >
-                  {form.isActive ? <ToggleRight size={38} className="text-[#9c5f22]" /> : <ToggleLeft size={38} className="text-slate-300" />}
+                  {form.isActive ? <ToggleRight size={38} className="text-primary" /> : <ToggleLeft size={38} className="text-secondary-300" />}
                 </button>
               </div>
             </div>
@@ -338,17 +327,17 @@ export default function Tables() {
         {/* List Grid Column */}
         <div className="lg:col-span-2 space-y-4">
           {/* Filters */}
-          <div className="flex flex-col gap-3 bg-white/40 backdrop-blur p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex flex-col gap-3 bg-white/40 backdrop-blur p-4 rounded-2xl border border-secondary-100 shadow-sm">
             {/* Floor Filters */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap shrink-0">Floor:</span>
+              <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap shrink-0">Floor:</span>
               <button
                 type="button"
                 onClick={() => setFloorFilter('all')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   floorFilter === 'all'
-                    ? 'bg-[#9c5f22] text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 All Floors
@@ -360,8 +349,8 @@ export default function Tables() {
                   onClick={() => setFloorFilter(floor.id)}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                     floorFilter === floor.id
-                      ? 'bg-[#9c5f22] text-white shadow-sm'
-                      : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                   }`}
                 >
                   {floor.name}
@@ -372,8 +361,8 @@ export default function Tables() {
                 onClick={() => setFloorFilter('unassigned')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   floorFilter === 'unassigned'
-                    ? 'bg-[#9c5f22] text-white shadow-sm'
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 Unassigned
@@ -381,15 +370,15 @@ export default function Tables() {
             </div>
 
             {/* Status Filters */}
-            <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100/60 pt-2.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400 mr-1 whitespace-nowrap shrink-0">Status:</span>
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-secondary-100/60 pt-2.5">
+              <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap shrink-0">Status:</span>
               <button
                 type="button"
                 onClick={() => setStatusFilter('')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   statusFilter === '' 
-                    ? 'bg-[#9c5f22] text-white shadow-sm' 
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    ? 'bg-primary text-white shadow-sm' 
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 {t('tables.all') || 'All'}
@@ -400,7 +389,7 @@ export default function Tables() {
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   statusFilter === 'vacant' 
                     ? 'bg-emerald-600 text-white shadow-sm' 
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 {t('tables.vacant') || 'Vacant'}
@@ -411,7 +400,7 @@ export default function Tables() {
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                   statusFilter === 'occupied' 
                     ? 'bg-amber-600 text-white shadow-sm' 
-                    : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
                 }`}
               >
                 {t('tables.occupied') || 'Occupied'}
@@ -421,10 +410,10 @@ export default function Tables() {
 
           {/* Seating layout grid */}
           {tables.length === 0 ? (
-            <div className="card bg-white p-8 text-center text-slate-400">
-              <Coffee size={40} className="mx-auto mb-3 opacity-30 text-slate-500" />
+            <div className="card bg-white p-8 text-center text-secondary-400">
+              <Coffee size={40} className="mx-auto mb-3 opacity-30 text-secondary-500" />
               <p className="text-sm font-semibold">{t('common.noData')}</p>
-              <p className="text-xs mt-1 text-slate-400/80">No tables match your active search / status filters.</p>
+              <p className="text-xs mt-1 text-secondary-400/80">No tables match your active search / status filters.</p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
@@ -435,7 +424,7 @@ export default function Tables() {
                     key={table.id} 
                     className={`card bg-white p-5 shadow-sm border transition relative flex flex-col justify-between h-40 ${
                       !table.isActive 
-                        ? 'opacity-60 border-slate-100 bg-slate-50/50' 
+                        ? 'opacity-60 border-secondary-100 bg-mist/50' 
                         : isOccupied 
                           ? 'border-amber-100 hover:shadow-md' 
                           : 'border-emerald-100 hover:shadow-md'
@@ -444,19 +433,19 @@ export default function Tables() {
                     <div>
                       <div className="flex items-start justify-between">
                         <div>
-                          <h4 className="font-serif text-lg font-bold text-slate-800 dark:text-white truncate max-w-[130px]">
+                          <h4 className="font-serif text-lg font-bold text-ink dark:text-white truncate max-w-[130px]">
                             {table.name}
                           </h4>
                           <div className="flex flex-wrap items-center gap-1.5 mt-1">
                             {table.capacity ? (
-                              <div className="flex items-center gap-1 text-xs text-slate-400 font-semibold">
+                              <div className="flex items-center gap-1 text-xs text-secondary-400 font-semibold">
                                 <Users size={12} />
                                 <span>{table.capacity} seats</span>
                               </div>
                             ) : (
-                              <p className="text-xs text-slate-400">No capacity</p>
+                              <p className="text-xs text-secondary-400">No capacity</p>
                             )}
-                            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold border border-slate-200/40 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-800">
+                            <span className="text-[10px] bg-secondary-100 text-secondary-700 px-2 py-0.5 rounded-full font-bold border border-secondary-200/40 dark:bg-slate-800 dark:text-secondary-400 dark:border-slate-800">
                               {table.category?.name || floors.find(f => f.id === table.categoryId)?.name || 'No Floor'}
                             </span>
                           </div>
@@ -484,17 +473,17 @@ export default function Tables() {
                         type="button"
                         onClick={() => handleToggleActive(table)}
                         title="Toggle active status"
-                        className="text-slate-400 hover:text-slate-600 transition flex items-center gap-1.5"
+                        className="text-secondary-400 hover:text-secondary-700 transition flex items-center gap-1.5"
                       >
                         {table.isActive !== false ? (
                           <>
-                            <span className="h-2 w-2 rounded-full bg-[#9c5f22]" />
-                            <span className="text-[10px] font-bold text-slate-500">Active</span>
+                            <span className="h-2 w-2 rounded-full bg-primary" />
+                            <span className="text-[10px] font-bold text-secondary-500">Active</span>
                           </>
                         ) : (
                           <>
                             <span className="h-2 w-2 rounded-full bg-slate-300" />
-                            <span className="text-[10px] font-bold text-slate-400">Inactive</span>
+                            <span className="text-[10px] font-bold text-secondary-400">Inactive</span>
                           </>
                         )}
                       </button>
@@ -504,7 +493,7 @@ export default function Tables() {
                         <button
                           type="button"
                           onClick={() => handleEdit(table)}
-                          className="p-1 rounded bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
+                          className="p-1 rounded bg-mist text-secondary-500 hover:bg-secondary-100 hover:text-ink transition"
                           title={t('common.edit')}
                         >
                           <Pencil size={14} />

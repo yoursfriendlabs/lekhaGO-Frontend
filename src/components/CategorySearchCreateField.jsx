@@ -172,14 +172,14 @@ export default function CategorySearchCreateField({
             <Tag size={16} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold text-slate-800 dark:text-slate-100">{selected.name || placeholder || '—'}</p>
-            <p className="text-xs text-slate-500">{t('inventory.itemCategory')}</p>
+            <p className="truncate font-semibold text-ink">{selected.name || placeholder || '—'}</p>
+            <p className="text-xs text-secondary-500">{t('inventory.itemCategory')}</p>
           </div>
           <button
             type="button"
             id={clearButtonId || undefined}
             onClick={handleClear}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-slate-600 dark:hover:bg-slate-800"
+            className="rounded-lg p-1.5 text-secondary-400 hover:bg-white hover:text-secondary-700 dark:hover:bg-slate-800"
             aria-label={t('common.clear')}
           >
             <X size={16} />
@@ -187,11 +187,11 @@ export default function CategorySearchCreateField({
         </div>
       ) : (
         <div>
-          <div className="flex items-center gap-2 rounded-2xl border border-slate-200/70 bg-white px-3 py-1 dark:border-slate-700/60 dark:bg-slate-900/60 focus-within:border-primary-300">
-            <Search size={16} className="shrink-0 text-slate-400" />
+          <div className="flex items-center gap-2 rounded-2xl border border-secondary-200/70 bg-white px-3 py-1 dark:border-slate-700/60 dark:bg-slate-900/60 focus-within:border-primary-300">
+            <Search size={16} className="shrink-0 text-secondary-400" />
             <input
               id={inputId || undefined}
-              className="flex-1 bg-transparent w-1/3 text-sm focus:border-none border-none focus:ring-0 outline-none placeholder:text-slate-400 dark:text-slate-200"
+              className="flex-1 bg-transparent w-1/3 text-sm focus:border-none border-none focus:ring-0 outline-none placeholder:text-secondary-400 dark:text-slate-200"
               placeholder={searchPlaceholder || placeholder || t('categories.selectCategory')}
               value={query}
               onChange={(event) => {
@@ -210,7 +210,7 @@ export default function CategorySearchCreateField({
                   setResults([]);
                   setMessage('');
                 }}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-secondary-400 hover:text-secondary-700"
                 aria-label={t('common.clear')}
               >
                 <X size={14} />
@@ -219,30 +219,30 @@ export default function CategorySearchCreateField({
           </div>
 
           {open ? (
-            <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-2xl border border-secondary-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
               {visibleResults.length > 0 ? (
                 visibleResults.map((category) => (
                   <button
                     key={category.id || category.name}
                     type="button"
-                    className="flex w-full items-center gap-3 border-b border-slate-100/80 px-4 py-3 text-left text-sm hover:bg-slate-50 dark:border-slate-800/50 dark:hover:bg-slate-800/60 last:border-b-0"
+                    className="flex w-full items-center gap-3 border-b border-secondary-100/80 px-4 py-3 text-left text-sm hover:bg-mist dark:border-slate-800/50 dark:hover:bg-slate-800/60 last:border-b-0"
                     onClick={() => handleSelect(category)}
                   >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary-100 text-secondary-700 dark:bg-slate-800 dark:text-secondary-300">
                       <Tag size={14} />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-slate-800 dark:text-slate-200">{category.name}</p>
-                      <p className="text-xs text-slate-500">{category.type || 'product'}</p>
+                      <p className="font-semibold text-ink dark:text-slate-200">{category.name}</p>
+                      <p className="text-xs text-secondary-500">{category.type || 'product'}</p>
                     </div>
                   </button>
                 ))
               ) : (
-                <p className="px-4 py-3 text-sm text-slate-500">{t('categories.noCategories')}</p>
+                <p className="px-4 py-3 text-sm text-secondary-500">{t('categories.noCategories')}</p>
               )}
 
               {canCreate ? (
-                <div className="border-t border-slate-100/80 px-4 py-3 dark:border-slate-800/50">
+                <div className="border-t border-secondary-100/80 px-4 py-3 dark:border-slate-800/50">
                   <button
                     type="button"
                     id={createButtonId || undefined}
