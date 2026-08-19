@@ -40,11 +40,8 @@ export default function StatsCard({
   size = 'default',
   onClick,
   isActive = false,
-<<<<<<< HEAD
-=======
   children,
   id,
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
 }) {
   const heading = title || label || '';
   const colors = TONE_STYLES[tone] || TONE_STYLES.default;
@@ -54,22 +51,14 @@ export default function StatsCard({
 
   return (
     <div
-<<<<<<< HEAD
-      className={`card flex items-center justify-between border backdrop-blur-md transition ${
-        isActive
-          ? 'border-primary ring-1 ring-primary bg-primary-50/15 dark:bg-primary-950/15 shadow-md scale-[1.01]'
-          : 'border-slate-100 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 shadow-sm'
-      } ${paddingClasses[size] || paddingClasses.default} ${
-        onClick ? 'cursor-pointer hover:border-slate-300 dark:hover:border-slate-700 hover:shadow' : ''
-      }`}
-=======
       id={id}
       className={`flex items-center justify-between gap-3 rounded-2xl border bg-white/90 shadow-sm backdrop-blur-sm transition dark:bg-slate-900/70 ${
         isActive
           ? 'border-primary ring-1 ring-primary/40 bg-primary-50/20 shadow-md dark:bg-primary-950/20'
           : 'border-secondary-200/70 dark:border-slate-800/60'
-      } ${onClick ? 'cursor-pointer hover:border-primary/40 hover:shadow' : ''}`}
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
+      } ${PADDING_CLASSES[size] || PADDING_CLASSES.default} ${
+        onClick ? 'cursor-pointer hover:border-primary/40 hover:shadow' : ''
+      }`}
       onClick={onClick}
       onKeyDown={onClick ? (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
