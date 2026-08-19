@@ -279,11 +279,7 @@ const partyName = isSale
                   <span>-{money(record.discountTotal || record.discount)}</span>
                 </div>
               )}
-<<<<<<< HEAD
-              <div className="flex justify-between border-t border-slate-200/70 pt-3 font-bold text-slate-900 dark:border-slate-700 dark:text-white">
-=======
               <div className="flex justify-between border-t border-secondary-200/70 pt-3 font-bold text-ink dark:border-slate-700 dark:text-white">
->>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
                 <span className="text-base">Grand Total</span>
                 <span className="text-lg">{money(record.grandTotal)}</span>
               </div>
