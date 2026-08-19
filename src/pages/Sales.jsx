@@ -28,10 +28,14 @@ import { useSaleStore } from '../stores/sales';
 import { useProductStore } from '../stores/products';
 import { getCreatorDisplayName, getCurrentCreatorValue } from '../lib/records';
 <<<<<<< HEAD
+<<<<<<< HEAD
 import StatsCard from '../components/StatsCard.jsx';
 =======
 import StatsCard, { STATS_GRID_CLASS } from '../components/StatsCard.jsx';
 >>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
+=======
+import StatsCard, { STATS_GRID_CLASS } from '../components/StatsCard.jsx';
+>>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
 import RefreshButton from '../components/RefreshButton.jsx';
 import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
 import DateDisplay from '../components/DateDisplay.jsx';

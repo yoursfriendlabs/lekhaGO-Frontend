@@ -240,10 +240,14 @@ function DeliveryBadge({ date, isGym, isClosed, createdAt }) {
           <DateDisplay date={createdAt} format="D MMM YYYY" />
         ) : (
 <<<<<<< HEAD
+<<<<<<< HEAD
           <span className="text-slate-400">—</span>
 =======
           <span className="text-secondary-400">—</span>
 >>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
+=======
+          <span className="text-secondary-400">—</span>
+>>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
         )}
         <div className="text-[10px] md:text-xs font-bold mt-0.5 text-emerald-600/80 dark:text-emerald-400/80">
           {isGym ? "Completed / Inactive" : t("services.closed") || "Completed"}
@@ -256,6 +260,7 @@ function DeliveryBadge({ date, isGym, isClosed, createdAt }) {
     if (createdAt) {
       return (
 <<<<<<< HEAD
+<<<<<<< HEAD
         <div className="leading-snug text-slate-500 dark:text-slate-400 text-xs md:text-sm">
           <DateDisplay date={createdAt} format="D MMM YYYY" />
           <div className="text-[10px] md:text-xs font-bold mt-0.5 text-slate-400 dark:text-slate-500">
@@ -264,16 +269,25 @@ function DeliveryBadge({ date, isGym, isClosed, createdAt }) {
           <DateDisplay date={createdAt} format="D MMM YYYY" />
           <div className="text-[10px] md:text-xs font-bold mt-0.5 text-secondary-400">
 >>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
+=======
+        <div className="leading-snug text-secondary-500 text-xs md:text-sm">
+          <DateDisplay date={createdAt} format="D MMM YYYY" />
+          <div className="text-[10px] md:text-xs font-bold mt-0.5 text-secondary-400">
+>>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
             {t("services.created") || "Created"}
           </div>
         </div>
       );
     }
 <<<<<<< HEAD
+<<<<<<< HEAD
     return <span className="text-slate-400">—</span>;
 =======
     return <span className="text-secondary-400">—</span>;
 >>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
+=======
+    return <span className="text-secondary-400">—</span>;
+>>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
   }
 
   const days = getDeliveryDaysLeft(date);
@@ -282,10 +296,14 @@ function DeliveryBadge({ date, isGym, isClosed, createdAt }) {
   if (days === null) {
     return (
 <<<<<<< HEAD
+<<<<<<< HEAD
       <div className="leading-snug text-slate-500 dark:text-slate-400 text-xs md:text-sm">
 =======
       <div className="leading-snug text-secondary-500 text-xs md:text-sm">
 >>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
+=======
+      <div className="leading-snug text-secondary-500 text-xs md:text-sm">
+>>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
         {label}
       </div>
     );
@@ -310,10 +328,14 @@ function DeliveryBadge({ date, isGym, isClosed, createdAt }) {
     <div className="leading-snug">
       <div className={colorClass}>{label}</div>
 <<<<<<< HEAD
+<<<<<<< HEAD
       <div className="text-[10px] md:text-xs font-bold mt-0.5 text-slate-500 dark:text-slate-400">{remainingText}</div>
 =======
       <div className="text-[10px] md:text-xs font-bold mt-0.5 text-secondary-500">{remainingText}</div>
 >>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
+=======
+      <div className="text-[10px] md:text-xs font-bold mt-0.5 text-secondary-500">{remainingText}</div>
+>>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
     </div>
   );
 }
@@ -2879,10 +2901,14 @@ export default function Services() {
                               </label>
                               <div className="flex h-11 items-center justify-between rounded-xl border border-secondary-200 bg-secondary-50/20 px-3.5 mt-1 dark:border-slate-800 dark:bg-slate-900/50">
 <<<<<<< HEAD
+<<<<<<< HEAD
                                 <span className="text-xs font-bold text-secondary-500 dark:text-slate-400">
 =======
                                 <span className="text-xs font-bold text-secondary-500 dark:text-secondary-400">
 >>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
+=======
+                                <span className="text-xs font-bold text-secondary-500 dark:text-secondary-400">
+>>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
                                   {hasDeliveryDate ? t("common.yes") : t("common.no")}
                                 </span>
                                 <label className="relative inline-flex cursor-pointer items-center text-xs">
@@ -2924,10 +2950,14 @@ export default function Services() {
                                           setHeader((prev) => ({ ...prev, deliveryDate: nextDate }));
                                         }}
 <<<<<<< HEAD
+<<<<<<< HEAD
                                         className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:border-[#9c5f22] text-xs font-bold text-slate-600 bg-white hover:bg-[#9c5f22]/5 transition shadow-sm"
 =======
                                         className="px-2.5 py-1.5 rounded-xl border border-secondary-200 hover:border-primary text-xs font-bold text-secondary-700 bg-white hover:bg-primary/5 transition shadow-sm"
 >>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
+=======
+                                        className="px-2.5 py-1.5 rounded-xl border border-secondary-200 hover:border-primary text-xs font-bold text-secondary-700 bg-white hover:bg-primary/5 transition shadow-sm"
+>>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
                                       >
                                         {opt.label}
                                       </button>

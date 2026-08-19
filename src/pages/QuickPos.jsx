@@ -2233,10 +2233,14 @@ return (
                 <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
                   <div className="relative">
 <<<<<<< HEAD
+<<<<<<< HEAD
                     <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
 =======
                     <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-secondary-400">
 >>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
+=======
+                    <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-secondary-400">
+>>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
                       %
                     </div>
                     <input
@@ -2270,10 +2274,14 @@ return (
                 <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
                   <div className="relative">
 <<<<<<< HEAD
+<<<<<<< HEAD
                     <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
 =======
                     <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-secondary-400">
 >>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
+=======
+                    <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-secondary-400">
+>>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
                       {t("currency.symbol")}
                     </div>
                     <input
@@ -2302,10 +2310,14 @@ return (
                     <div className="min-w-[7rem] w-full max-w-[8rem] shrink-0 sm:w-auto">
                       <div className="relative">
 <<<<<<< HEAD
+<<<<<<< HEAD
                         <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">
 =======
                         <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-secondary-400">
 >>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
+=======
+                        <div className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-secondary-400">
+>>>>>>> 3c6dca05518ed734fae71c25319a5f64b2dc19d5
                           {t("currency.symbol")}
                         </div>
                         <input
