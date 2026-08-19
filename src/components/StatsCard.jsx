@@ -23,6 +23,12 @@ const TONE_STYLES = {
   },
 };
 
+const PADDING_CLASSES = {
+  sm: 'p-3.5 rounded-xl',
+  md: 'p-4 rounded-2xl',
+  default: 'p-4 rounded-2xl',
+};
+
 export default function StatsCard({
   title,
   label,
@@ -31,6 +37,7 @@ export default function StatsCard({
   icon: Icon,
   tone = 'default',
   loading = false,
+  size = 'default',
   onClick,
   isActive = false,
   children,
@@ -45,11 +52,13 @@ export default function StatsCard({
   return (
     <div
       id={id}
-      className={`flex items-center justify-between gap-3 rounded-2xl border bg-white/90 p-4 shadow-sm backdrop-blur-sm transition dark:bg-slate-900/70 ${
+      className={`flex items-center justify-between gap-3 rounded-2xl border bg-white/90 shadow-sm backdrop-blur-sm transition dark:bg-slate-900/70 ${
         isActive
           ? 'border-primary ring-1 ring-primary/40 bg-primary-50/20 shadow-md dark:bg-primary-950/20'
           : 'border-secondary-200/70 dark:border-slate-800/60'
-      } ${onClick ? 'cursor-pointer hover:border-primary/40 hover:shadow' : ''}`}
+      } ${PADDING_CLASSES[size] || PADDING_CLASSES.default} ${
+        onClick ? 'cursor-pointer hover:border-primary/40 hover:shadow' : ''
+      }`}
       onClick={onClick}
       onKeyDown={onClick ? (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
