@@ -20,7 +20,7 @@ function badgeClass(tone = 'slate') {
     case 'sky':
       return 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300';
     default:
-      return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+      return 'bg-secondary-200 text-ink-light dark:bg-slate-800 dark:text-secondary-300';
   }
 }
 

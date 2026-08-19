@@ -68,7 +68,7 @@ export default function ForgotPassword() {
         t('auth.forgotPasswordTipSingleUse'),
       ]}
       footer={(
-        <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+        <p className="text-center text-sm text-secondary-500">
           {t('auth.rememberPassword')}{' '}
           <Link className="font-medium text-primary hover:text-primary/80" to="/login">
             {t('auth.signIn')}
@@ -92,7 +92,7 @@ export default function ForgotPassword() {
             required
             disabled={loading}
           />
-          <p className="mt-1 text-xs text-slate-500">{t('auth.forgotPasswordHint')}</p>
+          <p className="mt-1 text-xs text-secondary-500">{t('auth.forgotPasswordHint')}</p>
         </div>
 
         <button className="btn-primary w-full justify-center" type="submit" disabled={loading || !normalizeEmail(email)}>

@@ -13,7 +13,7 @@ import Notice from './components/Notice';
 import RouteFallback from './components/RouteFallback';
 import PwaLifecycle from './components/PwaLifecycle';
 import SubscriptionStatusBanner, { formatSubscriptionStatusDate } from './components/subscription/SubscriptionStatusBanner.jsx';
-import { getFeatureAccessLevel as getPermissionAccessLevel } from './lib/accessControl';
+import { getFeatureAccessLevel as getPermissionAccessLevel, isOwnStaffMembership } from './lib/accessControl';
 import { hasUnverifiedEmail, isStaffActivationRequired } from './lib/authFlow';
 import { getSubscriptionGuard, getSubscriptionStatusState, humanizeKey } from './lib/subscription';
 import { buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB } from './lib/settingsTabs';
@@ -70,7 +70,7 @@ function RoleGuard({ children, allowedRoles = OWNER_AND_STAFF_ROLES, redirectTo 
   return children;
 }
 
-export function SubscriptionFeatureRoute({ children, featureKey, redirectTo = buildSettingsTabPath(SUBSCRIPTION_SETTINGS_TAB) }) {
+export function SubscriptionFeatureRoute({ children, featureKey, featureKeys, redirectTo = buildSettingsTabPath(SUBSCRIPTION_SETTINGS_TAB) }) {
   const location = useLocation();
   const {
     accessControl,
@@ -80,14 +80,18 @@ export function SubscriptionFeatureRoute({ children, featureKey, redirectTo = bu
     subscription,
   } = useAuth();
   const { t } = useI18n();
+  const keys = featureKeys || (featureKey ? [featureKey] : []);
 
-  if (canViewFeature(featureKey)) {
+  if (keys.some((key) => canViewFeature(key))) {
     return children;
   }
 
-  const permissionLevel = getPermissionAccessLevel(accessControl, featureKey, role);
+  const blockedByPermission = keys.some((key) => {
+    const permissionLevel = getPermissionAccessLevel(accessControl, key, role);
+    return permissionLevel === 'none' && hasSubscriptionFeatureAccess(key);
+  });
 
-  if (permissionLevel === 'none' && hasSubscriptionFeatureAccess(featureKey)) {
+  if (blockedByPermission) {
     return (
       <Navigate
         to="/app"
@@ -95,7 +99,7 @@ export function SubscriptionFeatureRoute({ children, featureKey, redirectTo = bu
         state={{
           notice: {
             title: t('appAccess.permissionRedirectTitle'),
-            description: t('appAccess.permissionRedirectDescription', { feature: humanizeKey(featureKey) }),
+            description: t('appAccess.permissionRedirectDescription', { feature: humanizeKey(keys[0]) }),
             tone: 'warn',
             from: `${location.pathname}${location.search}`,
           },
@@ -114,7 +118,7 @@ export function SubscriptionFeatureRoute({ children, featureKey, redirectTo = bu
     }
     : {
       title: t('settingsPage.subscription.redirectTitle'),
-      description: t('settingsPage.subscription.redirectDescription', { feature: humanizeKey(featureKey) }),
+      description: t('settingsPage.subscription.redirectDescription', { feature: humanizeKey(keys[0]) }),
       tone: 'warn',
       from: `${location.pathname}${location.search}`,
     };
@@ -127,6 +131,27 @@ export function SubscriptionFeatureRoute({ children, featureKey, redirectTo = bu
         notice,
       }}
     />
+  );
+}
+
+function StaffOrPersonalProfileRoute() {
+  const { role, accessControl } = useAuth();
+  if (role === 'staff' && accessControl?.membershipId) {
+    return <StaffSalaryProfile />;
+  }
+  return <Profile />;
+}
+
+function OwnOrManagedStaffSalaryRoute() {
+  const { membershipId } = useParams();
+  const { accessControl, canViewFeature } = useAuth();
+  if (isOwnStaffMembership(accessControl, membershipId) || canViewFeature('staff')) {
+    return <StaffSalaryProfile />;
+  }
+  return (
+    <SubscriptionFeatureRoute featureKey="staff">
+      <StaffSalaryProfile />
+    </SubscriptionFeatureRoute>
   );
 }
 
@@ -169,11 +194,11 @@ function LedgerRedirect() {
 function InvoiceAccessRoute({ children }) {
   const { type } = useParams();
   const allowedRoles = OWNER_AND_STAFF_ROLES;
-  const featureKey = type === 'purchases' ? 'purchases' : 'sales';
+  const featureKeys = type === 'purchases' ? ['purchases'] : ['sales', 'quickPos'];
 
   return (
     <RoleGuard allowedRoles={allowedRoles}>
-      <SubscriptionFeatureRoute featureKey={featureKey}>
+      <SubscriptionFeatureRoute featureKeys={featureKeys}>
         {children}
       </SubscriptionFeatureRoute>
     </RoleGuard>
@@ -257,7 +282,7 @@ function AppShell() {
   const routeNotice = location.state?.notice || null;
 
   return (
-    <div className="gradient-bg min-h-[100dvh] overflow-x-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 md:h-screen md:overflow-hidden">
+    <div className="gradient-bg min-h-[100dvh] overflow-x-hidden bg-mist text-ink md:h-screen md:overflow-hidden">
       <div className="flex min-h-[100dvh] max-w-full md:h-screen">
         <Sidebar />
         <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col overflow-x-hidden md:ml-64 md:min-h-0 md:h-screen md:overflow-hidden">
@@ -288,10 +313,10 @@ function AppShell() {
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
                       {t('auth.emailVerificationBannerEyebrow')}
                     </p>
-                    <h2 className="mt-2 font-serif text-xl text-slate-900 dark:text-white">
+                    <h2 className="mt-2 font-serif text-xl text-ink">
                       {requiresActivation ? t('auth.activationBannerStaffTitle') : t('auth.activationBannerTitle')}
                     </h2>
-                    <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    <p className="mt-2 text-sm text-secondary-600">
                       {requiresActivation ? t('auth.activationBannerStaffDescription') : t('auth.activationBannerDescription')}
                     </p>
                   </div>
@@ -345,7 +370,7 @@ function AppShell() {
                     )}
                   />
                   <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="sales"><Sales /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="pos" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="sales">{posPageElement}</SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="pos" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="quickPos">{posPageElement}</SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route
                     path="services"
                     element={(
@@ -360,7 +385,7 @@ function AppShell() {
                   />
                   <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="parties"><Parties /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="tables" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="tables"><Tables /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="billing" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="sales"><CashierBilling /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="billing" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKeys={['billing', 'sales', 'quickPos']}><CashierBilling /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route
                     path="tasks"
                     element={(
@@ -381,7 +406,7 @@ function AppShell() {
                   <Route path="staff" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="staff"><Staff /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route
                     path="staff-salary/:membershipId"
-                    element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="staff"><StaffSalaryProfile /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>}
+                    element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><OwnOrManagedStaffSalaryRoute /></RoleGuard></EmailActivationRequiredRoute>}
                   />
                   <Route path="admin" element={<Navigate to="/app/settings" replace />} />
                   <Route
@@ -389,7 +414,7 @@ function AppShell() {
                     element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="order-attributes"><Navigate to={buildSettingsTabPath(ORDER_ATTRIBUTES_SETTINGS_TAB)} replace /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>}
                   />
                   <Route path="settings" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Settings /></RoleGuard></EmailActivationRequiredRoute>} />
-                  <Route path="profile" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><Profile /></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="profile" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><StaffOrPersonalProfileRoute /></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="invoice/:type/:id" element={<EmailActivationRequiredRoute><InvoiceAccessRoute><Invoice /></InvoiceAccessRoute></EmailActivationRequiredRoute>} />
                   <Route path="activate-account" element={<ActivationOnlyRoute><ActivateAccount /></ActivationOnlyRoute>} />
                 </Routes>

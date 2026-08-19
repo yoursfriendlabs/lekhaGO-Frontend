@@ -2,6 +2,7 @@ import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../lib/auth.jsx';
 import { I18nProvider } from '../lib/i18n.jsx';
+import { ThemeProvider } from '../lib/theme.jsx';
 
 export function renderWithProviders(ui, { route = '/', withAuth = false } = {}) {
   const Wrapper = ({ children }) => (
@@ -12,9 +13,11 @@ export function renderWithProviders(ui, { route = '/', withAuth = false } = {}) 
         v7_relativeSplatPath: true,
       }}
     >
-      <I18nProvider>
-        {withAuth ? <AuthProvider>{children}</AuthProvider> : children}
-      </I18nProvider>
+      <ThemeProvider>
+        <I18nProvider>
+          {withAuth ? <AuthProvider>{children}</AuthProvider> : children}
+        </I18nProvider>
+      </ThemeProvider>
     </MemoryRouter>
   );
 

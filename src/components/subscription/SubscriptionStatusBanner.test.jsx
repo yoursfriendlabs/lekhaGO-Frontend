@@ -27,7 +27,8 @@ describe('SubscriptionStatusBanner', () => {
             subscriptionStatus: 'active',
           },
         }}
-      />
+      />,
+      { withAuth: true }
     );
 
     expect(screen.getByText(/your free trial is about to end/i)).toBeInTheDocument();
@@ -64,7 +65,8 @@ describe('SubscriptionStatusBanner', () => {
             subscriptionStatus: 'expired',
           },
         }}
-      />
+      />,
+      { withAuth: true }
     );
 
     expect(screen.getByText(/your free trial has ended/i)).toBeInTheDocument();

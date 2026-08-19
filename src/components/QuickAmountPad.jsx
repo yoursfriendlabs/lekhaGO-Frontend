@@ -93,13 +93,13 @@ export default function QuickAmountPad({
       <div className="rounded-[32px] border border-secondary-200/80 bg-white px-5 py-5 shadow-sm">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-secondary-400">
               {t('quickEntry.amount')}
             </p>
-            {helperText ? <p className="mt-1 text-sm text-slate-500">{helperText}</p> : null}
+            {helperText ? <p className="mt-1 text-sm text-secondary-500">{helperText}</p> : null}
           </div>
           <div className="text-right">
-            <p className="text-sm text-slate-400">{t('quickEntry.liveTotal')}</p>
+            <p className="text-sm text-secondary-400">{t('quickEntry.liveTotal')}</p>
             <p className="text-xl font-semibold text-primary-700">
               {t('currency.formatted', {
                 symbol: t('currency.symbol'),
@@ -110,7 +110,7 @@ export default function QuickAmountPad({
         </div>
 
         <input
-          className="mt-6 w-full border-0 bg-transparent p-0 text-right text-[2.6rem] font-semibold tracking-tight text-slate-900 focus:outline-none focus:ring-0"
+          className="mt-6 w-full border-0 bg-transparent p-0 text-right text-[2.6rem] font-semibold tracking-tight text-ink focus:outline-none focus:ring-0"
           value={expression}
           onChange={(event) => onExpressionChange(event.target.value)}
           inputMode="decimal"
@@ -139,8 +139,8 @@ export default function QuickAmountPad({
               key === '='
                 ? 'col-span-2 border-primary-500 bg-primary text-white shadow-sm hover:bg-primary-600'
                 : /^[+\-×÷%⌫]$/.test(key)
-                  ? 'border-secondary-200 bg-secondary-50 text-slate-700 hover:bg-secondary-100'
-                  : 'border-slate-200 bg-white text-slate-900 hover:border-primary-200 hover:bg-primary-50/40'
+                  ? 'border-secondary-200 bg-secondary-50 text-ink-light hover:bg-secondary-100'
+                  : 'border-secondary-200 bg-white text-ink hover:border-primary-200 hover:bg-primary-50/40'
             }`}
           >
             {getKeyContent(key)}

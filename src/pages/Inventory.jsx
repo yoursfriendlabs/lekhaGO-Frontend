@@ -12,10 +12,11 @@ import { useI18n } from '../lib/i18n.jsx';
 import { getPurityOptionsForMetal, METAL_TYPE_OPTIONS } from '../lib/jewellery.js';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { buildSettingsTabPath, UNITS_SETTINGS_TAB } from '../lib/settingsTabs.js';
+import { useShallow } from 'zustand/react/shallow';
 import { useProductStore } from '../stores/products';
 import { Pencil, Plus, History, AlertTriangle, Clock, TrendingUp, TrendingDown, Trash2, Eye, Layers } from 'lucide-react';
 import ImageCropperModal from '../components/ImageCropperModal.jsx';
-import StatsCard from '../components/StatsCard.jsx';
+import StatsCard, { STATS_GRID_CLASS } from '../components/StatsCard.jsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import ActionMenu from '../components/ActionMenu.jsx';
 import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
@@ -65,7 +66,7 @@ const toDateInputValue = (value) => {
   return match ? match[0] : '';
 };
 
-const buildProductPayload = (form) => ({
+const buildProductPayload = (form, { includePurchasePrice = true } = {}) => ({
   name: form.name,
   companyName: String(form.companyName || '').trim() || null,
   sku: form.itemCode.trim(),
@@ -78,7 +79,7 @@ const buildProductPayload = (form) => ({
   secondaryUnit: form.secondaryUnit,
   conversionRate: parseNumber(form.conversionRate),
   salePrice: parseNumber(form.salePrice),
-  purchasePrice: parseNumber(form.purchasePrice),
+  ...(includePurchasePrice ? { purchasePrice: parseNumber(form.purchasePrice) } : {}),
   secondarySalePrice: parseNumber(form.secondarySalePrice),
   mrpPrice: parseNumber(form.mrpPrice),
   wholesalePrice: parseNumber(form.wholesalePrice),
@@ -225,9 +226,14 @@ function getItemTypeLabel(itemType, itemTypeOptions, t) {
 
 export default function Inventory() {
   const { t } = useI18n();
-  const { canManageFeature, businessId } = useAuth();
+  const { canManageFeature, canViewFeature, businessId } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const canManageInventory = canManageFeature('inventory');
+  const canViewPurchasePrice = canViewFeature('purchasePrice');
+  const canManagePurchasePrice = canManageFeature('purchasePrice');
+  // Selecting only what this page renders. Subscribing to the whole store also
+  // subscribed to its internal `lists` cache, so every fetch for any query
+  // re-rendered the entire page.
   const {
     products,
     total: productsTotal,
@@ -236,7 +242,17 @@ export default function Inventory() {
     fetch: fetchProducts,
     invalidate: invalidateProducts,
     patchProduct,
-  } = useProductStore();
+  } = useProductStore(
+    useShallow((state) => ({
+      products: state.products,
+      total: state.total,
+      loading: state.loading,
+      error: state.error,
+      fetch: state.fetch,
+      invalidate: state.invalidate,
+      patchProduct: state.patchProduct,
+    })),
+  );
   const inventoryProfile = businessProfile?.inventory || {};
   const itemTypeOptions = Array.isArray(inventoryProfile.itemTypes) && inventoryProfile.itemTypes.length
     ? inventoryProfile.itemTypes
@@ -268,6 +284,12 @@ export default function Inventory() {
   const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => {
+    if (!canViewPurchasePrice && sortKey === 'purchasePrice') {
+      setSortKey('name');
+    }
+  }, [canViewPurchasePrice, sortKey]);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
     return () => window.clearTimeout(timer);
   }, [query]);
@@ -295,6 +317,7 @@ export default function Inventory() {
     if (!businessId) return;
     try {
       setStatsLoading(true);
+<<<<<<< HEAD
       // Low / near-expiry counts come from the same list filters the UI uses,
       // so cards always match what you see when you click/filter.
       const [lowRes, nearRes, allRes, statsRes] = await Promise.all([
@@ -310,6 +333,17 @@ export default function Inventory() {
         lowStockCount: Number(lowRes?.total ?? statsRes?.lowStockCount ?? 0),
         nearExpiryCount: Number(nearRes?.total ?? statsRes?.nearExpiryCount ?? 0),
         allCount: Number(allRes?.total ?? 0),
+=======
+      // /api/products/stats applies the same in-stock threshold and 20-day
+      // expiry window as the `stock=low` and `stock=nearexpiry` list filters,
+      // so the cards still match what you see after clicking through. Counting
+      // via the list endpoint as well would just ask the same two questions
+      // a second time.
+      const statsRes = await api.getProductStats();
+      setStats({
+        lowStockCount: Number(statsRes?.lowStockCount || 0),
+        nearExpiryCount: Number(statsRes?.nearExpiryCount || 0),
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
         popularCount: Number(statsRes?.popularCount || 0),
         leastPopularCount: Number(statsRes?.leastPopularCount || 0),
       });
@@ -326,11 +360,15 @@ export default function Inventory() {
     }
   }, [businessId]);
 
+  // Depending on `products` here refetched the stats on every list load,
+  // because the store returns a new array identity each time. The mutation
+  // handlers below refresh the stats themselves, which is the only time the
+  // numbers can actually change.
   useEffect(() => {
     if (businessId) {
       fetchStats();
     }
-  }, [businessId, products, fetchStats]);
+  }, [businessId, fetchStats]);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deleteProduct, setDeleteProduct] = useState(null);
@@ -823,7 +861,7 @@ export default function Inventory() {
     setStatus({ type: 'info', message: '' });
 
     try {
-      const payload = buildProductPayload(form);
+      const payload = buildProductPayload(form, { includePurchasePrice: canManagePurchasePrice });
       const optimisticCategory = selectedCategory
         ? {
           id: selectedCategory.id,
@@ -842,6 +880,7 @@ export default function Inventory() {
       if (editingId) {
         const updatedProduct = await api.updateProduct(editingId, payload);
         patchProduct(editingId, updatedProduct || optimisticProduct);
+        fetchStats();
         setStatus({ type: 'success', message: t('inventory.messages.itemUpdated') });
       } else {
         await api.createProduct(payload);
@@ -914,6 +953,8 @@ export default function Inventory() {
         ...restockProduct,
         stockOnHand: fallbackStock,
       });
+      // Stock moved, so the low-stock and near-expiry cards need recounting.
+      fetchStats();
 
       const quantityLabel = `${formatQuantity(quantityValue)}${restockProduct.primaryUnit ? ` ${restockProduct.primaryUnit}` : ''}`;
       closeRestockDialog();
@@ -992,14 +1033,13 @@ export default function Inventory() {
       />
 
       {/* Inventory Stats Cards */}
-      <div id="inventory-stats-grid" className="grid gap-2.5 grid-cols-2 lg:grid-cols-4 sm:gap-4">
+      <div id="inventory-stats-grid" className={STATS_GRID_CLASS}>
         <StatsCard
           title={t('inventory.lowStockItems') || 'Low Stock Items'}
           value={stats?.lowStockCount ?? 0}
           icon={AlertTriangle}
           tone="danger"
           loading={statsLoading}
-          size="sm"
           onClick={() => {
             setStockFilter('low');
             setPage(1);
@@ -1012,7 +1052,6 @@ export default function Inventory() {
           icon={Clock}
           tone="warning"
           loading={statsLoading}
-          size="sm"
           onClick={() => {
             setStockFilter('nearexpiry');
             setSortKey('expiryDate');
@@ -1026,7 +1065,10 @@ export default function Inventory() {
           icon={Layers}
           tone="info"
           loading={statsLoading}
+<<<<<<< HEAD
           size="sm"
+=======
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
           onClick={() => {
             setStockFilter('all');
             setSortKey('');
@@ -1040,7 +1082,6 @@ export default function Inventory() {
           icon={TrendingDown}
           tone="default"
           loading={statsLoading}
-          size="sm"
         />
       </div>
 
@@ -1048,7 +1089,11 @@ export default function Inventory() {
 
       <div id="inventory-items-card" className="card">
         <div className="flex flex-wrap items-center justify-between gap-3">
+<<<<<<< HEAD
           <h3 className="font-serif text-xl text-slate-900 dark:text-white sm:text-2xl animate-fade-in" key={stockFilter}>
+=======
+          <h3 className="font-serif text-xl text-ink sm:text-2xl animate-fade-in" key={stockFilter}>
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
             {stockFilter === 'low'
               ? t('inventory.lowStockItems') || 'Low Stock Items'
               : stockFilter === 'nearexpiry'
@@ -1060,8 +1105,8 @@ export default function Inventory() {
         </div>
 
         <div className="mt-4 grid gap-2.5 grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.8fr)_repeat(3,minmax(0,1fr))] sm:gap-3">
-          <div className="flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 shadow-sm focus-within:border-emerald-300 dark:border-slate-800 dark:bg-slate-950 sm:col-span-2 xl:col-span-1">
-            <span className="pl-3 text-slate-400">🔍</span>
+          <div className="flex min-w-0 items-center gap-2 rounded-xl border border-secondary-200 bg-white text-sm text-secondary-700 shadow-sm focus-within:border-emerald-300 dark:border-slate-800 dark:bg-slate-950 sm:col-span-2 xl:col-span-1">
+            <span className="pl-3 text-secondary-400">🔍</span>
             <input
               id="inventory-search-input"
               className="w-full bg-transparent focus:border-none focus:ring-0 border-none"
@@ -1103,7 +1148,9 @@ export default function Inventory() {
             <option value="name">{t('inventory.sortByName') || 'Sort by Name'}</option>
             <option value="quantity">{t('inventory.sortByQuantity') || 'Sort by Stock'}</option>
             <option value="salePrice">{t('inventory.sortBySalePrice') || 'Sort by Sale Price'}</option>
-            <option value="purchasePrice">{t('inventory.sortByPurchasePrice') || 'Sort by Purchase Price'}</option>
+            {canViewPurchasePrice ? (
+              <option value="purchasePrice">{t('inventory.sortByPurchasePrice') || 'Sort by Purchase Price'}</option>
+            ) : null}
             <option value="expiryDate">{t('inventory.sortByExpiryDate') || 'Sort by Expiry Date'}</option>
           </select>
         </div>
@@ -1111,15 +1158,15 @@ export default function Inventory() {
         {/* Mobile card view */}
         <div id="inventory-mobile-list" className="mt-4 md:hidden space-y-3">
           {productsLoading && products.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+            <p className="py-3 text-sm text-secondary-500">{t('common.loading')}</p>
           ) : pagedItems.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">{t('inventory.noItems')}</p>
+            <p className="py-3 text-sm text-secondary-500">{t('inventory.noItems')}</p>
           ) : (
             pagedItems.map((item) => (
               <div
                 key={item.id}
                 id={getInventoryItemCardId(item.id)}
-                className="rounded-2xl border border-slate-200/70 bg-white/80 p-3.5 text-sm dark:border-slate-800/60 dark:bg-slate-900/60"
+                className="rounded-2xl border border-secondary-200/70 bg-white/80 p-3.5 text-sm dark:border-slate-800/60 dark:bg-slate-900/60"
               >
                 <div
                   role="button"
@@ -1137,7 +1184,7 @@ export default function Inventory() {
                     <img
                       src={item.imageUrl}
                       alt={item.name}
-                      className="h-11 w-11 shrink-0 rounded-xl object-cover border border-slate-200 dark:border-slate-800"
+                      className="h-11 w-11 shrink-0 rounded-xl object-cover border border-secondary-200 dark:border-slate-800"
                       onClick={(event) => {
                         event.stopPropagation();
                         setPreviewImage(item.imageUrl);
@@ -1149,8 +1196,8 @@ export default function Inventory() {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-900 dark:text-white truncate">{item.name}</p>
-                    <p className="text-xs text-slate-500 truncate">
+                    <p className="font-semibold text-ink truncate">{item.name}</p>
+                    <p className="text-xs text-secondary-500 truncate">
                       {[
                         item.brand,
                         item.category !== '-' ? item.category : null,
@@ -1175,7 +1222,7 @@ export default function Inventory() {
                   </div>
                 </div>
                 {item.expiryDate && (
-                  <div className="mt-2 text-xs text-slate-500 px-0.5">
+                  <div className="mt-2 text-xs text-secondary-500 px-0.5">
                     <span>{t('inventory.expiryDate') || 'Expiry Date'}:</span>
                     <div className={`mt-0.5 text-sm font-extrabold tracking-wide ${getExpiryDateColorClass(item.expiryDate)}`}>
                       <DateDisplay date={item.expiryDate} />
@@ -1183,11 +1230,13 @@ export default function Inventory() {
                     <div className="text-xs font-bold mt-0.5">{getExpiryRemainingDaysText(item.expiryDate, t)}</div>
                   </div>
                 )}
-                <div className="mt-2.5 flex items-center justify-between gap-2 text-xs text-slate-500 border-t border-slate-100 pt-2.5 dark:border-slate-800">
-                  <span className="min-w-0 truncate">{t('products.salePrice')}: <strong className="text-slate-700 dark:text-slate-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.salePrice.toFixed(2) })}</strong></span>
-                  <span className="min-w-0 truncate text-right">{t('products.purchasePrice')}: <strong className="text-slate-700 dark:text-slate-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.purchasePrice.toFixed(2) })}</strong></span>
+                <div className="mt-2.5 flex items-center justify-between gap-2 text-xs text-secondary-500 border-t border-secondary-100 pt-2.5 dark:border-slate-800">
+                  <span className="min-w-0 truncate">{t('products.salePrice')}: <strong className="text-ink-light dark:text-secondary-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: item.salePrice.toFixed(2) })}</strong></span>
+                  {canViewPurchasePrice ? (
+                    <span className="min-w-0 truncate text-right">{t('products.purchasePrice')}: <strong className="text-ink-light dark:text-secondary-300">{t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(item.purchasePrice || 0).toFixed(2) })}</strong></span>
+                  ) : null}
                 </div>
-                <div className="mt-2.5 flex items-center gap-2 border-t border-slate-100 pt-2.5 dark:border-slate-800">
+                <div className="mt-2.5 flex items-center gap-2 border-t border-secondary-100 pt-2.5 dark:border-slate-800">
                   <button
                     id={getInventoryItemActionId('view', item.id)}
                     className="btn-secondary min-h-10 min-w-0 flex-1 justify-center gap-1.5 px-2.5 text-center text-xs leading-tight"
@@ -1249,8 +1298,8 @@ export default function Inventory() {
         </div>
         {/* Desktop table */}
         <div id="inventory-desktop-table" className="mt-4 overflow-x-auto hidden md:block">
-          <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-            <thead className="text-xs uppercase text-slate-400">
+          <table className="w-full text-sm text-secondary-700">
+            <thead className="text-xs uppercase text-ink">
               <tr>
                 <th className="py-2 text-left">{t('inventory.itemName')}</th>
                 <th className="py-2 text-left">{t('inventory.brand')}</th>
@@ -1258,7 +1307,9 @@ export default function Inventory() {
                 <th className="py-2 text-left">{t('inventory.itemCode')}</th>
                 <th className="py-2 text-left">{t('inventory.expiryDate') || 'Expiry Date'}</th>
                 <th className="py-2 text-right">{t('products.salePrice')}</th>
-                <th className="py-2 text-right">{t('products.purchasePrice')}</th>
+                {canViewPurchasePrice ? (
+                  <th className="py-2 text-right">{t('products.purchasePrice')}</th>
+                ) : null}
                 <th className="py-2 text-right">{t('inventory.quantity')}</th>
                 <th className="py-2 text-right">{t('common.actions')}</th>
               </tr>
@@ -1266,19 +1317,19 @@ export default function Inventory() {
             <tbody>
               {productsLoading && products.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-3 text-slate-500">{t('common.loading')}</td>
+                  <td colSpan={canViewPurchasePrice ? 10 : 9} className="py-3 text-secondary-500">{t('common.loading')}</td>
                 </tr>
               ) : pagedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-3 text-slate-500">{t('inventory.noItems')}</td>
+                  <td colSpan={canViewPurchasePrice ? 10 : 9} className="py-3 text-secondary-500">{t('inventory.noItems')}</td>
                 </tr>
               ) : (
                 pagedItems.map((item) => (
-                  <tr key={item.id} id={getInventoryItemRowId(item.id)} className="border-t border-slate-200/70 dark:border-slate-800/70">
+                  <tr key={item.id} id={getInventoryItemRowId(item.id)} className="border-t border-secondary-200/70">
                     <td className="py-3">
                       <div className="flex items-center gap-3">
                         {item.imageUrl ? (
-                          <img src={item.imageUrl} alt={item.name} className="h-10 w-10 shrink-0 rounded-xl object-cover border border-slate-200 dark:border-slate-800 cursor-zoom-in" onClick={() => setPreviewImage(item.imageUrl)} />
+                          <img src={item.imageUrl} alt={item.name} className="h-10 w-10 shrink-0 rounded-xl object-cover border border-secondary-200 dark:border-slate-800 cursor-zoom-in" onClick={() => setPreviewImage(item.imageUrl)} />
                         ) : (
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
                             {item.name?.slice(0, 1) || 'I'}
@@ -1290,9 +1341,9 @@ export default function Inventory() {
                             className="text-left"
                             onClick={() => openDetailDialog(item.id, 'overview')}
                           >
-                            <p className="font-semibold text-slate-900 hover:text-primary dark:text-white">{item.name}</p>
+                            <p className="font-semibold text-ink hover:text-primary dark:text-white">{item.name}</p>
                           </button>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-secondary-500">
                             {[
                               showJewelleryFields
                                 ? (item.metalType && item.purity
@@ -1315,22 +1366,24 @@ export default function Inventory() {
                     <td className="py-3">{item.itemCode}</td>
                     <td className="py-3 text-left">
                       {item.expiryDate ? (
-                        <div className={`leading-snug ${getExpiryDateColorClass(item.expiryDate) || 'text-slate-500'}`}>
+                        <div className={`leading-snug ${getExpiryDateColorClass(item.expiryDate) || 'text-secondary-500'}`}>
                           <div className="text-sm font-extrabold tracking-wide">
                             <DateDisplay date={item.expiryDate} />
                           </div>
                           <div className="text-xs font-bold mt-0.5">{getExpiryRemainingDaysText(item.expiryDate, t)}</div>
                         </div>
                       ) : (
-                        <span className="text-slate-400">—</span>
+                        <span className="text-secondary-400">—</span>
                       )}
                     </td>
                     <td className="py-3 text-right">
                       {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.salePrice.toFixed(2) })}
                     </td>
-                    <td className="py-3 text-right">
-                      {t('currency.formatted', { symbol: t('currency.symbol'), amount: item.purchasePrice.toFixed(2) })}
-                    </td>
+                    {canViewPurchasePrice ? (
+                      <td className="py-3 text-right">
+                        {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(item.purchasePrice || 0).toFixed(2) })}
+                      </td>
+                    ) : null}
                     <td className="py-3 text-right">
                       {item.quantity.toFixed(2)} {item.unit || ''}
                     </td>
@@ -1417,9 +1470,9 @@ export default function Inventory() {
           <FormSectionCard hint={t('inventory.restockHelp')} className="p-3 sm:p-4">
             <div className="space-y-3 sm:space-y-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{t('inventory.itemName')}</p>
-                <p id="inventory-restock-item-name" className="mt-1 break-words text-base font-semibold text-slate-900 dark:text-white sm:text-lg">{restockProduct?.name || '-'}</p>
-                <p id="inventory-restock-item-unit" className="text-sm text-slate-500">{restockProduct?.primaryUnit || t('inventory.noUnit')}</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-secondary-400">{t('inventory.itemName')}</p>
+                <p id="inventory-restock-item-name" className="mt-1 break-words text-base font-semibold text-ink sm:text-lg">{restockProduct?.name || '-'}</p>
+                <p id="inventory-restock-item-unit" className="text-sm text-secondary-500">{restockProduct?.primaryUnit || t('inventory.noUnit')}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -1429,7 +1482,7 @@ export default function Inventory() {
                   className={`min-h-11 min-w-0 rounded-xl border px-2 py-2 text-center text-xs font-semibold leading-tight whitespace-normal transition sm:rounded-2xl sm:px-3 sm:py-2.5 sm:text-sm ${
                     !isRestockRemove
                       ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-200'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
+                      : 'border-secondary-200 bg-white text-secondary-700 hover:bg-mist dark:border-slate-800 dark:bg-slate-950 dark:text-secondary-300'
                   }`}
                   onClick={() => setRestockAction('add')}
                 >
@@ -1441,7 +1494,7 @@ export default function Inventory() {
                   className={`min-h-11 min-w-0 rounded-xl border px-2 py-2 text-center text-xs font-semibold leading-tight whitespace-normal transition sm:rounded-2xl sm:px-3 sm:py-2.5 sm:text-sm ${
                     isRestockRemove
                       ? 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300'
+                      : 'border-secondary-200 bg-white text-secondary-700 hover:bg-mist dark:border-slate-800 dark:bg-slate-950 dark:text-secondary-300'
                   }`}
                   onClick={() => setRestockAction('remove')}
                 >
@@ -1452,7 +1505,7 @@ export default function Inventory() {
               <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
                 <div>
                   <label className="label">{t('inventory.quantityOnHand')}</label>
-                  <div id="inventory-restock-current-stock" className="mt-1 rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-700 dark:border-slate-800/70 dark:bg-slate-900/50 dark:text-slate-200 sm:rounded-2xl sm:px-4 sm:py-3">
+                  <div id="inventory-restock-current-stock" className="mt-1 rounded-xl border border-secondary-200/70 bg-mist px-3 py-2.5 text-sm font-medium text-ink-light dark:border-slate-800/70 dark:bg-slate-900/50 dark:text-slate-200 sm:rounded-2xl sm:px-4 sm:py-3">
                     {formatQuantity(currentRestockStock)}{restockUnitSuffix}
                   </div>
                 </div>
@@ -1477,8 +1530,8 @@ export default function Inventory() {
               </div>
 
               {!isRestockRemove ? (
-                <div className="space-y-3 rounded-xl border border-slate-200/70 bg-slate-50/70 p-3 dark:border-slate-800/70 dark:bg-slate-900/40 sm:rounded-2xl">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                <div className="space-y-3 rounded-xl border border-secondary-200/70 bg-mist/70 p-3 dark:border-slate-800/70 dark:bg-slate-900/40 sm:rounded-2xl">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">
                     {t('inventory.stockLots') || 'Stock lot'}
                   </p>
                   <div className="grid gap-3 sm:grid-cols-[1.1fr_1fr] sm:items-end sm:gap-4">
@@ -1505,7 +1558,7 @@ export default function Inventory() {
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-secondary-500">
                     {t('inventory.restockExpiryHelp') || 'If this stock has a new expiry/batch, add it here. Older stock keeps its own lot.'}
                   </p>
                 </div>
@@ -1539,7 +1592,7 @@ export default function Inventory() {
             </div>
           </FormSectionCard>
 
-          <div className="mobile-sticky-actions sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t border-slate-200/70 bg-white/95 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:static sm:mx-0 sm:mb-0 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+          <div className="mobile-sticky-actions sticky bottom-0 z-10 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t border-secondary-200/70 bg-white/95 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95 sm:static sm:mx-0 sm:mb-0 sm:flex-row sm:justify-end sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
             <button id="inventory-restock-close" className="btn-secondary w-full whitespace-normal text-center leading-tight sm:w-auto" type="button" onClick={closeRestockDialog}>
               <span className="min-w-0 break-words">{t('common.close')}</span>
             </button>
@@ -1555,7 +1608,7 @@ export default function Inventory() {
       </Dialog>
 
       <Dialog isOpen={previewImage !== null} onClose={() => setPreviewImage(null)} title={t('common.preview') || 'Image Preview'} size="lg">
-        <div className="flex justify-center items-center p-2 bg-slate-50 dark:bg-slate-900 rounded-2xl overflow-hidden">
+        <div className="flex justify-center items-center p-2 bg-mist rounded-2xl overflow-hidden">
           <img src={previewImage} alt="Preview" className="max-w-full max-h-[70vh] rounded-xl object-contain" />
         </div>
       </Dialog>
@@ -1574,12 +1627,12 @@ export default function Inventory() {
                 <div className="w-full md:w-1/3">
                   <label className="label mb-1.5 block">Product Image</label>
                   {form.imageUrl ? (
-                    <div className="relative group rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 aspect-square w-full bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+                    <div className="relative group rounded-2xl overflow-hidden border border-secondary-200 dark:border-slate-800 aspect-square w-full bg-mist flex items-center justify-center">
                       <img src={form.imageUrl} alt="Product" className="object-cover w-full h-full cursor-zoom-in" onClick={() => setPreviewImage(form.imageUrl)} />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                         <button
                           type="button"
-                          className="bg-white/90 hover:bg-white text-slate-800 hover:text-slate-900 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm transition"
+                          className="bg-white/90 hover:bg-white text-ink hover:text-ink text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm transition"
                           onClick={() => document.getElementById('inventory-image-input').click()}
                         >
                           Change
@@ -1595,21 +1648,21 @@ export default function Inventory() {
                     </div>
                   ) : (
                     <div
-                      className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-primary-500 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer aspect-square bg-slate-50/50 hover:bg-slate-50 dark:bg-slate-900/20 dark:hover:bg-slate-900/40 transition group"
+                      className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-primary-500 rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer aspect-square bg-mist/50 hover:bg-mist/20 dark:hover:bg-slate-900/40 transition group"
                       onClick={() => document.getElementById('inventory-image-input').click()}
                     >
                       {imageUploading ? (
                         <div className="flex flex-col items-center gap-2">
                           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-                          <span className="text-xs text-slate-500">Uploading...</span>
+                          <span className="text-xs text-secondary-500">Uploading...</span>
                         </div>
                       ) : (
                         <div className="flex flex-col items-center gap-2">
-                          <div className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-slate-100 dark:border-slate-700 group-hover:scale-105 transition-transform">
-                            <Plus className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                          <div className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-sm border border-secondary-100 dark:border-slate-700 group-hover:scale-105 transition-transform">
+                            <Plus className="w-5 h-5 text-secondary-500" />
                           </div>
-                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Upload image</span>
-                          <span className="text-[10px] text-slate-400">JPG, PNG, WEBP (Max 5MB)</span>
+                          <span className="text-xs font-semibold text-ink-light dark:text-secondary-300">Upload image</span>
+                          <span className="text-[10px] text-secondary-400">JPG, PNG, WEBP (Max 5MB)</span>
                         </div>
                       )}
                     </div>
@@ -1655,7 +1708,7 @@ export default function Inventory() {
                     <div>
                       <label className="label">
                         {t('inventory.itemCode')}
-                        <span className="ml-1 text-[10px] text-slate-400 font-normal">(barcode)</span>
+                        <span className="ml-1 text-[10px] text-secondary-400 font-normal">(barcode)</span>
                       </label>
                       <input
                         id="inventory-item-code"
@@ -1687,20 +1740,20 @@ export default function Inventory() {
                       {categoriesError ? (
                         <p className="mt-2 text-xs text-rose-600">{categoriesError}</p>
                       ) : categoriesLoading && !selectedCategory ? (
-                        <p className="mt-2 text-xs text-slate-500">{t('common.loading')}</p>
+                        <p className="mt-2 text-xs text-secondary-500">{t('common.loading')}</p>
                       ) : null}
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200/70 bg-slate-50/60 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
+              <div className="rounded-2xl border border-secondary-200/70 bg-mist/60 p-3 dark:border-slate-800/70 dark:bg-slate-900/40">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">
                       {t('inventory.stockLots') || 'Stock lots'}
                     </p>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                    <p className="mt-1 text-sm text-secondary-700">
                       {editingId
                         ? (t('inventory.stockLotsEditHint') || 'Product details stay the same. Stock is tracked in lots below.')
                         : (t('inventory.stockLotsCreateHint') || 'Optional opening lot. Later restock/purchase can add more lots.')}
@@ -1749,7 +1802,11 @@ export default function Inventory() {
 
                 {editingId && (
                   <div className="mt-4 space-y-2">
+<<<<<<< HEAD
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+=======
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
                       {t('inventory.existingLots') || 'Existing open lots'}
                     </p>
                     {editBatches.length > 0 ? (
@@ -1758,21 +1815,36 @@ export default function Inventory() {
                         return (
                           <div
                             key={batch.id || `batch-${batchIndex}`}
+<<<<<<< HEAD
                             className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950/50"
                           >
                             <div className="min-w-0">
                               <div className="font-medium text-slate-700 dark:text-slate-200">
+=======
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-secondary-200/80 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950/50"
+                          >
+                            <div className="min-w-0">
+                              <div className="font-medium text-ink-light">
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
                                 {batch.batchNumber
                                   ? `${t('inventory.batchNumber') || 'Batch'}: ${batch.batchNumber}`
                                   : (t('inventory.noBatchNumber') || 'No batch no.')}
                               </div>
+<<<<<<< HEAD
                               <div className={batchExpiry ? getExpiryDateColorClass(batchExpiry) : 'text-slate-500'}>
+=======
+                              <div className={batchExpiry ? getExpiryDateColorClass(batchExpiry) : 'text-secondary-500'}>
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
                                 {batchExpiry
                                   ? formatDateBoth(batchExpiry)
                                   : (t('inventory.noExpiry') || 'No expiry')}
                               </div>
                             </div>
+<<<<<<< HEAD
                             <span className="font-semibold text-slate-700 dark:text-slate-200">
+=======
+                            <span className="font-semibold text-ink-light">
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
                               {formatQuantity(batch.quantityOnHand || 0)}
                               {form.primaryUnit ? ` ${form.primaryUnit}` : ''}
                             </span>
@@ -1780,7 +1852,7 @@ export default function Inventory() {
                         );
                       })
                     ) : (
-                      <p className="text-xs text-slate-500">{t('inventory.noBatches') || 'No open lots yet.'}</p>
+                      <p className="text-xs text-secondary-500">{t('inventory.noBatches') || 'No open lots yet.'}</p>
                     )}
                   </div>
                 )}
@@ -1809,7 +1881,11 @@ export default function Inventory() {
             </div>
           </FormSectionCard>
 
+<<<<<<< HEAD
           <div className="flex border-b border-slate-200 dark:border-slate-800 gap-6 px-1">
+=======
+          <div className="flex border-b border-secondary-200 dark:border-slate-800 gap-6 px-1">
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
             <button
               id="inventory-stock-tab"
               type="button"
@@ -1817,7 +1893,11 @@ export default function Inventory() {
               className={`pb-3 text-sm font-semibold transition-all relative ${
                 activeTab === 'stock'
                   ? 'text-primary'
+<<<<<<< HEAD
                   : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+=======
+                  : 'text-secondary-500 hover:text-ink dark:text-secondary-400 dark:hover:text-white'
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
               }`}
             >
               {t('inventory.stockDetails')}
@@ -1832,7 +1912,11 @@ export default function Inventory() {
               className={`pb-3 text-sm font-semibold transition-all relative ${
                 activeTab === 'other'
                   ? 'text-primary'
+<<<<<<< HEAD
                   : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+=======
+                  : 'text-secondary-500 hover:text-ink dark:text-secondary-400 dark:hover:text-white'
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
               }`}
             >
               {t('inventory.otherDetails')}
@@ -1891,9 +1975,9 @@ export default function Inventory() {
                     ))}
                   </select>
                   {unitsError ? <p className="mt-2 text-xs text-rose-600">{unitsError}</p> : null}
-                  {!unitsError && unitsLoading ? <p className="mt-2 text-xs text-slate-500">{t('common.loading')}</p> : null}
+                  {!unitsError && unitsLoading ? <p className="mt-2 text-xs text-secondary-500">{t('common.loading')}</p> : null}
                   {!unitsError && !unitsLoading && unitOptions.length === 0 ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-secondary-500">
                       <span>{t('unitsManagement.manageHint')}</span>
                       <Link className="font-semibold text-emerald-600 hover:text-emerald-700" to={buildSettingsTabPath(UNITS_SETTINGS_TAB)}>
                         {t('unitsManagement.manageCta')}
@@ -1905,10 +1989,22 @@ export default function Inventory() {
                   <label className="label">{t('products.salePrice')}</label>
                   <input id="inventory-sale-price" className="input mt-1" name="salePrice" type="number" step="0.1" value={form.salePrice} onChange={handleFormChange} />
                 </div>
-                <div>
-                  <label className="label">{t('products.purchasePrice')}</label>
-                  <input id="inventory-purchase-price" className="input mt-1" name="purchasePrice" type="number" step="0.1" value={form.purchasePrice} onChange={handleFormChange} />
-                </div>
+                {canViewPurchasePrice ? (
+                  <div>
+                    <label className="label">{t('products.purchasePrice')}</label>
+                    <input
+                      id="inventory-purchase-price"
+                      className="input mt-1"
+                      name="purchasePrice"
+                      type="number"
+                      step="0.1"
+                      value={form.purchasePrice}
+                      onChange={handleFormChange}
+                      readOnly={!canManagePurchasePrice}
+                      disabled={!canManagePurchasePrice}
+                    />
+                  </div>
+                ) : null}
                 <div>
                   <label className="label">{t('inventory.mrpPrice')}</label>
                   <input id="inventory-mrp-price" className="input mt-1" name="mrpPrice" type="number" step="0.1" value={form.mrpPrice} onChange={handleFormChange} />
@@ -1939,7 +2035,7 @@ export default function Inventory() {
                     ))}
                   </select>
                   {!hasPrimaryUnitSelected ? (
-                    <p className="mt-2 text-xs text-slate-500">Add a primary unit first.</p>
+                    <p className="mt-2 text-xs text-secondary-500">Add a primary unit first.</p>
                   ) : null}
                 </div>
                 <div>
@@ -1952,7 +2048,11 @@ export default function Inventory() {
                 </div>
                 <div className="flex flex-col justify-end">
                   <div className="flex items-center justify-between rounded-xl border border-secondary-200 bg-secondary-50/20 px-3.5 py-2.5 dark:border-slate-800 dark:bg-slate-900/50">
+<<<<<<< HEAD
                     <span className="text-sm font-semibold text-secondary-700 dark:text-slate-300">
+=======
+                    <span className="text-sm font-semibold text-secondary-700 dark:text-secondary-300">
+>>>>>>> 8eae9c5815bd9dac96a1dad460647a583bfa9292
                       {t('inventory.lowStockAlert')}
                     </span>
                     <label className="relative inline-flex cursor-pointer items-center text-xs">

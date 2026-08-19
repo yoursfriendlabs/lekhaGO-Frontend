@@ -26,36 +26,36 @@ export default function InvoiceHeader({ biz = {}, invoiceType, invoiceNo, date, 
       {/* Accent bar */}
       <div className="h-1.5 w-full bg-primary" />
 
-      <div className="flex items-start justify-between gap-6 px-0 pt-6 pb-6 border-b border-slate-200/70 dark:border-slate-800/70">
+      <div className="flex items-start justify-between gap-6 px-0 pt-6 pb-6 border-b border-secondary-200/70">
         {/* ── Left: business identity ── */}
         <div className="flex items-start gap-4 min-w-0">
           {logoSrc ? (
             <img
               src={logoSrc}
               alt="Logo"
-              className="h-16 w-16 shrink-0 rounded-xl border border-slate-200/70 bg-white object-contain p-1 shadow-sm"
+              className="h-16 w-16 shrink-0 rounded-xl border border-secondary-200/70 bg-white object-contain p-1 shadow-sm"
             />
           ) : null}
 
           <div className="min-w-0">
-            <h1 className={`font-serif font-bold text-slate-900 dark:text-white leading-tight ${logoSrc ? 'text-2xl' : 'text-3xl'}`}>
+            <h1 className={`font-serif font-bold text-ink leading-tight ${logoSrc ? 'text-2xl' : 'text-3xl'}`}>
               {biz.companyName || 'PasalManager'}
             </h1>
 
             {hasDetails && (
               <div className="mt-1.5 space-y-0.5">
                 {biz.address && (
-                  <p className="whitespace-pre-wrap text-xs leading-snug text-slate-500 dark:text-slate-400">
+                  <p className="whitespace-pre-wrap text-xs leading-snug text-secondary-500">
                     {biz.address}
                   </p>
                 )}
                 {(biz.phone || biz.email) && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-secondary-500">
                     {[biz.phone, biz.email].filter(Boolean).join('  ·  ')}
                   </p>
                 )}
                 {biz.panVat && (
-                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <p className="text-xs font-semibold text-secondary-700">
                     PAN / VAT No: {biz.panVat}
                   </p>
                 )}
@@ -74,14 +74,14 @@ export default function InvoiceHeader({ biz = {}, invoiceType, invoiceNo, date, 
               {reprintLabel}
             </p>
           ) : null}
-          <p className="mt-1 font-mono text-xl font-bold text-slate-900 dark:text-white">
+          <p className="mt-1 font-mono text-xl font-bold text-ink">
             #{invoiceNo}
           </p>
           {date && (
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{date}</p>
+            <p className="mt-1 text-xs text-secondary-500">{date}</p>
           )}
           {status && (
-            <span className={`mt-2 inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${statusColor || 'bg-slate-100 text-slate-600'}`}>
+            <span className={`mt-2 inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${statusColor || 'bg-secondary-100 text-secondary-700'}`}>
               {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
             </span>
           )}

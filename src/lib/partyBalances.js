@@ -40,8 +40,8 @@ export function getPartyBalanceMeta(currentAmount, t) {
     absoluteAmount: 0,
     tone: 'settled',
     label: t('parties.settled'),
-    badgeClass: 'bg-slate-100 text-slate-500',
-    textClass: 'text-slate-400',
+    badgeClass: 'bg-secondary-100 text-secondary-500',
+    textClass: 'text-secondary-400',
   };
 }
 

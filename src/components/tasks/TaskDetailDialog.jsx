@@ -15,24 +15,24 @@ import {
 
 function MetaItem({ label, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/70">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</p>
-      <div className="mt-2 text-sm text-slate-700 dark:text-slate-200">{value}</div>
+    <div className="rounded-2xl border border-secondary-200/70 bg-mist/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/70">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">{label}</p>
+      <div className="mt-2 text-sm text-ink-light">{value}</div>
     </div>
   );
 }
 
 function TaskActivityRow({ activity, meta }) {
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 dark:border-slate-800/70 dark:bg-slate-950/60">
+    <div className="rounded-2xl border border-secondary-200/70 bg-white/90 p-4 dark:border-slate-800/70 dark:bg-slate-950/60">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-slate-900 dark:text-white">
+        <p className="text-sm font-semibold text-ink">
           {(activity?.actor?.name || 'Someone')} · {getTaskActivityLabel(activity?.type, meta)}
         </p>
-        <span className="text-xs text-slate-400">{formatTaskTimestamp(activity?.createdAt)}</span>
+        <span className="text-xs text-secondary-400">{formatTaskTimestamp(activity?.createdAt)}</span>
       </div>
       {activity?.content ? (
-        <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">{activity.content}</p>
+        <p className="mt-2 whitespace-pre-wrap text-sm text-secondary-700">{activity.content}</p>
       ) : null}
     </div>
   );
@@ -100,7 +100,7 @@ export default function TaskDetailDialog({
         </div>
 
         {loading ? (
-          <div className="rounded-3xl border border-slate-200/70 bg-slate-50/80 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-800/70 dark:bg-slate-900/60 dark:text-slate-400">
+          <div className="rounded-3xl border border-secondary-200/70 bg-mist/80 px-4 py-10 text-center text-sm text-secondary-500 dark:border-slate-800/70 dark:bg-slate-900/60 dark:text-secondary-400">
             {t('tasks.loading.detail')}
           </div>
         ) : null}
@@ -114,10 +114,10 @@ export default function TaskDetailDialog({
         {!loading && task ? (
           <>
             <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-5 dark:border-slate-800/70 dark:bg-slate-950/60">
+              <div className="space-y-4 rounded-3xl border border-secondary-200/70 bg-white/90 p-5 dark:border-slate-800/70 dark:bg-slate-950/60">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{t('tasks.detail.description')}</p>
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">{t('tasks.detail.description')}</p>
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-secondary-700">
                     {task.description || t('tasks.empty.noDescription')}
                   </p>
                 </div>
@@ -141,17 +141,17 @@ export default function TaskDetailDialog({
                 </div>
               </div>
 
-              <div className="space-y-4 rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 dark:border-slate-800/70 dark:bg-slate-900/60">
+              <div className="space-y-4 rounded-3xl border border-secondary-200/70 bg-mist/80 p-5 dark:border-slate-800/70 dark:bg-slate-900/60">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{t('tasks.detail.assignees')}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">{t('tasks.detail.assignees')}</p>
                   {assigneeNames.length === 0 ? (
-                    <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{t('tasks.empty.noAssignees')}</p>
+                    <p className="mt-3 text-sm text-secondary-500">{t('tasks.empty.noAssignees')}</p>
                   ) : (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {assigneeNames.map((name) => (
                         <span
                           key={name}
-                          className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:bg-slate-950/80 dark:text-slate-200"
+                          className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-ink-light shadow-sm dark:bg-slate-950/80 dark:text-slate-200"
                         >
                           <Users size={12} />
                           {name}
@@ -162,14 +162,14 @@ export default function TaskDetailDialog({
                 </div>
 
                 {canManageTasks ? (
-                  <div className="rounded-2xl border border-slate-200/70 bg-white/90 p-4 dark:border-slate-800/70 dark:bg-slate-950/60">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{t('tasks.detail.statusAction')}</p>
+                  <div className="rounded-2xl border border-secondary-200/70 bg-white/90 p-4 dark:border-slate-800/70 dark:bg-slate-950/60">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary-400">{t('tasks.detail.statusAction')}</p>
                     <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                        <p className="text-sm font-semibold text-ink dark:text-slate-200">
                           {getTaskStatusLabel(task?.status, meta)}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        <p className="mt-1 text-xs text-secondary-500">
                           {t('tasks.detail.statusActionHint', { status: getTaskStatusLabel(task?.status, meta) })}
                         </p>
                       </div>
@@ -187,10 +187,10 @@ export default function TaskDetailDialog({
             </section>
 
             <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-              <div className="space-y-4 rounded-3xl border border-slate-200/70 bg-white/90 p-5 dark:border-slate-800/70 dark:bg-slate-950/60">
+              <div className="space-y-4 rounded-3xl border border-secondary-200/70 bg-white/90 p-5 dark:border-slate-800/70 dark:bg-slate-950/60">
                 <div className="flex items-center gap-2">
-                  <MessageSquarePlus size={16} className="text-slate-400" />
-                  <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('tasks.detail.commentTitle')}</h3>
+                  <MessageSquarePlus size={16} className="text-secondary-400" />
+                  <h3 className="font-serif text-lg text-ink">{t('tasks.detail.commentTitle')}</h3>
                 </div>
 
                 {canManageTasks ? (
@@ -206,14 +206,14 @@ export default function TaskDetailDialog({
                     </button>
                   </form>
                 ) : (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{t('tasks.detail.readOnlyComments')}</p>
+                  <p className="text-sm text-secondary-500">{t('tasks.detail.readOnlyComments')}</p>
                 )}
               </div>
 
-              <div className="space-y-4 rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5 dark:border-slate-800/70 dark:bg-slate-900/60">
+              <div className="space-y-4 rounded-3xl border border-secondary-200/70 bg-mist/80 p-5 dark:border-slate-800/70 dark:bg-slate-900/60">
                 <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-serif text-lg text-slate-900 dark:text-white">{t('tasks.detail.timeline')}</h3>
-                  <span className="text-xs uppercase tracking-[0.16em] text-slate-400">{task.activities?.length || 0}</span>
+                  <h3 className="font-serif text-lg text-ink">{t('tasks.detail.timeline')}</h3>
+                  <span className="text-xs uppercase tracking-[0.16em] text-secondary-400">{task.activities?.length || 0}</span>
                 </div>
 
                 {task.activities?.length ? (
@@ -223,7 +223,7 @@ export default function TaskDetailDialog({
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{t('tasks.empty.noActivity')}</p>
+                  <p className="text-sm text-secondary-500">{t('tasks.empty.noActivity')}</p>
                 )}
               </div>
             </section>

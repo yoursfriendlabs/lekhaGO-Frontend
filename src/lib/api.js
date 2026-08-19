@@ -841,12 +841,6 @@ export const api = {
       { limit: 50, ...params },
       listCache(["products", "reports", "dashboard"]),
     ),
-  countProducts: (params = {}) =>
-    collectionRequest(
-      "/api/products",
-      { limit: 1, ...params },
-      listCache(["product-stats", "products"], CACHE_TTL.short, { force: true }),
-    ),
   getProductStats: () =>
     request(
       "/api/products/stats",
@@ -1038,6 +1032,27 @@ export const api = {
         "banks",
       ]),
     ),
+  cancelPurchase: (id, data = {}) =>
+    request(
+      `/api/purchases/${id}/cancel`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("purchase", id),
+        "purchases",
+        "products",
+        "reports",
+        "dashboard",
+        "parties",
+        "party-statements",
+        "banks",
+      ]),
+    ),
+  recordPurchaseReprint: (id) =>
+    request(
+      `/api/purchases/${id}/reprint`,
+      { method: "POST" },
+      mutationConfig([detailTags("purchase", id), "purchases"]),
+    ),
   deletePurchase: (id) =>
     request(
       `/api/purchases/${id}`,
@@ -1178,6 +1193,27 @@ export const api = {
         "party-statements",
         "banks",
       ]),
+    ),
+  cancelService: (id, data = {}) =>
+    request(
+      `/api/services/${id}/cancel`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("service", id),
+        "services",
+        "products",
+        "reports",
+        "dashboard",
+        "parties",
+        "party-statements",
+        "banks",
+      ]),
+    ),
+  recordServiceReprint: (id) =>
+    request(
+      `/api/services/${id}/reprint`,
+      { method: "POST" },
+      mutationConfig([detailTags("service", id), "services"]),
     ),
   deleteService: (id) =>
     request(
@@ -1563,6 +1599,10 @@ export const api = {
       { method: "DELETE" },
       mutationConfig([detailTags("table", id), "tables"]),
     ),
+
+  // Reports whether the backend is accepting event streams. Checked once per
+  // session so we never open an EventSource the server will just reject.
+  getEventsStatus: () => request("/api/events/status"),
 };
 
 export { toQueryKey };

@@ -1,17 +1,20 @@
-import { Clock3, LogOut, Sparkles, TriangleAlert } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Clock3, LogOut, Sparkles, TriangleAlert, UserRound } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { getSubscriptionStatusState } from '../lib/subscription.js';
 import TaskNotificationsButton from './tasks/TaskNotificationsButton.jsx';
+import ThemeSelector from './ThemeSelector.jsx';
 import { formatSubscriptionDaysRemainingLabel, formatSubscriptionStatusDate } from './subscription/SubscriptionStatusBanner.jsx';
 import UpgradeSubscriptionCta, { shouldShowUpgradeCta } from './subscription/UpgradeSubscriptionCta.jsx';
 
 export default function Topbar() {
-  const { user, logout, role, subscription } = useAuth();
+  const { user, logout, role, subscription, accessControl } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const { locale, setLocale, t } = useI18n();
 
+  const showStaffProfileLink = role === 'staff' && Boolean(accessControl?.membershipId);
   const subscriptionAccess = subscription?.access || null;
   const subscriptionStatus = getSubscriptionStatusState(subscription);
   const isActiveTrial = subscriptionStatus.kind === 'trial' || subscriptionStatus.kind === 'trial-expiring';
@@ -35,7 +38,7 @@ export default function Topbar() {
     : 'border-primary/20 bg-primary/10 text-primary-700 dark:border-primary/30 dark:bg-primary/15 dark:text-primary-200';
 
   return (
-    <header className="sticky top-0 z-20 border-b border-secondary-200/80 bg-white/92 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur md:px-6 md:py-4">
+    <header className="sticky top-0 z-20 border-b border-secondary-200/80 bg-surface/92 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur md:px-6 md:py-4">
       <div className="flex min-w-0 items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-[10px] uppercase tracking-[0.2em] text-secondary-500">{t('topbar.workspace')}</p>
@@ -62,9 +65,11 @@ export default function Topbar() {
             <UpgradeSubscriptionCta className="btn-primary min-h-[42px] px-3 py-2 text-xs md:px-4 md:text-sm" />
           ) : null}
 
+          <ThemeSelector variant="compact" />
+
           <button
             onClick={() => setLocale(locale === 'en' ? 'ne' : 'en')}
-            className="inline-flex min-h-[42px] min-w-[42px] items-center justify-center rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-base transition-transform active:scale-95"
+            className="inline-flex min-h-[42px] min-w-[42px] items-center justify-center rounded-2xl border border-secondary-200 bg-primary-50 px-3 py-2 text-base transition-transform active:scale-95"
             aria-label={t('topbar.language')}
             title={t('topbar.language')}
             type="button"
@@ -72,8 +77,20 @@ export default function Topbar() {
             {locale === 'en' ? '🇳🇵' : '🇬🇧'}
           </button>
 
+          {showStaffProfileLink ? (
+            <Link
+              to="/app/profile"
+              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-2xl border border-secondary-200 bg-surface px-3 py-2 text-sm font-semibold text-ink transition-transform active:scale-95"
+              aria-label={t('nav.profile')}
+              title={t('nav.profile')}
+            >
+              <UserRound className="h-4 w-4" aria-hidden />
+              <span className="hidden md:inline">{t('nav.profile')}</span>
+            </Link>
+          ) : null}
+
           <button
-            className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-2xl border border-secondary-200 bg-white px-3 py-2 text-sm font-semibold text-rose-600 transition-transform active:scale-95"
+            className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-2xl border border-secondary-200 bg-surface px-3 py-2 text-sm font-semibold text-rose-600 transition-transform active:scale-95"
             onClick={logout}
             type="button"
             aria-label={t('topbar.logout')}

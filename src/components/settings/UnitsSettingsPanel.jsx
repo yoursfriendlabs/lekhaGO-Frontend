@@ -189,8 +189,8 @@ export default function UnitsSettingsPanel() {
       <div className="card space-y-4">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="space-y-1">
-            <h2 className="font-serif text-xl text-slate-900 dark:text-white">{t('unitsManagement.title')}</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{t('unitsManagement.subtitle')}</p>
+            <h2 className="font-serif text-xl text-ink">{t('unitsManagement.title')}</h2>
+            <p className="text-sm text-secondary-500">{t('unitsManagement.subtitle')}</p>
           </div>
           <button className="btn-primary w-full md:w-auto" type="button" onClick={openCreate}>
             <Plus size={16} className="mr-1.5 inline" />
@@ -213,18 +213,18 @@ export default function UnitsSettingsPanel() {
 
         <div className="space-y-3 md:hidden">
           {listLoading && units.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">{t('common.loading')}</p>
+            <p className="py-3 text-sm text-secondary-500">{t('common.loading')}</p>
           ) : units.length === 0 ? (
-            <p className="py-3 text-sm text-slate-500">{t('unitsManagement.noUnits')}</p>
+            <p className="py-3 text-sm text-secondary-500">{t('unitsManagement.noUnits')}</p>
           ) : (
             units.map((unit) => (
               <div
                 key={unit.id}
-                className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60"
+                className="rounded-2xl border border-secondary-200/70 bg-white/80 p-4 dark:border-slate-800/60 dark:bg-slate-900/60"
               >
                 <div className="space-y-1">
-                  <p className="font-semibold text-slate-900 dark:text-white">{unit.name}</p>
-                  <p className="text-xs text-slate-500">{unit.symbol || '—'}</p>
+                  <p className="font-semibold text-ink">{unit.name}</p>
+                  <p className="text-xs text-secondary-500">{unit.symbol || '—'}</p>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button className="btn-ghost" type="button" onClick={() => openEdit(unit)}>
@@ -242,8 +242,8 @@ export default function UnitsSettingsPanel() {
         </div>
 
         <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-sm text-slate-600 dark:text-slate-300">
-            <thead className="text-xs uppercase text-slate-400">
+          <table className="w-full text-sm text-secondary-700">
+            <thead className="text-xs uppercase text-ink">
               <tr>
                 <th className="py-2 text-left">{t('unitsManagement.name')}</th>
                 <th className="py-2 text-left">{t('unitsManagement.symbol')}</th>
@@ -253,16 +253,16 @@ export default function UnitsSettingsPanel() {
             <tbody>
               {listLoading && units.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="py-3 text-slate-500">{t('common.loading')}</td>
+                  <td colSpan={3} className="py-3 text-secondary-500">{t('common.loading')}</td>
                 </tr>
               ) : units.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="py-3 text-slate-500">{t('unitsManagement.noUnits')}</td>
+                  <td colSpan={3} className="py-3 text-secondary-500">{t('unitsManagement.noUnits')}</td>
                 </tr>
               ) : (
                 units.map((unit) => (
-                  <tr key={unit.id} className="border-t border-slate-200/70 dark:border-slate-800/70">
-                    <td className="py-3 font-semibold text-slate-900 dark:text-white">{unit.name}</td>
+                  <tr key={unit.id} className="border-t border-secondary-200/70">
+                    <td className="py-3 font-semibold text-ink">{unit.name}</td>
                     <td className="py-3">{unit.symbol || '—'}</td>
                     <td className="py-3 text-right">
                       <ActionMenu

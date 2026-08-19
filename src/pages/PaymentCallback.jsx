@@ -69,8 +69,8 @@ export default function PaymentCallback() {
   const brandColorClass = provider === 'esewa' ? 'text-emerald-600' : provider === 'khalti' ? 'text-violet-700' : 'text-primary';
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center bg-slate-50 px-4 py-12 dark:bg-slate-950">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-8 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60 text-center">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-mist px-4 py-12 dark:bg-slate-950">
+      <div className="w-full max-w-md rounded-3xl border border-secondary-200/80 bg-white p-8 shadow-sm dark:border-slate-800/70 dark:bg-slate-900/60 text-center">
         
         {verifyState === 'verifying' && (
           <div className="space-y-6 py-6">
@@ -81,7 +81,7 @@ export default function PaymentCallback() {
               <h2 className="text-xl font-bold text-slate-950 dark:text-white">
                 Verifying Payment
               </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
+              <p className="text-sm text-secondary-500">
                 Confirming transaction status with {providerLabel}. Please do not refresh the page or go back.
               </p>
             </div>
@@ -99,14 +99,14 @@ export default function PaymentCallback() {
               <h2 className="text-2xl font-bold text-slate-950 dark:text-white">
                 Payment Successful!
               </h2>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
+              <p className="text-sm text-secondary-700">
                 Your subscription has been activated successfully via {providerLabel}.
               </p>
             </div>
 
-            <div className="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/40 text-left text-sm space-y-3">
+            <div className="rounded-2xl bg-mist p-4 dark:bg-slate-900/40 text-left text-sm space-y-3">
               <div className="flex justify-between">
-                <span className="text-slate-500">Plan Activated</span>
+                <span className="text-secondary-500">Plan Activated</span>
                 <span className="font-semibold text-slate-950 dark:text-white flex items-center gap-1">
                   <ShieldCheck className="h-4 w-4 text-primary" />
                   Growth Plan
@@ -114,7 +114,7 @@ export default function PaymentCallback() {
               </div>
               {txCode && (
                 <div className="flex justify-between">
-                  <span className="text-slate-500">Transaction ID</span>
+                  <span className="text-secondary-500">Transaction ID</span>
                   <span className="font-mono font-semibold text-slate-850 dark:text-slate-200">{txCode}</span>
                 </div>
               )}
@@ -142,7 +142,7 @@ export default function PaymentCallback() {
               <h2 className="text-2xl font-bold text-slate-950 dark:text-white">
                 Payment Verification Failed
               </h2>
-              <p className="text-sm text-slate-600 dark:text-slate-300">
+              <p className="text-sm text-secondary-700">
                 We could not complete your upgrade request with {providerLabel}.
               </p>
             </div>

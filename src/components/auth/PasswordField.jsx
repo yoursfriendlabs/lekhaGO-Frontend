@@ -41,7 +41,7 @@ export default function PasswordField({
         />
         <button
           type="button"
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-secondary-400 transition hover:text-secondary-700 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => setVisible((current) => !current)}
           disabled={disabled}
           aria-label={visible ? t('auth.hidePassword') : t('auth.showPassword')}
@@ -50,7 +50,7 @@ export default function PasswordField({
         </button>
       </div>
       {error ? <p id={`${fieldId}-error`} className="mt-1 text-xs text-rose-600">{error}</p> : null}
-      {!error && hint ? <p id={`${fieldId}-hint`} className="mt-1 text-xs text-slate-500">{hint}</p> : null}
+      {!error && hint ? <p id={`${fieldId}-hint`} className="mt-1 text-xs text-secondary-500">{hint}</p> : null}
     </div>
   );
 }

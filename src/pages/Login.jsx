@@ -22,12 +22,12 @@ function SpinIcon() {
 }
 
 const inputCls =
-  'w-full h-12 rounded-lg border border-gray-300 bg-white px-4 text-gray-900 placeholder-gray-400 ' +
-  'transition-colors focus:outline-none focus:border-[#9b6835] focus:ring-1 focus:ring-[#9b6835]';
+  'w-full h-12 rounded-lg border border-secondary-200 bg-surface px-4 text-ink placeholder-secondary-400 ' +
+  'transition-colors focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary';
 
 const btnPrimary =
-  'inline-flex w-full h-12 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#9b6835] to-[#af865d] ' +
-  'font-semibold text-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:from-[#8a5d2f] hover:to-[#9e7751] ' +
+  'inline-flex w-full h-12 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-400 ' +
+  'font-semibold text-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:from-primary-600 hover:to-primary-500 ' +
   'hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none';
 
 const BRAND_STATS = [
@@ -114,13 +114,13 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 to-white">
+    <div className="flex min-h-screen bg-gradient-to-br from-mist to-surface">
       <div className="flex w-full items-center justify-center p-8 lg:w-1/2 lg:p-12">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center login-animate-fade-down">
 
-            <h1 className="text-4xl font-bold tracking-tight text-gray-900">{t('auth.loginTitle')}</h1>
-            <p className="mt-3 text-lg text-gray-600">{t('auth.loginHeroSubtitle')}</p>
+            <h1 className="text-4xl font-bold tracking-tight text-ink">{t('auth.loginTitle')}</h1>
+            <p className="mt-3 text-lg text-secondary-600">{t('auth.loginHeroSubtitle')}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="login-animate-fade-up space-y-6">
@@ -133,7 +133,7 @@ export default function Login() {
             <div className="space-y-2">
               <label
                 htmlFor="email"
-                className="flex items-center gap-2 text-sm font-medium text-gray-700"
+                className="flex items-center gap-2 text-sm font-medium text-ink-light"
               >
                 <Mail className="h-4 w-4" aria-hidden />
                 {t('auth.emailAddress')}
@@ -154,7 +154,7 @@ export default function Login() {
             <div className="space-y-2">
               <label
                 htmlFor="password"
-                className="flex items-center gap-2 text-sm font-medium text-gray-700"
+                className="flex items-center gap-2 text-sm font-medium text-ink-light"
               >
                 <Lock className="h-4 w-4" aria-hidden />
                 {t('auth.password')}
@@ -174,7 +174,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-secondary-400 transition-colors hover:text-ink-light"
                   aria-label={showPw ? 'Hide password' : 'Show password'}
                 >
                   {showPw ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -186,15 +186,15 @@ export default function Login() {
               <label className="group flex cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"
-                  className="cursor-pointer rounded border-gray-300 text-[#9b6835] focus:ring-[#9b6835]"
+                  className="cursor-pointer rounded border-secondary-300 text-primary focus:ring-primary"
                 />
-                <span className="text-sm text-gray-600 transition-colors group-hover:text-gray-900">
+                <span className="text-sm text-secondary-600 transition-colors group-hover:text-ink">
                   {t('auth.rememberMe')}
                 </span>
               </label>
               <Link
                 to="/forgot-password"
-                className="text-sm font-medium text-[#9b6835] transition-colors hover:text-[#8a5d2f] hover:underline"
+                className="text-sm font-medium text-primary transition-colors hover:text-primary-600 hover:underline"
               >
                 {t('auth.forgotPassword')}
               </Link>
@@ -215,11 +215,11 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="login-animate-fade-in-delay text-center text-gray-600">
+          <p className="login-animate-fade-in-delay text-center text-secondary-600">
             {t('auth.noAccount')}{' '}
             <Link
               to="/register"
-              className="font-medium text-[#9b6835] transition-colors hover:text-[#8a5d2f] hover:underline"
+              className="font-medium text-primary transition-colors hover:text-primary-600 hover:underline"
             >
               {t('auth.signUp')}
             </Link>
@@ -227,7 +227,7 @@ export default function Login() {
         </div>
       </div>
 
-      <div className="login-animate-panel relative hidden w-1/2 overflow-hidden bg-gradient-to-br from-[#9b6835] via-[#af865d] to-[#9b6835] lg:flex lg:items-center lg:justify-center lg:p-12">
+      <div className="login-animate-panel relative hidden w-1/2 overflow-hidden bg-gradient-to-br from-primary via-primary-400 to-primary lg:flex lg:items-center lg:justify-center lg:p-12">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute left-20 top-20 h-72 w-72 animate-pulse rounded-full bg-white blur-3xl" />
           <div
