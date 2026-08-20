@@ -9,7 +9,9 @@ import {
   Plus,
   RefreshCw,
   Search,
+  SlidersHorizontal,
   ClipboardList,
+  X,
 } from "lucide-react";
 import StatsCard from "../components/StatsCard.jsx";
 import ActionMenu from "../components/ActionMenu.jsx";
@@ -260,9 +262,7 @@ function TaskBoard({
           className="min-w-[18rem] flex-1 rounded-3xl border border-secondary-200/70 bg-mist/80 p-4 dark:border-slate-800/70 dark:bg-slate-900/60"
         >
           <div className="flex items-center justify-between gap-3">
-            <h3 className="font-serif text-lg text-ink">
-              {column.label}
-            </h3>
+            <h3 className="font-serif text-lg text-ink">{column.label}</h3>
             <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-500 shadow-sm dark:bg-slate-950/80 dark:text-secondary-300">
               {grouped.get(column.key)?.length || 0}
             </span>
@@ -330,6 +330,8 @@ function getTaskStatusPalette(statusKey) {
     checkClass: "text-primary-600",
   };
 }
+
+const DUE_FILTER_KEYS = ["overdue", "today", "upcoming"];
 
 export default function Tasks() {
   const { t } = useI18n();
@@ -401,6 +403,74 @@ export default function Tasks() {
       ...getTaskStatusPalette(status.key),
     }));
   }, [meta.statuses]);
+
+  const dueFilterLabels = useMemo(
+    () => ({
+      overdue: t("tasks.badges.overdue"),
+      today: t("tasks.badges.today"),
+      upcoming: t("tasks.badges.upcoming"),
+    }),
+    [t],
+  );
+
+  // Chips describing every active filter (besides scope/view), each removable on its own.
+  const activeFilterChips = useMemo(() => {
+    const chips = [];
+
+    if (statusFilter) {
+      const match = meta.statuses.find((status) => status.key === statusFilter);
+      chips.push({
+        key: "status",
+        label: match?.label || humanizeTaskKey(statusFilter),
+        onClear: () => handleFilterChange("status", ""),
+      });
+    }
+
+    if (priorityFilter) {
+      const match = meta.priorities.find(
+        (priority) => priority.key === priorityFilter,
+      );
+      chips.push({
+        key: "priority",
+        label: match?.label || humanizeTaskKey(priorityFilter),
+        onClear: () => handleFilterChange("priority", ""),
+      });
+    }
+
+    if (dueFilter) {
+      chips.push({
+        key: "due",
+        label: dueFilterLabels[dueFilter] || humanizeTaskKey(dueFilter),
+        onClear: () => handleFilterChange("due", ""),
+      });
+    }
+
+    if (debouncedQuery.trim()) {
+      chips.push({
+        key: "query",
+        label: `“${debouncedQuery.trim()}”`,
+        onClear: () => setQueryInput(""),
+      });
+    }
+
+    return chips;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    statusFilter,
+    priorityFilter,
+    dueFilter,
+    debouncedQuery,
+    meta,
+    dueFilterLabels,
+  ]);
+
+  const clearAllFilters = () => {
+    setQueryInput("");
+    updateParams(
+      { status: null, priority: null, due: null, q: null },
+      { resetPage: true },
+    );
+  };
 
   const updateParams = (updates = {}, { resetPage = false } = {}) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -795,136 +865,182 @@ export default function Tasks() {
       {metaError ? <Notice title={metaError} tone="warn" /> : null}
       {loadError ? <Notice title={loadError} tone="error" /> : null}
 
-      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <div className="card space-y-4">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="space-y-2">
+      {/* Task Stats Cards */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
+        <StatsCard
+          title={t("tasks.summary.openTasks")}
+          value={Math.max(tasksData.total - completedCount, 0)}
+          icon={ClipboardList}
+          tone="default"
+        />
+        <StatsCard
+          title={t("tasks.summary.overdue")}
+          value={overdueCount}
+          icon={Clock}
+          tone="danger"
+        />
+        <StatsCard
+          title={t("tasks.summary.unread")}
+          value={unreadCount}
+          icon={BellRing}
+          tone="info"
+        />
+      </div>
+
+      {/* Task Filters */}
+      <div className="card space-y-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal size={14} className="text-secondary-400" />
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-400">
                 {t("tasks.filters.title")}
               </p>
-              <TaskScopeFilter
-                value={scopeFilter}
-                onChange={(value) => handleFilterChange("scope", value)}
-                t={t}
+              {activeFilterChips.length ? (
+                <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary-100 px-1.5 text-[11px] font-bold text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">
+                  {activeFilterChips.length}
+                </span>
+              ) : null}
+            </div>
+            <TaskScopeFilter
+              value={scopeFilter}
+              onChange={(value) => handleFilterChange("scope", value)}
+              t={t}
+            />
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
+            <label className="relative block w-full sm:w-72">
+              <Search
+                size={18}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400"
               />
-            </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <label className="relative block w-full max-w-md">
-                <Search
-                  size={18}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-secondary-400"
-                />
+              <input
+                type="text"
+                value={queryInput}
+                onChange={(event) => setQueryInput(event.target.value)}
+                placeholder={t("tasks.filters.searchPlaceholder")}
+                className="h-11 w-full rounded-xl border border-secondary-200 bg-white pl-10 pr-9 text-sm shadow-sm transition-all duration-200 placeholder:text-secondary-400 focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:focus:border-slate-600 dark:focus:ring-slate-800"
+              />
 
-                <input
-                  type="text"
-                  value={queryInput}
-                  onChange={(event) => setQueryInput(event.target.value)}
-                  placeholder={t("tasks.filters.searchPlaceholder")}
-                  className="h-11 w-full rounded-xl border border-secondary-200 bg-white pl-10 pr-4 text-sm shadow-sm transition-all duration-200 placeholder:text-secondary-400 focus:border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:focus:border-slate-600 dark:focus:ring-slate-800"
-                />
-              </label>
+              {queryInput ? (
+                <button
+                  type="button"
+                  onClick={() => setQueryInput("")}
+                  aria-label={t("common.clear")}
+                  className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-secondary-400 transition hover:bg-secondary-100 hover:text-secondary-600 dark:hover:bg-slate-800"
+                >
+                  <X size={14} />
+                </button>
+              ) : null}
+            </label>
 
+            <button
+              type="button"
+              className="btn-ghost gap-2 justify-center"
+              onClick={() => loadTasks()}
+              disabled={loading}
+            >
+              <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+              {t("tasks.actions.refresh")}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <label className="label" htmlFor="tasks-status-filter">
+              {t("common.status")}
+            </label>
+            <select
+              id="tasks-status-filter"
+              className="input mt-1"
+              value={statusFilter}
+              onChange={(event) =>
+                handleFilterChange("status", event.target.value)
+              }
+            >
+              <option value="">{t("tasks.filters.allStatuses")}</option>
+              {meta.statuses.map((status) => (
+                <option key={status.key} value={status.key}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="label" htmlFor="tasks-priority-filter">
+              {t("tasks.form.priority")}
+            </label>
+            <select
+              id="tasks-priority-filter"
+              className="input mt-1"
+              value={priorityFilter}
+              onChange={(event) =>
+                handleFilterChange("priority", event.target.value)
+              }
+            >
+              <option value="">{t("tasks.filters.allPriorities")}</option>
+              {meta.priorities.map((priority) => (
+                <option key={priority.key} value={priority.key}>
+                  {priority.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="label" htmlFor="tasks-due-filter">
+              {t("tasks.filters.due")}
+            </label>
+            <select
+              id="tasks-due-filter"
+              className="input mt-1"
+              value={dueFilter}
+              onChange={(event) =>
+                handleFilterChange("due", event.target.value)
+              }
+            >
+              <option value="">{t("tasks.filters.allDueStates")}</option>
+              {DUE_FILTER_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {dueFilterLabels[key]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {activeFilterChips.length ? (
+          <div className="flex flex-wrap items-center gap-2 border-t border-dashed border-secondary-200/70 pt-4 dark:border-slate-800/70">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-secondary-400">
+              {t("tasks.filters.active")}
+            </span>
+
+            {activeFilterChips.map((chip) => (
               <button
+                key={chip.key}
                 type="button"
-                className="btn-ghost gap-2 justify-center"
-                onClick={() => loadTasks()}
-                disabled={loading}
+                onClick={chip.onClear}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 transition hover:bg-primary-100 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/50"
               >
-                <RefreshCw
-                  size={16}
-                  className={loading ? "animate-spin" : ""}
-                />
-                {t("tasks.actions.refresh")}
+                {chip.label}
+                <X size={12} />
               </button>
-            </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={clearAllFilters}
+              className="ml-auto text-xs font-semibold text-secondary-500 underline-offset-2 transition hover:text-primary-600 hover:underline dark:text-secondary-400"
+            >
+              {t("tasks.filters.clearAll")}
+            </button>
           </div>
-
-          <div className="grid gap-3 md:grid-cols-3">
-            <div>
-              <label className="label" htmlFor="tasks-status-filter">
-                {t("common.status")}
-              </label>
-              <select
-                id="tasks-status-filter"
-                className="input mt-1"
-                value={statusFilter}
-                onChange={(event) =>
-                  handleFilterChange("status", event.target.value)
-                }
-              >
-                <option value="">{t("tasks.filters.allStatuses")}</option>
-                {meta.statuses.map((status) => (
-                  <option key={status.key} value={status.key}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="label" htmlFor="tasks-priority-filter">
-                {t("tasks.form.priority")}
-              </label>
-              <select
-                id="tasks-priority-filter"
-                className="input mt-1"
-                value={priorityFilter}
-                onChange={(event) =>
-                  handleFilterChange("priority", event.target.value)
-                }
-              >
-                <option value="">{t("tasks.filters.allPriorities")}</option>
-                {meta.priorities.map((priority) => (
-                  <option key={priority.key} value={priority.key}>
-                    {priority.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="label" htmlFor="tasks-due-filter">
-                {t("tasks.filters.due")}
-              </label>
-              <select
-                id="tasks-due-filter"
-                className="input mt-1"
-                value={dueFilter}
-                onChange={(event) =>
-                  handleFilterChange("due", event.target.value)
-                }
-              >
-                <option value="">{t("tasks.filters.allDueStates")}</option>
-                <option value="overdue">{t("tasks.badges.overdue")}</option>
-                <option value="today">{t("tasks.badges.today")}</option>
-                <option value="upcoming">{t("tasks.badges.upcoming")}</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-1 xl:gap-3">
-          <StatsCard
-            title={t("tasks.summary.openTasks")}
-            value={Math.max(tasksData.total - completedCount, 0)}
-            icon={ClipboardList}
-            tone="default"
-          />
-          <StatsCard
-            title={t("tasks.summary.overdue")}
-            value={overdueCount}
-            icon={Clock}
-            tone="danger"
-          />
-          <StatsCard
-            title={t("tasks.summary.unread")}
-            value={unreadCount}
-            icon={BellRing}
-            tone="info"
-          />
-        </div>
-      </section>
+        ) : null}
+      </div>
 
       {!businessId ? (
         <Notice
