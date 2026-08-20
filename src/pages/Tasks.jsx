@@ -904,7 +904,7 @@ export default function Tasks() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-1 xl:gap-3">
           <StatsCard
             title={t("tasks.summary.openTasks")}
             value={Math.max(tasksData.total - completedCount, 0)}
