@@ -3,6 +3,12 @@ export function toAmount(value) {
   return Number.isFinite(amount) ? amount : 0;
 }
 
+function toNullableAmount(value) {
+  if (value === '' || value === null || value === undefined) return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+
 /**
  * Party To Pay / To Receive comes from `party.currentAmount` only.
  * The backend is the source of truth and counts remaining dues:
@@ -45,12 +51,23 @@ export function getPartyBalanceMeta(currentAmount, t) {
   };
 }
 
+export function getStatementRunningBalanceMeta(row, t) {
+  const runningBalance = toNullableAmount(row?.runningBalance ?? row?.running_balance);
+  if (runningBalance === null) return null;
+  return getPartyBalanceMeta(runningBalance, t);
+}
+
 export function normalizePartyStatementResponse(payload) {
   const items = Array.isArray(payload?.items)
     ? payload.items
     : Array.isArray(payload?.rows)
     ? payload.rows
     : [];
+
+  const rows = items.map((row) => ({
+    ...row,
+    runningBalance: toNullableAmount(row?.runningBalance ?? row?.running_balance),
+  }));
 
   return {
     party: payload?.party || null,
@@ -74,8 +91,11 @@ export function normalizePartyStatementResponse(payload) {
       totalPaymentIn: toAmount(payload?.summary?.totalPaymentIn),
       totalPaymentOut: toAmount(payload?.summary?.totalPaymentOut),
       currentAmount: toAmount(payload?.summary?.currentAmount),
+      runningBalance: toNullableAmount(
+        payload?.summary?.runningBalance ?? payload?.summary?.running_balance
+      ),
     },
-    rows: items,
+    rows,
     expenses: Array.isArray(payload?.expenses) ? payload.expenses : [],
     pagination: {
       limit: Number(payload?.limit ?? payload?.pagination?.limit ?? 100),

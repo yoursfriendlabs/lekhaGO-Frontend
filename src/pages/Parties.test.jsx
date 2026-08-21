@@ -110,10 +110,13 @@ describe('Parties', () => {
         type: 'sale',
         date: '2026-08-01',
         totalAmount: 100,
-        paidAmount: 100,
-        dueAmount: 0,
+        paidAmount: 0,
+        dueAmount: 100,
+        amount: 0,
+        runningBalance: -5100,
+        paymentType: { method: 'cash', label: 'cash' },
       }],
-      summary: { totalRows: 1 },
+      summary: { totalRows: 1, runningBalance: -5100 },
     });
 
     renderWithProviders(<Parties />, { route: '/app/parties', withAuth: true });
@@ -122,5 +125,8 @@ describe('Parties', () => {
 
     const viewLink = await screen.findByRole('link', { name: 'View' });
     expect(viewLink).toHaveAttribute('href', '/app/invoice/sales/sale-1');
+    expect(screen.queryByText(/Running balance/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/5,100\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/To Receive/)).toBeInTheDocument();
   });
 });

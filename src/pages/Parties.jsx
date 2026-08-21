@@ -25,6 +25,7 @@ import { useI18n } from "../lib/i18n.jsx";
 import dayjs, { todayISODate } from "../lib/datetime";
 import {
   getPartyBalanceMeta,
+  getStatementRunningBalanceMeta,
   getStatementTypeLabel,
   normalizePartyStatementResponse,
   toAmount,
@@ -1440,6 +1441,7 @@ export default function Parties() {
                 ) : (
                   statementData.rows.map((row) => {
                     const amountFields = getStatementAmountFields(row, t);
+                    const runningBalanceMeta = getStatementRunningBalanceMeta(row, t);
                     const canEditTransaction = canManageParties && isEditableTransactionRow(row);
                     const viewPath = getTransactionViewPath(row);
 
@@ -1476,12 +1478,24 @@ export default function Parties() {
                                 </span>
                               ) : null}
                             </div>
-                            <PaymentTypeSummary
-                              source={row}
-                              className="mt-2"
-                              labelClassName="text-xs font-medium"
-                              metaClassName="text-[11px]"
-                            />
+                            <div className="mt-2">
+                              <PaymentTypeSummary
+                                source={row}
+                                className="mt-0"
+                                labelClassName="text-xs font-medium"
+                                metaClassName="text-[11px]"
+                              />
+                              {runningBalanceMeta ? (
+                                <p className={`mt-1 text-sm font-semibold ${runningBalanceMeta.textClass}`}>
+                                  {t("currency.formatted", {
+                                    symbol: t("currency.symbol"),
+                                    amount: runningBalanceMeta.absoluteAmount.toFixed(2),
+                                  })}
+                                  {" "}
+                                  {runningBalanceMeta.label}
+                                </p>
+                              ) : null}
+                            </div>
                           </div>
                           <div className="flex shrink-0 flex-col items-end gap-2">
                             <div className="flex items-center gap-1">
@@ -1521,8 +1535,7 @@ export default function Parties() {
                                       {amountFields.secondaryLabel}:{" "}
                                       {t("currency.formatted", {
                                         symbol: t("currency.symbol"),
-                                        amount:
-                                      amountFields.secondaryValue.toFixed(2),
+                                        amount: amountFields.secondaryValue.toFixed(2),
                                       })}
                                     </p>
                                   ) : null}
