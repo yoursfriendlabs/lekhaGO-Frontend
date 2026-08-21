@@ -9,34 +9,35 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useSnackbar } from '../lib/snackbar.jsx';
 import { formatMaybeDate, formatMaybeDateTime } from '../lib/datetime';
 import dayjs from '../lib/datetime';
+import { calculateDuration } from '../lib/datetime-calc';
 import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
 import DateDisplay from '../components/DateDisplay.jsx';
 
 function DatePresetSelect({ fromValue, toValue, onChange }) {
   const today = dayjs();
-  
+
   const getPreset = () => {
     if (!fromValue || !toValue) return "";
-    
+
     const todayStr = today.format("YYYY-MM-DD");
     if (fromValue === todayStr && toValue === todayStr) return "today";
-    
+
     const startOfWeek = today.startOf("week").format("YYYY-MM-DD");
     const endOfWeek = today.endOf("week").format("YYYY-MM-DD");
     if (fromValue === startOfWeek && toValue === endOfWeek) return "week";
-    
+
     const startOfMonth = today.startOf("month").format("YYYY-MM-DD");
     const endOfMonth = today.endOf("month").format("YYYY-MM-DD");
     if (fromValue === startOfMonth && toValue === endOfMonth) return "month";
-    
+
     const startOfYear = today.startOf("year").format("YYYY-MM-DD");
     const endOfYear = today.endOf("year").format("YYYY-MM-DD");
     if (fromValue === startOfYear && toValue === endOfYear) return "year";
-    
+
     const startOfPrevYear = today.subtract(1, "year").startOf("year").format("YYYY-MM-DD");
     const endOfPrevYear = today.subtract(1, "year").endOf("year").format("YYYY-MM-DD");
     if (fromValue === startOfPrevYear && toValue === endOfPrevYear) return "prev_year";
-    
+
     return "custom";
   };
 
@@ -89,21 +90,21 @@ export default function Attendance() {
   const { t } = useI18n();
   const { showError, showSuccess } = useSnackbar();
   const { user, role, businessId } = useAuth();
-  
+
   // Punch Card States
   const [todayStatus, setTodayStatus] = useState(null);
   const [todayLoading, setTodayLoading] = useState(false);
   const [punching, setPunching] = useState(false);
   const [gpsError, setGpsError] = useState('');
   const [apiError, setApiError] = useState('');
-  
+
   // History Filters & Logs States
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [staffList, setStaffList] = useState([]);
   const [staffLoading, setStaffLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   // Filter inputs
   const [selectedStaffId, setSelectedStaffId] = useState('');
   const [dateFrom, setDateFrom] = useState(() => dayjs().subtract(30, 'day').format('YYYY-MM-DD'));
@@ -147,7 +148,7 @@ export default function Attendance() {
       // Filter out members who have user records
       const validStaff = members.filter(m => m.user?.id);
       setStaffList(validStaff);
-      
+
       // Auto-select the current user if they are in the list, or the first staff member
       if (validStaff.length > 0) {
         setSelectedStaffId((current) => {
@@ -541,6 +542,7 @@ export default function Attendance() {
                   <th className="pb-3 pr-4">{t('attendance.date')}</th>
                   <th className="pb-3 pr-4">{t('attendance.punchInTimeLabel')}</th>
                   <th className="pb-3 pr-4">{t('attendance.punchOutTimeLabel')}</th>
+                  <th className="pb-3 pr-4">{t('attendance.duration')}</th>
                   <th className="pb-3 pr-4">{t('attendance.status')}</th>
                 </tr>
               </thead>
@@ -579,6 +581,18 @@ export default function Attendance() {
                           </span>
                         )}
                       </div>
+                    </td>
+                    <td className="py-4 pr-4">
+                      {(() => {
+                        const duration = calculateDuration(record.punchInTime, record.punchOutTime);
+                        return duration ? (
+                          <span className="inline-flex items-center rounded-md bg-mist px-2 py-0.5 text-xs font-medium text-secondary-700 ring-1 ring-inset ring-secondary-200/70 dark:bg-slate-800 dark:text-secondary-300 dark:ring-slate-700">
+                            {duration.formatted}
+                          </span>
+                        ) : (
+                          <span className="text-secondary-400">—</span>
+                        );
+                      })()}
                     </td>
                     <td className="py-4 pr-4 capitalize">
                       <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${

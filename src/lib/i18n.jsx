@@ -491,6 +491,7 @@ const dictionaries = {
       noLogs: 'No attendance records found.',
       staffName: 'Staff Name',
       role: 'Role',
+      duration: 'Duration',
     },
     appAccess: {
       lockedTitle: 'Workspace access is limited right now',
@@ -2692,6 +2693,7 @@ const dictionaries = {
       noLogs: 'कुनै हाजिरी रेकर्ड फेला परेन।',
       staffName: 'कर्मचारीको नाम',
       role: 'भूमिका',
+      duration: 'अवधि',
     },
     appAccess: {
       lockedTitle: 'Workspace पहुँच अहिले सीमित छ',
