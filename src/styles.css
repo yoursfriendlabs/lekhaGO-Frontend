@@ -306,7 +306,7 @@ thead th,
     color: black !important;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   }
-  
+
   .thermal-print-clone * {
     visibility: visible !important;
     color: black !important;
@@ -337,4 +337,8 @@ thead th,
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+/* Compact button variant — overrides .btn padding for dense layouts (e.g. unit type selector) */
+.btn-sm {
+  @apply px-3 py-1.5 text-xs;
 }

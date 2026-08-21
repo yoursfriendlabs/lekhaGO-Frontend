@@ -3442,8 +3442,8 @@ export default function Services() {
                                       }
                                       className={
                                         itemDraft.unitType === "primary"
-                                          ? "btn-primary w-full text-sm"
-                                          : "btn-ghost w-full text-sm"
+                                          ? "btn-primary btn-sm w-full"
+                                          : "btn-ghost btn-sm w-full"
                                       }
                                     >
                                       {itemDraftProduct.primaryUnit ||
@@ -3460,14 +3460,11 @@ export default function Services() {
                                       }
                                       className={
                                         itemDraft.unitType === "secondary"
-                                          ? "btn-primary w-full text-sm"
-                                          : "btn-ghost w-full text-sm"
+                                          ? "btn-primary btn-sm w-full"
+                                          : "btn-ghost btn-sm w-full"
                                       }
                                     >
-                                      {itemDraftProduct.secondaryUnit}{" "}
-                                      <span className="ml-1 text-xs opacity-70">
-                                        ({t("products.secondaryUnit")})
-                                      </span>
+                                      {itemDraftProduct.secondaryUnit}
                                     </button>
                                   </div>
                                   {itemDraftProduct.conversionRate > 0 ? (
