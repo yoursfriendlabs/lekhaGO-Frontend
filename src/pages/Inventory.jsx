@@ -366,19 +366,29 @@ export default function Inventory() {
     try {
       setStatsLoading(true);
       // /api/products/stats applies the same in-stock threshold and 20-day
-      // expiry window as the `stock=low` and `stock=nearexpiry` list filters,
-      // so the cards still match what you see after clicking through. Counting
-      // via the list endpoint as well would just ask the same two questions
-      // a second time.
-      const [statsRes, allRes] = await Promise.all([
+      // expiry window as the `stock=low` and `stock=nearexpiry` list filters.
+      // Its lowStockCount only covers items with 0 < stock <= threshold, so we
+      // also count the `stock=out` list to include items with stock 0 (out of
+      // stock) in the low-stock card.
+      const [statsRes, allRes, lowRes, outRes] = await Promise.all([
         api.getProductStats(),
         api.listProducts({ limit: 1 }).catch((err) => {
           console.error("Failed to fetch product count", err);
           return null;
         }),
+        api.listProducts({ limit: 1, stock: "low" }).catch((err) => {
+          console.error("Failed to fetch low-stock count", err);
+          return null;
+        }),
+        api.listProducts({ limit: 1, stock: "out" }).catch((err) => {
+          console.error("Failed to fetch out-of-stock count", err);
+          return null;
+        }),
       ]);
       setStats({
-        lowStockCount: Number(statsRes?.lowStockCount || 0),
+        lowStockCount:
+          Number(lowRes?.total ?? statsRes?.lowStockCount ?? 0) +
+          Number(outRes?.total ?? 0),
         nearExpiryCount: Number(statsRes?.nearExpiryCount || 0),
         allCount: Number(allRes?.total ?? statsRes?.totalCount ?? 0),
         popularCount: Number(statsRes?.popularCount || 0),

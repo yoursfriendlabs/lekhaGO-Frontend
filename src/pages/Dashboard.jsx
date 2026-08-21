@@ -327,13 +327,26 @@ export default function Dashboard() {
     setLoading(true);
     setLoadError('');
 
-    api.getDashboardSummary({
-      from: rangeStart.format('YYYY-MM-DD'),
-      to: rangeEnd.format('YYYY-MM-DD'),
-    })
-      .then((data) => {
+    // The dashboard summary's lowStockCount only covers items with
+    // 0 < stock <= threshold. Items with stock 0 (out of stock) are even more
+    // critical, so also fetch the low and out-of-stock product lists and
+    // include both in the low-stock count and list.
+    Promise.all([
+      api.getDashboardSummary({
+        from: rangeStart.format('YYYY-MM-DD'),
+        to: rangeEnd.format('YYYY-MM-DD'),
+      }),
+      api.listProducts({ limit: 5, stock: 'low' }).catch(() => null),
+      api.listProducts({ limit: 5, stock: 'out' }).catch(() => null),
+    ])
+      .then(([data, lowRes, outRes]) => {
         if (!isActive) return;
-        setSummary(normalizeDashboardSummary(data));
+        const normalized = normalizeDashboardSummary(data);
+        setSummary({
+          ...normalized,
+          lowStockCount: Number(lowRes?.total ?? 0) + Number(outRes?.total ?? 0),
+          lowStockItems: [...(lowRes?.items ?? []), ...(outRes?.items ?? [])],
+        });
       })
       .catch((err) => {
         if (!isActive) return;
