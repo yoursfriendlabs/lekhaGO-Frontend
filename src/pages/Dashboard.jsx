@@ -107,7 +107,9 @@ function normalizeDashboardSummary(payload = {}) {
     lowStockItems,
     recentSales: asArray(summary.recentSales),
     recentPurchases: asArray(summary.recentPurchases),
-    upcomingServiceDeliveries: asArray(summary.upcomingServiceDeliveries),
+    upcomingServiceDeliveries: asArray(summary.upcomingServiceDeliveries).filter(
+      (order) => !['closed', 'cancelled', 'canceled', 'void'].includes(String(order?.status || '').toLowerCase()),
+    ),
     breakdown: {
       revenue: {
         sales: firstNumber(summary?.breakdown?.revenue, ['sales']) ?? salesTotal,
