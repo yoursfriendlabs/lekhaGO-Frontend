@@ -149,11 +149,11 @@ function buildCartItem(product, unitType = "primary") {
     productId: product.id,
     name: product.name,
     categoryName: product.categoryName,
-    quantity: 1,
+    quantity: 0,
     unitType,
     unitPrice,
     taxRate: Number(product.taxRate || 0),
-    lineTotal: unitPrice.toFixed(2),
+    lineTotal: "0.00", // placeholder — filled once a quantity is entered
     primaryUnit: product.primaryUnit || "",
     secondaryUnit: product.secondaryUnit || "",
     conversionRate: Number(product.conversionRate || 0),
@@ -167,7 +167,7 @@ const emptyCheckoutForm = {
   saleDate: todayISODate(),
   invoiceNo: "",
   notes: "",
-  discount: "0",
+  discount: "", // placeholder — starts empty like taxRate
   amountReceived: "0",
   paymentMethod: "cash",
   bankId: "",
@@ -222,10 +222,13 @@ export default function QuickPos() {
     customerName: "",
     customerPhone: "",
     location: "",
-    notes: ""
+    notes: "",
   });
 
-  const vacantTables = useMemo(() => allTables.filter((t) => t.status === "vacant"), [allTables]);
+  const vacantTables = useMemo(
+    () => allTables.filter((t) => t.status === "vacant"),
+    [allTables],
+  );
 
   const filteredTablesForSelector = useMemo(() => {
     return allTables.filter((table) => {
@@ -322,17 +325,24 @@ export default function QuickPos() {
       api.getTables({ isActive: "true", limit: 100 }).catch(() => null),
       api.listCategories({ type: "table", limit: 100 }).catch(() => null),
     ])
-      .then(([productResponse, sequenceResponse, tablesResponse, categoriesResponse]) => {
-        if (!isActive) return;
-        const normalizedProducts = (productResponse?.items || [])
-          .map(normalizePosProduct)
-          .filter((product) => product.id);
+      .then(
+        ([
+          productResponse,
+          sequenceResponse,
+          tablesResponse,
+          categoriesResponse,
+        ]) => {
+          if (!isActive) return;
+          const normalizedProducts = (productResponse?.items || [])
+            .map(normalizePosProduct)
+            .filter((product) => product.id);
 
-        setProducts(normalizedProducts);
-        setSuggestedInvoiceNo(sequenceResponse?.nextSaleInvoiceNo || "");
-        setAllTables(tablesResponse?.items || []);
-        setFloors(categoriesResponse?.items || []);
-      })
+          setProducts(normalizedProducts);
+          setSuggestedInvoiceNo(sequenceResponse?.nextSaleInvoiceNo || "");
+          setAllTables(tablesResponse?.items || []);
+          setFloors(categoriesResponse?.items || []);
+        },
+      )
       .catch((error) => {
         if (!isActive) return;
         setProducts([]);
@@ -353,7 +363,9 @@ export default function QuickPos() {
     try {
       const [salesResponse, tablesResponse] = await Promise.all([
         api.listSales({ limit: 120 }).catch(() => ({ items: [] })),
-        isTablesEnabled ? api.getTables({ isActive: "true", limit: 100 }).catch(() => null) : null
+        isTablesEnabled
+          ? api.getTables({ isActive: "true", limit: 100 }).catch(() => null)
+          : null,
       ]);
 
       if (salesResponse?.items) {
@@ -380,7 +392,10 @@ export default function QuickPos() {
   useEffect(() => {
     if (!businessId) return;
 
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+    if (
+      typeof Notification !== "undefined" &&
+      Notification.permission === "default"
+    ) {
       Notification.requestPermission();
     }
 
@@ -397,10 +412,13 @@ export default function QuickPos() {
     setTableSelectorOpen(false);
 
     setDeliveryFormState({
-      customerName: activeAttributes?.customer_name || selectedParty?.name || "",
-      customerPhone: activeAttributes?.customer_phone || selectedParty?.phone || "",
-      location: activeAttributes?.customer_address || selectedParty?.address || "",
-      notes: checkoutForm?.notes || ""
+      customerName:
+        activeAttributes?.customer_name || selectedParty?.name || "",
+      customerPhone:
+        activeAttributes?.customer_phone || selectedParty?.phone || "",
+      location:
+        activeAttributes?.customer_address || selectedParty?.address || "",
+      notes: checkoutForm?.notes || "",
     });
     setDeliveryFormOpen(true);
   };
@@ -428,12 +446,18 @@ export default function QuickPos() {
 
       if (activeOrder) {
         const fullSale = await api.getSale(activeOrder.id);
-        if (fullSale?.isLocked === true || fullSale?.isLocked === 'true' || fullSale?.isLocked === 1) {
+        if (
+          fullSale?.isLocked === true ||
+          fullSale?.isLocked === "true" ||
+          fullSale?.isLocked === 1
+        ) {
           ignoreAutoSaveRef.current = true;
           setCart([]);
           setEditingId(null);
           setDeletedItemIds([]);
-          showError('This IRD tax invoice is locked and cannot be edited from POS.');
+          showError(
+            "This IRD tax invoice is locked and cannot be edited from POS.",
+          );
           return;
         }
         const saleItems = fullSale?.SaleItems || [];
@@ -471,7 +495,7 @@ export default function QuickPos() {
           saleDate: fullSale.saleDate || todayISODate(),
           invoiceNo: fullSale.invoiceNo || "",
           notes: fullSale.notes || "",
-          discount: String(fullSale.discount || 0),
+          discount: fullSale.discount ? String(fullSale.discount) : "",
           amountReceived: String(fullSale.amountReceived || 0),
           paymentMethod: fullSale.paymentMethod || "cash",
           bankId: fullSale.bankId || "",
@@ -645,16 +669,30 @@ export default function QuickPos() {
     const options = [{ label: t("common.exact") || "Exact", value: total }];
 
     [100, 500, 1000, 2000, 5000].forEach((denom) => {
-      if (denom >= roundTotal && !options.some((o) => Math.abs(o.value - denom) < 0.01)) {
-        options.push({ label: `${t("currency.symbol") || "Rs"} ${denom}`, value: denom });
+      if (
+        denom >= roundTotal &&
+        !options.some((o) => Math.abs(o.value - denom) < 0.01)
+      ) {
+        options.push({
+          label: `${t("currency.symbol") || "Rs"} ${denom}`,
+          value: denom,
+        });
       }
     });
 
     if (options.length === 1 && total > 0) {
       const next100 = Math.ceil(total / 100) * 100;
       const next500 = Math.ceil(total / 500) * 500;
-      if (next100 > total) options.push({ label: `${t("currency.symbol") || "Rs"} ${next100}`, value: next100 });
-      if (next500 > next100) options.push({ label: `${t("currency.symbol") || "Rs"} ${next500}`, value: next500 });
+      if (next100 > total)
+        options.push({
+          label: `${t("currency.symbol") || "Rs"} ${next100}`,
+          value: next100,
+        });
+      if (next500 > next100)
+        options.push({
+          label: `${t("currency.symbol") || "Rs"} ${next500}`,
+          value: next500,
+        });
     }
 
     return options;
@@ -706,8 +744,6 @@ export default function QuickPos() {
     activeAttributesRef.current = activeAttributes;
     selectedPartyRef.current = selectedParty;
   });
-
-
 
   useEffect(() => {
     if (!isTablesEnabled || !activeTableId || loading) return;
@@ -775,12 +811,24 @@ export default function QuickPos() {
           attributes: {
             ...(currentActiveAttributes || {}),
             order_status: currentActiveAttributes?.order_status || "new",
-            order_type: activeSessionOption || currentActiveAttributes?.order_type || "dine_in",
+            order_type:
+              activeSessionOption ||
+              currentActiveAttributes?.order_type ||
+              "dine_in",
             table_no:
               resolvedTableNo || currentActiveAttributes?.table_no || "",
-            customer_name: currentSelectedParty?.name || currentActiveAttributes?.customer_name || "",
-            customer_phone: currentSelectedParty?.phone || currentActiveAttributes?.customer_phone || "",
-            customer_address: currentSelectedParty?.address || currentActiveAttributes?.customer_address || "",
+            customer_name:
+              currentSelectedParty?.name ||
+              currentActiveAttributes?.customer_name ||
+              "",
+            customer_phone:
+              currentSelectedParty?.phone ||
+              currentActiveAttributes?.customer_phone ||
+              "",
+            customer_address:
+              currentSelectedParty?.address ||
+              currentActiveAttributes?.customer_address ||
+              "",
           },
           items: [
             ...currentCart.map((item) => ({
@@ -891,22 +939,8 @@ export default function QuickPos() {
         });
       }
 
-      // Check stock availability for new item
-      const availableStock = getAvailableStockQuantity(
-        product,
-        unitType,
-        product,
-      );
-      if (1 > availableStock) {
-        showError(
-          isAllStockExpired(product)
-            ? t("sales.allStockExpiredNamed", { name: product.name })
-            : t("sales.insufficientStock") ||
-                `Insufficient stock for ${product.name}. Available: ${availableStock}`,
-        );
-        return previous;
-      }
-
+      // New items start at quantity 0 (placeholder). Stock is validated
+      // when the user enters an actual quantity via updateCartQuantity.
       return [...previous, buildCartItem(product, unitType)];
     });
   };
@@ -1100,7 +1134,8 @@ export default function QuickPos() {
         ? true
         : resolvedReceivedAmount >= totals.grandTotal;
 
-      const currentOrderType = activeSessionOption || activeAttributes?.order_type || "dine_in";
+      const currentOrderType =
+        activeSessionOption || activeAttributes?.order_type || "dine_in";
       const orderStatus = activeAttributes?.order_status || "new";
       const matchedTable = allTables.find(
         (t) => String(t.id) === String(checkoutForm.tableId),
@@ -1124,11 +1159,15 @@ export default function QuickPos() {
         attributes: {
           ...(activeAttributes || {}),
           order_status: orderStatus,
-          order_type: activeSessionOption || activeAttributes?.order_type || "dine_in",
+          order_type:
+            activeSessionOption || activeAttributes?.order_type || "dine_in",
           table_no: resolvedTableNo || activeAttributes?.table_no || "",
-          customer_name: selectedParty?.name || activeAttributes?.customer_name || "",
-          customer_phone: selectedParty?.phone || activeAttributes?.customer_phone || "",
-          customer_address: selectedParty?.address || activeAttributes?.customer_address || "",
+          customer_name:
+            selectedParty?.name || activeAttributes?.customer_name || "",
+          customer_phone:
+            selectedParty?.phone || activeAttributes?.customer_phone || "",
+          customer_address:
+            selectedParty?.address || activeAttributes?.customer_address || "",
         },
         items: [
           ...cart.map((item) => ({
@@ -1220,7 +1259,8 @@ export default function QuickPos() {
       } else {
         setSuccessState({
           id: created?.id || "",
-          invoiceNo: created?.invoiceNo || manualInvoiceNo || suggestedInvoiceNo,
+          invoiceNo:
+            created?.invoiceNo || manualInvoiceNo || suggestedInvoiceNo,
           total: totals.grandTotal,
           action: nextAction,
         });
@@ -1242,7 +1282,7 @@ export default function QuickPos() {
     onChange,
     stopPropagation = false,
   }) => (
-<div
+    <div
       className="ml-auto inline-grid w-auto grid-cols-2 gap-0.5 rounded-full border border-secondary-200 bg-white px-0.5 py-0.5 text-[9px] font-semibold shadow-sm"
       onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
       onPointerDown={
@@ -1274,7 +1314,7 @@ export default function QuickPos() {
 
   const renderUnitSwitcher = (item) => {
     if (!item.secondaryUnit) {
-return (
+      return (
         <span className="text-xs text-secondary-500">
           /{" "}
           {getUnitShortcut(getProductUnitLabel(item, item.unitType)) ||
@@ -1342,7 +1382,9 @@ return (
 
   const renderFooterBar = ({ compact = false } = {}) => (
     <div className={compact ? "space-y-2.5" : "space-y-4"}>
-      <div className={`flex flex-col gap-2 rounded-[24px] bg-secondary-100 ${compact ? "p-2.5" : "p-3 sm:p-4"}`}>
+      <div
+        className={`flex flex-col gap-2 rounded-[24px] bg-secondary-100 ${compact ? "p-2.5" : "p-3 sm:p-4"}`}
+      >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <button
@@ -1360,7 +1402,9 @@ return (
             <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
               {t("sales.grandTotal")}
             </p>
-            <p className={`font-bold text-ink ${compact ? "text-base" : "text-lg"}`}>
+            <p
+              className={`font-bold text-ink ${compact ? "text-base" : "text-lg"}`}
+            >
               {money(totals.grandTotal)}
             </p>
           </div>
@@ -1419,8 +1463,8 @@ return (
           {submitting
             ? t("common.saving")
             : isTablesEnabled
-            ? (t("quickPos.confirmOrder") || "Confirm Order")
-            : t("quickPos.quickSave")}
+              ? t("quickPos.confirmOrder") || "Confirm Order"
+              : t("quickPos.quickSave")}
         </button>
       </div>
     </div>
@@ -1485,7 +1529,8 @@ return (
               Select Order Type & Seating Area
             </h2>
             <p className="text-sm text-secondary-500">
-              Choose one of the order options below to start adding items to order.
+              Choose one of the order options below to start adding items to
+              order.
             </p>
           </div>
 
@@ -1523,11 +1568,10 @@ return (
                 <span className="inline-flex items-center justify-center p-3 rounded-2xl bg-blue-50 text-blue-600 mb-2">
                   <Package2 size={24} />
                 </span>
-                <h3 className="text-lg font-bold text-ink">
-                  Home Delivery
-                </h3>
+                <h3 className="text-lg font-bold text-ink">Home Delivery</h3>
                 <p className="text-xs text-secondary-500">
-                  Delivery order, reference party addresses and track runner details.
+                  Delivery order, reference party addresses and track runner
+                  details.
                 </p>
               </div>
               <span className="text-xs font-bold text-primary flex items-center gap-1 pt-2">
@@ -1664,7 +1708,9 @@ return (
 
                     <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-secondary-100 dark:border-slate-800 mt-2">
                       <span className="text-[10px] text-secondary-400">
-                        {table.capacity ? `${table.capacity} seats` : "No limit"}
+                        {table.capacity
+                          ? `${table.capacity} seats`
+                          : "No limit"}
                       </span>
                       <span className="text-[9px] bg-secondary-100 text-secondary-700 px-1.5 py-0.5 rounded font-medium border border-secondary-200/50 truncate max-w-[70px]">
                         {table.category?.name || "No Floor"}
@@ -1691,7 +1737,11 @@ return (
               <button
                 type="button"
                 className="btn-ghost h-11 justify-center rounded-[18px] text-ink-light hover:text-ink border border-secondary-200/80 bg-white shadow-2xs font-semibold px-4"
-                onClick={() => navigate(queryRef === "orders" ? "/app/orders" : "/app/billing")}
+                onClick={() =>
+                  navigate(
+                    queryRef === "orders" ? "/app/orders" : "/app/billing",
+                  )
+                }
               >
                 <ArrowLeft size={16} className="mr-1.5" />
                 {queryRef === "orders" ? "Seating Map" : "Billing Counter"}
@@ -1749,9 +1799,7 @@ return (
           canProceed={cart.length > 0}
           backLabel={t("common.back")}
           nextLabel={
-            checkoutOpen
-              ? t("common.continue")
-              : t("quickPos.checkout")
+            checkoutOpen ? t("common.continue") : t("quickPos.checkout")
           }
           showNavigation={false}
         />
@@ -1779,7 +1827,11 @@ return (
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => navigate(queryRef === "orders" ? "/app/orders" : "/app/billing")}
+                    onClick={() =>
+                      navigate(
+                        queryRef === "orders" ? "/app/orders" : "/app/billing",
+                      )
+                    }
                     className="px-2.5 py-1.5 bg-white text-ink-light border border-secondary-200 text-xs font-bold rounded-xl shadow-2xs flex items-center"
                   >
                     <ArrowLeft size={14} className="mr-1" />
@@ -1810,7 +1862,10 @@ return (
                     }`}
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder={t("quickPos.searchPlaceholder") || "Search menu items, code, or category..."}
+                    placeholder={
+                      t("quickPos.searchPlaceholder") ||
+                      "Search menu items, code, or category..."
+                    }
                   />
                   {search && (
                     <button
@@ -1829,7 +1884,9 @@ return (
                       id="quick-pos-category"
                       className="input h-12 rounded-2xl bg-mist px-3 text-xs font-bold text-ink-light focus:bg-white border-secondary-200 max-w-[150px] truncate"
                       value={selectedCategory}
-                      onChange={(event) => setSelectedCategory(event.target.value)}
+                      onChange={(event) =>
+                        setSelectedCategory(event.target.value)
+                      }
                     >
                       {categoryOptions.map((category) => (
                         <option key={category} value={category}>
@@ -1909,8 +1966,7 @@ return (
                     selectedUnitType,
                   );
                   const isExpiredStock = isAllStockExpired(product);
-                  const isOutOfStock =
-                    getSellableQuantity(product) <= 0;
+                  const isOutOfStock = getSellableQuantity(product) <= 0;
 
                   return (
                     <article
@@ -1982,7 +2038,8 @@ return (
                             {isOutOfStock ? (
                               <div className="w-full text-center py-1.5 text-[10px] font-bold text-red-600 uppercase tracking-wider">
                                 {isExpiredStock
-                                  ? t("sales.allStockExpired") || "All stock is expired"
+                                  ? t("sales.allStockExpired") ||
+                                    "All stock is expired"
                                   : t("products.outOfStock") || "Out of Stock"}
                               </div>
                             ) : Number(inCartQty) > 0 ? (
@@ -2055,8 +2112,6 @@ return (
           )}
         </div>
 
-
-
         <aside className="hidden xl:block">
           <div className="sticky top-6 rounded-[32px] border border-secondary-200/70 bg-white/90 p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
@@ -2093,16 +2148,26 @@ return (
               <div className="mt-4 rounded-2xl border border-secondary-200 bg-mist/50 p-3.5 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-secondary-500 flex items-center gap-1.5">
-                    <Truck size={14} className="text-primary" /> Delivery Details
+                    <Truck size={14} className="text-primary" /> Delivery
+                    Details
                   </span>
                   <button
                     type="button"
                     onClick={() => {
                       setDeliveryFormState({
-                        customerName: activeAttributes?.customer_name || selectedParty?.name || "",
-                        customerPhone: activeAttributes?.customer_phone || selectedParty?.phone || "",
-                        location: activeAttributes?.customer_address || selectedParty?.address || "",
-                        notes: checkoutForm?.notes || ""
+                        customerName:
+                          activeAttributes?.customer_name ||
+                          selectedParty?.name ||
+                          "",
+                        customerPhone:
+                          activeAttributes?.customer_phone ||
+                          selectedParty?.phone ||
+                          "",
+                        location:
+                          activeAttributes?.customer_address ||
+                          selectedParty?.address ||
+                          "",
+                        notes: checkoutForm?.notes || "",
                       });
                       setDeliveryFormOpen(true);
                     }}
@@ -2112,10 +2177,24 @@ return (
                   </button>
                 </div>
                 <div className="text-xs space-y-1 text-ink-light">
-                  <p><span className="font-semibold text-ink">Name:</span> {activeAttributes?.customer_name || "-"}</p>
-                  <p><span className="font-semibold text-ink">Phone:</span> {activeAttributes?.customer_phone || "-"}</p>
-                  <p><span className="font-semibold text-ink">Location:</span> {activeAttributes?.customer_address || "-"}</p>
-                  {checkoutForm?.notes && <p><span className="font-semibold text-ink">Notes:</span> {checkoutForm.notes}</p>}
+                  <p>
+                    <span className="font-semibold text-ink">Name:</span>{" "}
+                    {activeAttributes?.customer_name || "-"}
+                  </p>
+                  <p>
+                    <span className="font-semibold text-ink">Phone:</span>{" "}
+                    {activeAttributes?.customer_phone || "-"}
+                  </p>
+                  <p>
+                    <span className="font-semibold text-ink">Location:</span>{" "}
+                    {activeAttributes?.customer_address || "-"}
+                  </p>
+                  {checkoutForm?.notes && (
+                    <p>
+                      <span className="font-semibold text-ink">Notes:</span>{" "}
+                      {checkoutForm.notes}
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -2123,7 +2202,10 @@ return (
             <div className="mt-5 max-h-[340px] space-y-3 overflow-y-auto pr-1">
               {cart.length === 0 ? (
                 <div className="rounded-[24px] border border-dashed border-secondary-200 bg-mist px-4 py-8 text-center">
-                  <ShoppingBag className="mx-auto text-secondary-300" size={28} />
+                  <ShoppingBag
+                    className="mx-auto text-secondary-300"
+                    size={28}
+                  />
                   <p className="mt-3 text-sm font-semibold text-ink-light">
                     {t("quickPos.emptyCart")}
                   </p>
@@ -2180,8 +2262,10 @@ return (
                           <input
                             type="number"
                             inputMode="decimal"
+                            min="0"
                             className="w-12 border-0 bg-transparent p-0 text-center text-sm font-semibold text-ink focus:outline-none focus:ring-0"
-                            value={item.quantity}
+                            value={item.quantity || ""}
+                            placeholder="0"
                             onChange={(e) =>
                               updateCartQuantity(item.productId, e.target.value)
                             }
@@ -2279,14 +2363,14 @@ return (
                       inputMode="decimal"
                       min="0"
                       step="0.01"
-                      value={checkoutForm.discount}
+                      value={checkoutForm.discount || ""}
                       onChange={(event) =>
                         setCheckoutForm((previous) => ({
                           ...previous,
                           discount: event.target.value,
                         }))
                       }
-                      placeholder="0.00"
+                      placeholder="0"
                     />
                   </div>
                 </div>
@@ -2394,8 +2478,8 @@ return (
               {submitting
                 ? t("common.saving")
                 : isTablesEnabled
-                ? (t("quickPos.confirmOrder") || "Confirm Order")
-                : t("quickPos.saveOnly")}
+                  ? t("quickPos.confirmOrder") || "Confirm Order"
+                  : t("quickPos.saveOnly")}
             </button>
           </div>
         }
@@ -2504,10 +2588,19 @@ return (
                   type="button"
                   onClick={() => {
                     setDeliveryFormState({
-                      customerName: activeAttributes?.customer_name || selectedParty?.name || "",
-                      customerPhone: activeAttributes?.customer_phone || selectedParty?.phone || "",
-                      location: activeAttributes?.customer_address || selectedParty?.address || "",
-                      notes: checkoutForm?.notes || ""
+                      customerName:
+                        activeAttributes?.customer_name ||
+                        selectedParty?.name ||
+                        "",
+                      customerPhone:
+                        activeAttributes?.customer_phone ||
+                        selectedParty?.phone ||
+                        "",
+                      location:
+                        activeAttributes?.customer_address ||
+                        selectedParty?.address ||
+                        "",
+                      notes: checkoutForm?.notes || "",
                     });
                     setDeliveryFormOpen(true);
                   }}
@@ -2517,10 +2610,24 @@ return (
                 </button>
               </div>
               <div className="text-xs space-y-0.5 text-ink-light">
-                <p><span className="font-semibold text-ink">Name:</span> {activeAttributes?.customer_name || "-"}</p>
-                <p><span className="font-semibold text-ink">Phone:</span> {activeAttributes?.customer_phone || "-"}</p>
-                <p><span className="font-semibold text-ink">Location:</span> {activeAttributes?.customer_address || "-"}</p>
-                {checkoutForm?.notes && <p><span className="font-semibold text-ink">Notes:</span> {checkoutForm.notes}</p>}
+                <p>
+                  <span className="font-semibold text-ink">Name:</span>{" "}
+                  {activeAttributes?.customer_name || "-"}
+                </p>
+                <p>
+                  <span className="font-semibold text-ink">Phone:</span>{" "}
+                  {activeAttributes?.customer_phone || "-"}
+                </p>
+                <p>
+                  <span className="font-semibold text-ink">Location:</span>{" "}
+                  {activeAttributes?.customer_address || "-"}
+                </p>
+                {checkoutForm?.notes && (
+                  <p>
+                    <span className="font-semibold text-ink">Notes:</span>{" "}
+                    {checkoutForm.notes}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -2580,8 +2687,10 @@ return (
                         <input
                           type="number"
                           inputMode="decimal"
+                          min="0"
                           className="w-8 border-0 bg-transparent p-0 text-center text-xs font-semibold text-ink focus:outline-none focus:ring-0"
-                          value={item.quantity}
+                          value={item.quantity || ""}
+                          placeholder="0"
                           onChange={(e) =>
                             updateCartQuantity(item.productId, e.target.value)
                           }
@@ -2639,7 +2748,7 @@ return (
                         inputMode="decimal"
                         min="0"
                         step="0.01"
-                        value={checkoutForm.discount}
+                        value={checkoutForm.discount || ""}
                         onChange={(event) =>
                           setCheckoutForm((previous) => ({
                             ...previous,
@@ -2819,12 +2928,16 @@ return (
                       <Sparkles size={14} className="text-emerald-600" />
                       {t("sales.changeToReturn") || "Change to Return"}
                     </span>
-                    <span className="text-sm font-black text-emerald-700">{money(changeAmount)}</span>
+                    <span className="text-sm font-black text-emerald-700">
+                      {money(changeAmount)}
+                    </span>
                   </div>
                 ) : dueAmount > 0 ? (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-bold text-amber-800 flex justify-between items-center shadow-2xs">
                     <span>{t("sales.dueAmount") || "Due Amount"}</span>
-                    <span className="text-sm font-black text-amber-700">{money(dueAmount)}</span>
+                    <span className="text-sm font-black text-amber-700">
+                      {money(dueAmount)}
+                    </span>
                   </div>
                 ) : null}
               </div>
@@ -2946,14 +3059,16 @@ return (
           <div className="flex flex-col gap-3 border-b border-secondary-100 pb-3 dark:border-slate-800">
             {/* Floor Filters */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap shrink-0">Floor:</span>
+              <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap shrink-0">
+                Floor:
+              </span>
               <button
                 type="button"
-                onClick={() => setSelectedFloorFilter('all')}
+                onClick={() => setSelectedFloorFilter("all")}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
-                  selectedFloorFilter === 'all'
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
+                  selectedFloorFilter === "all"
+                    ? "bg-primary text-white shadow-sm"
+                    : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                 }`}
               >
                 All Floors
@@ -2965,8 +3080,8 @@ return (
                   onClick={() => setSelectedFloorFilter(floor.id)}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
                     selectedFloorFilter === floor.id
-                      ? 'bg-primary text-white shadow-sm'
-                      : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
+                      ? "bg-primary text-white shadow-sm"
+                      : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                   }`}
                 >
                   {floor.name}
@@ -2974,11 +3089,11 @@ return (
               ))}
               <button
                 type="button"
-                onClick={() => setSelectedFloorFilter('unassigned')}
+                onClick={() => setSelectedFloorFilter("unassigned")}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
-                  selectedFloorFilter === 'unassigned'
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
+                  selectedFloorFilter === "unassigned"
+                    ? "bg-primary text-white shadow-sm"
+                    : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                 }`}
               >
                 Unassigned
@@ -2987,36 +3102,38 @@ return (
 
             {/* Status Filters */}
             <div className="flex flex-wrap items-center gap-1.5 border-t border-secondary-100/60 pt-2.5">
-              <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap shrink-0">Status:</span>
+              <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap shrink-0">
+                Status:
+              </span>
               <button
                 type="button"
-                onClick={() => setSelectedStatusFilter('all')}
+                onClick={() => setSelectedStatusFilter("all")}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
-                  selectedStatusFilter === 'all'
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
+                  selectedStatusFilter === "all"
+                    ? "bg-primary text-white shadow-sm"
+                    : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                 }`}
               >
                 All
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedStatusFilter('vacant')}
+                onClick={() => setSelectedStatusFilter("vacant")}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
-                  selectedStatusFilter === 'vacant'
-                    ? 'bg-emerald-600 text-white shadow-sm'
-                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
+                  selectedStatusFilter === "vacant"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                 }`}
               >
                 Vacant
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedStatusFilter('occupied')}
+                onClick={() => setSelectedStatusFilter("occupied")}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
-                  selectedStatusFilter === 'occupied'
-                    ? 'bg-amber-600 text-white shadow-sm'
-                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
+                  selectedStatusFilter === "occupied"
+                    ? "bg-amber-600 text-white shadow-sm"
+                    : "bg-white text-secondary-700 hover:bg-mist border border-secondary-200"
                 }`}
               >
                 Occupied
@@ -3081,13 +3198,19 @@ return (
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2 w-full">
-                    <span className="text-sm font-bold truncate max-w-[90px]">{table.name}</span>
-                    <span className={`px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider ${isOccupied ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}>
+                    <span className="text-sm font-bold truncate max-w-[90px]">
+                      {table.name}
+                    </span>
+                    <span
+                      className={`px-1 py-0.5 rounded text-[7px] font-bold uppercase tracking-wider ${isOccupied ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"}`}
+                    >
                       {isOccupied ? "Occupied" : "Vacant"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-1 w-full pt-1.5 border-t border-secondary-100 dark:border-slate-800 mt-2">
-                    <span className="text-[10px] text-secondary-400">{table.capacity ? `${table.capacity} seats` : "No limit"}</span>
+                    <span className="text-[10px] text-secondary-400">
+                      {table.capacity ? `${table.capacity} seats` : "No limit"}
+                    </span>
                     <span className="text-[9px] bg-secondary-100 text-secondary-700 px-1.5 py-0.5 rounded font-medium border border-secondary-200/50 truncate max-w-[70px]">
                       {table.category?.name || "No Floor"}
                     </span>
@@ -3110,9 +3233,18 @@ return (
       </Dialog>
 
       {/* Image Preview Dialog */}
-      <Dialog isOpen={previewImage !== null} onClose={() => setPreviewImage(null)} title={t('common.preview') || 'Image Preview'} size="lg">
+      <Dialog
+        isOpen={previewImage !== null}
+        onClose={() => setPreviewImage(null)}
+        title={t("common.preview") || "Image Preview"}
+        size="lg"
+      >
         <div className="flex justify-center items-center p-2 bg-mist rounded-2xl overflow-hidden">
-          <img src={previewImage} alt="Preview" className="max-w-full max-h-[70vh] rounded-xl object-contain" />
+          <img
+            src={previewImage}
+            alt="Preview"
+            className="max-w-full max-h-[70vh] rounded-xl object-contain"
+          />
         </div>
       </Dialog>
 
@@ -3126,7 +3258,10 @@ return (
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            setCheckoutForm((prev) => ({ ...prev, notes: deliveryFormState.notes }));
+            setCheckoutForm((prev) => ({
+              ...prev,
+              notes: deliveryFormState.notes,
+            }));
             setActiveAttributes((prev) => ({
               ...prev,
               customer_name: deliveryFormState.customerName,
@@ -3138,43 +3273,71 @@ return (
           className="space-y-4"
         >
           <div>
-            <label className="label text-ink-light font-semibold text-xs">Customer Name</label>
+            <label className="label text-ink-light font-semibold text-xs">
+              Customer Name
+            </label>
             <input
               type="text"
               required
               className="input mt-1.5 w-full rounded-xl border border-secondary-200 text-sm focus:border-primary"
               placeholder="Enter customer name"
               value={deliveryFormState.customerName}
-              onChange={(e) => setDeliveryFormState(prev => ({ ...prev, customerName: e.target.value }))}
+              onChange={(e) =>
+                setDeliveryFormState((prev) => ({
+                  ...prev,
+                  customerName: e.target.value,
+                }))
+              }
             />
           </div>
           <div>
-            <label className="label text-ink-light font-semibold text-xs">Phone Number (Optional)</label>
+            <label className="label text-ink-light font-semibold text-xs">
+              Phone Number (Optional)
+            </label>
             <input
               type="tel"
               className="input mt-1.5 w-full rounded-xl border border-secondary-200 text-sm focus:border-primary"
               placeholder="Enter phone number"
               value={deliveryFormState.customerPhone}
-              onChange={(e) => setDeliveryFormState(prev => ({ ...prev, customerPhone: e.target.value }))}
+              onChange={(e) =>
+                setDeliveryFormState((prev) => ({
+                  ...prev,
+                  customerPhone: e.target.value,
+                }))
+              }
             />
           </div>
           <div>
-            <label className="label text-ink-light font-semibold text-xs">Location / Address</label>
+            <label className="label text-ink-light font-semibold text-xs">
+              Location / Address
+            </label>
             <textarea
               required
               className="input mt-1.5 w-full rounded-xl border border-secondary-200 text-sm min-h-[70px] resize-none focus:border-primary"
               placeholder="Enter delivery address"
               value={deliveryFormState.location}
-              onChange={(e) => setDeliveryFormState(prev => ({ ...prev, location: e.target.value }))}
+              onChange={(e) =>
+                setDeliveryFormState((prev) => ({
+                  ...prev,
+                  location: e.target.value,
+                }))
+              }
             />
           </div>
           <div>
-            <label className="label text-ink-light font-semibold text-xs">Notes / Special Instructions</label>
+            <label className="label text-ink-light font-semibold text-xs">
+              Notes / Special Instructions
+            </label>
             <textarea
               className="input mt-1.5 w-full rounded-xl border border-secondary-200 text-sm min-h-[70px] resize-none focus:border-primary"
               placeholder="Special instructions for delivery"
               value={deliveryFormState.notes}
-              onChange={(e) => setDeliveryFormState(prev => ({ ...prev, notes: e.target.value }))}
+              onChange={(e) =>
+                setDeliveryFormState((prev) => ({
+                  ...prev,
+                  notes: e.target.value,
+                }))
+              }
             />
           </div>
           <div className="flex justify-end gap-2 pt-3 border-t border-secondary-100 dark:border-slate-800">
