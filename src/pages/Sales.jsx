@@ -39,6 +39,11 @@ import {
   normalizeLookupProduct,
   toProductLookupOption,
 } from '../lib/lookups.js';
+import {
+  getStockAvailabilityMessage,
+  isAllStockExpired,
+  toAvailableUnitQuantity,
+} from '../lib/stockAvailability.js';
 
 const emptyItem = {
   productId: '',
@@ -449,6 +454,25 @@ export default function Sales() {
       return;
     }
 
+    const product = getProductById(itemDraft.productId);
+    const requestedQty = Number(itemDraft.quantity || 0);
+    const available = toAvailableUnitQuantity(product, itemDraft.unitType || 'primary', product);
+    const otherQty = items.reduce((sum, item, index) => {
+      if (editingItemIdx !== null && index === editingItemIdx) return sum;
+      if (String(item.productId) !== String(itemDraft.productId)) return sum;
+      if ((item.unitType || 'primary') !== (itemDraft.unitType || 'primary')) return sum;
+      return sum + Number(item.quantity || 0);
+    }, 0);
+    if (requestedQty + otherQty > available) {
+      setStatus({
+        type: 'error',
+        message: isAllStockExpired(product)
+          ? t('sales.allStockExpiredNamed', { name: product?.name })
+          : t('sales.insufficientStock'),
+      });
+      return;
+    }
+
     const draft = {
       ...itemDraft,
       lineTotal: (Number(itemDraft.quantity || 0) * Number(itemDraft.unitPrice || 0)).toFixed(2),
@@ -701,6 +725,23 @@ export default function Sales() {
       return Number(getProductById(item.productId)?.conversionRate || 0) <= 0;
     });
     if (invalidConversion) { setStatus({ type: 'error', message: t('errors.conversionRequired') }); return; }
+    if (formMode !== 'edit') {
+      const expiredOrShortItem = items.find((item) => {
+        const product = getProductById(item.productId);
+        const available = toAvailableUnitQuantity(product, item.unitType || 'primary', product);
+        return Number(item.quantity || 0) > available;
+      });
+      if (expiredOrShortItem) {
+        const product = getProductById(expiredOrShortItem.productId);
+        setStatus({
+          type: 'error',
+          message: isAllStockExpired(product)
+            ? t('sales.allStockExpiredNamed', { name: product?.name || expiredOrShortItem.name })
+            : t('sales.insufficientStock'),
+        });
+        return;
+      }
+    }
     if (requiresBankSelection(header, receivedAmount)) {
       setStatus({ type: 'error', message: t('payments.bankRequired') });
       return;
@@ -754,7 +795,7 @@ export default function Sales() {
       invalidateSales(listParams);
       fetchSales(listParams, true);
     } catch (err) {
-      setStatus({ type: 'error', message: err.message });
+      setStatus({ type: 'error', message: getStockAvailabilityMessage(err, t) });
     } finally {
       setSavingSale(false);
     }

@@ -42,6 +42,12 @@ import { useSSEEvent, SSE_EVENTS } from "../hooks/useSSE.js";
 import { useProductStore } from "../stores/products";
 import { useSaleStore } from "../stores/sales";
 import { checkNewAndReadyOrders } from "../lib/cafeOrders.js";
+import {
+  getSellableQuantity,
+  getStockAvailabilityMessage,
+  isAllStockExpired,
+  toAvailableUnitQuantity,
+} from "../lib/stockAvailability.js";
 
 function getProductCategoryName(product = {}) {
   if (typeof product.categoryName === "string" && product.categoryName.trim())
@@ -101,34 +107,12 @@ function formatStockLabel(product, unitType = "primary") {
   return `${quantity} ${unitLabel}`.trim();
 }
 
-function getStockQuantity(product = {}) {
-  return Number(
-    product?.stockOnHand ??
-      product?.openingStock ??
-      product?.quantityOnHand ??
-      0,
-  );
-}
-
-function getConversionRate(product = {}) {
-  return Number(product?.conversionRate || 0);
-}
-
 function getAvailableStockQuantity(
   product,
   unitType = "primary",
   fallback = {},
 ) {
-  const stockOnHand = getStockQuantity(product) || getStockQuantity(fallback);
-  const conversionRate =
-    getConversionRate(product) || getConversionRate(fallback);
-  const secondaryUnit = product?.secondaryUnit || fallback?.secondaryUnit || "";
-
-  if (unitType === "secondary" && secondaryUnit && conversionRate > 0) {
-    return stockOnHand * conversionRate;
-  }
-
-  return stockOnHand;
+  return toAvailableUnitQuantity(product, unitType, fallback);
 }
 
 function getProductUnitLabel(product, unitType) {
@@ -889,8 +873,10 @@ export default function QuickPos() {
         // Check stock availability
         if (newQty > availableStock) {
           showError(
-            t("sales.insufficientStock") ||
-              `Insufficient stock for ${product.name}. Available: ${availableStock}`,
+            isAllStockExpired(product)
+              ? t("sales.allStockExpiredNamed", { name: product.name })
+              : t("sales.insufficientStock") ||
+                  `Insufficient stock for ${product.name}. Available: ${availableStock}`,
           );
           return previous;
         }
@@ -913,8 +899,10 @@ export default function QuickPos() {
       );
       if (1 > availableStock) {
         showError(
-          t("sales.insufficientStock") ||
-            `Insufficient stock for ${product.name}. Available: ${availableStock}`,
+          isAllStockExpired(product)
+            ? t("sales.allStockExpiredNamed", { name: product.name })
+            : t("sales.insufficientStock") ||
+                `Insufficient stock for ${product.name}. Available: ${availableStock}`,
         );
         return previous;
       }
@@ -939,8 +927,10 @@ export default function QuickPos() {
     // Validate stock availability
     if (requestedQty > 0 && requestedQty > availableStock) {
       showError(
-        t("sales.insufficientStock") ||
-          `Insufficient stock for ${product?.name}. Available: ${availableStock}`,
+        isAllStockExpired(product)
+          ? t("sales.allStockExpiredNamed", { name: product?.name })
+          : t("sales.insufficientStock") ||
+              `Insufficient stock for ${product?.name}. Available: ${availableStock}`,
       );
       return;
     }
@@ -1069,13 +1059,17 @@ export default function QuickPos() {
     });
 
     if (insufficientStockItems.length > 0) {
+      const expiredItems = insufficientStockItems.filter((item) =>
+        isAllStockExpired(getProductById(item.productId) || item),
+      );
       const itemNames = insufficientStockItems
         .map((item) => item.name)
         .join(", ");
       setStatus({
         type: "error",
-        message:
-          t("sales.insufficientStock") || `Insufficient stock: ${itemNames}`,
+        message: expiredItems.length
+          ? t("sales.allStockExpiredNamed", { name: itemNames })
+          : t("sales.insufficientStock") || `Insufficient stock: ${itemNames}`,
       });
       return;
     }
@@ -1211,6 +1205,10 @@ export default function QuickPos() {
               0,
               Number(product.stockOnHand || 0) - stockReduction,
             ),
+            sellableQuantity: Math.max(
+              0,
+              getSellableQuantity(product) - stockReduction,
+            ),
           };
         }),
       );
@@ -1229,7 +1227,10 @@ export default function QuickPos() {
       }
       resetSaleFlow();
     } catch (error) {
-      setStatus({ type: "error", message: error.message });
+      setStatus({
+        type: "error",
+        message: getStockAvailabilityMessage(error, t),
+      });
     } finally {
       setSubmitting(false);
     }
@@ -1907,7 +1908,9 @@ return (
                     product,
                     selectedUnitType,
                   );
-                  const isOutOfStock = Number(product.stockOnHand || 0) <= 0;
+                  const isExpiredStock = isAllStockExpired(product);
+                  const isOutOfStock =
+                    getSellableQuantity(product) <= 0;
 
                   return (
                     <article
@@ -1978,7 +1981,9 @@ return (
                           <div className="mt-2 flex">
                             {isOutOfStock ? (
                               <div className="w-full text-center py-1.5 text-[10px] font-bold text-red-600 uppercase tracking-wider">
-                                {t("products.outOfStock") || "Out of Stock"}
+                                {isExpiredStock
+                                  ? t("sales.allStockExpired") || "All stock is expired"
+                                  : t("products.outOfStock") || "Out of Stock"}
                               </div>
                             ) : Number(inCartQty) > 0 ? (
                               <div className="flex w-full items-center justify-between rounded-full bg-primary-50 px-1 py-1">

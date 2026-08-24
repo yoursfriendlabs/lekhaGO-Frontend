@@ -12,6 +12,7 @@ import FlexibleDateInput from '../components/FlexibleDateInput.jsx';
 import { Dialog } from '../components/ui/Dialog.tsx';
 import ConfirmDialog from '../components/ui/ConfirmDialog.jsx';
 import { api } from '../lib/api';
+import { getStockAvailabilityMessage } from '../lib/stockAvailability.js';
 import { useAuth } from '../lib/auth';
 import { useBusinessSettings } from '../lib/businessSettings.jsx';
 import { useI18n } from '../lib/i18n.jsx';
@@ -515,7 +516,7 @@ export default function CafeOrders() {
       resetForm();
       await loadOrders();
     } catch (err) {
-      setStatus({ type: 'error', message: err.message || 'Unable to save the order.' });
+      setStatus({ type: 'error', message: getStockAvailabilityMessage(err, t) || err.message || 'Unable to save the order.' });
     }
   };
 

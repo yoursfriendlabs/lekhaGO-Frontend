@@ -911,6 +911,39 @@ export const api = {
       );
     });
   },
+  exchangeProductBatch: (productId, batchId, data) =>
+    request(
+      `/api/products/${productId}/batches/${batchId}/exchange`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("product", productId),
+        "products",
+        "reports",
+        "dashboard",
+      ]),
+    ),
+  destroyProductBatch: (productId, batchId, data = {}) =>
+    request(
+      `/api/products/${productId}/batches/${batchId}/destroy`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("product", productId),
+        "products",
+        "reports",
+        "dashboard",
+      ]),
+    ),
+  updateProductBatch: (productId, batchId, data) =>
+    request(
+      `/api/products/${productId}/batches/${batchId}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("product", productId),
+        "products",
+        "reports",
+        "dashboard",
+      ]),
+    ),
   listCategories: (params = {}) =>
     collectionRequest(
       "/api/categories",

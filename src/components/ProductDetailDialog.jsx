@@ -5,7 +5,12 @@ import { useI18n } from '../lib/i18n.jsx';
 import { useAuth } from '../lib/auth';
 import DateDisplay from './DateDisplay.jsx';
 import { formatDateBoth } from '../lib/nepaliDate.js';
-import { History, Layers, Package, Pencil, Plus } from 'lucide-react';
+import { History, Layers, Package, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import FlexibleDateInput from './FlexibleDateInput.jsx';
+import ConfirmDialog from './ui/ConfirmDialog.jsx';
+import Notice from './Notice.jsx';
+import ActionMenu from './ActionMenu.jsx';
+import { isExpiryDateExpired } from '../lib/stockAvailability.js';
 
 function toDateInputValue(value) {
   if (!value) return '';
@@ -68,6 +73,7 @@ export default function ProductDetailDialog({
   showJewelleryFields = false,
   onEdit,
   onRestock,
+  onProductUpdated,
 }) {
   const { t } = useI18n();
   const { canViewFeature } = useAuth();
@@ -82,6 +88,13 @@ export default function ProductDetailDialog({
   const [historyPage, setHistoryPage] = useState(1);
   const [historyTotal, setHistoryTotal] = useState(0);
   const historyPageSize = 10;
+  const [exchangeLot, setExchangeLot] = useState(null);
+  const [destroyLot, setDestroyLot] = useState(null);
+  const [editLot, setEditLot] = useState(null);
+  const [exchangeForm, setExchangeForm] = useState({ batchNumber: '', expiryDate: '' });
+  const [editExpiryDate, setEditExpiryDate] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [actionSaving, setActionSaving] = useState(false);
 
   const display = product || productHint || {};
   const unitLabel = display.primaryUnit || display.unit?.name || display.unit || '';
@@ -90,6 +103,16 @@ export default function ProductDetailDialog({
   const salePrice = Number(display.salePrice ?? 0);
   const purchasePrice = Number(display.purchasePrice ?? 0);
   const nearestExpiry = toDateInputValue(display.expiryDate);
+  const expiredQuantity = Number(display.expiredQuantity || 0);
+  const sellableQuantity = display.sellableQuantity != null
+    ? Number(display.sellableQuantity)
+    : stock;
+
+  const applyUpdatedProduct = (updated) => {
+    if (!updated) return;
+    setProduct(updated);
+    onProductUpdated?.(updated);
+  };
 
   const loadHistory = useCallback(async (id, pageNum = 1) => {
     if (!id) return;
@@ -120,6 +143,12 @@ export default function ProductDetailDialog({
     setHistoryError('');
     setError('');
     setProduct(null);
+    setExchangeLot(null);
+    setDestroyLot(null);
+    setEditLot(null);
+    setActionError('');
+    setExchangeForm({ batchNumber: '', expiryDate: '' });
+    setEditExpiryDate('');
 
     if (!productId) return undefined;
 
@@ -152,7 +181,88 @@ export default function ProductDetailDialog({
     history: t('inventory.detail.history') || 'History',
   };
 
+  const openExchange = (batch) => {
+    setActionError('');
+    setDestroyLot(null);
+    setEditLot(null);
+    setExchangeLot(batch);
+    setExchangeForm({ batchNumber: '', expiryDate: '' });
+  };
+
+  const openEditLot = (batch) => {
+    setActionError('');
+    setExchangeLot(null);
+    setDestroyLot(null);
+    setEditLot(batch);
+    setEditExpiryDate(toDateInputValue(batch?.expiryDate));
+  };
+
+  const handleEditLotSubmit = async (event) => {
+    event.preventDefault();
+    if (!productId || !editLot?.id || actionSaving) return;
+    try {
+      setActionSaving(true);
+      setActionError('');
+      const response = await api.updateProductBatch(productId, editLot.id, {
+        expiryDate: toDateInputValue(editExpiryDate) || null,
+      });
+      applyUpdatedProduct(response?.product || response);
+      setEditLot(null);
+      setHistoryPage(1);
+      if (tab === 'history') loadHistory(productId, 1);
+    } catch (err) {
+      setActionError(err.message || t('inventory.editLotTitle'));
+    } finally {
+      setActionSaving(false);
+    }
+  };
+
+  const handleExchangeSubmit = async (event) => {
+    event.preventDefault();
+    if (!productId || !exchangeLot?.id || actionSaving) return;
+    const batchNumber = String(exchangeForm.batchNumber || '').trim();
+    const expiryDate = toDateInputValue(exchangeForm.expiryDate);
+    if (!batchNumber || !expiryDate || isExpiryDateExpired(expiryDate)) {
+      setActionError(t('inventory.exchangeRequired') || 'Enter a new batch number and a future expiry date.');
+      return;
+    }
+    try {
+      setActionSaving(true);
+      setActionError('');
+      const response = await api.exchangeProductBatch(productId, exchangeLot.id, {
+        batchNumber,
+        expiryDate,
+      });
+      applyUpdatedProduct(response?.product || response);
+      setExchangeLot(null);
+      setHistoryPage(1);
+      if (tab === 'history') loadHistory(productId, 1);
+    } catch (err) {
+      setActionError(err.message || t('inventory.exchangeRequired'));
+    } finally {
+      setActionSaving(false);
+    }
+  };
+
+  const handleDestroyConfirm = async () => {
+    if (!productId || !destroyLot?.id || actionSaving) return;
+    try {
+      setActionSaving(true);
+      setActionError('');
+      const response = await api.destroyProductBatch(productId, destroyLot.id);
+      applyUpdatedProduct(response?.product || response);
+      setDestroyLot(null);
+      setHistoryPage(1);
+      if (tab === 'history') loadHistory(productId, 1);
+    } catch (err) {
+      setActionError(err.message || t('inventory.destroyLotTitle'));
+    } finally {
+      setActionSaving(false);
+    }
+  };
+
   return (
+    <>
     <Dialog
       isOpen={isOpen}
       onClose={onClose}
@@ -196,6 +306,11 @@ export default function ProductDetailDialog({
               {batches.length > 1 ? (
                 <span className="rounded-full bg-secondary-200/80 px-2 py-0.5 text-xs font-semibold text-secondary-700 dark:bg-slate-800 dark:text-secondary-300">
                   {batches.length} {t('inventory.lots') || 'lots'}
+                </span>
+              ) : null}
+              {expiredQuantity > 0 ? (
+                <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-950/40 dark:text-rose-300">
+                  {t('inventory.expiredLot') || 'Expired lot'}
                 </span>
               ) : null}
             </div>
@@ -250,6 +365,11 @@ export default function ProductDetailDialog({
             <DetailRow label={t('inventory.quantity')}>
               {formatQuantity(stock)}{unitLabel ? ` ${unitLabel}` : ''}
             </DetailRow>
+            {expiredQuantity > 0 ? (
+              <DetailRow label={t('inventory.sellableStock') || 'Sellable'}>
+                {formatQuantity(sellableQuantity)}{unitLabel ? ` ${unitLabel}` : ''}
+              </DetailRow>
+            ) : null}
             <DetailRow label={t('inventory.nearestExpiry') || 'Nearest expiry'}>
               {nearestExpiry ? (
                 <div className={getExpiryDateColorClass(nearestExpiry)}>
@@ -263,6 +383,11 @@ export default function ProductDetailDialog({
 
         {tab === 'lots' ? (
           <div className="space-y-2">
+            <p className="text-sm text-secondary-600">
+              {t('inventory.stockLotsTabHint') ||
+                'Edit expiry on any lot. Exchange and destroy are only for expired lots.'}
+            </p>
+            {actionError ? <Notice title={actionError} tone="error" /> : null}
             {loading ? (
               <p className="py-8 text-center text-sm text-secondary-500">{t('common.loading')}</p>
             ) : batches.length === 0 ? (
@@ -272,10 +397,15 @@ export default function ProductDetailDialog({
             ) : (
               batches.map((batch, index) => {
                 const expiry = toDateInputValue(batch.expiryDate);
+                const expired = batch.isExpired === true || isExpiryDateExpired(expiry);
                 return (
                   <div
                     key={batch.id || `lot-${index}`}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-secondary-200/80 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-950/50"
+                    className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2.5 ${
+                      expired
+                        ? 'border-rose-200 bg-rose-50/80 dark:border-rose-900/50 dark:bg-rose-950/20'
+                        : 'border-secondary-200/80 bg-white dark:border-slate-800 dark:bg-slate-950/50'
+                    }`}
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-ink dark:text-slate-200">
@@ -292,10 +422,52 @@ export default function ProductDetailDialog({
                         ) : (t('inventory.noExpiry') || 'No expiry')}
                       </p>
                     </div>
-                    <span className="text-sm font-semibold text-ink dark:text-slate-200">
-                      {formatQuantity(batch.quantityOnHand || 0)}
-                      {unitLabel ? ` ${unitLabel}` : ''}
-                    </span>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <span className="text-sm font-semibold text-ink dark:text-slate-200">
+                        {formatQuantity(batch.quantityOnHand || 0)}
+                        {unitLabel ? ` ${unitLabel}` : ''}
+                      </span>
+                      {canManageInventory ? (
+                        expired ? (
+                          <ActionMenu
+                            label={t('common.actions')}
+                            actions={[
+                              {
+                                label: t('inventory.editLot') || 'Edit expiry',
+                                icon: Pencil,
+                                onClick: () => openEditLot(batch),
+                              },
+                              {
+                                label: t('inventory.exchangeLot') || 'Exchange',
+                                icon: RefreshCw,
+                                onClick: () => openExchange(batch),
+                              },
+                              {
+                                label: t('inventory.destroyLot') || 'Destroy',
+                                icon: Trash2,
+                                tone: 'danger',
+                                onClick: () => {
+                                  setActionError('');
+                                  setExchangeLot(null);
+                                  setEditLot(null);
+                                  setDestroyLot(batch);
+                                },
+                              },
+                            ]}
+                          />
+                        ) : (
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-secondary-500 transition hover:bg-secondary-100 hover:text-ink dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                            title={t('inventory.editLot') || 'Edit expiry'}
+                            aria-label={t('inventory.editLot') || 'Edit expiry'}
+                            onClick={() => openEditLot(batch)}
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        )
+                      ) : null}
+                    </div>
                   </div>
                 );
               })
@@ -439,5 +611,147 @@ export default function ProductDetailDialog({
         </div>
       </div>
     </Dialog>
+    <Dialog
+      isOpen={Boolean(editLot)}
+      onClose={() => {
+        if (actionSaving) return;
+        setEditLot(null);
+        setActionError('');
+      }}
+      title={t('inventory.editLotTitle') || 'Edit lot expiry'}
+      size="md"
+    >
+      <form className="space-y-4" onSubmit={handleEditLotSubmit}>
+        <p className="text-sm text-secondary-600">
+          {t('inventory.editExpiryHelp')}
+        </p>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-secondary-400">{t('inventory.stockLots')}</p>
+          <p className="mt-1 text-sm font-medium text-ink">
+            {editLot?.batchNumber
+              ? `${t('inventory.batchNumber')}: ${editLot.batchNumber}`
+              : (t('inventory.noBatchNumber') || 'No batch no.')}
+          </p>
+          <p className="text-xs text-secondary-500">
+            {formatQuantity(editLot?.quantityOnHand || 0)}
+            {unitLabel ? ` ${unitLabel}` : ''}
+          </p>
+        </div>
+        <div>
+          <label className="label">{t('inventory.expiryDateOptional')}</label>
+          <div className="mt-1">
+            <FlexibleDateInput
+              id="inventory-edit-lot-expiry-date"
+              name="editLotExpiryDate"
+              value={editExpiryDate}
+              onChange={(event) => setEditExpiryDate(event.target.value || '')}
+              className="input w-full"
+            />
+          </div>
+          {editExpiryDate ? (
+            <button
+              type="button"
+              className="mt-2 text-xs font-semibold text-secondary-500 hover:text-ink"
+              onClick={() => setEditExpiryDate('')}
+            >
+              {t('inventory.clearExpiry') || 'Remove expiry date'}
+            </button>
+          ) : null}
+        </div>
+        {actionError ? <Notice title={actionError} tone="error" /> : null}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            className="btn-secondary w-full sm:w-auto"
+            onClick={() => setEditLot(null)}
+            disabled={actionSaving}
+          >
+            {t('common.cancel')}
+          </button>
+          <button type="submit" className="btn-primary w-full sm:w-auto" disabled={actionSaving}>
+            {actionSaving ? t('common.loading') : t('common.save')}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+    <Dialog
+      isOpen={Boolean(exchangeLot)}
+      onClose={() => {
+        if (actionSaving) return;
+        setExchangeLot(null);
+        setActionError('');
+      }}
+      title={t('inventory.exchangeLotTitle') || 'Exchange expired lot'}
+      size="md"
+    >
+      <form className="space-y-4" onSubmit={handleExchangeSubmit}>
+        <p className="text-sm text-secondary-600">
+          {t('inventory.exchangeHelp')}
+        </p>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-secondary-400">{t('inventory.expiredLot')}</p>
+          <p className="mt-1 text-sm font-medium text-ink">
+            {exchangeLot?.batchNumber
+              ? `${t('inventory.batchNumber')}: ${exchangeLot.batchNumber}`
+              : (t('inventory.noBatchNumber') || 'No batch no.')}
+          </p>
+          <p className="text-xs text-rose-600">
+            {exchangeLot?.expiryDate ? <DateDisplay date={exchangeLot.expiryDate} /> : null}
+            {' · '}
+            {formatQuantity(exchangeLot?.quantityOnHand || 0)}
+            {unitLabel ? ` ${unitLabel}` : ''}
+          </p>
+        </div>
+        <div>
+          <label className="label">{t('inventory.newBatchNumber')}</label>
+          <input
+            className="input mt-1"
+            value={exchangeForm.batchNumber}
+            onChange={(event) => setExchangeForm((prev) => ({ ...prev, batchNumber: event.target.value }))}
+            placeholder={t('inventory.batchNumberPlaceholder') || 'Eg. LOT-A12'}
+            required
+          />
+        </div>
+        <div>
+          <label className="label">{t('inventory.newExpiryDate')}</label>
+          <div className="mt-1">
+            <FlexibleDateInput
+              id="inventory-exchange-expiry-date"
+              name="exchangeExpiryDate"
+              value={exchangeForm.expiryDate}
+              onChange={(event) => setExchangeForm((prev) => ({ ...prev, expiryDate: event.target.value || '' }))}
+              className="input w-full"
+            />
+          </div>
+        </div>
+        {actionError ? <Notice title={actionError} tone="error" /> : null}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            className="btn-secondary w-full sm:w-auto"
+            onClick={() => setExchangeLot(null)}
+            disabled={actionSaving}
+          >
+            {t('common.cancel')}
+          </button>
+          <button type="submit" className="btn-primary w-full sm:w-auto" disabled={actionSaving}>
+            {actionSaving ? t('common.loading') : (t('inventory.exchangeLot') || 'Exchange')}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+    <ConfirmDialog
+      isOpen={Boolean(destroyLot)}
+      onClose={() => {
+        if (actionSaving) return;
+        setDestroyLot(null);
+      }}
+      onConfirm={handleDestroyConfirm}
+      title={t('inventory.destroyLotTitle') || 'Destroy expired stock'}
+      description={t('inventory.destroyLotConfirm')}
+      confirmLabel={t('inventory.destroyLot') || 'Destroy'}
+      confirming={actionSaving}
+    />
+    </>
   );
 }

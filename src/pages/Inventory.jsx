@@ -82,7 +82,10 @@ const toDateInputValue = (value) => {
   return match ? match[0] : "";
 };
 
-const buildProductPayload = (form, { includePurchasePrice = true } = {}) => ({
+const buildProductPayload = (
+  form,
+  { includePurchasePrice = true, includeLotFields = true } = {},
+) => ({
   name: form.name,
   companyName: String(form.companyName || "").trim() || null,
   sku: form.itemCode.trim(),
@@ -105,8 +108,14 @@ const buildProductPayload = (form, { includePurchasePrice = true } = {}) => ({
   openingStock: parseNumber(form.openingStock),
   lowStockAlert: form.lowStockAlert,
   imageUrl: form.imageUrl || null,
-  expiryDate: form.expiryDate || null,
-  ...(form.batchNumber ? { batchNumber: String(form.batchNumber).trim() } : {}),
+  ...(includeLotFields
+    ? {
+        expiryDate: form.expiryDate || null,
+        ...(form.batchNumber
+          ? { batchNumber: String(form.batchNumber).trim() }
+          : {}),
+      }
+    : {}),
 });
 
 function getProductCategoryName(product = {}) {
@@ -579,6 +588,11 @@ export default function Inventory() {
       ),
       batchCount: Number(product.batchCount || product.batches?.length || 0),
       expiryDate: toDateInputValue(product.expiryDate),
+      expiredQuantity: Number(product.expiredQuantity || 0),
+      sellableQuantity: Number(
+        product.sellableQuantity ?? product.stockOnHand ?? product.openingStock ?? 0,
+      ),
+      hasExpiredStock: Boolean(product.hasExpiredStock) || Number(product.expiredQuantity || 0) > 0,
     }));
   }, [products]);
 
@@ -967,6 +981,7 @@ export default function Inventory() {
     try {
       const payload = buildProductPayload(form, {
         includePurchasePrice: canManagePurchasePrice,
+        includeLotFields: !editingId,
       });
       const optimisticCategory = selectedCategory
         ? {
@@ -1246,7 +1261,9 @@ export default function Inventory() {
               ? t("inventory.lowStockItems") || "Low Stock Items"
               : stockFilter === "nearexpiry"
                 ? t("inventory.nearExpiryItems") || "Near Expiry"
-                : t("inventory.allItems") || "All items"}{" "}
+                : stockFilter === "expired"
+                  ? t("inventory.expiredStock") || "Expired stock"
+                  : t("inventory.allItems") || "All items"}{" "}
             ({totalItems})
           </h3>
         </div>
@@ -1287,6 +1304,9 @@ export default function Inventory() {
             <option value="out">{t("inventory.outStock")}</option>
             <option value="nearexpiry">
               {t("inventory.nearExpiryItems") || "Near Expiry"}
+            </option>
+            <option value="expired">
+              {t("inventory.expiredStock") || "Expired stock"}
             </option>
           </select>
 
@@ -1376,6 +1396,9 @@ export default function Inventory() {
                         item.unit || t("inventory.noUnit"),
                         item.batchCount > 1
                           ? `${item.batchCount} ${t("inventory.lots") || "lots"}`
+                          : null,
+                        item.hasExpiredStock
+                          ? t("inventory.expiredLot") || "Expired lot"
                           : null,
                       ]
                         .filter(Boolean)
@@ -1576,6 +1599,9 @@ export default function Inventory() {
                               item.unit || t("inventory.noUnit"),
                               item.batchCount > 1
                                 ? `${item.batchCount} ${t("inventory.lots") || "lots"}`
+                                : null,
+                              item.hasExpiredStock
+                                ? t("inventory.expiredLot") || "Expired lot"
                                 : null,
                             ]
                               .filter(Boolean)
@@ -2112,37 +2138,53 @@ export default function Inventory() {
                     </p>
                   </div>
                   {editingId ? (
-                    <button
-                      type="button"
-                      className="btn-ghost text-sm"
-                      onClick={() => {
-                        const productId = editingId;
-                        closeDialog();
-                        openRestockDialog(productId);
-                      }}
-                    >
-                      <Plus size={14} className="mr-1.5 inline" />
-                      {t("inventory.restockAdd") || "Add stock"}
-                    </button>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        className="btn-ghost text-sm"
+                        onClick={() => {
+                          const productId = editingId;
+                          closeDialog();
+                          openDetailDialog(productId, "lots");
+                        }}
+                      >
+                        <Layers size={14} className="mr-1.5 inline" />
+                        {t("inventory.manageLots") || "Manage lots"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost text-sm"
+                        onClick={() => {
+                          const productId = editingId;
+                          closeDialog();
+                          openRestockDialog(productId);
+                        }}
+                      >
+                        <Plus size={14} className="mr-1.5 inline" />
+                        {t("inventory.restockAdd") || "Add stock"}
+                      </button>
+                    </div>
                   ) : null}
                 </div>
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="label">
-                      {t("inventory.expiryDateOptional") ||
-                        "Expiry Date (Optional)"}
-                    </label>
-                    <div className="mt-1">
-                      <FlexibleDateInput
-                        id="inventory-expiry-date"
-                        name="expiryDate"
-                        value={form.expiryDate}
-                        onChange={handleFormChange}
-                      />
+                {!editingId ? (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="label">
+                        {t("inventory.expiryDateOptional") ||
+                          "Expiry Date (Optional)"}
+                      </label>
+                      <div className="mt-1">
+                        <FlexibleDateInput
+                          id="inventory-expiry-date"
+                          name="expiryDate"
+                          value={form.expiryDate}
+                          onChange={handleFormChange}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : null}
 
                 {editingId && (
                   <div className="mt-4 space-y-2">
@@ -2520,6 +2562,12 @@ export default function Inventory() {
               }
             : undefined
         }
+        onProductUpdated={(updated) => {
+          if (!updated?.id) return;
+          useProductStore.getState().patchProduct(updated.id, updated);
+          setDetailProductHint(updated);
+          fetchStats();
+        }}
       />
 
       <ImageCropperModal

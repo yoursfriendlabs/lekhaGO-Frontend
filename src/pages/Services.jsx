@@ -80,6 +80,11 @@ import {
   normalizeLookupProduct,
   toProductLookupOption,
 } from "../lib/lookups.js";
+import {
+  getStockAvailabilityMessage,
+  isAllStockExpired,
+  toAvailableUnitQuantity,
+} from "../lib/stockAvailability.js";
 
 import dayjs, {
   formatMaybeDate,
@@ -1238,6 +1243,25 @@ export default function Services() {
       return;
     }
 
+    if (itemDraft.itemType === "part") {
+      const product = getProductById(itemDraft.productId);
+      const requestedQty = Number(itemDraft.quantity || 0);
+      const available = toAvailableUnitQuantity(
+        product,
+        itemDraft.unitType || "primary",
+        product,
+      );
+      if (requestedQty > available) {
+        setFormNotice({
+          type: "error",
+          message: isAllStockExpired(product)
+            ? t("sales.allStockExpiredNamed", { name: product?.name })
+            : t("sales.insufficientStock"),
+        });
+        return;
+      }
+    }
+
     const draft = {
       ...itemDraft,
       lineTotal: (
@@ -1572,6 +1596,28 @@ export default function Services() {
       setFormNotice({ type: "error", message: t("errors.conversionRequired") });
       return;
     }
+    if (!editingId) {
+      const expiredPart = chargeableItems.find((item) => {
+        if (item.itemType !== "part" || !item.productId) return false;
+        const product = getProductById(item.productId);
+        const available = toAvailableUnitQuantity(
+          product,
+          item.unitType || "primary",
+          product,
+        );
+        return Number(item.quantity || 0) > available;
+      });
+      if (expiredPart) {
+        const product = getProductById(expiredPart.productId);
+        setFormNotice({
+          type: "error",
+          message: isAllStockExpired(product)
+            ? t("sales.allStockExpiredNamed", { name: product?.name })
+            : t("sales.insufficientStock"),
+        });
+        return;
+      }
+    }
     if (!chargeableItems.length) {
       setFormNotice({ type: "error", message: t("services.addFirstItem") });
       try {
@@ -1692,7 +1738,7 @@ export default function Services() {
       closeDialog();
       loadServices();
     } catch (err) {
-      setFormNotice({ type: "error", message: err.message });
+      setFormNotice({ type: "error", message: getStockAvailabilityMessage(err, t) });
     }
   };
 
