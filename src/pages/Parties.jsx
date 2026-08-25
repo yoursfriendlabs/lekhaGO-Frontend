@@ -1670,6 +1670,7 @@ export default function Parties() {
               <label className="label">{t("parties.email")}</label>
               <input
                 className="input mt-1"
+                type="email"
                 name="email"
                 value={form.email}
                 onChange={handleChange}

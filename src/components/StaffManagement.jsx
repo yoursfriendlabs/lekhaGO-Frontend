@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Search,
   Eye,
@@ -97,7 +97,11 @@ function buildEmptyForm(_meta, role = 'staff') {
 }
 
 function normalizeErrorMessage(error, fallback) {
-  return error?.message || fallback;
+  const msg = error?.message || fallback;
+  if (/email.*(already|exists|in use|taken|duplicate)/i.test(msg)) {
+    return 'This email is already in use. Please use a different email.';
+  }
+  return msg;
 }
 
 /* ── Shared visual primitives, mirrored from the Services page ── */
@@ -205,6 +209,7 @@ function StaffFormDialog({
   form,
   meta,
   saving,
+  notice,
   wasNonLogin,
   onClose,
   onSubmit,
@@ -213,6 +218,7 @@ function StaffFormDialog({
   t,
 }) {
   const [activeTab, setActiveTab] = useState('general');
+  const scrollRef = useRef(null);
   const { businessProfile } = useBusinessSettings();
   const isCreate = mode === 'create';
   const readOnly = mode === 'view';
@@ -236,6 +242,12 @@ function StaffFormDialog({
   useEffect(() => {
     if (mode) setActiveTab('general');
   }, [mode]);
+
+  useEffect(() => {
+    if (notice?.message && notice?.type === 'error' && scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [notice]);
 
   if (!mode) return null;
 
@@ -297,7 +309,7 @@ function StaffFormDialog({
           </div>
 
           <form id="staff-management-form" className="flex min-h-0 flex-1 flex-col" onSubmit={handleFormSubmit}>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
+            <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-8 md:py-6">
               <div className="mx-auto w-full max-w-[920px] space-y-4">
                 <div className="flex gap-2 border-b border-secondary-200 pb-3 dark:border-slate-800">
                   <button
@@ -325,6 +337,10 @@ function StaffFormDialog({
                     {t('staffManagement.tabs.accessPermissions')}
                   </button>
                 </div>
+
+                {notice.message && notice.type === 'error' ? (
+                  <Notice title={notice.message} tone="error" />
+                ) : null}
 
                 <div className={`space-y-4 ${isDetailsStep ? '' : 'hidden'}`}>
                     <div className="rounded-[28px] border border-secondary-200/80 bg-white/95 p-5 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 md:p-6">
@@ -735,7 +751,7 @@ export default function StaffManagement({ businessId }) {
 
   useEffect(() => {
     if (notice.type !== 'success' && notice.type !== 'error') return;
-    const timer = setTimeout(() => setNotice({ type: '', message: '' }), 3000);
+    const timer = setTimeout(() => setNotice({ type: '', message: '' }), notice.type === 'error' ? 6000 : 3000);
     return () => clearTimeout(timer);
   }, [notice]);
 
@@ -1341,6 +1357,7 @@ export default function StaffManagement({ businessId }) {
         form={form}
         meta={meta}
         saving={saving}
+        notice={notice}
         wasNonLogin={form.membershipId ? (members.find((m) => m.membershipId === form.membershipId)?.hasLogin === false) : false}
         onClose={closeDialog}
         onSubmit={handleSubmit}

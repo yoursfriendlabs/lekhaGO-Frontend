@@ -1618,7 +1618,7 @@ export default function Sales() {
                       <p className="mt-1.5 font-semibold text-ink dark:text-slate-200">
                         {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.grandTotal || 0).toFixed(2) })}
                       </p>
-                      {due > 0 ? (
+                      {due > 0 && !isSaleCancelled(sale) ? (
                         <button
                           type="button"
                           onClick={() => openPayDialog(sale)}
@@ -1712,7 +1712,7 @@ export default function Sales() {
 
                       {/* Due — clickable pill opens Record Payment dialog */}
                       <td className="py-2.5 pr-4 text-right">
-                        {due > 0 ? (
+                        {due > 0 && !isSaleCancelled(sale) ? (
                           <button
                             type="button"
                             onClick={() => openPayDialog(sale)}
