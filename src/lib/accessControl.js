@@ -125,6 +125,7 @@ const SUBSCRIPTION_FEATURE_ALIASES = {
   purchasePrice: 'inventory',
   analytics: 'reports',
   ledger: 'reports',
+  banking: 'banks',
 };
 
 function asObject(value) {
