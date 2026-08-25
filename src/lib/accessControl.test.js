@@ -4,6 +4,7 @@ import {
   enforcePermissionDependencies,
   getFeatureAccessLevel,
   getStaffPermissionUiFeatures,
+  getSubscriptionFeatureKey,
   isOwnStaffMembership,
   normalizeAccessControl,
   withOwnProfileNavItem,
@@ -284,5 +285,10 @@ describe('access control helpers', () => {
         { role: 'owner', membershipId: 'mem-1' },
       ).map((item) => item.key),
     ).toEqual(['sales', 'settings']);
+  });
+
+  it('correctly maps banks feature key to banks subscription feature key', () => {
+    const key = getSubscriptionFeatureKey('banks');
+    expect(key).toBe('banks');
   });
 });
