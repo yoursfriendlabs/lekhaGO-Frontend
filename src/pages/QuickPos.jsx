@@ -149,11 +149,11 @@ function buildCartItem(product, unitType = "primary") {
     productId: product.id,
     name: product.name,
     categoryName: product.categoryName,
-    quantity: 0,
+    quantity: 1,
     unitType,
     unitPrice,
     taxRate: Number(product.taxRate || 0),
-    lineTotal: "0.00", // placeholder — filled once a quantity is entered
+    lineTotal: (1 * unitPrice).toFixed(2),
     primaryUnit: product.primaryUnit || "",
     secondaryUnit: product.secondaryUnit || "",
     conversionRate: Number(product.conversionRate || 0),
@@ -939,7 +939,7 @@ export default function QuickPos() {
         });
       }
 
-      // New items start at quantity 0 (placeholder). Stock is validated
+      // New items start at quantity 1. Stock is validated
       // when the user enters an actual quantity via updateCartQuantity.
       return [...previous, buildCartItem(product, unitType)];
     });
@@ -2857,10 +2857,10 @@ export default function QuickPos() {
                   <span className="text-xs font-bold uppercase tracking-wider text-secondary-500">
                     {t("services.amountReceived") || "Amount Received"}
                   </span>
-                  <label className="flex items-center gap-1.5 rounded-lg border border-secondary-200 bg-mist px-2.5 py-1 text-xs font-semibold text-secondary-700 cursor-pointer hover:bg-secondary-100 transition shrink-0">
+                  <label className="flex items-center gap-2 rounded-2xl border border-secondary-200/70 bg-mist/70 px-4 py-3 text-sm font-semibold text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-secondary-300 dark:hover:bg-slate-800/60 cursor-pointer shrink-0">
                     <input
                       type="checkbox"
-                      className="h-3.5 w-3.5 rounded accent-primary-600 cursor-pointer"
+                      className="h-4 w-4 rounded accent-primary-600 cursor-pointer"
                       checked={dueAmount === 0}
                       onChange={(event) => {
                         const checked = event.target.checked;

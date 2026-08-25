@@ -2066,7 +2066,7 @@ setInvoiceOrder(purchase);
                       }
                     />
                   </div>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-secondary-200/70 px-3 py-2.5 text-sm text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:text-secondary-300 dark:hover:bg-slate-800/40">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-secondary-200/70 bg-mist/70 px-4 py-3 text-sm font-semibold text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-secondary-300 dark:hover:bg-slate-800/60">
                     <input
                       type="checkbox"
                       className="h-4 w-4 rounded accent-primary-600"

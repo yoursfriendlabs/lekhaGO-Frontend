@@ -73,13 +73,9 @@ export default function SearchableSelect({
     );
     const left = Math.min(Math.max(rect.left, margin), Math.max(margin, viewportWidth - width - margin));
     const dropdownMaxHeight = 320;
-    const minHeight = 160;
     const belowSpace = viewportHeight - rect.bottom - margin - 4;
-    const aboveSpace = rect.top - margin - 4;
-    const opensAbove = belowSpace < minHeight && aboveSpace > belowSpace;
-    const availableHeight = opensAbove ? aboveSpace : belowSpace;
-    const maxHeight = Math.max(minHeight, Math.min(dropdownMaxHeight, availableHeight));
-    const top = opensAbove ? Math.max(margin, rect.top - maxHeight - 4) : rect.bottom + 4;
+    const maxHeight = Math.max(80, Math.min(dropdownMaxHeight, belowSpace));
+    const top = rect.bottom + 4;
 
     setDropdownStyle({ left, top, width, maxHeight });
   }, [dropdownMinWidth]);

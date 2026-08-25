@@ -1447,7 +1447,7 @@ export default function Sales() {
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <label className="label">{t('services.amountReceived')}</label>
-                      <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-secondary-200/70 px-3 py-2.5 text-sm text-ink-light transition hover:bg-secondary-100 shrink-0">
+                      <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-secondary-200/70 bg-mist/70 px-4 py-3 text-sm font-semibold text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-secondary-300 dark:hover:bg-slate-800/60 shrink-0">
                         <input
                           type="checkbox"
                           className="h-4 w-4 rounded accent-primary-600"
