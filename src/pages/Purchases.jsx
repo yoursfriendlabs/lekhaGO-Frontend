@@ -15,6 +15,7 @@ import {
   DollarSign,
   Clock,
   Receipt,
+  Check,
 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import Notice from "../components/Notice";
@@ -64,7 +65,7 @@ import QuickExpense from "../components/quickExpenses.jsx";
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
-function StatusBadge({ status, locked = false, onToggle }) {
+function StatusBadge({ status, locked = false }) {
   const normalized = String(status || "").toLowerCase();
   const map = {
     received:
@@ -77,16 +78,13 @@ function StatusBadge({ status, locked = false, onToggle }) {
     void: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
   };
   const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : "—";
-  const badgeClassName = `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[normalized] || "bg-secondary-100 text-secondary-700"}`;
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      {onToggle ? (
-        <button type="button" onClick={onToggle} className={`${badgeClassName} transition hover:opacity-80 cursor-pointer`} title="Click to toggle status">
-          {label}
-        </button>
-      ) : (
-        <span className={badgeClassName}>{label}</span>
-      )}
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[normalized] || "bg-secondary-100 text-secondary-700"}`}
+      >
+        {label}
+      </span>
       {locked && !["cancelled", "canceled", "void"].includes(normalized) ? (
         <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
           Locked
@@ -223,7 +221,9 @@ export default function Purchases() {
   const [cancellingPurchaseId, setCancellingPurchaseId] = useState("");
   const [deletingPurchaseId, setDeletingPurchaseId] = useState("");
   const [savingPurchase, setSavingPurchase] = useState(false);
-  const [togglingStatusId, setTogglingStatusId] = useState("");
+  const [statusDialog, setStatusDialog] = useState(null);
+  const [newStatus, setNewStatus] = useState("");
+  const [statusError, setStatusError] = useState("");
   const [recordingPaymentId, setRecordingPaymentId] = useState("");
   const [openingPurchaseForm, setOpeningPurchaseForm] = useState(false);
   const [page, setPage] = useState(1);
@@ -1075,25 +1075,35 @@ setInvoiceOrder(purchase);
 
   const invoiceReprintLabel = getIrdReprintLabel(invoiceOrder);
 
-  const handleToggleStatus = async (purchase) => {
+  const PURCHASE_STATUS_STEPS = [
+    { value: "received", label: "Received", desc: "Goods received", selectedClass: "border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20", dotClass: "bg-emerald-500", checkClass: "text-emerald-600" },
+    { value: "due", label: "Due", desc: "Payment pending", selectedClass: "border-rose-400 bg-rose-50 dark:bg-rose-900/20", dotClass: "bg-rose-500", checkClass: "text-rose-600" },
+    { value: "ordered", label: "Ordered", desc: "Order placed", selectedClass: "border-amber-400 bg-amber-50 dark:bg-amber-900/20", dotClass: "bg-amber-500", checkClass: "text-amber-600" },
+  ];
+
+  const openStatusDialog = (purchase) => {
     if (!canManagePurchases) return;
-    if (isIrdLocked(purchase) || isIrdCancelled(purchase)) return;
-    if (togglingStatusId) return;
-    const current = String(purchase.status || "").toLowerCase();
-    const next = current === "received" ? "due" : "received";
-    const grandTotal = Number(purchase.grandTotal || 0);
+    if (isIrdCancelled(purchase)) return;
+    setStatusDialog(purchase);
+    setNewStatus(purchase.status || "received");
+    setStatusError("");
+  };
+
+  const closeStatusDialog = () => setStatusDialog(null);
+
+  const handleUpdateStatus = async () => {
+    if (!canManagePurchases || !statusDialog) return;
+    const grandTotal = Number(statusDialog.grandTotal || 0);
     try {
-      setTogglingStatusId(purchase.id);
-      await api.updatePurchase(purchase.id, {
-        status: next,
-        amountReceived: next === "received" ? grandTotal : 0,
+      await api.updatePurchase(statusDialog.id, {
+        status: newStatus,
+        amountReceived: newStatus === "received" ? grandTotal : newStatus === "due" ? 0 : undefined,
       });
+      closeStatusDialog();
       invalidatePurchases(listParams);
       await fetchPurchases(listParams, true);
     } catch (err) {
-      console.error("Failed to toggle status", err);
-    } finally {
-      setTogglingStatusId("");
+      setStatusError(err.message);
     }
   };
 
@@ -1192,7 +1202,7 @@ setInvoiceOrder(purchase);
           paymentMethod: payPaymentMethod,
           bankId: payBankId,
           paymentNote: payNotes,
-        }),
+        }, { includeEmptyBankId: true }),
       });
       closePayDialog();
       await fetchPurchases(listParams, true);
@@ -2331,7 +2341,13 @@ setInvoiceOrder(purchase);
                           <PI size={12} />
                           {pm.label}
                         </span>
-                        <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} onToggle={!isIrdLocked(purchase) && !isIrdCancelled(purchase) ? () => handleToggleStatus(purchase) : undefined} />
+                        {canManagePurchases && !isIrdLocked(purchase) && !isIrdCancelled(purchase) ? (
+                          <button type="button" className="transition hover:opacity-75" onClick={() => openStatusDialog(purchase)}>
+                            <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} />
+                          </button>
+                        ) : (
+                          <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} />
+                        )}
                       </div>
                       <p className="mt-2 truncate font-semibold text-ink">
                         {purchase.invoiceNo || purchase.id.slice(0, 8)}
@@ -2441,7 +2457,13 @@ setInvoiceOrder(purchase);
                         <DateDisplay date={purchase.purchaseDate} format="ddd DD, MMM" />
                       </td>
                       <td className="py-2.5 pr-4">
-                        <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} onToggle={!isIrdLocked(purchase) && !isIrdCancelled(purchase) ? () => handleToggleStatus(purchase) : undefined} />
+                        {canManagePurchases && !isIrdLocked(purchase) && !isIrdCancelled(purchase) ? (
+                          <button type="button" className="transition hover:opacity-75" onClick={() => openStatusDialog(purchase)}>
+                            <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} />
+                          </button>
+                        ) : (
+                          <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} />
+                        )}
                       </td>
                       <td className="py-2.5 pr-4 text-ink-light dark:text-secondary-300">
                         {sn || <span className="text-secondary-400">—</span>}
@@ -2787,6 +2809,56 @@ setInvoiceOrder(purchase);
           </div>
         </div>
       </Dialog>
+
+      {/* ── Status Update Dialog ── */}
+      {statusDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) closeStatusDialog(); }}
+        >
+          <div className="w-full max-w-sm rounded-t-3xl bg-white shadow-2xl dark:bg-slate-950 sm:rounded-3xl">
+            <div className="flex items-center justify-between border-b border-secondary-200/70 px-6 py-4 dark:border-slate-800/70">
+              <h2 className="font-serif text-xl text-ink">{t("services.updateStatus") || "Update Status"}</h2>
+              <button type="button" onClick={closeStatusDialog} className="rounded-xl p-2 text-secondary-400 hover:bg-secondary-100 dark:hover:bg-slate-800">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="space-y-4 p-6">
+              {statusError ? <Notice title={statusError} tone="error" /> : null}
+              <div className="rounded-xl bg-mist p-3 text-sm dark:bg-slate-900/60">
+                <p className="font-semibold text-ink dark:text-slate-200">{statusDialog.invoiceNo || statusDialog.id.slice(0, 8)}</p>
+              </div>
+              <div className="space-y-2">
+                {PURCHASE_STATUS_STEPS.map((step) => {
+                  const isSelected = newStatus === step.value;
+                  return (
+                    <button
+                      key={step.value}
+                      type="button"
+                      onClick={() => setNewStatus(step.value)}
+                      className={`flex w-full items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition ${isSelected ? step.selectedClass : "border-secondary-200 bg-white dark:border-slate-700 dark:bg-slate-900"}`}
+                    >
+                      <span className={`h-3 w-3 shrink-0 rounded-full ${step.dotClass}`} />
+                      <div className="flex-1">
+                        <p className="font-semibold text-ink dark:text-slate-200">{step.label}</p>
+                        <p className="text-xs text-secondary-500">{step.desc}</p>
+                      </div>
+                      {isSelected && <Check size={16} className={step.checkClass} />}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row">
+                <button type="button" className="btn-ghost flex-1" onClick={closeStatusDialog}>{t("common.cancel")}</button>
+                <button type="button" className="btn-primary flex-1" onClick={handleUpdateStatus} disabled={newStatus === statusDialog.status}>
+                  {t("services.updateStatus") || "Update Status"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

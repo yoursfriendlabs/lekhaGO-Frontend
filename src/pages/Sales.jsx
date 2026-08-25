@@ -972,7 +972,7 @@ export default function Sales() {
       await api.updateSale(payDialog.id, {
         amountReceived: newReceived,
         status: newDue > 0 ? 'due' : 'paid',
-        ...buildPaymentPayload({ paymentMethod: payPaymentMethod, bankId: payBankId, paymentNote: payNotes }),
+        ...buildPaymentPayload({ paymentMethod: payPaymentMethod, bankId: payBankId, paymentNote: payNotes }, { includeEmptyBankId: true }),
       });
       setPayDialog(null);
       setStatus({ type: 'success', message: t('sales.messages.updated') });
