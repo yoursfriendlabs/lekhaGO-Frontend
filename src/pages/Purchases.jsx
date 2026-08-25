@@ -64,7 +64,7 @@ import QuickExpense from "../components/quickExpenses.jsx";
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
-function StatusBadge({ status, locked = false }) {
+function StatusBadge({ status, locked = false, onToggle }) {
   const normalized = String(status || "").toLowerCase();
   const map = {
     received:
@@ -77,13 +77,16 @@ function StatusBadge({ status, locked = false }) {
     void: "bg-secondary-200 text-ink-light dark:bg-slate-700/60 dark:text-slate-200",
   };
   const label = status ? status.charAt(0).toUpperCase() + status.slice(1) : "—";
+  const badgeClassName = `inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[normalized] || "bg-secondary-100 text-secondary-700"}`;
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
-      <span
-        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${map[normalized] || "bg-secondary-100 text-secondary-700"}`}
-      >
-        {label}
-      </span>
+      {onToggle ? (
+        <button type="button" onClick={onToggle} className={`${badgeClassName} transition hover:opacity-80 cursor-pointer`} title="Click to toggle status">
+          {label}
+        </button>
+      ) : (
+        <span className={badgeClassName}>{label}</span>
+      )}
       {locked && !["cancelled", "canceled", "void"].includes(normalized) ? (
         <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
           Locked
@@ -220,6 +223,7 @@ export default function Purchases() {
   const [cancellingPurchaseId, setCancellingPurchaseId] = useState("");
   const [deletingPurchaseId, setDeletingPurchaseId] = useState("");
   const [savingPurchase, setSavingPurchase] = useState(false);
+  const [togglingStatusId, setTogglingStatusId] = useState("");
   const [recordingPaymentId, setRecordingPaymentId] = useState("");
   const [openingPurchaseForm, setOpeningPurchaseForm] = useState(false);
   const [page, setPage] = useState(1);
@@ -1070,6 +1074,28 @@ setInvoiceOrder(purchase);
   };
 
   const invoiceReprintLabel = getIrdReprintLabel(invoiceOrder);
+
+  const handleToggleStatus = async (purchase) => {
+    if (!canManagePurchases) return;
+    if (isIrdLocked(purchase) || isIrdCancelled(purchase)) return;
+    if (togglingStatusId) return;
+    const current = String(purchase.status || "").toLowerCase();
+    const next = current === "received" ? "due" : "received";
+    const grandTotal = Number(purchase.grandTotal || 0);
+    try {
+      setTogglingStatusId(purchase.id);
+      await api.updatePurchase(purchase.id, {
+        status: next,
+        amountReceived: next === "received" ? grandTotal : 0,
+      });
+      invalidatePurchases(listParams);
+      await fetchPurchases(listParams, true);
+    } catch (err) {
+      console.error("Failed to toggle status", err);
+    } finally {
+      setTogglingStatusId("");
+    }
+  };
 
   const buildPurchaseActions = (purchase) => {
     const locked = isIrdLocked(purchase);
@@ -2305,7 +2331,7 @@ setInvoiceOrder(purchase);
                           <PI size={12} />
                           {pm.label}
                         </span>
-                        <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} />
+                        <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} onToggle={!isIrdLocked(purchase) && !isIrdCancelled(purchase) ? () => handleToggleStatus(purchase) : undefined} />
                       </div>
                       <p className="mt-2 truncate font-semibold text-ink">
                         {purchase.invoiceNo || purchase.id.slice(0, 8)}
@@ -2415,7 +2441,7 @@ setInvoiceOrder(purchase);
                         <DateDisplay date={purchase.purchaseDate} format="ddd DD, MMM" />
                       </td>
                       <td className="py-2.5 pr-4">
-                        <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} />
+                        <StatusBadge status={purchase.status} locked={isIrdLocked(purchase)} onToggle={!isIrdLocked(purchase) && !isIrdCancelled(purchase) ? () => handleToggleStatus(purchase) : undefined} />
                       </td>
                       <td className="py-2.5 pr-4 text-ink-light dark:text-secondary-300">
                         {sn || <span className="text-secondary-400">—</span>}

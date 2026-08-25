@@ -1493,6 +1493,7 @@ const dictionaries = {
       addTax: 'Add VAT',
       addDiscount: 'Add Discount',
       addReceived: 'Add Received',
+      recordPayment: 'Record Payment',
       dueAmount: 'Due Amount',
       messages: {
         created: 'Sale created',
@@ -3721,6 +3722,7 @@ const dictionaries = {
       addTax: 'भ्याट थप्नुहोस्',
       addDiscount: 'छुट थप्नुहोस्',
       addReceived: 'प्राप्त रकम',
+      recordPayment: 'भुक्तानी रेकर्ड',
       dueAmount: 'बक्यौता रकम',
       messages: {
         created: 'बिक्री सिर्जना भयो',

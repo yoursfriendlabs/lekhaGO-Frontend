@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Ban, Pencil, FileText, Package, Plus, Printer, RefreshCw, Trash2, TrendingUp, DollarSign, CheckCircle2, Clock, Calendar } from 'lucide-react';
+import { Ban, Pencil, FileText, Package, Plus, Printer, RefreshCw, Trash2, TrendingUp, DollarSign, CheckCircle2, Clock, Calendar, X } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Notice from '../components/Notice';
 import PaymentMethodFields from '../components/PaymentMethodFields.jsx';
@@ -212,6 +212,12 @@ export default function Sales() {
   const [syncingCbmsSaleId, setSyncingCbmsSaleId] = useState('');
   const [deletingSaleId, setDeletingSaleId] = useState('');
   const [savingSale, setSavingSale] = useState(false);
+  const [payDialog, setPayDialog] = useState(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payPaymentMethod, setPayPaymentMethod] = useState('cash');
+  const [payBankId, setPayBankId] = useState('');
+  const [payNotes, setPayNotes] = useState('');
+  const [payError, setPayError] = useState('');
   const [openingSaleForm, setOpeningSaleForm] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -859,6 +865,14 @@ export default function Sales() {
       });
     }
 
+    if (canManageSales && !cancelled && Number(sale.dueAmount || 0) > 0) {
+      actions.push({
+        label: t('sales.recordPayment') || 'Record Payment',
+        icon: DollarSign,
+        onClick: () => openPayDialog(sale),
+      });
+    }
+
     return actions;
   };
 
@@ -927,6 +941,45 @@ export default function Sales() {
       setStatus({ type: 'error', message: err.message || t('sales.messages.cbmsRetryFailed') });
     } finally {
       setSyncingCbmsSaleId('');
+    }
+  };
+
+  // ── Record payment for due sales ──
+  const openPayDialog = (sale) => {
+    if (!canManageSales) return;
+    setPayDialog(sale);
+    setPayAmount('');
+    setPayNotes('');
+    setPayPaymentMethod('cash');
+    setPayBankId('');
+    setPayError('');
+  };
+
+  const handleRecordPayment = async (e) => {
+    e.preventDefault();
+    if (!canManageSales) { setPayError(t('staffManagement.permissionError')); return; }
+    const amount = Number(payAmount || 0);
+    if (!amount || amount <= 0) { setPayError('Enter a valid amount.'); return; }
+    if (requiresBankSelection({ paymentMethod: payPaymentMethod, bankId: payBankId }, amount)) {
+      setPayError(t('payments.bankRequired'));
+      return;
+    }
+    const currentDue = Math.max(Number(payDialog.grandTotal || 0) - Number(payDialog.amountReceived || 0), 0);
+    if (amount > currentDue) { setPayError(`Amount cannot exceed due of ${currentDue.toFixed(2)}.`); return; }
+    try {
+      const newReceived = Number(payDialog.amountReceived || 0) + amount;
+      const newDue = Math.max(Number(payDialog.grandTotal || 0) - newReceived, 0);
+      await api.updateSale(payDialog.id, {
+        amountReceived: newReceived,
+        status: newDue > 0 ? 'due' : 'paid',
+        ...buildPaymentPayload({ paymentMethod: payPaymentMethod, bankId: payBankId, paymentNote: payNotes }),
+      });
+      setPayDialog(null);
+      setStatus({ type: 'success', message: t('sales.messages.updated') });
+      invalidateSales(listParams);
+      await fetchSales(listParams, true);
+    } catch (err) {
+      setPayError(err.message);
     }
   };
 
@@ -1151,14 +1204,16 @@ export default function Sales() {
                 </div>
               </FormSectionCard>
 
-              <FormSectionCard title={orderInfoTitle} hint={salesFlow.attributeSectionHint || undefined}>
-                <DynamicAttributes
-                  entityType="sale"
-                  attributes={header.attributes}
-                  hiddenKeys={hiddenSaleAttributeKeys}
-                  onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))}
-                />
-              </FormSectionCard>
+              {businessProfile?.type === 'cafe' && (
+                <FormSectionCard title={orderInfoTitle} hint={salesFlow.attributeSectionHint || undefined}>
+                  <DynamicAttributes
+                    entityType="sale"
+                    attributes={header.attributes}
+                    hiddenKeys={hiddenSaleAttributeKeys}
+                    onChange={(attr) => setHeader((prev) => ({ ...prev, attributes: attr }))}
+                  />
+                </FormSectionCard>
+              )}
             </>
           ) : null}
 
@@ -1389,10 +1444,20 @@ export default function Sales() {
               </div>
 
                 <div className="mt-4 border-t border-secondary-200/70 pt-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                    <div className="flex-1">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
                       <label className="label">{t('services.amountReceived')}</label>
-                      <input
+                      <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-secondary-200/70 px-3 py-2.5 text-sm text-ink-light transition hover:bg-secondary-100 shrink-0">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded accent-primary-600"
+                          checked={isPaid}
+                          onChange={(e) => setIsPaid(e.target.checked)}
+                        />
+                        {t('services.fullyPaid')}
+                      </label>
+                    </div>
+                    <input
                       className="input mt-1"
                       type="number"
                       step="0.01"
@@ -1400,24 +1465,14 @@ export default function Sales() {
                       value={isPaid ? totals.grandTotal.toFixed(2) : header.amountReceived}
                       disabled={isPaid}
                       onChange={(e) => setHeader((prev) => ({ ...prev, amountReceived: e.target.value }))}
-                      />
-                      <QuickPaymentButtons
-                        disabled={totals.grandTotal <= 0}
-                        onNoPayment={() => applyQuickReceivedAmount(0)}
-                        onHalfPayment={() => applyQuickReceivedAmount(totals.grandTotal / 2)}
-                        onFullPayment={() => applyQuickReceivedAmount(totals.grandTotal, { markPaid: true })}
-                      />
-                    </div>
-                    <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-secondary-200/70 px-3 py-2.5 text-sm text-ink-light transition hover:bg-secondary-100 sm:mb-0.5">
-                      <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded accent-primary-600"
-                      checked={isPaid}
-                      onChange={(e) => setIsPaid(e.target.checked)}
                     />
-                    {t('services.fullyPaid')}
-                  </label>
-                </div>
+                    <QuickPaymentButtons
+                      disabled={totals.grandTotal <= 0}
+                      onNoPayment={() => applyQuickReceivedAmount(0)}
+                      onHalfPayment={() => applyQuickReceivedAmount(totals.grandTotal / 2)}
+                      onFullPayment={() => applyQuickReceivedAmount(totals.grandTotal, { markPaid: true })}
+                    />
+                  </div>
 
                 {dueAmount > 0 && (
                   <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-2.5 text-sm">
@@ -1564,9 +1619,13 @@ export default function Sales() {
                         {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.grandTotal || 0).toFixed(2) })}
                       </p>
                       {due > 0 ? (
-                        <span className="mt-0.5 inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                        <button
+                          type="button"
+                          onClick={() => openPayDialog(sale)}
+                          className="mt-0.5 inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60 cursor-pointer"
+                        >
                           {t('currency.formatted', { symbol: t('currency.symbol'), amount: due.toFixed(2) })} due
-                        </span>
+                        </button>
                       ) : (
                         <p className="mt-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">Paid</p>
                       )}
@@ -1651,12 +1710,16 @@ export default function Sales() {
                         {t('currency.formatted', { symbol: t('currency.symbol'), amount: Number(sale.amountReceived || 0).toFixed(2) })}
                       </td>
 
-                      {/* Due — rose pill or green "Paid" exactly like Services */}
+                      {/* Due — clickable pill opens Record Payment dialog */}
                       <td className="py-2.5 pr-4 text-right">
                         {due > 0 ? (
-                          <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                          <button
+                            type="button"
+                            onClick={() => openPayDialog(sale)}
+                            className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/60 cursor-pointer"
+                          >
                             {t('currency.formatted', { symbol: t('currency.symbol'), amount: due.toFixed(2) })} due
-                          </span>
+                          </button>
                         ) : (
                           <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Paid</span>
                         )}
@@ -1743,6 +1806,66 @@ export default function Sales() {
           </div>
         </div>
       </Dialog>
+
+      {/* ── Record Payment Dialog ── */}
+      {payDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setPayDialog(null); }}
+        >
+          <div className="w-full max-w-sm rounded-t-3xl bg-white shadow-2xl dark:bg-slate-950 sm:rounded-3xl">
+            <div className="flex items-center justify-between border-b border-secondary-200/70 px-6 py-4 dark:border-slate-800/70">
+              <h2 className="font-serif text-xl text-ink">{t('sales.recordPayment') || 'Record Payment'}</h2>
+              <button type="button" onClick={() => setPayDialog(null)} className="rounded-xl p-2 text-secondary-400 hover:bg-secondary-100 dark:hover:bg-slate-800">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleRecordPayment} className="space-y-4 p-6">
+              {payError ? (
+                <div className="space-y-3">
+                  <Notice title={payError} tone="error" />
+                  <button type="button" className="btn-secondary w-full sm:w-auto" onClick={() => setPayError('')}>{t('common.back')}</button>
+                </div>
+              ) : null}
+              <div className="rounded-xl bg-mist p-3 text-sm dark:bg-slate-900/60">
+                <p className="font-semibold text-ink dark:text-slate-200">{payDialog.invoiceNo || payDialog.id.slice(0, 8)}</p>
+                <div className="mt-2 flex items-center justify-between text-xs">
+                  <span className="text-secondary-500">Total: {money(payDialog.grandTotal)}</span>
+                  <span className="font-semibold text-rose-600 dark:text-rose-400">
+                    {t('services.dueAmount')}: {money(Math.max(Number(payDialog.grandTotal || 0) - Number(payDialog.amountReceived || 0), 0))}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <label className="label">{t('services.amountReceived')}</label>
+                <input
+                  className="input mt-1"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  placeholder="0.00"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <PaymentMethodFields
+                  value={{ paymentMethod: payPaymentMethod, bankId: payBankId, paymentNote: payNotes }}
+                  onChange={(patch) => { setPayPaymentMethod(patch.paymentMethod); setPayBankId(patch.bankId); setPayNotes(patch.paymentNote); }}
+                  noteLabel={t('payments.paymentNote')}
+                />
+              </div>
+              <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row">
+                <button type="button" className="btn-ghost flex-1" onClick={() => setPayDialog(null)}>{t('common.cancel')}</button>
+                <button type="submit" className="btn-primary flex-1">{t('sales.recordPayment') || 'Record Payment'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
