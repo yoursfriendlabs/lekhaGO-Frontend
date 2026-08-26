@@ -419,8 +419,30 @@ function normalizeServiceOrder(record) {
     attributes: normalizedAttributes,
   });
 
+  const rawPaymentMethod = String(
+    record.paymentMethod || record.method || ""
+  ).toLowerCase();
+  const paymentMethod = rawPaymentMethod === "bank"
+    ? "bank"
+    : rawPaymentMethod === "cash"
+      ? "cash"
+      : record.bankId || record.Bank?.id || record.bank?.id
+        ? "bank"
+        : "cash";
+
+  const isBank = paymentMethod === "bank";
+  const bankId = isBank
+    ? String(record.bankId || record.Bank?.id || record.bank?.id || "").trim()
+    : null;
+  const Bank = isBank ? (record.Bank || record.bank || null) : null;
+  const bank = isBank ? (record.bank || record.Bank || null) : null;
+
   return {
     ...record,
+    paymentMethod,
+    bankId,
+    Bank,
+    bank,
     attributes: normalizedAttributes,
     items,
     ServiceItems: Array.isArray(record.ServiceItems)
@@ -1702,9 +1724,10 @@ export default function Services() {
         discountTotal: totals.discountTotal,
         grandTotal: totals.grandTotal,
         receivedTotal: totals.received,
-        ...(Number(totals.received || 0) > 0
-          ? buildPaymentPayload({ paymentMethod, bankId, paymentNote })
-          : { paymentMethod: "cash" }),
+        ...buildPaymentPayload(
+          { paymentMethod, bankId, paymentNote },
+          { includeEmptyBankId: true },
+        ),
         items: chargeableItems.map((item) => ({
           ...item,
           quantity: Number(item.quantity),
@@ -1838,11 +1861,14 @@ export default function Services() {
       const newReceived = Number(payDialog.receivedTotal || 0) + amount;
       await api.updateService(payDialog.id, {
         receivedTotal: newReceived,
-        ...buildPaymentPayload({
-          paymentMethod: payPaymentMethod,
-          bankId: payBankId,
-          paymentNote: payNotes,
-        }),
+        ...buildPaymentPayload(
+          {
+            paymentMethod: payPaymentMethod,
+            bankId: payBankId,
+            paymentNote: payNotes,
+          },
+          { includeEmptyBankId: true },
+        ),
       });
       const refreshedOrder = normalizeServiceOrder(
         await api.getService(payDialog.id),

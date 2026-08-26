@@ -1,12 +1,16 @@
 export function getEffectivePaymentMethod(paymentMethod, bankId) {
-  return String(bankId || '').trim() ? 'bank' : paymentMethod === 'bank' ? 'bank' : 'cash';
+  const normalizedMethod = String(paymentMethod || '').trim().toLowerCase();
+  if (normalizedMethod === 'cash') return 'cash';
+  if (normalizedMethod === 'bank') return 'bank';
+  return String(bankId || '').trim() ? 'bank' : 'cash';
 }
 
 export function normalizePaymentFields(source = {}) {
-  const bankId = String(source.bankId || '').trim();
+  const explicitMethod = getEffectivePaymentMethod(source.paymentMethod, source.bankId);
+  const bankId = explicitMethod === 'bank' ? String(source.bankId || '').trim() : '';
 
   return {
-    paymentMethod: getEffectivePaymentMethod(source.paymentMethod, bankId),
+    paymentMethod: explicitMethod,
     bankId,
     paymentNote: String(source.paymentNote || '').trim(),
   };
