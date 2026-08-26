@@ -925,10 +925,15 @@ const [mobileStep, setMobileStep] = useState("details");
       } else {
         delete payload.invoiceNo;
       }
+      const isExpense = header.entryType === "expense";
       const successMsg =
         formMode === "edit" && editingId
-          ? t("purchases.messages.updated")
-          : t("purchases.messages.created");
+          ? isExpense
+            ? t("purchases.messages.expenseUpdated")
+            : t("purchases.messages.updated")
+          : isExpense
+            ? t("purchases.messages.expenseCreated")
+            : t("purchases.messages.created");
       if (formMode === "edit" && editingId) {
         await api.updatePurchase(editingId, payload);
       } else {
@@ -974,14 +979,25 @@ const [mobileStep, setMobileStep] = useState("details");
       await api.deletePurchase(deletePurchase.id);
       useProductStore.getState().invalidate();
       invalidatePurchases();
-      setStatus({ type: "success", message: t("purchases.messages.deleted") });
+      const isExpense = getPurchaseEntryType(deletePurchase) === "expense";
+      setStatus({
+        type: "success",
+        message: isExpense
+          ? t("purchases.messages.expenseDeleted")
+          : t("purchases.messages.deleted"),
+      });
       if (pagedPurchases.length === 1 && page > 1)
         setPage((c) => Math.max(1, c - 1));
       await fetchPurchases(listParams, true);
     } catch (err) {
+      const isExpense = getPurchaseEntryType(deletePurchase) === "expense";
       setStatus({
         type: "error",
-        message: err.message || t("purchases.messages.deleteFailed"),
+        message:
+          err.message ||
+          (isExpense
+            ? t("purchases.messages.expenseDeleteFailed")
+            : t("purchases.messages.deleteFailed")),
       });
     } finally {
       setDeletingPurchaseId("");
@@ -1033,10 +1049,18 @@ const [mobileStep, setMobileStep] = useState("details");
     setPayDialog(null);
     setPayError("");
   };
-const closeQuickExpense = () => setQuickExpenseOpen(false);
+  const closeQuickExpense = () => setQuickExpenseOpen(false);
   const handleQuickExpenseSaved = async () => {
     invalidatePurchases(listParams);
-    await fetchPurchases(listParams, true);
+    try {
+      await fetchPurchases(listParams, true);
+    } catch {
+      /* list refresh failure is non-critical */
+    }
+    setStatus({
+      type: "success",
+      message: t("purchases.messages.expenseCreated"),
+    });
   };
 
   // ── Invoice / Bill modal handlers ──
