@@ -296,7 +296,7 @@ export default function QuickPos() {
       return;
     }
 
-    if (!Number(checkoutForm.amountReceived || 0)) {
+    if (isPaid && !Number(checkoutForm.amountReceived || 0)) {
       setCheckoutForm((prev) => ({
         ...prev,
         amountReceived: totals.grandTotal.toFixed(2),
@@ -653,8 +653,11 @@ export default function QuickPos() {
   }, [cart, checkoutForm.discount, checkoutForm.taxRate]);
 
   const receivedAmount = useMemo(
-    () => Math.min(Number(checkoutForm.amountReceived || 0), totals.grandTotal),
-    [checkoutForm.amountReceived, totals.grandTotal],
+    () =>
+      isPaid
+        ? totals.grandTotal
+        : Math.min(Math.max(Number(checkoutForm.amountReceived || 0), 0), totals.grandTotal),
+    [isPaid, checkoutForm.amountReceived, totals.grandTotal],
   );
   const dueAmount = Math.max(totals.grandTotal - receivedAmount, 0);
 
@@ -1108,7 +1111,16 @@ export default function QuickPos() {
       return;
     }
 
-    if (requiresBankSelection(checkoutForm, receivedAmount)) {
+    const isOneClickQuickSavePaid =
+      !isTablesEnabled && !checkoutOpen && isPaid;
+
+    const resolvedReceivedAmount = isOneClickQuickSavePaid
+      ? totals.grandTotal
+      : isPaid
+        ? totals.grandTotal
+        : Math.min(Math.max(Number(checkoutForm.amountReceived || 0), 0), totals.grandTotal);
+
+    if (requiresBankSelection(checkoutForm, resolvedReceivedAmount)) {
       setStatus({ type: "error", message: bankRequiredMessage });
       return;
     }
@@ -1121,18 +1133,8 @@ export default function QuickPos() {
       const { paymentMethod, bankId, paymentNote, discount, ...headerFields } =
         checkoutForm;
 
-      // Standard business (no tables): quick save = completed paid sale.
-      // Cafe/restaurant (tables enabled): quick save = confirm order (due).
-      // If the user explicitly entered an amount via the checkout dialog,
-      // always honour that value regardless of business type.
-      const isStandardQuickSave =
-        !isTablesEnabled && nextAction === "save" && receivedAmount === 0;
-      const resolvedReceivedAmount = isStandardQuickSave
-        ? totals.grandTotal
-        : receivedAmount;
-      const isPaidBill = isStandardQuickSave
-        ? true
-        : resolvedReceivedAmount >= totals.grandTotal;
+      const isPaidBill =
+        totals.grandTotal === 0 || resolvedReceivedAmount >= totals.grandTotal;
 
       const currentOrderType =
         activeSessionOption || activeAttributes?.order_type || "dine_in";
@@ -2393,12 +2395,15 @@ export default function QuickPos() {
                           min="0"
                           step="0.01"
                           value={checkoutForm.amountReceived}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            const val = event.target.value;
                             setCheckoutForm((previous) => ({
                               ...previous,
-                              amountReceived: event.target.value,
-                            }))
-                          }
+                              amountReceived: val,
+                            }));
+                            const numVal = Number(val || 0);
+                            setIsPaid(numVal >= totals.grandTotal && totals.grandTotal > 0);
+                          }}
                           onBlur={() => setShowAmountReceivedInput(false)}
                         />
                       </div>
@@ -2407,7 +2412,13 @@ export default function QuickPos() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => {
-                          if (isPaid) setIsPaid(false);
+                          if (isPaid) {
+                            setIsPaid(false);
+                            setCheckoutForm((previous) => ({
+                              ...previous,
+                              amountReceived: "0",
+                            }));
+                          }
                           setShowAmountReceivedInput(true);
                         }}
                         className="hover:text-primary-600 transition-colors font-medium"
@@ -2422,7 +2433,21 @@ export default function QuickPos() {
                         type="checkbox"
                         className="h-3.5 w-3.5 rounded accent-primary-600 cursor-pointer"
                         checked={isPaid}
-                        onChange={(e) => setIsPaid(e.target.checked)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setIsPaid(checked);
+                          if (checked) {
+                            setCheckoutForm((prev) => ({
+                              ...prev,
+                              amountReceived: totals.grandTotal.toFixed(2),
+                            }));
+                          } else {
+                            setCheckoutForm((prev) => ({
+                              ...prev,
+                              amountReceived: "0",
+                            }));
+                          }
+                        }}
                         title={t("quickPos.fullyPaid")}
                       />
                     </div>
@@ -2861,7 +2886,7 @@ export default function QuickPos() {
                     <input
                       type="checkbox"
                       className="h-4 w-4 rounded accent-primary-600 cursor-pointer"
-                      checked={dueAmount === 0}
+                      checked={isPaid}
                       onChange={(event) => {
                         const checked = event.target.checked;
                         setIsPaid(checked);
@@ -2899,6 +2924,8 @@ export default function QuickPos() {
                         ...previous,
                         amountReceived: val,
                       }));
+                      const numVal = Number(val || 0);
+                      setIsPaid(numVal >= totals.grandTotal && totals.grandTotal > 0);
                     }}
                     placeholder="0.00"
                   />
@@ -2910,10 +2937,12 @@ export default function QuickPos() {
                       key={idx}
                       type="button"
                       onClick={() => {
+                        const val = opt.value;
                         setCheckoutForm((prev) => ({
                           ...prev,
-                          amountReceived: String(opt.value.toFixed(2)),
+                          amountReceived: String(val.toFixed(2)),
                         }));
+                        setIsPaid(val >= totals.grandTotal && totals.grandTotal > 0);
                       }}
                       className="px-2.5 py-1 rounded-xl border border-secondary-200 hover:border-primary text-xs font-bold text-ink-light bg-mist hover:bg-primary/5 transition shadow-2xs"
                     >
