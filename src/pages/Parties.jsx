@@ -680,6 +680,7 @@ export default function Parties() {
 
   const openEdit = (party) => {
     if (!canManageParties) return;
+    setStatus({ type: "info", message: "" });
     setEditingId(party.id);
     setForm({
       name: party.name || "",
@@ -885,9 +886,25 @@ export default function Parties() {
         ? await api.updateParty(editingId, form)
         : await api.createParty(form);
 
-      if (saved?.id) {
-        upsertParty(saved);
-        setSelectedId(saved.id);
+      const resolvedParty = saved?.id ? saved : { ...form, id: editingId };
+
+      if (resolvedParty?.id) {
+        upsertParty(resolvedParty);
+        setParties((prev) => {
+          const index = prev.findIndex((p) => p.id === resolvedParty.id);
+          if (index >= 0) {
+            const next = [...prev];
+            next[index] = { ...next[index], ...resolvedParty };
+            return next;
+          }
+          return [resolvedParty, ...prev];
+        });
+        setStatementData((prev) => ({
+          ...prev,
+          party: prev.party ? { ...prev.party, ...resolvedParty } : resolvedParty,
+        }));
+        setSelectedId(resolvedParty.id);
+        setStatementReloadKey((prev) => prev + 1);
       }
 
       invalidateParties();
@@ -953,30 +970,52 @@ export default function Parties() {
         return;
       }
 
+      const paymentPayload = buildPaymentPayload(
+        {
+          paymentMethod: txState.form.paymentMethod,
+          bankId: txState.form.bankId,
+          paymentNote: txState.form.note,
+        },
+        {
+          noteKey: "note",
+          includeEmptyBankId: Boolean(txState.editingTxId),
+        },
+      );
+
       const payload = {
         partyId: txState.form.partyId,
         direction: txState.form.direction,
         amount,
         txDate: txState.form.txDate,
-        ...buildPaymentPayload(
-          {
-            paymentMethod: txState.form.paymentMethod,
-            bankId: txState.form.bankId,
-            paymentNote: txState.form.note,
-          },
-          { noteKey: "note" },
-        ),
+        ...paymentPayload,
       };
 
       let savedTransaction;
       if (txState.editingTxId) {
         const rowType = txState.form._rowType;
         if (rowType === "sale") {
-          savedTransaction = await api.updateSale(txState.editingTxId, payload);
+          savedTransaction = await api.updateSale(txState.editingTxId, {
+            partyId: payload.partyId,
+            saleDate: payload.txDate,
+            notes: txState.form.note,
+            amountReceived: amount,
+            ...paymentPayload,
+          });
         } else if (rowType === "service") {
-          savedTransaction = await api.updateService(txState.editingTxId, payload);
+          savedTransaction = await api.updateService(txState.editingTxId, {
+            partyId: payload.partyId,
+            notes: txState.form.note,
+            receivedTotal: amount,
+            ...paymentPayload,
+          });
         } else if (rowType === "purchase") {
-          savedTransaction = await api.updatePurchase(txState.editingTxId, payload);
+          savedTransaction = await api.updatePurchase(txState.editingTxId, {
+            partyId: payload.partyId,
+            purchaseDate: payload.txDate,
+            notes: txState.form.note,
+            amountReceived: amount,
+            ...paymentPayload,
+          });
         } else if (rowType === "payment_in" || rowType === "payment_out") {
           savedTransaction = await api.updatePartyTransaction(txState.editingTxId, payload);
         } else {

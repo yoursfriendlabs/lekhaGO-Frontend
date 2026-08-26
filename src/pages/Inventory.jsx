@@ -379,10 +379,10 @@ export default function Inventory() {
       // Its lowStockCount only covers items with 0 < stock <= threshold, so we
       // also count the `stock=out` list to include items with stock 0 (out of
       // stock) in the low-stock card.
-      const [statsRes, allRes, lowRes, outRes] = await Promise.all([
-        api.getProductStats(),
-        api.listProducts({ limit: 1 }).catch((err) => {
-          console.error("Failed to fetch product count", err);
+      const [statsRes, allProductsRes, lowRes, outRes, popularRes, salesRes, servicesRes] = await Promise.all([
+        api.getProductStats().catch(() => null),
+        api.listProducts({ limit: 1000 }).catch((err) => {
+          console.error("Failed to fetch products", err);
           return null;
         }),
         api.listProducts({ limit: 1, stock: "low" }).catch((err) => {
@@ -393,15 +393,117 @@ export default function Inventory() {
           console.error("Failed to fetch out-of-stock count", err);
           return null;
         }),
+        api.getPopularItemsAnalytics({ limit: 1000 }).catch(() => null),
+        api.listSales({ limit: 1000 }).catch(() => null),
+        api.listServices({ limit: 1000 }).catch(() => null),
       ]);
+
+      const allProducts = Array.isArray(allProductsRes?.items)
+        ? allProductsRes.items
+        : Array.isArray(allProductsRes?.data)
+          ? allProductsRes.data
+          : Array.isArray(allProductsRes?.products)
+            ? allProductsRes.products
+            : Array.isArray(allProductsRes)
+              ? allProductsRes
+              : [];
+
+      const totalAll = Number(
+        allProductsRes?.total ||
+        allProducts.length ||
+        statsRes?.totalCount ||
+        statsRes?.allCount ||
+        statsRes?.total ||
+        0,
+      );
+
+      const soldQuantities = new Map();
+
+      (popularRes?.items || []).forEach((item) => {
+        const pid = String(item?.productId || item?.id || "");
+        if (pid) {
+          const qty = Number(item.totalQuantity || item.saleQuantity || item.orderCount || 0);
+          soldQuantities.set(pid, Math.max(soldQuantities.get(pid) || 0, qty));
+        }
+      });
+
+      const salesList = Array.isArray(salesRes?.items)
+        ? salesRes.items
+        : Array.isArray(salesRes)
+          ? salesRes
+          : [];
+      salesList.forEach((sale) => {
+        const saleItems = Array.isArray(sale?.SaleItems)
+          ? sale.SaleItems
+          : Array.isArray(sale?.items)
+            ? sale.items
+            : Array.isArray(sale?.saleItems)
+              ? sale.saleItems
+              : [];
+        saleItems.forEach((item) => {
+          const pid = String(item?.productId || item?.ProductId || item?.product?.id || item?.Product?.id || "");
+          if (pid) {
+            const qty = Number(item?.quantity || 1);
+            soldQuantities.set(pid, (soldQuantities.get(pid) || 0) + qty);
+          }
+        });
+      });
+
+      const servicesList = Array.isArray(servicesRes?.items)
+        ? servicesRes.items
+        : Array.isArray(servicesRes)
+          ? servicesRes
+          : [];
+      servicesList.forEach((srv) => {
+        const srvItems = Array.isArray(srv?.ServiceItems)
+          ? srv.ServiceItems
+          : Array.isArray(srv?.items)
+            ? srv.items
+            : Array.isArray(srv?.serviceItems)
+              ? srv.serviceItems
+              : [];
+        srvItems.forEach((item) => {
+          const pid = String(item?.productId || item?.ProductId || item?.product?.id || item?.Product?.id || "");
+          if (pid) {
+            const qty = Number(item?.quantity || 1);
+            soldQuantities.set(pid, (soldQuantities.get(pid) || 0) + qty);
+          }
+        });
+      });
+
+      // Find unsold products (0 sold quantity)
+      const unsoldProducts = allProducts.filter((p) => {
+        const pid = String(p.id || p._id || "");
+        return (soldQuantities.get(pid) || 0) === 0;
+      });
+
+      let leastPopularCount = unsoldProducts.length;
+      if (leastPopularCount === 0 && allProducts.length > 0 && soldQuantities.size > 0) {
+        // If all products have at least 1 sale, count the items with lowest sales
+        const quantities = allProducts.map((p) => soldQuantities.get(String(p.id || p._id || "")) || 0);
+        const minQty = Math.min(...quantities);
+        leastPopularCount = allProducts.filter(
+          (p) => (soldQuantities.get(String(p.id || p._id || "")) || 0) <= minQty,
+        ).length;
+      } else if (leastPopularCount === 0 && totalAll > 0 && soldQuantities.size === 0) {
+        leastPopularCount = totalAll;
+      }
+
+      const backendLeastPopular =
+        statsRes?.leastPopularCount ?? statsRes?.unsoldCount ?? statsRes?.unsoldProductsCount;
+      const resolvedLeastPopular =
+        backendLeastPopular != null && Number(backendLeastPopular) > 0
+          ? Number(backendLeastPopular)
+          : leastPopularCount;
+
       setStats({
         lowStockCount:
           Number(lowRes?.total ?? statsRes?.lowStockCount ?? 0) +
           Number(outRes?.total ?? 0),
         nearExpiryCount: Number(statsRes?.nearExpiryCount || 0),
-        allCount: Number(allRes?.total ?? statsRes?.totalCount ?? 0),
-        popularCount: Number(statsRes?.popularCount || 0),
-        leastPopularCount: Number(statsRes?.leastPopularCount || 0),
+        allCount: totalAll,
+        popularCount: Number(statsRes?.popularCount || soldQuantities.size),
+        leastPopularCount: resolvedLeastPopular,
       });
     } catch (err) {
       console.error("Failed to fetch product stats", err);
@@ -1244,6 +1346,13 @@ export default function Inventory() {
           icon={TrendingDown}
           tone="default"
           loading={statsLoading}
+          size="sm"
+          onClick={() => {
+            setStockFilter("unsold");
+            setSortKey("leastPopular");
+            setPage(1);
+          }}
+          isActive={stockFilter === "unsold" || sortKey === "leastPopular"}
         />
       </div>
 
@@ -1263,7 +1372,13 @@ export default function Inventory() {
                 ? t("inventory.nearExpiryItems") || "Near Expiry"
                 : stockFilter === "expired"
                   ? t("inventory.expiredStock") || "Expired stock"
-                  : t("inventory.allItems") || "All items"}{" "}
+                  : stockFilter === "unsold"
+                    ? t("inventory.leastPopularItems") || "Least Popular (Unsold)"
+                    : stockFilter === "in"
+                      ? t("inventory.inStock") || "In stock"
+                      : stockFilter === "out"
+                        ? t("inventory.outStock") || "Out of stock"
+                        : t("inventory.allItems") || "All items"}{" "}
             ({totalItems})
           </h3>
         </div>
@@ -1308,6 +1423,9 @@ export default function Inventory() {
             <option value="expired">
               {t("inventory.expiredStock") || "Expired stock"}
             </option>
+            <option value="unsold">
+              {t("inventory.leastPopularItems") || "Least Popular (Unsold)"}
+            </option>
           </select>
 
           <select
@@ -1332,6 +1450,9 @@ export default function Inventory() {
             ) : null}
             <option value="expiryDate">
               {t("inventory.sortByExpiryDate") || "Sort by Expiry Date"}
+            </option>
+            <option value="leastPopular">
+              {t("inventory.leastPopularItems") || "Least Popular (Unsold)"}
             </option>
           </select>
         </div>
