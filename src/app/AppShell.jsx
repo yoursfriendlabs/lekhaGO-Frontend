@@ -144,7 +144,7 @@ export default function AppShell() {
     <div className="gradient-bg min-h-[100dvh] overflow-x-hidden bg-mist text-ink md:h-screen md:overflow-hidden">
       <div className="flex min-h-[100dvh] max-w-full md:h-screen">
         <Sidebar />
-        <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col overflow-x-hidden md:ml-64 md:min-h-0 md:h-screen md:overflow-hidden">
+        <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col overflow-x-hidden md:ml-16 md:min-h-0 md:h-screen md:overflow-hidden">
           <Topbar />
           <main className="min-w-0 flex-1 overflow-x-hidden px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+88px)] md:min-h-0 md:overflow-y-auto md:px-6 md:py-8 md:pb-8">
             {!businessId ? (

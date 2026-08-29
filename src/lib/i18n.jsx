@@ -119,6 +119,15 @@ const dictionaries = {
       stats: 'Stats',
       tables: 'Tables',
       billing: 'Billing Counter',
+      orders: 'Orders',
+      groups: {
+        overview: 'Overview',
+        operations: 'Operations',
+        people: 'People',
+        insights: 'Insights',
+        account: 'Account',
+        more: 'More',
+      },
     },
     tables: {
       title: 'Table Management',
@@ -2354,6 +2363,15 @@ const dictionaries = {
       stats: 'तथ्याङ्क',
       tables: 'टेबल',
       billing: 'बिलिङ काउन्टर',
+      orders: 'अर्डर',
+      groups: {
+        overview: 'अवलोकन',
+        operations: 'सञ्चालन',
+        people: 'मानिस',
+        insights: 'विश्लेषण',
+        account: 'खाता',
+        more: 'थप',
+      },
     },
     tables: {
       title: 'टेबल व्यवस्थापन',
