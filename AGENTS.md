@@ -21,14 +21,25 @@ VITE_API_BASE_URL=http://localhost:4000
 
 ## Architecture
 
-**ManageMyShop** is a React 18 + Vite + Tailwind CSS business management dashboard for inventory, sales, purchases, services, and parties. It targets small/medium shops with multi-business support and English/Nepali (i18n).
+**PasalManager / ManageMyShop** is a React 19 + Vite 6 + Tailwind CSS dashboard. Alias `@/` maps to `src/`.
 
-### Routing (`src/App.jsx`)
+### Folder layout
+
+| Path | Role |
+|------|------|
+| `src/app/` | Providers, route guards, lazy page map, AppShell |
+| `src/pages/<domain>/` | Route screens |
+| `src/components/{layout,ui,form,<domain>}/` | Chrome, primitives, feature UI |
+| `src/lib/` | API, auth, i18n; grouped helpers (`dates`, `money`, `business`) |
+| `src/hooks/` | SSE and shared hooks |
+| `src/stores/` | Zustand business-scoped lists |
+
+### Routing (`src/app/`)
 
 Three tiers:
 - **Public:** `/`, `/login`, `/register`
-- **Protected shell** (`/app/*`): wraps authenticated routes in a layout with Sidebar, Topbar, MobileNav
-- `ProtectedRoute` redirects to `/login` if no token
+- **Protected shell** (`/app/*`): `AppShell` with Sidebar, Topbar, MobileNav
+- Guards live in `src/app/guards.jsx`
 
 ### Context Providers (all in `src/lib/`)
 
@@ -56,11 +67,12 @@ Named exports correspond to REST resources: `getProducts`, `createSale`, `getPar
 
 ### Key Conventions
 
-- Pages live in `src/pages/`, reusable UI in `src/components/`
-- State is local `useState` or React Context — no Redux/Zustand
+- Pages live in `src/pages/<domain>/`, shared UI in `src/components/{layout,ui,form,<domain>}/`
+- Prefer `@/` imports for new files
+- List data uses Zustand scoped stores; local `useState` for form UI
 - All user-visible strings should use `t('key')` from `useI18n()`
 - Business context must be set in Topbar before making most API calls; missing `businessId` causes API errors
-- `DynamicAttributes.jsx` handles custom order fields; `FileUpload.jsx` handles attachment uploads to `POST /api/uploads/attachment`
+- `components/orders/DynamicAttributes.jsx` handles custom order fields; `components/form/FileUpload.jsx` handles `POST /api/uploads/attachment`
 
 ### Deployment
 

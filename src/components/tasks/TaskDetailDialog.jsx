@@ -1,6 +1,6 @@
 import { MessageSquarePlus, RefreshCw, Users } from 'lucide-react';
 import { Dialog } from '../ui/Dialog.tsx';
-import { formatMaybeDate } from '../../lib/datetime';
+import { formatMaybeDate } from '../../lib/dates/datetime';
 import {
   formatTaskTimestamp,
   getTaskActivityLabel,

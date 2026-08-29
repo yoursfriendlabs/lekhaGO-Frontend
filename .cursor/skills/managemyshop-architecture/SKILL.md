@@ -26,9 +26,13 @@ Env: copy `.env.example` → `.env`, set `VITE_API_BASE_URL` (default `http://lo
 
 | Path | Role |
 |------|------|
-| `src/pages/` | Route screens (lazy-loaded in `App.jsx`) |
-| `src/components/` | Shared UI, settings panels, tasks, subscription |
-| `src/lib/` | API, auth, i18n, theme, business profile, print, payments |
+| `src/app/` | Providers, guards, lazy pages, AppShell |
+| `src/pages/<domain>/` | Route screens |
+| `src/components/layout/` | Sidebar, Topbar, MobileNav |
+| `src/components/ui/` | Shared primitives |
+| `src/components/form/` | Inputs |
+| `src/components/<domain>/` | Feature UI |
+| `src/lib/` | API, auth, i18n; grouped helpers in `dates`, `money`, `business` |
 | `src/hooks/` | SSE, task notifications, debounce, mobile, loading |
 | `src/stores/` | Zustand scoped list stores (parties, products, sales, …) |
 

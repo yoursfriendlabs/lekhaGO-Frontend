@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, ShieldAlert, ShieldCheck } from 'lucide-react';
-import Notice from '../Notice.jsx';
+import Notice from '../ui/Notice.jsx';
 import PasswordField from '../auth/PasswordField.jsx';
 import SpinnerIcon from '../auth/SpinnerIcon.jsx';
 import { api } from '../../lib/api';

@@ -12,7 +12,7 @@ import {
 import {
   getCategoryPermissions,
   normalizeStaffCollection,
-} from './staff';
+} from './business/staff';
 
 describe('access control helpers', () => {
   it('keeps owners fully accessible even when access control has empty permissions', () => {

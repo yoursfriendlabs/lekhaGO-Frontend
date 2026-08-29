@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarClock, RefreshCw, ShieldAlert, WalletCards } from 'lucide-react';
-import Notice from '../Notice.jsx';
+import Notice from '../ui/Notice.jsx';
 import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import TeamSeatUsagePanel from '../subscription/TeamSeatUsagePanel.jsx';
 import { formatSubscriptionStatusDate } from '../subscription/SubscriptionStatusBanner.jsx';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { todayISODate } from '../../lib/datetime';
+import { todayISODate } from '../../lib/dates/datetime';
 import { useI18n } from '../../lib/i18n.jsx';
 import {
   getPreferredBillingCycle,

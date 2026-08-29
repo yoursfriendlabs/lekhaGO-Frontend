@@ -1,4 +1,4 @@
-import ThemeSelector from '../ThemeSelector.jsx';
+import ThemeSelector from '../ui/ThemeSelector.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 
 export default function AppearanceSettingsPanel() {

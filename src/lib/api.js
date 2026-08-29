@@ -4,14 +4,14 @@ import {
   getToken,
   setSessionNotice,
 } from "./storage";
-import { normalizePopularAnalyticsResponse } from "./analyticsPopular";
-import { normalizeLedgerReportResponse } from "./ledger";
+import { normalizePopularAnalyticsResponse } from "./inventory/analyticsPopular";
+import { normalizeLedgerReportResponse } from "./money/ledger";
 import { toQueryKey, toQueryString } from "./queryKey";
 import {
   normalizeStaffCollection,
   normalizeStaffMeta,
   normalizeStaffMember,
-} from "./staff";
+} from "./business/staff";
 import {
   normalizeTaskDetail,
   normalizeTaskListItem,

@@ -2,6 +2,10 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { cloudflare } from "@cloudflare/vite-plugin";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const srcDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "src");
 
 export default defineConfig(({ mode }) => ({
   plugins: [
@@ -114,5 +118,10 @@ export default defineConfig(({ mode }) => ({
     environment: "jsdom",
     globals: true,
     setupFiles: "./src/test/setup.js",
+  },
+  resolve: {
+    alias: {
+      "@": srcDir,
+    },
   },
 }));

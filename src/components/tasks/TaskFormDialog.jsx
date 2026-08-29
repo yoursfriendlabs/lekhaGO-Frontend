@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Dialog } from '../ui/Dialog.tsx';
-import FlexibleDateInput from '../FlexibleDateInput.jsx';
+import FlexibleDateInput from '../form/FlexibleDateInput.jsx';
 
 function sortStaff(members = []) {
   return [...members].sort((left, right) => {
