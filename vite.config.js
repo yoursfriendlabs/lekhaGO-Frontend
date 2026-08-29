@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       injectRegister: "auto",
       registerType: "autoUpdate",
-      includeAssets: ["Logo.png", "Logo.png"],
+      includeAssets: ["favicon-32.png", "apple-touch-icon.png", "Logo.png", "icon-192.png", "icon-512.png"],
       manifest: {
         id: "/",
         name: "PasalManager",
@@ -26,16 +26,22 @@ export default defineConfig(({ mode }) => ({
         categories: ["business", "productivity"],
         icons: [
           {
-            src: "/Logo.png",
+            src: "/icon-192.png",
             sizes: "192x192",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "any",
           },
           {
             src: "/icon-512.png",
             sizes: "512x512",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "any",
+          },
+          {
+            src: "/icon-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
       },

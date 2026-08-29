@@ -21,6 +21,7 @@ import { useI18n } from '../lib/i18n.jsx';
 import { setPendingEmailVerification } from '../lib/storage';
 import { getFallbackBusinessTypes } from '../lib/businessProfile';
 import SearchableSelect from '../components/SearchableSelect.jsx';
+import BrandLogo from '../components/BrandLogo.jsx';
 
 const inputCls =
   'w-full h-12 rounded-xl border border-secondary-200 bg-surface px-4 text-ink placeholder-secondary-400 ' +
@@ -43,7 +44,9 @@ function getTypeIcon(type) {
 }
 
 function getRegistrationBusinessTypes(items) {
-  return Array.isArray(items) ? items : [];
+  return Array.isArray(items)
+    ? items.filter((item) => String(item?.value || '').toLowerCase() !== 'personal')
+    : [];
 }
 
 function buildStatusCopy(status, t) {
@@ -219,9 +222,9 @@ export default function Register() {
       <div className="flex w-full items-center justify-center p-6 lg:w-1/2 lg:p-12">
         <div className="w-full max-w-2xl space-y-6">
           <div className="text-center lg:text-left">
-            <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-              {t('auth.register')}
-            </span>
+            <BrandLogo className="mx-auto mb-4 block h-10 w-full max-w-[220px] lg:mx-0" />
+          
+          
             <h1  className="mt-4 text-4xl font-bold tracking-tight text-ink">{t('auth.registerTitle')}</h1>
             <p className="mt-3 text-lg text-secondary-600">{t('auth.registerSubtitle')}</p>
           </div>

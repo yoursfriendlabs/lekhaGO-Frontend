@@ -8,6 +8,7 @@ import TaskNotificationsButton from './tasks/TaskNotificationsButton.jsx';
 import ThemeSelector from './ThemeSelector.jsx';
 import { formatSubscriptionDaysRemainingLabel, formatSubscriptionStatusDate } from './subscription/SubscriptionStatusBanner.jsx';
 import UpgradeSubscriptionCta, { shouldShowUpgradeCta } from './subscription/UpgradeSubscriptionCta.jsx';
+import BrandLogo from './BrandLogo.jsx';
 
 export default function Topbar() {
   const { user, logout, role, subscription, accessControl } = useAuth();
@@ -40,6 +41,7 @@ export default function Topbar() {
   return (
     <header className="sticky top-0 z-20 border-b border-secondary-200/80 bg-surface/92 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur md:px-6 md:py-4">
       <div className="flex min-w-0 items-center justify-between gap-3">
+        <BrandLogo variant="mark" className="h-8 w-8 shrink-0 md:hidden" />
         <div className="min-w-0 flex-1">
           <p className="text-[10px] uppercase tracking-[0.2em] text-secondary-500">{t('topbar.workspace')}</p>
           <h2 className="truncate font-serif text-base text-ink sm:text-lg">{title}</h2>

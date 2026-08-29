@@ -7,6 +7,7 @@ import { useAuth } from '../lib/auth';
 import { getVerificationEmail, isEmailVerificationRequiredError } from '../lib/emailVerification';
 import { useI18n } from '../lib/i18n.jsx';
 import { consumeSessionNotice, setPendingEmailVerification } from '../lib/storage';
+import BrandLogo from '../components/BrandLogo.jsx';
 
 function SpinIcon() {
   return (
@@ -118,8 +119,8 @@ export default function Login() {
       <div className="flex w-full items-center justify-center p-8 lg:w-1/2 lg:p-12">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center login-animate-fade-down">
-
-            <h1 className="text-4xl font-bold tracking-tight text-ink">{t('auth.loginTitle')}</h1>
+            <BrandLogo className="mx-auto block h-10 w-full max-w-[220px]" />
+            <h1 className="mt-6 text-4xl font-bold tracking-tight text-ink">{t('auth.loginTitle')}</h1>
             <p className="mt-3 text-lg text-secondary-600">{t('auth.loginHeroSubtitle')}</p>
           </div>
 
