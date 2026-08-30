@@ -10,7 +10,12 @@ export default function Sidebar() {
   const { navGroups } = useAppNavigation();
 
   return (
-    <aside className="group/sidebar hidden h-full w-16 flex-col overflow-hidden border-r border-secondary-200/70 bg-surface/95 shadow-none transition-[width,box-shadow] duration-200 ease-out hover:w-60 hover:shadow-[8px_0_32px_rgba(28,25,23,0.08)] focus-within:w-60 focus-within:shadow-[8px_0_32px_rgba(28,25,23,0.08)] md:fixed md:inset-y-0 md:left-0 md:z-30 md:flex">
+    <aside
+      className="group/sidebar hidden h-full w-16 flex-col overflow-hidden border-r border-secondary-200/70 bg-surface/95 shadow-none transition-[width,box-shadow] duration-200 ease-out hover:w-60 hover:shadow-[8px_0_32px_rgba(28,25,23,0.08)] focus-within:w-60 focus-within:shadow-[8px_0_32px_rgba(28,25,23,0.08)] md:fixed md:inset-y-0 md:left-0 md:z-30 md:flex"
+      onClick={() => {
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+      }}
+    >
       <NavLink
         to="/app"
         end
