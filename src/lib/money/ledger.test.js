@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeLedgerReportResponse, normalizeLedgerRow } from './ledger';
+import { formatLedgerNote, normalizeLedgerReportResponse, normalizeLedgerRow } from './ledger';
 
 describe('ledger helpers', () => {
   it('preserves backend debit, credit, and running balance values as-is', () => {
@@ -54,5 +54,20 @@ describe('ledger helpers', () => {
     expect(report.items).toHaveLength(1);
     expect(report.items[0].runningBalance).toBeNull();
     expect(report.items[0].paymentType.bank.name).toBe('Nabil');
+  });
+
+  it('trims ledger notes and localizes the opening-balance system note', () => {
+    const row = normalizeLedgerRow({
+      id: 'row-3',
+      type: 'payment_in',
+      note: '  Advance for next order  ',
+    });
+
+    expect(row.note).toBe('Advance for next order');
+    expect(formatLedgerNote('')).toBe('');
+    expect(formatLedgerNote('Opening Balance', (key) => (
+      key === 'parties.openingBalanceNote' ? 'Opening Balance' : key
+    ))).toBe('Opening Balance');
+    expect(formatLedgerNote('Paid in cash')).toBe('Paid in cash');
   });
 });

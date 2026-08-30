@@ -33,7 +33,6 @@ import Pagination from '../../components/ui/Pagination';
 import PartyFilterSelect from "../../components/parties/PartyFilterSelect.jsx";
 import RefreshButton from "../../components/ui/RefreshButton.jsx";
 import FlexibleDateInput from "../../components/form/FlexibleDateInput.jsx";
-import DateDisplay from "../../components/form/DateDisplay.jsx";
 import { api, invalidateApiCache, API_BASE } from "../../lib/api";
 import { formatCurrency } from "../../lib/money/currency";
 import { useI18n } from "../../lib/i18n.jsx";
@@ -43,6 +42,8 @@ import dayjs, { formatMaybeDate, todayISODate } from "../../lib/dates/datetime";
 import { normalizeLookupParty, toPartyLookupOption } from '../../lib/lookups.js';
 import { getPaymentTypeDisplay, hasPaymentTypeData } from '../../lib/money/paymentType';
 import { printElement } from '../../lib/print/print';
+import { formatLedgerNote } from '../../lib/money/ledger';
+import { PartyStatementEntries, PartyStatementPrintSheet } from './PartyStatementViews.jsx';
 
 const EMPTY_METRIC_TOTALS = Object.freeze({
   count: 0,
@@ -1523,11 +1524,6 @@ function formatLedgerText(value) {
   return text || '-';
 }
 
-function formatStatusText(value) {
-  const text = formatLedgerText(value);
-  return text === '-' ? text : text.replace(/_/g, ' ');
-}
-
 function getLedgerTypeMeta(type, t) {
   const map = {
     sale: { label: t('ledger.sale'), className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
@@ -1542,20 +1538,6 @@ function getLedgerTypeMeta(type, t) {
     label: formatLedgerText(type),
     className: 'bg-secondary-100 text-secondary-700 dark:bg-slate-800 dark:text-secondary-300',
   };
-}
-
-function getStatusToneClass(status) {
-  const normalized = String(status || '').trim().toLowerCase();
-  if (['paid', 'completed', 'received', 'settled', 'success', 'active'].includes(normalized)) {
-    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300';
-  }
-  if (['pending', 'draft', 'open', 'in_progress', 'processing'].includes(normalized)) {
-    return 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300';
-  }
-  if (['cancelled', 'void', 'failed', 'inactive'].includes(normalized)) {
-    return 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300';
-  }
-  return 'bg-secondary-100 text-secondary-700 dark:bg-slate-800 dark:text-secondary-300';
 }
 
 function getBalanceToneClass(value) {
@@ -1574,31 +1556,6 @@ function toResolvedPartyOption(raw) {
   const party = normalizeLookupParty(raw);
   if (!party.id) return null;
   return toPartyLookupOption(party);
-}
-
-function PaymentMethodCell({ paymentDisplay, align = 'left' }) {
-  const alignClass = align === 'right' ? 'text-right' : '';
-  return (
-    <div className={`min-w-0 ${alignClass}`}>
-      <p className={`truncate text-sm font-medium text-ink-light dark:text-secondary-300 ${alignClass}`}>
-        {paymentDisplay.label}
-      </p>
-      {paymentDisplay.balanceText ? (
-        <p className={`truncate text-xs text-secondary-500 ${alignClass}`}>
-          {paymentDisplay.balanceText}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function StatusPill({ status }) {
-  const label = formatStatusText(status);
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${getStatusToneClass(status)}`}>
-      {label}
-    </span>
-  );
 }
 
 function toCsvCell(value) {
@@ -2189,7 +2146,7 @@ export default function Reports() {
     return t("currency.formatted", {
       symbol: t("currency.symbol"),
       amount: formatted,
-    });
+    }).replace(/ /g, '\u00a0');
   };
 
   // Calculations for Ledger UI
@@ -2197,7 +2154,7 @@ export default function Reports() {
     ...row,
     referenceDisplay: formatLedgerText(row.referenceNo),
     partyDisplay: formatLedgerText(row.partyName),
-    statusDisplay: formatStatusText(row.status),
+    noteDisplay: formatLedgerNote(row.note, t),
     typeMeta: getLedgerTypeMeta(row.type, t),
     paymentDisplay: hasPaymentTypeData(row)
       ? getPaymentTypeDisplay(row, {
@@ -2208,6 +2165,12 @@ export default function Reports() {
         })
       : { label: '-', balanceText: '' },
   })), [ledger.items, t]);
+
+  const hasStatementNotes = useMemo(
+    () => statementRows.some((row) => Boolean(row.noteDisplay)),
+    [statementRows],
+  );
+  const showStatementParty = !selectedPartyId;
 
   const ledgerSummary = useMemo(() => {
     const totalDebit = statementRows.reduce((sum, row) => sum + Number(row.debit || 0), 0);
@@ -2354,7 +2317,7 @@ export default function Reports() {
         t('ledger.referenceNo'),
         t('ledger.party'),
         t('ledger.type'),
-        t('common.status'),
+        ...(hasStatementNotes ? [t('ledger.note')] : []),
         t('payments.paymentMethod'),
         t('ledger.debit'),
         t('ledger.credit'),
@@ -2365,7 +2328,7 @@ export default function Reports() {
         row.referenceDisplay,
         row.partyDisplay,
         row.typeMeta.label,
-        row.statusDisplay,
+        ...(hasStatementNotes ? [row.noteDisplay] : []),
         [row.paymentDisplay.label, row.paymentDisplay.balanceText].filter(Boolean).join(' - '),
         row.debit > 0 ? formatCurrency(row.debit, { symbol: t('currency.symbol') }) : '',
         row.credit > 0 ? formatCurrency(row.credit, { symbol: t('currency.symbol') }) : '',
@@ -2379,6 +2342,7 @@ export default function Reports() {
     const now = dayjs();
     printElement(printRef.current, {
       prepareClone: (clone) => {
+        clone.classList.add('party-statement-print');
         clone.querySelectorAll('[data-printed-at]').forEach((node) => {
           node.textContent = now.format('D MMM YYYY, HH:mm');
         });
@@ -2867,119 +2831,20 @@ export default function Reports() {
         <div className="space-y-6 animate-fadeIn">
           {/* Printable Statement Block */}
           <div ref={printRef} className="space-y-6">
-            <div className="hidden print:block">
-              <div className="overflow-hidden rounded-3xl border border-secondary-200 bg-white">
-                <div className="h-1.5 w-full bg-primary" />
-                <div className="flex items-start justify-between gap-6 border-b border-secondary-200 px-8 pb-6 pt-6">
-                  <div className="flex min-w-0 items-start gap-4">
-                    {logoSrc ? (
-                      <img
-                        src={logoSrc}
-                        alt="Logo"
-                        className="h-16 w-16 shrink-0 rounded-xl border border-secondary-200 bg-white object-contain p-1 shadow-sm"
-                      />
-                    ) : null}
-                    <div className="min-w-0">
-                      <h1 className={`font-serif font-bold leading-tight text-ink ${logoSrc ? 'text-2xl' : 'text-3xl'}`}>
-                        {biz?.companyName || 'PasalManager'}
-                      </h1>
-                      {(biz?.address || biz?.phone || biz?.email || biz?.panVat) ? (
-                        <div className="mt-1.5 space-y-0.5">
-                          {biz?.address ? <p className="whitespace-pre-wrap text-xs leading-snug text-secondary-500">{biz.address}</p> : null}
-                          {(biz?.phone || biz?.email) ? <p className="text-xs text-secondary-500">{[biz.phone, biz.email].filter(Boolean).join('  ·  ')}</p> : null}
-                          {biz?.panVat ? <p className="text-xs font-semibold text-secondary-700">PAN / VAT No: {biz.panVat}</p> : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-xs font-bold uppercase tracking-widest text-primary-600">{t('ledger.statementTitle')}</p>
-                    <p className="mt-1 text-sm font-semibold text-ink">{selectedPartyLabel}</p>
-                    <p className="mt-1 text-xs text-secondary-500">{timeSpanLabel}</p>
-                    <p className="mt-2 text-xs text-secondary-400" data-printed-at>{dayjs().format('D MMM YYYY, HH:mm')}</p>
-                  </div>
-                </div>
-                <div className="border-b border-secondary-200 bg-mist px-8 py-6">
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-secondary-400">{balanceLabel}</p>
-                      <p className={`mt-1.5 text-sm font-semibold ${balanceToneClass}`}>
-                        {formatMoney(Math.abs(ledgerSummary.currentBalance))}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-secondary-400">{t('ledger.totalDebit')}</p>
-                      <p className="mt-1.5 text-sm font-semibold text-ink">
-                        {formatMoney(ledgerSummary.totalDebit)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-secondary-400">{t('ledger.totalCredit')}</p>
-                      <p className="mt-1.5 text-sm font-semibold text-ink">
-                        {formatMoney(ledgerSummary.totalCredit)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-secondary-400">{t('ledger.totalEntries')}</p>
-                      <p className="mt-1.5 text-sm font-semibold text-ink">{ledgerSummary.entries}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="px-8 py-6">
-                  <table className="w-full text-sm text-ink-light">
-                    <thead className="text-xs text-ink uppercase">
-                      <tr className="tracking-wider border-b pb-2">
-                        <th className="pb-3 text-left">{t('common.date')}</th>
-                        <th className="pb-3 text-left">{t('ledger.referenceNo')}</th>
-                        <th className="pb-3 text-left">{t('ledger.party')}</th>
-                        <th className="pb-3 text-left">{t('ledger.type')}</th>
-                        <th className="pb-3 text-left">{t('common.status')}</th>
-                        <th className="pb-3 text-left">{t('payments.paymentMethod')}</th>
-                        <th className="pb-3 text-right">{t('ledger.debit')}</th>
-                        <th className="pb-3 text-right">{t('ledger.credit')}</th>
-                        <th className="pb-3 text-right">{t('ledger.runningBalance')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {statementRows.length === 0 ? (
-                        <tr>
-                          <td colSpan={9} className="py-4 text-secondary-400 text-center">{t('ledger.noTransactions')}</td>
-                        </tr>
-                      ) : (
-                        statementRows.map((row) => (
-                          <tr key={`print-${row.type}-${row.id}`}>
-                            <td className="py-3"><DateDisplay date={row.date} format="DD/MM/YYYY" /></td>
-                            <td className="py-3">{row.referenceDisplay}</td>
-                            <td className="py-3">{row.partyDisplay}</td>
-                            <td className="py-3">{row.typeMeta.label}</td>
-                            <td className="py-3">{row.statusDisplay}</td>
-                            <td className="py-3">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-ink-light">{row.paymentDisplay.label}</p>
-                                {row.paymentDisplay.balanceText ? <p className="truncate text-xs text-secondary-500">{row.paymentDisplay.balanceText}</p> : null}
-                              </div>
-                            </td>
-                            <td className="py-3 text-right text-rose-700">
-                              {row.debit > 0 ? formatMoney(row.debit) : '-'}
-                            </td>
-                            <td className="py-3 text-right text-emerald-700">
-                              {row.credit > 0 ? formatMoney(row.credit) : '-'}
-                            </td>
-                            <td className={`py-3 text-right ${getBalanceToneClass(row.runningBalance)}`}>
-                              {formatMoney(row.runningBalance)}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex items-center justify-between border-t border-secondary-200 bg-mist px-8 py-4">
-                  <p className="text-xs text-secondary-400">{t('ledger.totalEntries')}: {ledgerSummary.entries}</p>
-                  <p className="text-xs text-secondary-400">Printed on <span data-printed-date>{dayjs().format('D MMM YYYY')}</span></p>
-                </div>
-              </div>
-            </div>
+            <PartyStatementPrintSheet
+              t={t}
+              logoSrc={logoSrc}
+              biz={biz}
+              selectedPartyLabel={selectedPartyLabel}
+              timeSpanLabel={timeSpanLabel}
+              balanceLabel={balanceLabel}
+              balanceToneClass={balanceToneClass}
+              ledgerSummary={ledgerSummary}
+              formatMoney={formatMoney}
+              statementRows={statementRows}
+              showParty={showStatementParty}
+              getBalanceToneClass={getBalanceToneClass}
+            />
 
             {/* Screen UI Block */}
             <div className="space-y-6 print:hidden">
@@ -3083,75 +2948,20 @@ export default function Reports() {
                   <Notice title={ledgerStatus} tone="error" />
                 ) : (
                   <>
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[980px] text-sm">
-                        <thead className="text-xs uppercase text-ink">
-                          <tr>
-                            <th className="py-2.5 pr-4 text-left">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  applyLedgerQuery({
-                                    order: ledgerSortOrder === 'desc' ? 'asc' : 'desc',
-                                  });
-                                }}
-                                className="inline-flex items-center gap-1 font-semibold hover:text-secondary-700 dark:hover:text-secondary-300"
-                              >
-                                {t('common.date')}
-                                {ledgerSortOrder === 'desc' ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
-                              </button>
-                            </th>
-                            <th className="py-2.5 pr-4 text-left">{t('ledger.referenceNo')}</th>
-                            <th className="py-2.5 pr-4 text-left">{t('ledger.party')}</th>
-                            <th className="py-2.5 pr-4 text-left">{t('ledger.type')}</th>
-                            <th className="py-2.5 pr-4 text-left">{t('common.status')}</th>
-                            <th className="py-2.5 pr-4 text-left">{t('payments.paymentMethod')}</th>
-                            <th className="py-2.5 pr-4 text-right">{t('ledger.debit')}</th>
-                            <th className="py-2.5 pr-4 text-right">{t('ledger.credit')}</th>
-                            <th className="py-2.5 text-right">{t('ledger.runningBalance')}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                          {isLedgerBusy && statementRows.length === 0 ? (
-                            <tr>
-                              <td colSpan={9} className="py-4 text-secondary-400 text-center">{t('common.loading')}</td>
-                            </tr>
-                          ) : statementRows.length === 0 ? (
-                            <tr>
-                              <td colSpan={9} className="py-4 text-secondary-400 text-center">{t('ledger.noTransactions')}</td>
-                            </tr>
-                          ) : (
-                            statementRows.map((row) => (
-                              <tr key={`${row.type}-${row.id}`} className="align-top hover:bg-mist/50 dark:hover:bg-slate-800/20 transition-colors">
-                                <td className="py-3 pr-4 font-medium text-ink dark:text-slate-200"><DateDisplay date={row.date} format="DD/MM/YYYY" /></td>
-                                <td className="py-3 pr-4 text-ink-light dark:text-secondary-300">{row.referenceDisplay}</td>
-                                <td className="py-3 pr-4 text-ink-light dark:text-secondary-300">{row.partyDisplay}</td>
-                                <td className="py-3 pr-4">
-                                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${row.typeMeta.className}`}>
-                                    {row.typeMeta.label}
-                                  </span>
-                                </td>
-                                <td className="py-3 pr-4">
-                                  <StatusPill status={row.status} />
-                                </td>
-                                <td className="py-3 pr-4">
-                                  <PaymentMethodCell paymentDisplay={row.paymentDisplay} />
-                                </td>
-                                <td className="py-3 pr-4 text-right font-semibold text-rose-700 dark:text-rose-300">
-                                  {row.debit > 0 ? formatMoney(row.debit) : '-'}
-                                </td>
-                                <td className="py-3 pr-4 text-right font-semibold text-emerald-700 dark:text-emerald-300">
-                                  {row.credit > 0 ? formatMoney(row.credit) : '-'}
-                                </td>
-                                <td className={`py-3 text-right font-semibold ${getBalanceToneClass(row.runningBalance)}`}>
-                                  {formatMoney(row.runningBalance)}
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
+                    <PartyStatementEntries
+                      t={t}
+                      statementRows={statementRows}
+                      showParty={showStatementParty}
+                      formatMoney={formatMoney}
+                      getBalanceToneClass={getBalanceToneClass}
+                      isBusy={isLedgerBusy}
+                      onToggleSort={() => {
+                        applyLedgerQuery({
+                          order: ledgerSortOrder === 'desc' ? 'asc' : 'desc',
+                        });
+                      }}
+                      SortIcon={ledgerSortOrder === 'desc' ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+                    />
 
                     <Pagination
                       page={page}

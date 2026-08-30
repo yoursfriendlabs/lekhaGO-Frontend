@@ -42,6 +42,12 @@ html, body {
   }
   @page { margin: 1.2cm; size: A4 portrait; }
 }
+body:has(.party-statement-sheet) {
+  padding: 8px !important;
+}
+.print-clone:has(.party-statement-sheet) {
+  padding: 0 !important;
+}
 `;
 
 function waitForPrintLayout() {

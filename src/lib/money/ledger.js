@@ -44,6 +44,7 @@ function pickLedgerItems(payload) {
  * @property {string | null} partyId
  * @property {string | null} partyName
  * @property {string | null} status
+ * @property {string} note
  * @property {number} debit
  * @property {number} credit
  * @property {number | null} runningBalance
@@ -82,6 +83,7 @@ export function normalizeLedgerRow(row = {}) {
     partyId: row?.partyId || null,
     partyName: row?.partyName || null,
     status: row?.status || null,
+    note: String(row?.note || row?.notes || '').trim(),
     debit: toNumber(row?.debit),
     credit: toNumber(row?.credit),
     runningBalance: toNullableNumber(row?.runningBalance),
@@ -110,6 +112,23 @@ export function normalizeLedgerRow(row = {}) {
       },
     },
   };
+}
+
+/**
+ * Format a ledger statement note for display.
+ * Opening-balance system notes are localized when a translator is provided.
+ *
+ * @param {string | null | undefined} note
+ * @param {(key: string) => string} [t]
+ * @returns {string}
+ */
+export function formatLedgerNote(note, t) {
+  const raw = String(note || '').trim();
+  if (!raw) return '';
+  if (raw === 'Opening Balance') {
+    return typeof t === 'function' ? t('parties.openingBalanceNote') : raw;
+  }
+  return raw;
 }
 
 /**
