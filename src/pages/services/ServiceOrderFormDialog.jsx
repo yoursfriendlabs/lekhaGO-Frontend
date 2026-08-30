@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { Dialog } from "@/components/ui/Dialog.tsx";
 import Notice from "@/components/ui/Notice";
 import PaymentMethodFields from "@/components/form/PaymentMethodFields.jsx";
 import NoteTextarea from "@/components/form/NoteTextarea.jsx";
