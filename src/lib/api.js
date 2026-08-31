@@ -496,6 +496,24 @@ export const api = {
         CACHE_TTL.short,
       ),
     ),
+  listBusinesses: () =>
+    request(
+      "/api/auth/businesses",
+      {},
+      listCache(["auth-businesses"], CACHE_TTL.short),
+    ),
+  createBusiness: (data) =>
+    request(
+      "/api/auth/businesses",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        "auth-me",
+        "auth-businesses",
+        "subscription",
+        "business-profile",
+        "business-settings",
+      ]),
+    ),
   updateCurrentUser: (data) =>
     request(
       "/api/auth/me",

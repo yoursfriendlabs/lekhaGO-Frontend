@@ -34,6 +34,8 @@ const btnPrimary =
 
 const typeIconMap = {
   retail: Store,
+  cafe: UtensilsCrossed,
+  standard: Store,
   service: Wrench,
   general_store: ShoppingBasket,
   hospitality: UtensilsCrossed,
@@ -45,7 +47,10 @@ function getTypeIcon(type) {
 
 function getRegistrationBusinessTypes(items) {
   return Array.isArray(items)
-    ? items.filter((item) => String(item?.value || '').toLowerCase() !== 'personal')
+    ? items.filter((item) => {
+      const value = String(item?.value || '').toLowerCase();
+      return value === 'retail' || value === 'cafe' || value === 'standard';
+    })
     : [];
 }
 

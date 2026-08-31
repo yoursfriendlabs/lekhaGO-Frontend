@@ -80,6 +80,12 @@ export function normalizeSessionPayload(payload = {}, fallback = {}) {
     businessId,
     business: business || null,
     businessProfile,
+    businesses: Array.isArray(source.businesses)
+      ? source.businesses
+      : Array.isArray(fallbackSource.businesses)
+        ? fallbackSource.businesses
+        : [],
+    canCreateBusiness: Boolean(source.canCreateBusiness ?? fallbackSource.canCreateBusiness),
     accessControl,
     subscription,
   };

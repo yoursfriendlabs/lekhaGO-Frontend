@@ -2,21 +2,19 @@ import { Link } from 'react-router-dom';
 import { Clock3, LogOut, Sparkles, TriangleAlert, UserRound } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n.jsx';
-import { useBusinessSettings } from '../../lib/business/businessSettings.jsx';
 import { getSubscriptionStatusState } from '../../lib/subscription.js';
 import TaskNotificationsButton from '../tasks/TaskNotificationsButton.jsx';
 import ThemeSelector from '../ui/ThemeSelector.jsx';
 import { formatSubscriptionDaysRemainingLabel, formatSubscriptionStatusDate } from '../subscription/SubscriptionStatusBanner.jsx';
 import UpgradeSubscriptionCta, { shouldShowUpgradeCta } from '../subscription/UpgradeSubscriptionCta.jsx';
 import BrandLogo from './BrandLogo.jsx';
+import WorkspaceSwitcher from './WorkspaceSwitcher.jsx';
 
 export default function Topbar() {
   const { user, logout, role, subscription, accessControl } = useAuth();
-  const { businessProfile } = useBusinessSettings();
   const { locale, setLocale, t } = useI18n();
 
   const showStaffProfileLink = role === 'staff' && Boolean(accessControl?.membershipId);
-  const subscriptionAccess = subscription?.access || null;
   const subscriptionStatus = getSubscriptionStatusState(subscription);
   const isActiveTrial = subscriptionStatus.kind === 'trial' || subscriptionStatus.kind === 'trial-expiring';
   const trialEndDate = formatSubscriptionStatusDate(subscriptionStatus.trial?.endsAt, locale);
@@ -24,30 +22,17 @@ export default function Topbar() {
   const trialStatusLabel = trialDaysRemainingLabel || (subscriptionStatus.trial?.endsAt
     ? t('appAccess.trialEndsShort', { date: trialEndDate })
     : '');
-  const planLabel = subscription?.currentPlan?.label || (subscriptionAccess?.planKey ? humanizePlanKey(subscriptionAccess.planKey) : '');
   const showUpgradeAction = shouldShowUpgradeCta(subscription, role) && !isActiveTrial;
-  const businessLabel = String(businessProfile?.label || '').trim();
-  const userLabel = String(user?.name || '').trim();
-  const title = businessLabel || userLabel || t('topbar.welcome');
-  const supportingText = [
-    businessLabel && userLabel && businessLabel !== userLabel ? userLabel : '',
-    !isActiveTrial && planLabel ? planLabel : '',
-    subscriptionAccess?.hasPendingChange ? t('topbar.pendingPlan') : '',
-  ].filter(Boolean).join(' · ');
   const trialBadgeClass = subscriptionStatus.kind === 'trial-expiring'
     ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200'
     : 'border-primary/20 bg-primary/10 text-primary-700 dark:border-primary/30 dark:bg-primary/15 dark:text-primary-200';
 
   return (
     <header className="sticky top-0 z-20 border-b border-secondary-200/80 bg-surface/92 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur md:px-6 md:py-4">
-      <div className="flex min-w-0 items-center justify-between gap-3">
+      <div className="relative flex min-w-0 items-center justify-between gap-3">
         <BrandLogo variant="mark" className="h-8 w-8 shrink-0 md:hidden" />
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-secondary-500">{t('topbar.workspace')}</p>
-          <h2 className="truncate font-serif text-base text-ink sm:text-lg">{title}</h2>
-          {supportingText ? (
-            <p className="mt-1 truncate text-xs font-medium text-secondary-500">{supportingText}</p>
-          ) : null}
+          <WorkspaceSwitcher />
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -105,11 +90,4 @@ export default function Topbar() {
       </div>
     </header>
   );
-}
-
-function humanizePlanKey(value = '') {
-  return String(value)
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase())
-    .trim();
 }

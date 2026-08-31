@@ -40,6 +40,8 @@ export function AuthProvider({ children }) {
   const [role, setRoleState] = useState(() => getRole());
   const [accessControl, setAccessControlState] = useState(() => normalizeAccessControl(getAccessControl()));
   const [subscription, setSubscriptionState] = useState(() => normalizeSubscriptionPayload(getSubscription()));
+  const [businesses, setBusinessesState] = useState(() => []);
+  const [canCreateBusiness, setCanCreateBusinessState] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(() => {
     const storedToken = getToken();
     const storedSubscription = normalizeSubscriptionPayload(getSubscription());
@@ -65,6 +67,8 @@ export function AuthProvider({ children }) {
       businessId: nextBusinessId,
       business: nextBusiness,
     });
+    const nextBusinesses = Array.isArray(snapshot?.businesses) ? snapshot.businesses : [];
+    const nextCanCreateBusiness = Boolean(snapshot?.canCreateBusiness);
 
     setToken(nextToken);
     setUser(nextUser);
@@ -83,6 +87,8 @@ export function AuthProvider({ children }) {
     setRoleState(nextRole);
     setAccessControlState(nextAccessControl);
     setSubscriptionState(nextSubscription);
+    setBusinessesState(nextBusinesses);
+    setCanCreateBusinessState(nextCanCreateBusiness);
 
     return {
       token: nextToken,
@@ -90,6 +96,8 @@ export function AuthProvider({ children }) {
       businessId: nextBusinessId,
       business: nextBusiness,
       businessProfile: nextBusinessProfile,
+      businesses: nextBusinesses,
+      canCreateBusiness: nextCanCreateBusiness,
       role: nextRole,
       accessControl: nextAccessControl,
       subscription: nextSubscription,
@@ -160,6 +168,31 @@ export function AuthProvider({ children }) {
     setBusinessIdState(id);
   }, []);
 
+  const switchWorkspace = useCallback(async (nextBusinessId) => {
+    const id = String(nextBusinessId || '').trim();
+    if (!id || id === businessId) return null;
+    clearApiCache();
+    setBusinessId(id);
+    setBusinessIdState(id);
+    const payload = await api.getCurrentUser();
+    const snapshot = syncSession(payload, { token, businessId: id });
+    window.location.assign('/app');
+    return snapshot;
+  }, [businessId, syncSession, token]);
+
+  const createWorkspace = useCallback(async ({ name, type }) => {
+    const payload = await api.createBusiness({ name, type });
+    const nextId = payload?.business?.id || payload?.businessId || '';
+    if (nextId) {
+      clearApiCache();
+      setBusinessId(nextId);
+      setBusinessIdState(nextId);
+    }
+    const snapshot = syncSession(payload, { token, businessId: nextId || businessId });
+    window.location.assign('/app');
+    return snapshot;
+  }, [businessId, syncSession, token]);
+
   const updateBusiness = useCallback((updater) => {
     setBusinessState((currentBusiness) => {
       const nextBusiness = typeof updater === 'function' ? updater(currentBusiness) : updater;
@@ -200,6 +233,8 @@ export function AuthProvider({ children }) {
     setRoleState('');
     setAccessControlState(null);
     setSubscriptionState(null);
+    setBusinessesState([]);
+    setCanCreateBusinessState(false);
     setSessionLoading(false);
   }, []);
 
@@ -308,6 +343,8 @@ export function AuthProvider({ children }) {
       businessId,
       business,
       businessProfile,
+      businesses,
+      canCreateBusiness,
       role,
       accessControl,
       subscription,
@@ -317,6 +354,8 @@ export function AuthProvider({ children }) {
       syncSession,
       refreshSession,
       updateBusinessId,
+      switchWorkspace,
+      createWorkspace,
       updateBusiness,
       updateBusinessProfile,
       updateSubscription,
@@ -334,6 +373,8 @@ export function AuthProvider({ children }) {
       businessId,
       business,
       businessProfile,
+      businesses,
+      canCreateBusiness,
       role,
       accessControl,
       subscription,
@@ -343,6 +384,8 @@ export function AuthProvider({ children }) {
       syncSession,
       refreshSession,
       updateBusinessId,
+      switchWorkspace,
+      createWorkspace,
       updateBusiness,
       updateBusinessProfile,
       updateSubscription,
