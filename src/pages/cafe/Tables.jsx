@@ -1,0 +1,530 @@
+import { useEffect, useState, useMemo } from 'react';
+import PageHeader from '../../components/layout/PageHeader';
+import Notice from '../../components/ui/Notice';
+import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx';
+import { api } from '../../lib/api';
+import { useI18n } from '../../lib/i18n.jsx';
+import { Coffee, Users, Pencil, Trash2, Plus, ToggleLeft, ToggleRight, Clock, CheckCircle2 } from 'lucide-react';
+import StatsCard from '../../components/ui/StatsCard.jsx';
+
+const emptyForm = {
+  name: '',
+  capacity: '',
+  status: 'vacant',
+  isActive: true,
+  categoryId: '',
+};
+
+function getTableItems(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  if (Array.isArray(payload?.rows)) return payload.rows;
+  return [];
+}
+
+export default function Tables() {
+  const { t } = useI18n();
+  const [tables, setTables] = useState([]);
+  const [floors, setFloors] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [status, setStatus] = useState({ type: 'info', message: '' });
+  const [statusFilter, setStatusFilter] = useState(''); // '', 'vacant', 'occupied'
+  const [floorFilter, setFloorFilter] = useState('all');
+
+  const [editingId, setEditingId] = useState(null);
+  const [deleteTable, setDeleteTable] = useState(null);
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+
+  const loadFloors = async () => {
+    try {
+      const data = await api.listCategories({ type: 'table', limit: 100 });
+      setFloors(data?.items || []);
+    } catch (err) {
+      console.error('Failed to load floors', err);
+    }
+  };
+
+  useEffect(() => {
+    loadFloors();
+  }, []);
+
+  useEffect(() => {
+    if (status.type !== 'success' && status.type !== 'error') return;
+    const timer = setTimeout(() => setStatus({ type: 'info', message: '' }), 4000);
+    return () => clearTimeout(timer);
+  }, [status]);
+
+  const loadTables = async () => {
+    setLoading(true);
+    try {
+      const params = {
+        status: statusFilter || undefined,
+        limit: 100,
+      };
+      if (floorFilter !== 'all' && floorFilter !== 'unassigned') {
+        params.categoryId = floorFilter;
+      }
+      const data = await api.getTables(params);
+      let items = getTableItems(data);
+      if (floorFilter === 'unassigned') {
+        items = items.filter(t => !t.categoryId && !t.category);
+      }
+      setTables(items);
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadTables();
+  }, [statusFilter, floorFilter]);
+
+  const handleChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    const finalValue = type === 'checkbox' ? checked : value;
+    setForm((prev) => ({ ...prev, [name]: finalValue }));
+  };
+
+  const handleEdit = (table) => {
+    setEditingId(table.id);
+    setForm({
+      name: table.name || '',
+      capacity: table.capacity || '',
+      status: table.status || 'vacant',
+      isActive: table.isActive !== false,
+      categoryId: table.categoryId || table.category?.id || '',
+    });
+    setStatus({ type: 'info', message: '' });
+  };
+
+  const handleCancel = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setStatus({ type: 'info', message: '' });
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTable) return;
+    setDeleteSubmitting(true);
+    try {
+      await api.deleteTable(deleteTable.id);
+      setStatus({ type: 'success', message: t('tables.messages.deleted') || 'Table deleted successfully.' });
+      await loadTables();
+    } catch (err) {
+      setStatus({ 
+        type: 'error', 
+        message: err.status === 400 
+          ? (t('tables.messages.deleteError') || 'Cannot delete table. Make sure it has no active sales or unpaid orders.')
+          : err.message 
+      });
+    } finally {
+      setDeleteSubmitting(false);
+      setDeleteTable(null);
+    }
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setLoading(true);
+    setStatus({ type: 'info', message: '' });
+
+    const payload = {
+      name: form.name,
+      capacity: form.capacity ? Number(form.capacity) : undefined,
+      status: form.status,
+      isActive: form.isActive,
+      categoryId: form.categoryId || null,
+    };
+
+    try {
+      if (editingId) {
+        await api.updateTable(editingId, payload);
+        setStatus({ type: 'success', message: t('tables.messages.updated') || 'Table updated successfully.' });
+      } else {
+        await api.createTable(payload);
+        setStatus({ type: 'success', message: t('tables.messages.created') || 'Table created successfully.' });
+      }
+      setForm(emptyForm);
+      setEditingId(null);
+      await loadTables();
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleStatus = async (table) => {
+    const nextStatus = table.status === 'occupied' ? 'vacant' : 'occupied';
+    try {
+      await api.updateTable(table.id, { status: nextStatus });
+      setTables((prev) =>
+        prev.map((t) => (t.id === table.id ? { ...t, status: nextStatus } : t))
+      );
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message });
+    }
+  };
+
+  const handleToggleActive = async (table) => {
+    const nextActive = !table.isActive;
+    try {
+      await api.updateTable(table.id, { isActive: nextActive });
+      setTables((prev) =>
+        prev.map((t) => (t.id === table.id ? { ...t, isActive: nextActive } : t))
+      );
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message });
+    }
+  };
+
+  // Stats calculation
+  const stats = useMemo(() => {
+    const total = tables.length;
+    const vacant = tables.filter((t) => t.status === 'vacant').length;
+    const occupied = tables.filter((t) => t.status === 'occupied').length;
+    return { total, vacant, occupied };
+  }, [tables]);
+
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        title={t('tables.title') || 'Table Management'}
+        subtitle={t('tables.subtitle') || 'Manage seating layout, occupancy status, and table capacities.'}
+      />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4">
+        <StatsCard
+          title="Total Tables"
+          value={stats.total}
+          icon={Coffee}
+          tone="default"
+        />
+        <StatsCard
+          title="Vacant Tables"
+          value={stats.vacant}
+          icon={CheckCircle2}
+          tone="success"
+        />
+        <StatsCard
+          title="Occupied Tables"
+          value={stats.occupied}
+          icon={Clock}
+          tone="warning"
+        />
+      </div>
+
+      {/* Main Content Area */}
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* Form Column */}
+        <div className="lg:col-span-1">
+          <form onSubmit={handleSubmit} className="card sticky top-24 space-y-4 p-6 bg-white shadow-sm border border-secondary-100">
+            <h3 className="text-lg font-bold text-ink">
+              {editingId ? t('tables.editTable') || 'Edit Table' : t('tables.addTable') || 'Add Table'}
+            </h3>
+
+            {status.message && (
+              <Notice 
+                title={status.message} 
+                tone={status.type === 'error' ? 'error' : status.type === 'success' ? 'success' : 'info'} 
+              />
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="label">{t('tables.tableName') || 'Table Name'}</label>
+                <input
+                  required
+                  name="name"
+                  className="input mt-1"
+                  value={form.name}
+                  onChange={handleChange}
+                  placeholder="e.g. Table 4, Balcony 2"
+                />
+              </div>
+
+              <div>
+                <label className="label">{t('tables.capacity') || 'Capacity'}</label>
+                <input
+                  type="number"
+                  name="capacity"
+                  min="1"
+                  className="input mt-1"
+                  value={form.capacity}
+                  onChange={handleChange}
+                  placeholder="e.g. 4"
+                />
+              </div>
+
+              <div>
+                <label className="label">{t('tables.status') || 'Status'}</label>
+                <select
+                  name="status"
+                  className="input mt-1"
+                  value={form.status}
+                  onChange={handleChange}
+                >
+                  <option value="vacant">{t('tables.vacant') || 'Vacant'}</option>
+                  <option value="occupied">{t('tables.occupied') || 'Occupied'}</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Floor / Dining Area</label>
+                <select
+                  name="categoryId"
+                  className="input mt-1"
+                  value={form.categoryId || ''}
+                  onChange={handleChange}
+                >
+                  <option value="">-- Unassigned / General --</option>
+                  {floors.map((floor) => (
+                    <option key={floor.id} value={floor.id}>
+                      {floor.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-sm font-semibold text-ink-light dark:text-secondary-300">
+                  {t('tables.active') || 'Active / Show in lists'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, isActive: !prev.isActive }))}
+                  className="text-primary hover:opacity-85 transition"
+                >
+                  {form.isActive ? <ToggleRight size={38} className="text-primary" /> : <ToggleLeft size={38} className="text-secondary-300" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                disabled={loading}
+                type="submit"
+                className="btn-primary flex-1 justify-center rounded-xl py-2.5 text-sm"
+              >
+                {loading ? t('common.saving') || 'Saving...' : t('tables.saveTable') || 'Save Table'}
+              </button>
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="btn-secondary rounded-xl py-2.5 text-sm"
+                >
+                  {t('common.cancel')}
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+
+        {/* List Grid Column */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Filters */}
+          <div className="flex flex-col gap-3 bg-white/40 backdrop-blur p-4 rounded-2xl border border-secondary-100 shadow-sm">
+            {/* Floor Filters */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap shrink-0">Floor:</span>
+              <button
+                type="button"
+                onClick={() => setFloorFilter('all')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                  floorFilter === 'all'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
+                }`}
+              >
+                All Floors
+              </button>
+              {floors.map((floor) => (
+                <button
+                  key={floor.id}
+                  type="button"
+                  onClick={() => setFloorFilter(floor.id)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                    floorFilter === floor.id
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
+                  }`}
+                >
+                  {floor.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setFloorFilter('unassigned')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                  floorFilter === 'unassigned'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
+                }`}
+              >
+                Unassigned
+              </button>
+            </div>
+
+            {/* Status Filters */}
+            <div className="flex flex-wrap items-center gap-1.5 border-t border-secondary-100/60 pt-2.5">
+              <span className="text-[10px] uppercase font-bold text-secondary-400 mr-1 whitespace-nowrap shrink-0">Status:</span>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                  statusFilter === '' 
+                    ? 'bg-primary text-white shadow-sm' 
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
+                }`}
+              >
+                {t('tables.all') || 'All'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('vacant')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                  statusFilter === 'vacant' 
+                    ? 'bg-emerald-600 text-white shadow-sm' 
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
+                }`}
+              >
+                {t('tables.vacant') || 'Vacant'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter('occupied')}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition ${
+                  statusFilter === 'occupied' 
+                    ? 'bg-amber-600 text-white shadow-sm' 
+                    : 'bg-white text-secondary-700 hover:bg-mist border border-secondary-200'
+                }`}
+              >
+                {t('tables.occupied') || 'Occupied'}
+              </button>
+            </div>
+          </div>
+
+          {/* Seating layout grid */}
+          {tables.length === 0 ? (
+            <div className="card bg-white p-8 text-center text-secondary-400">
+              <Coffee size={40} className="mx-auto mb-3 opacity-30 text-secondary-500" />
+              <p className="text-sm font-semibold">{t('common.noData')}</p>
+              <p className="text-xs mt-1 text-secondary-400/80">No tables match your active search / status filters.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+              {tables.map((table) => {
+                const isOccupied = table.status === 'occupied';
+                return (
+                  <div 
+                    key={table.id} 
+                    className={`card bg-white p-5 shadow-sm border transition relative flex flex-col justify-between h-40 ${
+                      !table.isActive 
+                        ? 'opacity-60 border-secondary-100 bg-mist/50' 
+                        : isOccupied 
+                          ? 'border-amber-100 hover:shadow-md' 
+                          : 'border-emerald-100 hover:shadow-md'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="font-serif text-lg font-bold text-ink dark:text-white truncate max-w-[130px]">
+                            {table.name}
+                          </h4>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            {table.capacity ? (
+                              <div className="flex items-center gap-1 text-xs text-secondary-400 font-semibold">
+                                <Users size={12} />
+                                <span>{table.capacity} seats</span>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-secondary-400">No capacity</p>
+                            )}
+                            <span className="text-[10px] bg-secondary-100 text-secondary-700 px-2 py-0.5 rounded-full font-bold border border-secondary-200/40 dark:bg-slate-800 dark:text-secondary-400 dark:border-slate-800">
+                              {table.category?.name || floors.find(f => f.id === table.categoryId)?.name || 'No Floor'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Status Badge clickable to toggle occupancy */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(table)}
+                          title="Toggle occupancy status"
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold border transition ${
+                            isOccupied
+                              ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-400/20'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-400/20'
+                          }`}
+                        >
+                          {isOccupied ? t('tables.occupied') || 'Occupied' : t('tables.vacant') || 'Vacant'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-4 border-t border-slate-50 pt-3">
+                      {/* Active switch */}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleActive(table)}
+                        title="Toggle active status"
+                        className="text-secondary-400 hover:text-secondary-700 transition flex items-center gap-1.5"
+                      >
+                        {table.isActive !== false ? (
+                          <>
+                            <span className="h-2 w-2 rounded-full bg-primary" />
+                            <span className="text-[10px] font-bold text-secondary-500">Active</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="h-2 w-2 rounded-full bg-slate-300" />
+                            <span className="text-[10px] font-bold text-secondary-400">Inactive</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* CRUD Actions */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(table)}
+                          className="p-1 rounded bg-mist text-secondary-500 hover:bg-secondary-100 hover:text-ink transition"
+                          title={t('common.edit')}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTable(table)}
+                          className="p-1 rounded bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-700 transition"
+                          title={t('common.delete')}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        isOpen={Boolean(deleteTable)}
+        onClose={() => setDeleteTable(null)}
+        onConfirm={handleDelete}
+        title={t('tables.addTable') ? 'Delete Table' : 'डेस्क/टेबल हटाउनुहोस्'}
+        description={t('tables.deleteConfirm') || 'Are you sure you want to delete this table?'}
+        confirming={deleteSubmitting}
+      />
+    </div>
+  );
+}

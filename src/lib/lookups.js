@@ -70,6 +70,15 @@ export function normalizeLookupProduct(raw = {}) {
     conversionRate: Number(pickFirstDefined(raw.conversionRate, product.conversionRate, 0)),
     itemType: String(pickFirstDefined(raw.itemType, product.itemType, 'goods')).trim(),
     stockOnHand: Number(pickFirstDefined(raw.stockOnHand, product.stockOnHand, 0)),
+    expiredQuantity: Number(pickFirstDefined(raw.expiredQuantity, product.expiredQuantity, 0)),
+    sellableQuantity: Number(pickFirstDefined(
+      raw.sellableQuantity,
+      product.sellableQuantity,
+      pickFirstDefined(raw.stockOnHand, product.stockOnHand, 0),
+    )),
+    hasExpiredStock: Boolean(pickFirstDefined(raw.hasExpiredStock, product.hasExpiredStock, false)),
+    expiryDate: pickFirstDefined(raw.expiryDate, product.expiryDate) || null,
+    batchCount: Number(pickFirstDefined(raw.batchCount, product.batchCount, 0)),
   };
 }
 

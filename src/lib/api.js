@@ -4,14 +4,14 @@ import {
   getToken,
   setSessionNotice,
 } from "./storage";
-import { normalizePopularAnalyticsResponse } from "./analyticsPopular";
-import { normalizeLedgerReportResponse } from "./ledger";
+import { normalizePopularAnalyticsResponse } from "./inventory/analyticsPopular";
+import { normalizeLedgerReportResponse } from "./money/ledger";
 import { toQueryKey, toQueryString } from "./queryKey";
 import {
   normalizeStaffCollection,
   normalizeStaffMeta,
   normalizeStaffMember,
-} from "./staff";
+} from "./business/staff";
 import {
   normalizeTaskDetail,
   normalizeTaskListItem,
@@ -911,6 +911,39 @@ export const api = {
       );
     });
   },
+  exchangeProductBatch: (productId, batchId, data) =>
+    request(
+      `/api/products/${productId}/batches/${batchId}/exchange`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("product", productId),
+        "products",
+        "reports",
+        "dashboard",
+      ]),
+    ),
+  destroyProductBatch: (productId, batchId, data = {}) =>
+    request(
+      `/api/products/${productId}/batches/${batchId}/destroy`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("product", productId),
+        "products",
+        "reports",
+        "dashboard",
+      ]),
+    ),
+  updateProductBatch: (productId, batchId, data) =>
+    request(
+      `/api/products/${productId}/batches/${batchId}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("product", productId),
+        "products",
+        "reports",
+        "dashboard",
+      ]),
+    ),
   listCategories: (params = {}) =>
     collectionRequest(
       "/api/categories",

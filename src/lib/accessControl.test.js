@@ -4,6 +4,7 @@ import {
   enforcePermissionDependencies,
   getFeatureAccessLevel,
   getStaffPermissionUiFeatures,
+  getSubscriptionFeatureKey,
   isOwnStaffMembership,
   normalizeAccessControl,
   withOwnProfileNavItem,
@@ -11,7 +12,7 @@ import {
 import {
   getCategoryPermissions,
   normalizeStaffCollection,
-} from './staff';
+} from './business/staff';
 
 describe('access control helpers', () => {
   it('keeps owners fully accessible even when access control has empty permissions', () => {
@@ -284,5 +285,10 @@ describe('access control helpers', () => {
         { role: 'owner', membershipId: 'mem-1' },
       ).map((item) => item.key),
     ).toEqual(['sales', 'settings']);
+  });
+
+  it('correctly maps banks feature key to banks subscription feature key', () => {
+    const key = getSubscriptionFeatureKey('banks');
+    expect(key).toBe('banks');
   });
 });

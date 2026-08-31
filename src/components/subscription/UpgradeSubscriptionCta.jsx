@@ -5,7 +5,7 @@ import { Dialog } from '../ui/Dialog.tsx';
 import { useAuth } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n.jsx';
 import { getSubscriptionStatusState } from '../../lib/subscription.js';
-import { buildSettingsTabPath, SUBSCRIPTION_SETTINGS_TAB } from '../../lib/settingsTabs';
+import { buildSettingsTabPath, SUBSCRIPTION_SETTINGS_TAB } from '../../lib/business/settingsTabs';
 import { formatSubscriptionDaysRemainingLabel, formatSubscriptionStatusDate } from './SubscriptionStatusBanner.jsx';
 
 const PAID_PLAN_KEYS = new Set(['growth', 'custom', 'pro', 'premium']);

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import Notice from '../Notice.jsx';
+import Notice from '../ui/Notice.jsx';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
-import { useBusinessSettings } from '../../lib/businessSettings';
+import { useBusinessSettings } from '../../lib/business/businessSettings';
 import { useI18n } from '../../lib/i18n.jsx';
 
 function getBusinessName(business, user) {

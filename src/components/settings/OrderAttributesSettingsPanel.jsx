@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
-import ActionMenu from '../ActionMenu.jsx';
-import Notice from '../Notice';
+import ActionMenu from '../ui/ActionMenu.jsx';
+import Notice from '../ui/Notice';
 import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n.jsx';

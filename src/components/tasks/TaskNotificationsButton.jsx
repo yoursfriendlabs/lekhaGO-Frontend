@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bell, BellRing, RefreshCw } from 'lucide-react';
 import { useTaskNotifications } from '../../hooks/useTaskNotifications';
-import { formatMaybeDateTime } from '../../lib/datetime';
+import { formatMaybeDateTime } from '../../lib/dates/datetime';
 
 function CounterPill({ label, value }) {
   return (

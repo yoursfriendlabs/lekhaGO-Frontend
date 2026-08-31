@@ -5,12 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm run dev       # Start dev server on port 5173
-npm run build     # Production build
-npm run preview   # Preview production build
+yarn dev       # Start dev server on port 5173
+yarn build     # Production build
+yarn test      # Vitest
+yarn preview   # Preview production build
 ```
-
-No test runner is configured. No lint scripts are defined.
 
 ## Environment
 
@@ -21,22 +20,39 @@ VITE_API_BASE_URL=http://localhost:4000
 
 ## Architecture
 
-**ManageMyShop** is a React 18 + Vite + Tailwind CSS business management dashboard for inventory, sales, purchases, services, and parties. It targets small/medium shops with multi-business support and English/Nepali (i18n).
+**PasalManager / ManageMyShop** is a React 19 + Vite 6 + Tailwind CSS dashboard. Alias `@/` maps to `src/`.
 
-### Routing (`src/App.jsx`)
+### Folder layout
+
+| Path | Role |
+|------|------|
+| `src/app/` | Providers, route guards, lazy page map, AppShell |
+| `src/pages/<domain>/` | Route screens (`auth`, `inventory`, `sales`, `services`, …) |
+| `src/components/layout/` | Sidebar, Topbar, MobileNav, error boundary |
+| `src/components/ui/` | Shared primitives (Notice, Pagination, Dialog) |
+| `src/components/form/` | Inputs (dates, selects, uploads, payments) |
+| `src/components/<domain>/` | Feature UI (`parties`, `inventory`, `staff`, `settings`, …) |
+| `src/lib/` | API client, auth, i18n, plus grouped helpers (`dates`, `money`, `business`) |
+| `src/hooks/` | SSE, debounce, mobile |
+| `src/stores/` | Zustand business-scoped lists |
+
+Put new code next to its domain. Do not add files to the `src/` root.
+
+### Routing (`src/app/`)
 
 Three tiers:
 - **Public:** `/`, `/login`, `/register`
-- **Protected shell** (`/app/*`): wraps authenticated routes in a layout with Sidebar, Topbar, MobileNav
-- `ProtectedRoute` redirects to `/login` if no token
+- **Protected shell** (`/app/*`): `AppShell` with Sidebar, Topbar, MobileNav
+- `ProtectedRoute` / `SubscriptionFeatureRoute` live in `src/app/guards.jsx`
 
-### Context Providers (all in `src/lib/`)
+### Context Providers
 
-| File | Context | Purpose |
-|------|---------|---------|
-| `auth.jsx` | `AuthContext` | JWT token, user, businessId; persisted in localStorage (`mms_token`, `mms_user`, `mms_business_id`) |
-| `i18n.jsx` | `I18nContext` | `useI18n()` → `{ t, language, setLanguage }`. Keys are dot-notation e.g. `t('common.add')` |
-| `theme.jsx` | `ThemeContext` | Theme stub; currently hard-coded to light |
+| File | Purpose |
+|------|---------|
+| `lib/auth.jsx` | JWT, user, businessId (`mms_token`, `mms_user`, `mms_business_id`) |
+| `lib/i18n.jsx` | `useI18n()` → `{ t, language, setLanguage }` |
+| `lib/theme.jsx` | Theme; light is the production default |
+| `lib/business/businessSettings.jsx` | Per-business settings |
 
 ### API Layer (`src/lib/api.js`)
 
@@ -56,11 +72,12 @@ Named exports correspond to REST resources: `getProducts`, `createSale`, `getPar
 
 ### Key Conventions
 
-- Pages live in `src/pages/`, reusable UI in `src/components/`
-- State is local `useState` or React Context — no Redux/Zustand
+- Pages live in `src/pages/<domain>/`, shared UI in `src/components/{layout,ui,form,<domain>}/`
+- Prefer `@/` imports for new files (e.g. `@/lib/api`)
+- List data uses Zustand scoped stores; local `useState` for form UI
 - All user-visible strings should use `t('key')` from `useI18n()`
 - Business context must be set in Topbar before making most API calls; missing `businessId` causes API errors
-- `DynamicAttributes.jsx` handles custom order fields; `FileUpload.jsx` handles attachment uploads to `POST /api/uploads/attachment`
+- `components/orders/DynamicAttributes.jsx` handles custom order fields; `components/form/FileUpload.jsx` handles `POST /api/uploads/attachment`
 
 ### Deployment
 

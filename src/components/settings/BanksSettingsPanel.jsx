@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Power, Trash2 } from 'lucide-react';
-import ActionMenu from '../ActionMenu.jsx';
-import NoteTextarea from '../NoteTextarea.jsx';
-import Notice from '../Notice';
-import Pagination from '../Pagination';
+import ActionMenu from '../ui/ActionMenu.jsx';
+import NoteTextarea from '../form/NoteTextarea.jsx';
+import Notice from '../ui/Notice';
+import Pagination from '../ui/Pagination';
 import { Dialog } from '../ui/Dialog.tsx';
 import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import { useI18n } from '../../lib/i18n.jsx';

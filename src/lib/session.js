@@ -1,4 +1,4 @@
-import { normalizeBusinessProfile } from './businessProfile';
+import { normalizeBusinessProfile } from './business/businessProfile';
 import { normalizeAccessControl } from './accessControl';
 import { normalizeSubscriptionPayload } from './subscription';
 

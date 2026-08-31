@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { ArrowRight, CalendarDays, Clock3, Sparkles, TriangleAlert } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { formatMaybeDate } from '../../lib/datetime';
+import { formatMaybeDate } from '../../lib/dates/datetime';
 import { useI18n } from '../../lib/i18n.jsx';
 import { getSubscriptionStatusState, normalizeSubscriptionPayload } from '../../lib/subscription';
-import { buildSettingsTabPath, SUBSCRIPTION_SETTINGS_TAB } from '../../lib/settingsTabs';
+import { buildSettingsTabPath, SUBSCRIPTION_SETTINGS_TAB } from '../../lib/business/settingsTabs';
 import { useAuth } from '../../lib/auth';
 import { api } from '../../lib/api';
 

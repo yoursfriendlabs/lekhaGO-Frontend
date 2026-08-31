@@ -216,6 +216,38 @@ thead th,
   animation: login-fade-up 0.6s 0.5s ease both;
 }
 
+.party-statement-table {
+  table-layout: fixed;
+  width: 100%;
+  border-collapse: collapse;
+}
+.party-statement-col-date {
+  width: 13%;
+}
+.party-statement-col-details {
+  width: 26%;
+}
+.party-statement-col-note {
+  width: 25%;
+}
+.party-statement-col-money {
+  width: 12%;
+  white-space: nowrap;
+}
+.party-statement-sheet .party-statement-table th,
+.party-statement-sheet .party-statement-table td {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.party-statement-sheet .party-statement-col-date,
+.party-statement-sheet .party-statement-col-money,
+.party-statement-table .party-statement-col-money {
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+
 .print-template {
   display: none;
 }
@@ -280,6 +312,26 @@ thead th,
     page-break-inside: avoid;
   }
 
+  .print-clone:has(.party-statement-sheet) {
+    padding: 0 !important;
+  }
+
+  .party-statement-sheet {
+    border-radius: 0 !important;
+  }
+
+  .party-statement-sheet tr {
+    page-break-inside: avoid;
+  }
+
+  .party-statement-sheet .group > span.absolute {
+    display: none !important;
+  }
+
+  .party-statement-sheet .border-dashed {
+    border-bottom-color: transparent !important;
+  }
+
   body {
     background: white !important;
     color: black !important;
@@ -306,7 +358,7 @@ thead th,
     color: black !important;
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
   }
-  
+
   .thermal-print-clone * {
     visibility: visible !important;
     color: black !important;
@@ -337,4 +389,8 @@ thead th,
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+/* Compact button variant — overrides .btn padding for dense layouts (e.g. unit type selector) */
+.btn-sm {
+  @apply px-3 py-1.5 text-xs;
 }

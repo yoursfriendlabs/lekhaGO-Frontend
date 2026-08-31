@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pencil, Plus, Trash2, Layers } from 'lucide-react';
-import ActionMenu from '../ActionMenu.jsx';
-import Notice from '../Notice';
-import Pagination from '../Pagination';
+import ActionMenu from '../ui/ActionMenu.jsx';
+import Notice from '../ui/Notice';
+import Pagination from '../ui/Pagination';
 import { Dialog } from '../ui/Dialog.tsx';
 import ConfirmDialog from '../ui/ConfirmDialog.jsx';
 import { api } from '../../lib/api';

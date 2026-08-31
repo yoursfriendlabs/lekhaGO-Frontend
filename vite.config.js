@@ -2,6 +2,10 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { cloudflare } from "@cloudflare/vite-plugin";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const srcDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "src");
 
 export default defineConfig(({ mode }) => ({
   plugins: [
@@ -9,7 +13,7 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       injectRegister: "auto",
       registerType: "autoUpdate",
-      includeAssets: ["Logo.png", "Logo.png"],
+      includeAssets: ["favicon-32.png", "apple-touch-icon.png", "Logo.png", "icon-192.png", "icon-512.png"],
       manifest: {
         id: "/",
         name: "PasalManager",
@@ -26,16 +30,22 @@ export default defineConfig(({ mode }) => ({
         categories: ["business", "productivity"],
         icons: [
           {
-            src: "/Logo.png",
+            src: "/icon-192.png",
             sizes: "192x192",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "any",
           },
           {
             src: "/icon-512.png",
             sizes: "512x512",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "any",
+          },
+          {
+            src: "/icon-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
       },
@@ -108,5 +118,10 @@ export default defineConfig(({ mode }) => ({
     environment: "jsdom",
     globals: true,
     setupFiles: "./src/test/setup.js",
+  },
+  resolve: {
+    alias: {
+      "@": srcDir,
+    },
   },
 }));
