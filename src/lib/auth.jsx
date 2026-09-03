@@ -42,7 +42,10 @@ export function AuthProvider({ children }) {
   const [accessControl, setAccessControlState] = useState(() => normalizeAccessControl(getAccessControl()));
   const [subscription, setSubscriptionState] = useState(() => normalizeSubscriptionPayload(getSubscription()));
   const [workspaces, setWorkspacesState] = useState([]);
+  const [canCreateWorkspace, setCanCreateWorkspaceState] = useState(false);
   const [canCreateBusiness, setCanCreateBusinessState] = useState(false);
+  const [canCreatePersonal, setCanCreatePersonalState] = useState(false);
+  const [creatableWorkspaceTypes, setCreatableWorkspaceTypesState] = useState([]);
   const [extraBusinessTypes, setExtraBusinessTypesState] = useState(['retail', 'cafe']);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(() => {
@@ -92,7 +95,10 @@ export function AuthProvider({ children }) {
     const nextWorkspaces = pickWorkspaceFields(snapshot);
     if (nextWorkspaces) {
       setWorkspacesState(nextWorkspaces.items);
+      setCanCreateWorkspaceState(nextWorkspaces.canCreateWorkspace);
       setCanCreateBusinessState(nextWorkspaces.canCreateBusiness);
+      setCanCreatePersonalState(nextWorkspaces.canCreatePersonal);
+      setCreatableWorkspaceTypesState(nextWorkspaces.creatableWorkspaceTypes);
       setExtraBusinessTypesState(nextWorkspaces.extraBusinessTypes);
     }
 
@@ -106,7 +112,10 @@ export function AuthProvider({ children }) {
       accessControl: nextAccessControl,
       subscription: nextSubscription,
       workspaces: nextWorkspaces?.items,
+      canCreateWorkspace: nextWorkspaces?.canCreateWorkspace,
       canCreateBusiness: nextWorkspaces?.canCreateBusiness,
+      canCreatePersonal: nextWorkspaces?.canCreatePersonal,
+      creatableWorkspaceTypes: nextWorkspaces?.creatableWorkspaceTypes,
       extraBusinessTypes: nextWorkspaces?.extraBusinessTypes,
     };
   }, []);
@@ -185,7 +194,10 @@ export function AuthProvider({ children }) {
     });
     if (!next) return [];
     setWorkspacesState(next.items);
+    setCanCreateWorkspaceState(next.canCreateWorkspace);
     setCanCreateBusinessState(next.canCreateBusiness);
+    setCanCreatePersonalState(next.canCreatePersonal);
+    setCreatableWorkspaceTypesState(next.creatableWorkspaceTypes);
     setExtraBusinessTypesState(next.extraBusinessTypes);
     return next.items;
   }, [token]);
@@ -276,7 +288,10 @@ export function AuthProvider({ children }) {
     setAccessControlState(null);
     setSubscriptionState(null);
     setWorkspacesState([]);
+    setCanCreateWorkspaceState(false);
     setCanCreateBusinessState(false);
+    setCanCreatePersonalState(false);
+    setCreatableWorkspaceTypesState([]);
     setExtraBusinessTypesState(['retail', 'cafe']);
     setWorkspaceBusy(false);
     setSessionLoading(false);
@@ -392,7 +407,10 @@ export function AuthProvider({ children }) {
       subscription,
       subscriptionAccess,
       workspaces,
+      canCreateWorkspace,
       canCreateBusiness,
+      canCreatePersonal,
+      creatableWorkspaceTypes,
       extraBusinessTypes,
       workspaceBusy,
       sessionLoading,
@@ -425,7 +443,10 @@ export function AuthProvider({ children }) {
       subscription,
       subscriptionAccess,
       workspaces,
+      canCreateWorkspace,
       canCreateBusiness,
+      canCreatePersonal,
+      creatableWorkspaceTypes,
       extraBusinessTypes,
       workspaceBusy,
       sessionLoading,

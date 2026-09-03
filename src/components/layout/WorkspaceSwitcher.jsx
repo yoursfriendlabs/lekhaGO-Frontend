@@ -4,7 +4,11 @@ import { Building2, Check, ChevronDown, Home, Plus, Users } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useBusinessSettings } from '../../lib/business/businessSettings.jsx';
-import { findWorkspace } from '../../lib/business/workspaces';
+import {
+  findWorkspace,
+  getDefaultCreatableWorkspaceType,
+  isPersonalWorkspaceType,
+} from '../../lib/business/workspaces';
 import { Dialog } from '../ui/Dialog';
 
 function workspaceIcon(item) {
@@ -25,6 +29,12 @@ function roleLabel(item, t) {
   return item?.isOwner ? t('workspaces.owner') : t('workspaces.staff');
 }
 
+function workspaceTypeLabel(type, t) {
+  if (isPersonalWorkspaceType(type)) return t('workspaces.personal');
+  if (type === 'cafe') return t('workspaces.typeCafe');
+  return t('workspaces.typeRetail');
+}
+
 export default function WorkspaceSwitcher() {
   const navigate = useNavigate();
   const { t } = useI18n();
@@ -34,8 +44,10 @@ export default function WorkspaceSwitcher() {
     businessId,
     business,
     workspaces,
+    canCreateWorkspace,
     canCreateBusiness,
-    extraBusinessTypes,
+    canCreatePersonal,
+    creatableWorkspaceTypes,
     workspaceBusy,
     refreshWorkspaces,
     switchWorkspace,
@@ -44,7 +56,10 @@ export default function WorkspaceSwitcher() {
 
   const [open, setOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: '', type: extraBusinessTypes[0] || 'retail' });
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    type: getDefaultCreatableWorkspaceType(creatableWorkspaceTypes),
+  });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const rootRef = useRef(null);
@@ -53,6 +68,12 @@ export default function WorkspaceSwitcher() {
   const businessLabel = String(business?.name || current?.name || businessProfile?.label || '').trim();
   const userLabel = String(user?.name || '').trim();
   const title = businessLabel || userLabel || t('topbar.welcome');
+  const createType = createForm.type || getDefaultCreatableWorkspaceType(creatableWorkspaceTypes);
+  const creatingPersonal = isPersonalWorkspaceType(createType);
+  const showTypeSelect = creatableWorkspaceTypes.length > 1;
+  const createActionLabel = canCreatePersonal && !canCreateBusiness
+    ? t('workspaces.addPersonal')
+    : t('workspaces.addBusiness');
 
   useEffect(() => {
     if (!open) return undefined;
@@ -68,6 +89,23 @@ export default function WorkspaceSwitcher() {
     document.addEventListener('mousedown', handleOutside);
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [open, refreshWorkspaces]);
+
+  useEffect(() => {
+    if (createOpen) return;
+    setCreateForm({
+      name: '',
+      type: getDefaultCreatableWorkspaceType(creatableWorkspaceTypes),
+    });
+  }, [creatableWorkspaceTypes, createOpen]);
+
+  const openCreateDialog = () => {
+    setError('');
+    setCreateForm({
+      name: '',
+      type: getDefaultCreatableWorkspaceType(creatableWorkspaceTypes),
+    });
+    setCreateOpen(true);
+  };
 
   const handleSwitch = async (item) => {
     if (!item?.id || item.id === businessId || workspaceBusy) return;
@@ -89,9 +127,8 @@ export default function WorkspaceSwitcher() {
     setCreating(true);
     setError('');
     try {
-      await createWorkspace({ name, type: createForm.type });
+      await createWorkspace({ name, type: createType });
       setCreateOpen(false);
-      setCreateForm({ name: '', type: extraBusinessTypes[0] || 'retail' });
       setOpen(false);
       navigate('/app', { replace: true });
     } catch (err) {
@@ -161,18 +198,15 @@ export default function WorkspaceSwitcher() {
               <li className="px-3 py-4 text-sm text-secondary-500">{t('workspaces.empty')}</li>
             )}
           </ul>
-          {canCreateBusiness ? (
+          {canCreateWorkspace ? (
             <div className="border-t border-secondary-100 p-2">
               <button
                 type="button"
                 className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10"
-                onClick={() => {
-                  setCreateForm({ name: '', type: extraBusinessTypes[0] || 'retail' });
-                  setCreateOpen(true);
-                }}
+                onClick={openCreateDialog}
               >
                 <Plus className="h-4 w-4" aria-hidden />
-                {t('workspaces.addBusiness')}
+                {createActionLabel}
               </button>
             </div>
           ) : null}
@@ -182,7 +216,7 @@ export default function WorkspaceSwitcher() {
       <Dialog
         isOpen={createOpen}
         onClose={() => !creating && setCreateOpen(false)}
-        title={t('workspaces.addBusiness')}
+        title={createActionLabel}
         size="sm"
         footer={(
           <>
@@ -196,10 +230,12 @@ export default function WorkspaceSwitcher() {
         )}
       >
         <form id="create-workspace-form" className="space-y-4" onSubmit={handleCreate}>
-          <p className="text-sm text-secondary-600">{t('workspaces.addBusinessHint')}</p>
+          <p className="text-sm text-secondary-600">
+            {creatingPersonal ? t('workspaces.addPersonalHint') : t('workspaces.addBusinessHint')}
+          </p>
           {error ? <p className="text-sm text-rose-600">{error}</p> : null}
           <label className="block">
-            <span className="label">{t('workspaces.name')}</span>
+            <span className="label">{creatingPersonal ? t('workspaces.personalName') : t('workspaces.name')}</span>
             <input
               className="input mt-1"
               value={createForm.name}
@@ -208,20 +244,22 @@ export default function WorkspaceSwitcher() {
               autoFocus
             />
           </label>
-          <label className="block">
-            <span className="label">{t('workspaces.type')}</span>
-            <select
-              className="input mt-1"
-              value={createForm.type}
-              onChange={(event) => setCreateForm((current) => ({ ...current, type: event.target.value }))}
-            >
-              {(extraBusinessTypes.length ? extraBusinessTypes : ['retail', 'cafe']).map((type) => (
-                <option key={type} value={type}>
-                  {type === 'cafe' ? t('workspaces.typeCafe') : t('workspaces.typeRetail')}
-                </option>
-              ))}
-            </select>
-          </label>
+          {showTypeSelect ? (
+            <label className="block">
+              <span className="label">{t('workspaces.type')}</span>
+              <select
+                className="input mt-1"
+                value={createType}
+                onChange={(event) => setCreateForm((current) => ({ ...current, type: event.target.value }))}
+              >
+                {creatableWorkspaceTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {workspaceTypeLabel(type, t)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
         </form>
       </Dialog>
     </div>
