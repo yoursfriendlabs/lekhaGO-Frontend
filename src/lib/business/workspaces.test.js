@@ -4,6 +4,7 @@ import {
   normalizeWorkspace,
   normalizeWorkspacePayload,
   pickWorkspaceFields,
+  resolveWorkspaceCreationOptions,
   sortWorkspaces,
 } from './workspaces';
 
@@ -44,20 +45,46 @@ describe('workspace helpers', () => {
     expect(items.map((item) => item.id)).toEqual(['home', 'shop', 'staff']);
   });
 
-  it('reads items or businesses from auth payloads', () => {
+  it('allows one owned personal and one owned business workspace', () => {
+    expect(resolveWorkspaceCreationOptions([
+      { isOwner: true, isPersonal: true },
+      { isOwner: true, isPersonal: false },
+    ])).toMatchObject({
+      canCreateWorkspace: false,
+      canCreateBusiness: false,
+      canCreatePersonal: false,
+    });
+
+    expect(resolveWorkspaceCreationOptions([
+      { isOwner: true, isPersonal: true },
+    ])).toMatchObject({
+      canCreateWorkspace: true,
+      canCreateBusiness: true,
+      canCreatePersonal: false,
+      creatableWorkspaceTypes: ['retail', 'cafe'],
+    });
+
+    expect(resolveWorkspaceCreationOptions([
+      { isOwner: true, isPersonal: false },
+    ])).toMatchObject({
+      canCreateWorkspace: true,
+      canCreateBusiness: false,
+      canCreatePersonal: true,
+      creatableWorkspaceTypes: ['personal'],
+    });
+  });
+
+  it('ignores staff memberships when deciding what can be created', () => {
     const payload = normalizeWorkspacePayload({
       businesses: [
         { id: 'biz-1', name: 'Home', type: 'personal', role: 'owner' },
         { id: 'biz-2', name: 'Shop', type: 'retail', role: 'staff' },
       ],
-      canCreateBusiness: true,
-      extraBusinessTypes: ['retail', 'cafe'],
     });
 
-    expect(payload.items).toHaveLength(2);
-    expect(payload.items[0].isPersonal).toBe(true);
-    expect(payload.items[1].isOwner).toBe(false);
     expect(payload.canCreateBusiness).toBe(true);
+    expect(payload.canCreatePersonal).toBe(false);
+    expect(payload.creatableWorkspaceTypes).toEqual(['retail', 'cafe']);
   });
 
   it('ignores payloads that do not include workspace fields', () => {

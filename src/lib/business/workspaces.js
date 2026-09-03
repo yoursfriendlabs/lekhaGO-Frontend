@@ -1,4 +1,5 @@
 export const EXTRA_BUSINESS_TYPES = Object.freeze(['retail', 'cafe']);
+export const PERSONAL_WORKSPACE_TYPE = 'personal';
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
@@ -25,7 +26,7 @@ export function normalizeWorkspace(item) {
 
   const type = pickString(source.type).toLowerCase();
   const role = pickString(source.role) || 'staff';
-  const isPersonal = source.isPersonal === true || type === 'personal' || type === 'household';
+  const isPersonal = source.isPersonal === true || type === PERSONAL_WORKSPACE_TYPE || type === 'household';
 
   return {
     id,
@@ -61,16 +62,67 @@ export function normalizeWorkspaceList(value) {
   return sortWorkspaces(raw.map(normalizeWorkspace).filter(Boolean));
 }
 
+export function resolveWorkspaceCreationOptions(items = []) {
+  const owned = items.filter((item) => item.isOwner);
+  const hasPersonal = owned.some((item) => item.isPersonal);
+  const hasBusiness = owned.some((item) => !item.isPersonal);
+
+  if (hasPersonal && hasBusiness) {
+    return {
+      canCreateWorkspace: false,
+      canCreateBusiness: false,
+      canCreatePersonal: false,
+      creatableWorkspaceTypes: [],
+      extraBusinessTypes: [],
+    };
+  }
+
+  if (hasBusiness && !hasPersonal) {
+    return {
+      canCreateWorkspace: true,
+      canCreateBusiness: false,
+      canCreatePersonal: true,
+      creatableWorkspaceTypes: [PERSONAL_WORKSPACE_TYPE],
+      extraBusinessTypes: [],
+    };
+  }
+
+  if (hasPersonal && !hasBusiness) {
+    return {
+      canCreateWorkspace: true,
+      canCreateBusiness: true,
+      canCreatePersonal: false,
+      creatableWorkspaceTypes: [...EXTRA_BUSINESS_TYPES],
+      extraBusinessTypes: [...EXTRA_BUSINESS_TYPES],
+    };
+  }
+
+  return {
+    canCreateWorkspace: false,
+    canCreateBusiness: false,
+    canCreatePersonal: false,
+    creatableWorkspaceTypes: [],
+    extraBusinessTypes: [],
+  };
+}
+
 export function normalizeWorkspacePayload(payload = {}) {
   const source = asObject(payload) || {};
   const items = normalizeWorkspaceList(source.items || source.businesses || source);
+  const computed = resolveWorkspaceCreationOptions(items);
+  const creatableWorkspaceTypes = Array.isArray(source.creatableWorkspaceTypes)
+    ? source.creatableWorkspaceTypes.map((type) => String(type || '').trim()).filter(Boolean)
+    : computed.creatableWorkspaceTypes;
   const extraBusinessTypes = Array.isArray(source.extraBusinessTypes) && source.extraBusinessTypes.length
     ? source.extraBusinessTypes.map((type) => String(type || '').trim()).filter(Boolean)
-    : [...EXTRA_BUSINESS_TYPES];
+    : creatableWorkspaceTypes.filter((type) => type !== PERSONAL_WORKSPACE_TYPE);
 
   return {
     items,
-    canCreateBusiness: toBoolean(source.canCreateBusiness, items.some((item) => item.isOwner)),
+    canCreateWorkspace: toBoolean(source.canCreateWorkspace, computed.canCreateWorkspace),
+    canCreateBusiness: toBoolean(source.canCreateBusiness, computed.canCreateBusiness),
+    canCreatePersonal: toBoolean(source.canCreatePersonal, computed.canCreatePersonal),
+    creatableWorkspaceTypes,
     extraBusinessTypes,
   };
 }
@@ -78,7 +130,13 @@ export function normalizeWorkspacePayload(payload = {}) {
 export function pickWorkspaceFields(payload) {
   const source = asObject(payload);
   if (!source) return null;
-  if (!('items' in source) && !('businesses' in source) && !('canCreateBusiness' in source)) {
+  if (
+    !('items' in source)
+    && !('businesses' in source)
+    && !('canCreateBusiness' in source)
+    && !('canCreateWorkspace' in source)
+    && !('creatableWorkspaceTypes' in source)
+  ) {
     return null;
   }
   return normalizeWorkspacePayload(source);
@@ -88,4 +146,12 @@ export function findWorkspace(items, businessId) {
   const id = pickString(businessId);
   if (!id) return null;
   return (items || []).find((item) => item.id === id || item.businessId === id) || null;
+}
+
+export function getDefaultCreatableWorkspaceType(creatableWorkspaceTypes = []) {
+  return creatableWorkspaceTypes[0] || EXTRA_BUSINESS_TYPES[0];
+}
+
+export function isPersonalWorkspaceType(type) {
+  return String(type || '').toLowerCase() === PERSONAL_WORKSPACE_TYPE;
 }
