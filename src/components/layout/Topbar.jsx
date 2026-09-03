@@ -2,17 +2,16 @@ import { Link } from 'react-router-dom';
 import { Clock3, LogOut, Sparkles, TriangleAlert, UserRound } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n.jsx';
-import { useBusinessSettings } from '../../lib/business/businessSettings.jsx';
 import { getSubscriptionStatusState } from '../../lib/subscription.js';
 import TaskNotificationsButton from '../tasks/TaskNotificationsButton.jsx';
 import ThemeSelector from '../ui/ThemeSelector.jsx';
 import { formatSubscriptionDaysRemainingLabel, formatSubscriptionStatusDate } from '../subscription/SubscriptionStatusBanner.jsx';
 import UpgradeSubscriptionCta, { shouldShowUpgradeCta } from '../subscription/UpgradeSubscriptionCta.jsx';
 import BrandLogo from './BrandLogo.jsx';
+import WorkspaceSwitcher from './WorkspaceSwitcher.jsx';
 
 export default function Topbar() {
-  const { user, logout, role, subscription, accessControl } = useAuth();
-  const { businessProfile } = useBusinessSettings();
+  const { logout, role, subscription, accessControl } = useAuth();
   const { locale, setLocale, t } = useI18n();
 
   const showStaffProfileLink = role === 'staff' && Boolean(accessControl?.membershipId);
@@ -26,11 +25,7 @@ export default function Topbar() {
     : '');
   const planLabel = subscription?.currentPlan?.label || (subscriptionAccess?.planKey ? humanizePlanKey(subscriptionAccess.planKey) : '');
   const showUpgradeAction = shouldShowUpgradeCta(subscription, role) && !isActiveTrial;
-  const businessLabel = String(businessProfile?.label || '').trim();
-  const userLabel = String(user?.name || '').trim();
-  const title = businessLabel || userLabel || t('topbar.welcome');
   const supportingText = [
-    businessLabel && userLabel && businessLabel !== userLabel ? userLabel : '',
     !isActiveTrial && planLabel ? planLabel : '',
     subscriptionAccess?.hasPendingChange ? t('topbar.pendingPlan') : '',
   ].filter(Boolean).join(' · ');
@@ -43,8 +38,7 @@ export default function Topbar() {
       <div className="flex min-w-0 items-center justify-between gap-3">
         <BrandLogo variant="mark" className="h-8 w-8 shrink-0 md:hidden" />
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] uppercase tracking-[0.2em] text-secondary-500">{t('topbar.workspace')}</p>
-          <h2 className="truncate font-serif text-base text-ink sm:text-lg">{title}</h2>
+          <WorkspaceSwitcher />
           {supportingText ? (
             <p className="mt-1 truncate text-xs font-medium text-secondary-500">{supportingText}</p>
           ) : null}
