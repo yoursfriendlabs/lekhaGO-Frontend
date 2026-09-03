@@ -492,9 +492,27 @@ export const api = {
       "/api/auth/me",
       {},
       listCache(
-        ["auth-me", "subscription", "business-profile"],
+        ["auth-me", "subscription", "business-profile", "workspaces"],
         CACHE_TTL.short,
       ),
+    ),
+  listWorkspaces: () =>
+    request(
+      "/api/auth/businesses",
+      {},
+      listCache(["workspaces", "auth-me"], CACHE_TTL.short),
+    ),
+  createWorkspace: (data) =>
+    request(
+      "/api/auth/businesses",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        "workspaces",
+        "auth-me",
+        "subscription",
+        "business-profile",
+        "business-settings",
+      ]),
     ),
   updateCurrentUser: (data) =>
     request(
@@ -505,6 +523,7 @@ export const api = {
         "subscription",
         "business-profile",
         "business-settings",
+        "workspaces",
       ]),
     ),
   changePassword: (data) =>

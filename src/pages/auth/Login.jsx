@@ -6,7 +6,8 @@ import { hasUnverifiedEmail } from '../../lib/authFlow';
 import { useAuth } from '../../lib/auth';
 import { getVerificationEmail, isEmailVerificationRequiredError } from '../../lib/emailVerification';
 import { useI18n } from '../../lib/i18n.jsx';
-import { consumeSessionNotice, setPendingEmailVerification } from '../../lib/storage';
+import { consumeSessionNotice, getBusinessId, setPendingEmailVerification } from '../../lib/storage';
+import { findWorkspace, normalizeWorkspacePayload } from '../../lib/business/workspaces';
 import BrandLogo from '../../components/layout/BrandLogo.jsx';
 
 function SpinIcon() {
@@ -41,7 +42,7 @@ const BRAND_STATS = [
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setSession } = useAuth();
+  const { setSession, switchWorkspace } = useAuth();
   const { t } = useI18n();
   const [form, setForm] = useState({ email: '', password: '', businessId: '' });
   const [status, setStatus] = useState(() => {
@@ -64,18 +65,26 @@ export default function Login() {
     setStatus({ type: 'info', message: '' });
     try {
       const data = await api.login({ email: form.email, password: form.password });
-      const resolvedBusinessId = form.businessId || data.business?.id || '';
+      const workspaces = normalizeWorkspacePayload(data).items;
+      const preferredId = form.businessId || getBusinessId();
+      const preferred = findWorkspace(workspaces, preferredId);
+      const loginBusinessId = data.business?.id || '';
+      const resolvedBusinessId = preferred?.id || loginBusinessId;
       const resolvedRole = data.role || data.user?.role || '';
       setSession(
         data.token,
         data.user,
-        resolvedBusinessId,
+        loginBusinessId || resolvedBusinessId,
         resolvedRole,
         data.subscription || null,
         data.business || null,
         data.businessProfile || null,
-        data.accessControl || data.user?.accessControl || null
+        data.accessControl || data.user?.accessControl || null,
+        data
       );
+      if (preferred?.id && preferred.id !== loginBusinessId && typeof switchWorkspace === 'function') {
+        await switchWorkspace(preferred.id);
+      }
       if (hasUnverifiedEmail(data.user)) {
         setPendingEmailVerification({
           email: data.user?.email || form.email,

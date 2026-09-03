@@ -27,6 +27,7 @@ import {
 } from './accessControl';
 import { normalizeSessionPayload } from './session';
 import { canAccessFeature, normalizeSubscriptionPayload } from './subscription';
+import { pickWorkspaceFields } from './business/workspaces';
 
 const AuthContext = createContext(null);
 const SHOULD_BOOTSTRAP_AUTH = import.meta.env.MODE !== 'test';
@@ -40,6 +41,10 @@ export function AuthProvider({ children }) {
   const [role, setRoleState] = useState(() => getRole());
   const [accessControl, setAccessControlState] = useState(() => normalizeAccessControl(getAccessControl()));
   const [subscription, setSubscriptionState] = useState(() => normalizeSubscriptionPayload(getSubscription()));
+  const [workspaces, setWorkspacesState] = useState([]);
+  const [canCreateBusiness, setCanCreateBusinessState] = useState(false);
+  const [extraBusinessTypes, setExtraBusinessTypesState] = useState(['retail', 'cafe']);
+  const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(() => {
     const storedToken = getToken();
     const storedSubscription = normalizeSubscriptionPayload(getSubscription());
@@ -84,6 +89,13 @@ export function AuthProvider({ children }) {
     setAccessControlState(nextAccessControl);
     setSubscriptionState(nextSubscription);
 
+    const nextWorkspaces = pickWorkspaceFields(snapshot);
+    if (nextWorkspaces) {
+      setWorkspacesState(nextWorkspaces.items);
+      setCanCreateBusinessState(nextWorkspaces.canCreateBusiness);
+      setExtraBusinessTypesState(nextWorkspaces.extraBusinessTypes);
+    }
+
     return {
       token: nextToken,
       user: nextUser,
@@ -93,6 +105,9 @@ export function AuthProvider({ children }) {
       role: nextRole,
       accessControl: nextAccessControl,
       subscription: nextSubscription,
+      workspaces: nextWorkspaces?.items,
+      canCreateBusiness: nextWorkspaces?.canCreateBusiness,
+      extraBusinessTypes: nextWorkspaces?.extraBusinessTypes,
     };
   }, []);
 
@@ -114,16 +129,17 @@ export function AuthProvider({ children }) {
 
     return applySessionSnapshot({
       ...snapshot,
+      ...pickWorkspaceFields(payload),
       token: overrides.token ?? token,
     });
   }, [accessControl, applySessionSnapshot, token, user, role, businessId, business, businessProfile, subscription]);
 
-  const setSession = useCallback((nextToken, nextUser, nextBusinessId, nextRole, nextSubscription = null, nextBusiness = null, nextBusinessProfile = null, nextAccessControl = null) => {
+  const setSession = useCallback((nextToken, nextUser, nextBusinessId, nextRole, nextSubscription = null, nextBusiness = null, nextBusinessProfile = null, nextAccessControl = null, workspaceSource = null) => {
     clearApiCache();
     clearPendingEmailVerification();
 
-    applySessionSnapshot(
-      normalizeSessionPayload(
+    applySessionSnapshot({
+      ...normalizeSessionPayload(
         {
           token: nextToken,
           user: nextUser,
@@ -137,8 +153,9 @@ export function AuthProvider({ children }) {
         {
           token: nextToken,
         }
-      )
-    );
+      ),
+      ...pickWorkspaceFields(workspaceSource),
+    });
   }, [applySessionSnapshot]);
 
   const refreshSession = useCallback(async () => {
@@ -159,6 +176,64 @@ export function AuthProvider({ children }) {
     setBusinessId(id);
     setBusinessIdState(id);
   }, []);
+
+  const refreshWorkspaces = useCallback(async () => {
+    if (!token || typeof api.listWorkspaces !== 'function') return [];
+    const payload = await api.listWorkspaces();
+    const next = pickWorkspaceFields(payload) || pickWorkspaceFields({
+      items: Array.isArray(payload) ? payload : payload?.items,
+    });
+    if (!next) return [];
+    setWorkspacesState(next.items);
+    setCanCreateBusinessState(next.canCreateBusiness);
+    setExtraBusinessTypesState(next.extraBusinessTypes);
+    return next.items;
+  }, [token]);
+
+  const switchWorkspace = useCallback(async (nextBusinessId) => {
+    const targetId = String(nextBusinessId || '').trim();
+    if (!targetId) return null;
+    if (targetId === businessId) return { businessId };
+
+    setWorkspaceBusy(true);
+    try {
+      setBusinessId(targetId);
+      setBusinessIdState(targetId);
+      clearApiCache();
+      const payload = await api.getCurrentUser();
+      return syncSession(payload, { token, businessId: targetId });
+    } catch (error) {
+      setBusinessId(businessId);
+      setBusinessIdState(businessId);
+      throw error;
+    } finally {
+      setWorkspaceBusy(false);
+    }
+  }, [businessId, syncSession, token]);
+
+  const createWorkspace = useCallback(async ({ name, type }) => {
+    setWorkspaceBusy(true);
+    try {
+      const payload = await api.createWorkspace({ name, type });
+      if (payload?.token) {
+        setToken(payload.token);
+        setTokenState(payload.token);
+      }
+      const nextBusinessId = payload?.business?.id || payload?.businessId || '';
+      if (nextBusinessId) {
+        setBusinessId(nextBusinessId);
+        setBusinessIdState(nextBusinessId);
+      }
+      clearApiCache();
+      return applySessionSnapshot({
+        ...normalizeSessionPayload(payload, { token: payload?.token || token }),
+        ...pickWorkspaceFields(payload),
+        token: payload?.token || token,
+      });
+    } finally {
+      setWorkspaceBusy(false);
+    }
+  }, [applySessionSnapshot, token]);
 
   const updateBusiness = useCallback((updater) => {
     setBusinessState((currentBusiness) => {
@@ -200,6 +275,10 @@ export function AuthProvider({ children }) {
     setRoleState('');
     setAccessControlState(null);
     setSubscriptionState(null);
+    setWorkspacesState([]);
+    setCanCreateBusinessState(false);
+    setExtraBusinessTypesState(['retail', 'cafe']);
+    setWorkspaceBusy(false);
     setSessionLoading(false);
   }, []);
 
@@ -312,10 +391,17 @@ export function AuthProvider({ children }) {
       accessControl,
       subscription,
       subscriptionAccess,
+      workspaces,
+      canCreateBusiness,
+      extraBusinessTypes,
+      workspaceBusy,
       sessionLoading,
       setSession,
       syncSession,
       refreshSession,
+      refreshWorkspaces,
+      switchWorkspace,
+      createWorkspace,
       updateBusinessId,
       updateBusiness,
       updateBusinessProfile,
@@ -338,10 +424,17 @@ export function AuthProvider({ children }) {
       accessControl,
       subscription,
       subscriptionAccess,
+      workspaces,
+      canCreateBusiness,
+      extraBusinessTypes,
+      workspaceBusy,
       sessionLoading,
       setSession,
       syncSession,
       refreshSession,
+      refreshWorkspaces,
+      switchWorkspace,
+      createWorkspace,
       updateBusinessId,
       updateBusiness,
       updateBusinessProfile,

@@ -134,7 +134,8 @@ export default function ActivateAccount() {
           nextSubscription,
           response?.business || null,
           response?.businessProfile || null,
-          response?.accessControl || response?.user?.accessControl || null
+          response?.accessControl || response?.user?.accessControl || null,
+          response
         );
       } else {
         updateUser({ emailVerified: true });
