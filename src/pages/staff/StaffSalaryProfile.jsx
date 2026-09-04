@@ -30,6 +30,7 @@ import { extractCoordinates, googleMapsUrl } from "../../lib/integrations/geo";
 import dayjs from "../../lib/dates/datetime";
 import FlexibleDateInput from "../../components/form/FlexibleDateInput.jsx";
 import DateDisplay from "../../components/form/DateDisplay.jsx";
+import MonthYearSelect from "../../components/form/MonthYearSelect.jsx";
 
 import StatsCard, { STATS_GRID_CLASS } from "../../components/ui/StatsCard.jsx";
 import Notice from "../../components/ui/Notice";
@@ -773,14 +774,12 @@ function PayrollEntryPanel({
               >
                 Applies to month
               </label>
-              <input
+              <MonthYearSelect
                 id="sal-month"
                 className="input mt-1 text-sm"
-                type="month"
                 value={monthYear}
                 onChange={(e) => setMonthYear(e.target.value)}
                 required
-                aria-label="Applies to month"
               />
             </div>
 

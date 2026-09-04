@@ -19,6 +19,7 @@ import ActionMenu from "../ui/ActionMenu";
 import RefreshButton from "../ui/RefreshButton.jsx";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import FlexibleDateInput from "../form/FlexibleDateInput.jsx";
+import MonthYearSelect from "../form/MonthYearSelect.jsx";
 import { Dialog } from "../ui/Dialog.tsx";
 import TeamSeatUsagePanel from "../subscription/TeamSeatUsagePanel.jsx";
 import { api, invalidateApiCache } from "../../lib/api";
@@ -1949,9 +1950,8 @@ function SalaryAdvanceDialog({ isOpen, member, t, onClose }) {
                 <label className="label" htmlFor="record-month">
                   {t("staffManagement.salaryRecords.monthYear")}
                 </label>
-                <input
+                <MonthYearSelect
                   id="record-month"
-                  type="month"
                   className="input mt-1"
                   value={monthYear}
                   onChange={(event) => setMonthYear(event.target.value)}
