@@ -1488,20 +1488,6 @@ setInvoiceOrder(purchase);
                       />
                     </div>
                   </div>
-                  {isExpense && (
-                    <div>
-                      <label className="label">
-                        {t("purchases.payeeName")}
-                      </label>
-                      <input
-                        className="input mt-1"
-                        name="partyName"
-                        value={header.partyName}
-                        onChange={handleHeaderChange}
-                        placeholder={t("purchases.payeeHint")}
-                      />
-                    </div>
-                  )}
                   <div>
                     <label className="label">{t("purchases.invoiceNo")}</label>
                     <input
@@ -1515,7 +1501,7 @@ setInvoiceOrder(purchase);
                       }
                     />
                   </div>
-                  <div className="min-w-0 xl:col-span-2">
+                  <div>
                     <label className="label">
                       {t("purchases.purchaseDate")}
                     </label>
