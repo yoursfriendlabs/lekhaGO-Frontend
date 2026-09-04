@@ -446,7 +446,7 @@ export default function Settings() {
   ];
 
   return (
-    <div className="min-w-0 max-w-6xl space-y-6 overflow-x-hidden">
+    <div className="min-w-0 space-y-6 overflow-x-hidden">
       <PageHeader title={t('settingsPage.title')} subtitle={activeTabMeta?.description || t('settingsPage.subtitle')} />
 
       <section className={STATS_GRID_CLASS}>
