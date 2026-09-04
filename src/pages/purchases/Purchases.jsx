@@ -2061,28 +2061,39 @@ setInvoiceOrder(purchase);
                 </div>
               )}
               <div className="mt-4 border-t border-secondary-200/70 pt-4 dark:border-slate-700/60">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                   <div className="flex-1">
                     <label className="label">{t("purchases.totalPaid")}</label>
-                    <input
-                      className="input mt-1"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.01"
-                      min="0"
-                      value={
-                        isPaid
-                          ? totals.grandTotal.toFixed(2)
-                          : header.amountReceived
-                      }
-                      disabled={isPaid}
-                      onChange={(e) =>
-                        setHeader((p) => ({
-                          ...p,
-                          amountReceived: e.target.value,
-                        }))
-                      }
-                    />
+                    <div className="mt-1 flex items-center gap-3">
+                      <input
+                        className="input flex-1"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        value={
+                          isPaid
+                            ? totals.grandTotal.toFixed(2)
+                            : header.amountReceived
+                        }
+                        disabled={isPaid}
+                        onChange={(e) =>
+                          setHeader((p) => ({
+                            ...p,
+                            amountReceived: e.target.value,
+                          }))
+                        }
+                      />
+                      <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm font-semibold text-ink-light dark:text-secondary-300">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded accent-primary-600"
+                          checked={isPaid}
+                          onChange={(e) => setIsPaid(e.target.checked)}
+                        />
+                        {t("services.fullyPaid")}
+                      </label>
+                    </div>
                     <QuickPaymentButtons
                       disabled={totals.grandTotal <= 0}
                       onNoPayment={() => applyQuickPaidAmount(0)}
@@ -2096,15 +2107,6 @@ setInvoiceOrder(purchase);
                       }
                     />
                   </div>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-secondary-200/70 bg-mist/70 px-4 py-3 text-sm font-semibold text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-secondary-300 dark:hover:bg-slate-800/60">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded accent-primary-600"
-                      checked={isPaid}
-                      onChange={(e) => setIsPaid(e.target.checked)}
-                    />
-                    {t("services.fullyPaid")}
-                  </label>
                 </div>
                 {dueAmount > 0 && (
                   <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-2.5 text-sm dark:border-rose-800/40 dark:bg-rose-900/20">
