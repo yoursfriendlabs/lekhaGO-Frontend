@@ -31,6 +31,7 @@ import StatsCard, { STATS_GRID_CLASS } from '../../components/ui/StatsCard.jsx';
 import RefreshButton from '../../components/ui/RefreshButton.jsx';
 import FlexibleDateInput from '../../components/form/FlexibleDateInput.jsx';
 import DateDisplay from '../../components/form/DateDisplay.jsx';
+import SaleInvoiceModal from './SaleInvoiceModal.jsx';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../../lib/money/payments';
 import { useIsMobile } from '../../hooks/useIsMobile.js';
 import {
@@ -126,7 +127,7 @@ export default function Sales() {
   const { t } = useI18n();
   const { businessId, user, canManageFeature } = useAuth();
   const canManageSales = canManageFeature('sales');
-  const { businessProfile } = useBusinessSettings();
+  const { businessProfile, settings: bizSettings } = useBusinessSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const createIntentHandledRef = useRef(false);
@@ -213,6 +214,7 @@ export default function Sales() {
   const [deletingSaleId, setDeletingSaleId] = useState('');
   const [savingSale, setSavingSale] = useState(false);
   const [payDialog, setPayDialog] = useState(null);
+  const [saleInvoice, setSaleInvoice] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [payPaymentMethod, setPayPaymentMethod] = useState('cash');
   const [payBankId, setPayBankId] = useState('');
@@ -828,9 +830,9 @@ export default function Sales() {
     }
 
     actions.push(
-      { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
-      { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
-      { label: 'Print Thermal', icon: Printer, to: `/app/invoice/sales/${sale.id}?thermal=1` },
+      { label: 'View Bill', icon: FileText, onClick: () => openSaleBill(sale, false) },
+      { label: 'Print Bill', icon: Printer, onClick: () => openSaleBill(sale, false) },
+      { label: 'Print Thermal', icon: Printer, onClick: () => openSaleBill(sale, true) },
     );
 
     if (canManageSales && locked && !cancelled) {
@@ -953,6 +955,15 @@ export default function Sales() {
     setPayPaymentMethod('cash');
     setPayBankId('');
     setPayError('');
+  };
+
+  const openSaleBill = async (sale, thermal = false) => {
+    try {
+      const full = await api.getSale(sale.id);
+      setSaleInvoice({ sale: full, initialThermal: thermal });
+    } catch {
+      setSaleInvoice({ sale, initialThermal: thermal });
+    }
   };
 
   const handleRecordPayment = async (e) => {
@@ -1865,6 +1876,20 @@ export default function Sales() {
           </div>
         </div>
       )}
+
+      {saleInvoice ? (
+        <SaleInvoiceModal
+          sale={saleInvoice.sale}
+          bizSettings={bizSettings}
+          money={money}
+          t={t}
+          initialThermal={saleInvoice.initialThermal}
+          onClose={() => setSaleInvoice(null)}
+          onReprinted={(updated) => {
+            if (updated) setSaleInvoice((cur) => (cur ? { ...cur, sale: updated } : cur));
+          }}
+        />
+      ) : null}
 
     </div>
   );
