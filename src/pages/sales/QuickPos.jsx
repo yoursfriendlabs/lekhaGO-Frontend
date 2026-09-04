@@ -42,6 +42,7 @@ import { useSSEEvent, SSE_EVENTS } from "../../hooks/useSSE.js";
 import { useProductStore } from "../../stores/products";
 import { useSaleStore } from "../../stores/sales";
 import { checkNewAndReadyOrders } from "../../lib/business/cafeOrders.js";
+import SaleInvoiceModal from "./SaleInvoiceModal.jsx";
 import {
   getSellableQuantity,
   getStockAvailabilityMessage,
@@ -188,7 +189,7 @@ export default function QuickPos() {
   const { businessId, user, canViewFeature, canManageFeature } = useAuth();
   const canViewSales = canViewFeature("sales");
   const canManageInventory = canManageFeature("inventory");
-  const { businessProfile } = useBusinessSettings();
+  const { businessProfile, settings: bizSettings } = useBusinessSettings();
   const isTablesEnabled = useMemo(() => {
     return businessProfile?.settings?.enabledModules?.includes("tables");
   }, [businessProfile]);
@@ -255,6 +256,7 @@ export default function QuickPos() {
   const [isPaid, setIsPaid] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successState, setSuccessState] = useState(null);
+  const [saleInvoice, setSaleInvoice] = useState(null);
   const [activeAttributes, setActiveAttributes] = useState({});
   const [mobileStep, setMobileStep] = useState("items");
   const [productUnitTypes, setProductUnitTypes] = useState({});
@@ -1060,6 +1062,15 @@ export default function QuickPos() {
       navigate("/app/orders");
     } else if (queryRef === "billing") {
       navigate("/app/billing");
+    }
+  };
+
+  const openSaleBill = async (saleId, thermal = false) => {
+    try {
+      const full = await api.getSale(saleId);
+      setSaleInvoice({ sale: full, initialThermal: thermal });
+    } catch {
+      setSaleInvoice({ sale: { id: saleId, invoiceNo: successState?.invoiceNo }, initialThermal: thermal });
     }
   };
 
@@ -3014,12 +3025,8 @@ export default function QuickPos() {
               type="button"
               className="btn-primary h-14 w-full justify-center rounded-[22px] text-base"
               onClick={() => {
-                const target =
-                  successState.action === "print"
-                    ? `/app/invoice/sales/${successState.id}?print=1`
-                    : `/app/invoice/sales/${successState.id}`;
                 setSuccessState(null);
-                navigate(target);
+                openSaleBill(successState.id, false);
               }}
             >
               {successState?.action === "print"
@@ -3036,7 +3043,7 @@ export default function QuickPos() {
                 className="btn-secondary h-14 w-full justify-center rounded-[22px] text-base bg-secondary-100 text-secondary-900 hover:bg-secondary-200"
                 onClick={() => {
                   setSuccessState(null);
-                  navigate(`/app/invoice/sales/${successState.id}?thermal=1`);
+                  openSaleBill(successState.id, true);
                 }}
               >
                 Print Thermal Receipt
@@ -3060,6 +3067,20 @@ export default function QuickPos() {
           )
         }
       />
+
+      {saleInvoice ? (
+        <SaleInvoiceModal
+          sale={saleInvoice.sale}
+          bizSettings={bizSettings}
+          money={money}
+          t={t}
+          initialThermal={saleInvoice.initialThermal}
+          onClose={() => setSaleInvoice(null)}
+          onReprinted={(updated) => {
+            if (updated) setSaleInvoice((cur) => (cur ? { ...cur, sale: updated } : cur));
+          }}
+        />
+      ) : null}
 
       {/* Table Selector Modal */}
       <Dialog
