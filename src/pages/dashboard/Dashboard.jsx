@@ -734,7 +734,7 @@ export default function Dashboard() {
         <div className="rounded-3xl border border-secondary-200/70 bg-white/90 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/70">
           <div className="flex items-center justify-between">
             <h3 className="font-serif text-lg text-ink">{t('dashboard.recentSales')}</h3>
-            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/services">{t('dashboard.viewAll')}</Link>
+            <Link className="text-xs text-emerald-600 dark:text-emerald-300" to="/app/sales">{t('dashboard.viewAll')}</Link>
           </div>
           <div className="mt-4 space-y-3">
             {recentSales.length === 0 ? (
@@ -743,7 +743,7 @@ export default function Dashboard() {
               recentSales.map((sale) => (
                 <div key={sale.id || sale.invoiceNo} className="flex items-center justify-between rounded-2xl border border-secondary-200/70 bg-white/70 p-3 dark:border-slate-700/60 dark:bg-slate-900/60">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-ink">{sale.customerName || String(sale.id ?? '').slice(0, 6) || '-'}</p>
+                    <p className="text-sm font-semibold text-ink">{sale.invoiceNo || String(sale.id ?? '').slice(0, 6) || '-'}</p>
                     <p className="text-xs text-secondary-500">{formatDate(sale.saleDate)} - {sale.status || t('nav.sales')}</p>
                   </div>
                   <p className="shrink-0 text-sm font-semibold text-emerald-700 dark:text-emerald-300">{formatMoney(sale.grandTotal)}</p>

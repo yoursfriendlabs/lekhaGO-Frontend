@@ -114,6 +114,12 @@ function getPurchaseDueAmount(p) {
     0,
   );
 }
+function cleanInvoiceNo(raw) {
+  const value = String(raw == null ? "" : raw).trim();
+  if (!value) return value;
+  const match = value.match(/(\d+)\s*$/);
+  return match ? match[1] : value;
+}
 function getVatAmount(lineTotal, taxRate) {
   return (Number(lineTotal || 0) * Number(taxRate || 0)) / 100;
 }
@@ -2194,7 +2200,7 @@ setInvoiceOrder(purchase);
             ) : null}
             <div className="rounded-[22px] bg-mist p-4 text-sm dark:bg-slate-900/60">
               <p className="font-semibold text-ink dark:text-slate-200">
-                {payDialog.invoiceNo || payDialog.id.slice(0, 8)}
+                {cleanInvoiceNo(payDialog.invoiceNo) || payDialog.id.slice(0, 8)}
               </p>
               {getSupplierName(payDialog) && (
                 <p className="text-secondary-500">
@@ -2374,7 +2380,7 @@ setInvoiceOrder(purchase);
                         )}
                       </div>
                       <p className="mt-2 truncate font-semibold text-ink">
-                        {purchase.invoiceNo || purchase.id.slice(0, 8)}
+                        {cleanInvoiceNo(purchase.invoiceNo) || purchase.id.slice(0, 8)}
                       </p>
                       <p className="mt-0.5 text-xs text-secondary-500">
                         <DateDisplay date={purchase.purchaseDate} format="ddd DD, MMM" />
@@ -2467,7 +2473,7 @@ setInvoiceOrder(purchase);
                       className="border-t border-secondary-200/70"
                     >
                       <td className="py-2.5 pr-4 font-medium text-ink dark:text-slate-200">
-                        {purchase.invoiceNo || purchase.id.slice(0, 8)}
+                        {cleanInvoiceNo(purchase.invoiceNo) || purchase.id.slice(0, 8)}
                       </td>
                       <td className="py-2.5 pr-4">
                         <span
@@ -2589,7 +2595,7 @@ setInvoiceOrder(purchase);
                   <ThermalReceipt
                     biz={bizSettings}
                     receiptType="Expense Receipt"
-                    invoiceNo={invoiceOrder.invoiceNo || invoiceOrder.id?.slice(0, 8)}
+                    invoiceNo={cleanInvoiceNo(invoiceOrder.invoiceNo) || invoiceOrder.id?.slice(0, 8)}
                     date={<DateDisplay date={invoiceOrder.purchaseDate} format="MMMM D, YYYY" mode="inline" />}
                     partyName={getSupplierName(invoiceOrder) || "—"}
                     creatorName={getCreatorDisplayName(invoiceOrder)}
@@ -2622,7 +2628,7 @@ setInvoiceOrder(purchase);
                   <InvoiceHeader
                     biz={bizSettings}
                     invoiceType="Expense Bill"
-                    invoiceNo={invoiceOrder.invoiceNo || invoiceOrder.id?.slice(0, 8)}
+                    invoiceNo={cleanInvoiceNo(invoiceOrder.invoiceNo) || invoiceOrder.id?.slice(0, 8)}
                     date={<DateDisplay date={invoiceOrder.purchaseDate} format="MMMM D, YYYY" mode="inline" />}
                     status={invoiceOrder.status}
                     statusColor="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
@@ -2771,7 +2777,7 @@ setInvoiceOrder(purchase);
         description={
           deletePurchase
             ? t("purchases.deleteConfirm", {
-                name: deletePurchase.invoiceNo || deletePurchase.id.slice(0, 8),
+                name: cleanInvoiceNo(deletePurchase.invoiceNo) || deletePurchase.id.slice(0, 8),
               })
             : t("common.confirmDelete")
         }
@@ -2814,7 +2820,7 @@ setInvoiceOrder(purchase);
           <p className="text-sm leading-6 text-secondary-700">
             {cancelPurchase
               ? t("purchases.cancelConfirm", {
-                  name: cancelPurchase.invoiceNo || cancelPurchase.id.slice(0, 8),
+                  name: cleanInvoiceNo(cancelPurchase.invoiceNo) || cancelPurchase.id.slice(0, 8),
                 })
               : ""}
           </p>
@@ -2850,7 +2856,7 @@ setInvoiceOrder(purchase);
             <div className="space-y-4 p-6">
               {statusError ? <Notice title={statusError} tone="error" /> : null}
               <div className="rounded-xl bg-mist p-3 text-sm dark:bg-slate-900/60">
-                <p className="font-semibold text-ink dark:text-slate-200">{statusDialog.invoiceNo || statusDialog.id.slice(0, 8)}</p>
+                <p className="font-semibold text-ink dark:text-slate-200">{cleanInvoiceNo(statusDialog.invoiceNo) || statusDialog.id.slice(0, 8)}</p>
               </div>
               <div className="space-y-2">
                 {PURCHASE_STATUS_STEPS.map((step) => {
