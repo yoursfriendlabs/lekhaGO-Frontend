@@ -33,6 +33,9 @@ import {
 import { toPartyLookupOption } from '../../lib/lookups.js';
 import { usePartyStore } from "../../stores/parties";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useBusinessSettings } from "../../lib/business/businessSettings.jsx";
+import PartyBillModal from "./PartyBillModal.jsx";
+import PartyServiceBillModal from "./PartyServiceBillModal.jsx";
 import {
   Plus,
   Bell,
@@ -200,9 +203,6 @@ const SUCCESS_NOTICE_TIMEOUT_MS = 3000;
 
 // Row types that have a corresponding update API on the backend
 const EDITABLE_TX_TYPES = new Set([
-  "sale",
-  "service",
-  "purchase",
   "payment_in",
   "payment_out",
 ]);
@@ -237,6 +237,8 @@ function getTransactionViewPath(row) {
     case "purchase":
     case "expense":
       return `/app/invoice/purchases/${row.id}`;
+    case "service":
+      return `/app/services`;
     default:
       return null;
   }
@@ -314,8 +316,18 @@ function mergeUniqueParties(existing = [], incoming = []) {
 export default function Parties() {
   // const { canManageFeature } = useAuth();
   const { t } = useI18n();
+  const { settings: bizSettings } = useBusinessSettings();
   const canManageParties = true;
   const navigate = useNavigate();
+
+  const money = (value) =>
+    t("currency.formatted", {
+      symbol: t("currency.symbol"),
+      amount: Number(value || 0).toFixed(2),
+    });
+
+  const [billView, setBillView] = useState(null);
+  const [serviceBill, setServiceBill] = useState(null);
   const {
     upsert: upsertParty,
     remove: removeParty,
@@ -786,6 +798,26 @@ export default function Parties() {
 
     await openEditTransaction(row);
   };
+
+  const openBill = async (row) => {
+    if (!row?.id) return;
+    if (row.type === "service") {
+      setServiceBill(row);
+      return;
+    }
+    const isSale = row.type === "sale";
+    if (!isSale && row.type !== "purchase" && row.type !== "expense") return;
+    setBillView(null);
+    try {
+      const full = isSale
+        ? await api.getSale(row.id)
+        : await api.getPurchase(row.id);
+      setBillView({ record: full, type: isSale ? "sale" : "purchase" });
+    } catch {
+      setBillView({ record: row, type: isSale ? "sale" : "purchase" });
+    }
+  };
+
 
   const closeTxDialog = () => {
     setSelectedTxPartyOption(null);
@@ -1539,13 +1571,14 @@ export default function Parties() {
                           <div className="flex shrink-0 flex-col items-end gap-2">
                             <div className="flex items-center gap-1">
                               {viewPath ? (
-                                <Link
-                                  to={viewPath}
+                                <button
+                                  type="button"
+                                  onClick={() => openBill(row)}
                                   className="inline-flex items-center gap-1 rounded-md bg-mist px-2 py-1 text-xs font-semibold text-ink-light transition-all hover:bg-secondary-100 active:scale-95"
                                 >
                                   <Eye size={12} />
                                   {t("common.view")}
-                                </Link>
+                                </button>
                               ) : null}
                               {canManageParties &&
                               EDITABLE_TX_TYPES.has(row.type) &&
@@ -1915,6 +1948,27 @@ export default function Parties() {
         description={t("parties.messages.confirmDeleteTransaction")}
         confirming={deleteTxSubmitting}
       />
+
+      {billView ? (
+        <PartyBillModal
+          record={billView.record}
+          type={billView.type}
+          bizSettings={bizSettings}
+          money={money}
+          t={t}
+          onClose={() => setBillView(null)}
+          onRefreshed={(updated) => {
+            if (updated) setBillView((cur) => (cur ? { ...cur, record: updated } : cur));
+          }}
+        />
+      ) : null}
+
+      {serviceBill ? (
+        <PartyServiceBillModal
+          record={serviceBill}
+          onClose={() => setServiceBill(null)}
+        />
+      ) : null}
     </div>
   );
 }
