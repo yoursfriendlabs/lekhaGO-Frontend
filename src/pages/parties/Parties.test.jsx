@@ -129,4 +129,64 @@ describe('Parties', () => {
     expect(screen.getByText(/5,100\.00/)).toBeInTheDocument();
     expect(screen.getByText(/To Receive/)).toBeInTheDocument();
   });
+
+  it('loads more party transactions with infinite scroll instead of pagination', async () => {
+    window.localStorage.setItem('mms_token', 'token-123');
+    window.localStorage.setItem('mms_role', 'owner');
+    window.localStorage.setItem('mms_business_id', 'business-123');
+    window.localStorage.setItem('mms_user', JSON.stringify({ id: 'user-1', name: 'Owner', role: 'owner' }));
+
+    const party = {
+      id: 'party-1',
+      name: 'Hari',
+      phone: '9800000000',
+      type: 'customer',
+      currentAmount: 0,
+    };
+    const allItems = Array.from({ length: 12 }, (_, index) => ({
+      id: `sale-${index + 1}`,
+      type: 'sale',
+      date: '2026-08-01',
+      totalAmount: 100,
+      paidAmount: 0,
+      dueAmount: 100,
+      amount: 0,
+      runningBalance: -100,
+      paymentType: { method: 'cash', label: 'cash' },
+    }));
+
+    apiMocks.listParties.mockResolvedValue({ items: [party], total: 1 });
+    apiMocks.partyStatement.mockImplementation(async (params = {}) => {
+      const offset = Number(params.offset || 0);
+      const limit = Number(params.limit || 10);
+      return {
+        party,
+        items: allItems.slice(offset, offset + limit),
+        summary: { totalRows: allItems.length, runningBalance: -100 },
+      };
+    });
+
+    renderWithProviders(<Parties />, { route: '/app/parties', withAuth: true });
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('link', { name: 'View' })).toHaveLength(10);
+    });
+    expect(screen.queryByRole('button', { name: 'Prev' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole('link', { name: 'View' }).map((link) => link.getAttribute('href'))
+    ).not.toContain('/app/invoice/sales/sale-11');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Load more' }));
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('link', { name: 'View' })).toHaveLength(12);
+    });
+    expect(
+      screen.getAllByRole('link', { name: 'View' }).map((link) => link.getAttribute('href'))
+    ).toContain('/app/invoice/sales/sale-11');
+    expect(apiMocks.partyStatement).toHaveBeenCalledWith(
+      expect.objectContaining({ partyId: 'party-1', limit: 10, offset: 10 })
+    );
+  });
 });

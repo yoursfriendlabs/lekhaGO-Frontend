@@ -2291,6 +2291,10 @@ const dictionaries = {
       next: 'Next',
       page: 'Page',
       of: 'of',
+      scrollToLoadMore: 'Scroll to load more',
+      loadMore: 'Load more',
+      allLoaded: 'All loaded',
+      retryLoadMore: 'Retry load more',
     },
   },
   ne: {
@@ -4568,6 +4572,10 @@ const dictionaries = {
       next: 'अर्को',
       page: 'पृष्ठ',
       of: 'को',
+      scrollToLoadMore: 'थप लोड गर्न स्क्रोल गर्नुहोस्',
+      loadMore: 'थप लोड गर्नुहोस्',
+      allLoaded: 'सबै लोड भयो',
+      retryLoadMore: 'फेरि लोड गर्नुहोस्',
     },
   },
 };
