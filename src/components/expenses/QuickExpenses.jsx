@@ -58,7 +58,7 @@ export default function QuickExpenseForm({
     removeDefaultCategory,
     addCustomCategory,
     removeCustomCategory,
-  } = useExpenseCategories({ businessId, includeCustom: true });
+  } = useExpenseCategories({ businessId, includeCustom: false });
 
   const [quickHeader, setQuickHeader] = useState(() => makeEmptyHeader());
   const [quickLines, setQuickLines] = useState(() => [makeEmptyLine()]);

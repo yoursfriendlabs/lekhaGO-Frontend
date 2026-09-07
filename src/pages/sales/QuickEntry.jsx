@@ -56,7 +56,7 @@ export default function QuickEntry() {
   const canManageQuickExpenses = canManageFeature('quickExpenses') || canManagePurchases;
   const canViewParties = canViewFeature('parties');
   const canManageParties = canManageFeature('parties');
-  const { categories: expenseCategories } = useExpenseCategories({ businessId, includeCustom: true });
+  const { categories: expenseCategories } = useExpenseCategories({ businessId, includeCustom: false });
 
   const amount = useMemo(() => evaluateQuickExpression(expression), [expression]);
   const isInstantForm = ['expense', 'payment_in', 'payment_out'].includes(activeTab);
