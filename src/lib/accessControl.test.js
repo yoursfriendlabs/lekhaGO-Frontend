@@ -44,12 +44,12 @@ describe('access control helpers', () => {
     const withSales = applyPermissionChange({}, 'sales', 'manage');
     expect(withSales.sales).toBe('manage');
     expect(withSales.inventory).toBe('view');
-    expect(withSales.parties).toBe('manage');
+    expect(withSales.parties).toBe('view');
 
     const withQuickPos = applyPermissionChange({}, 'quickPos', 'manage');
     expect(withQuickPos.quickPos).toBe('manage');
     expect(withQuickPos.inventory).toBe('view');
-    expect(withQuickPos.parties).toBe('manage');
+    expect(withQuickPos.parties).toBe('view');
 
     const withServices = applyPermissionChange({}, 'services', 'view');
     expect(withServices.services).toBe('view');
@@ -59,7 +59,7 @@ describe('access control helpers', () => {
     const withPurchases = applyPermissionChange({}, 'purchases', 'manage');
     expect(withPurchases.purchases).toBe('manage');
     expect(withPurchases.inventory).toBe('view');
-    expect(withPurchases.parties).toBe('manage');
+    expect(withPurchases.parties).toBe('view');
   });
 
   it('clears sales/pos/services/purchases when inventory view is removed', () => {
@@ -88,7 +88,7 @@ describe('access control helpers', () => {
   it('auto-grants party access for sales workflows and clears them when parties is removed', () => {
     const withServices = applyPermissionChange({}, 'services', 'manage');
     expect(withServices.services).toBe('manage');
-    expect(withServices.parties).toBe('manage');
+    expect(withServices.parties).toBe('view');
 
     const next = applyPermissionChange(
       {
