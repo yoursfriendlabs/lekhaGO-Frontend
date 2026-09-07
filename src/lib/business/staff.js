@@ -112,6 +112,11 @@ export function normalizeStaffMember(member, meta) {
     shift: pickString(source.shift) || null,
     shiftStarted: pickString(source.shiftStarted, source.shift_started) || null,
     shiftEnded: pickString(source.shiftEnded, source.shift_ended) || null,
+    offDays: Array.isArray(source.offDays)
+      ? source.offDays.map((day) => String(day).toLowerCase())
+      : Array.isArray(source.off_days)
+        ? source.off_days.map((day) => String(day).toLowerCase())
+        : [],
     address: pickString(source.address, user.address) || null,
     compensation: pickNumber(source.compensation, source.salary),
     salary: pickNumber(source.salary, source.compensation),

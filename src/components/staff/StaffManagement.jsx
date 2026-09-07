@@ -13,6 +13,7 @@ import {
   X,
   Check,
   Phone,
+  ChevronDown,
 } from "lucide-react";
 import Notice from "../ui/Notice";
 import ActionMenu from "../ui/ActionMenu";
@@ -35,7 +36,7 @@ import {
   groupStaffPermissionUiFeatures,
   hasInventoryDependentAccess,
 } from "../../lib/accessControl";
-import { formatMaybeDate, todayISODate } from "../../lib/dates/datetime";
+import { formatMaybeDate, todayISODate, WEEKDAY_KEYS } from "../../lib/dates/datetime";
 import { useAuth } from "../../lib/auth";
 import { useBusinessSettings } from "../../lib/business/businessSettings";
 import { useI18n } from "../../lib/i18n.jsx";
@@ -84,6 +85,7 @@ function buildEmptyForm(_meta, role = "staff") {
     shift: "",
     shiftStarted: "",
     shiftEnded: "",
+    offDays: [],
     address: "",
     compensation: "",
     salary: "",
@@ -172,6 +174,145 @@ function EmailVerificationBadge({ emailVerified, t }) {
   }
 
   return null;
+}
+
+function WeekdayMultiSelect({ value = [], onChange, disabled, t }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const selected = (value || []).filter((day) => WEEKDAY_KEYS.includes(day));
+
+  useEffect(() => {
+    const onDocClick = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  const toggleDay = (day) => {
+    if (disabled) return;
+    onChange(
+      selected.includes(day)
+        ? selected.filter((item) => item !== day)
+        : [...selected, day],
+    );
+  };
+
+  const setNone = () => {
+    if (disabled) return;
+    onChange([]);
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        id="staff-off-days"
+        type="button"
+        onClick={() => !disabled && setOpen((o) => !o)}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className={`input mt-1 flex min-h-[46px] w-full items-center justify-between gap-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+          open
+            ? "!border-primary-400 !ring-2 !ring-primary-400/25"
+            : "hover:border-secondary-300"
+        }`}
+      >
+        {selected.length === 0 ? (
+          <span className="text-sm text-secondary-400">
+            {t("staffManagement.noOffDays")}
+          </span>
+        ) : (
+          <span className="flex flex-wrap items-center gap-1.5">
+            {selected.map((day) => (
+              <span
+                key={day}
+                className="inline-flex max-w-full items-center truncate rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-900/40 dark:text-primary-200"
+              >
+                {t(`staffManagement.weekDays.${day}`)}
+              </span>
+            ))}
+          </span>
+        )}
+        <ChevronDown
+          size={15}
+          className={`shrink-0 text-secondary-400 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {open && !disabled ? (
+        <div className="absolute z-30 mt-2 w-full min-w-[260px] rounded-2xl border border-secondary-200/80 bg-white p-2 shadow-xl shadow-slate-900/10 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/40">
+          <div className="flex items-center justify-between px-2 py-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary-400">
+              {t("staffManagement.offDays")}
+            </p>
+            <span className="text-[10px] font-semibold text-secondary-400">
+              {t("common.selected")}: {selected.length}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={setNone}
+            className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-sm font-medium transition ${
+              selected.length === 0
+                ? "bg-mist text-ink dark:bg-slate-800 dark:text-slate-100"
+                : "text-secondary-600 hover:bg-mist dark:text-secondary-300 dark:hover:bg-slate-800"
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span
+                className={`flex h-4 w-4 items-center justify-center rounded-md border ${
+                  selected.length === 0
+                    ? "border-primary-600 bg-primary-600 text-white"
+                    : "border-secondary-300 bg-white dark:border-slate-600 dark:bg-slate-800"
+                }`}
+              >
+                {selected.length === 0 ? (
+                  <Check size={11} strokeWidth={3} />
+                ) : null}
+              </span>
+              {t("staffManagement.noOffDays")}
+            </span>
+          </button>
+
+          <div className="mt-1 border-t border-secondary-100 pt-1 dark:border-slate-800">
+            {WEEKDAY_KEYS.map((day) => {
+              const active = selected.includes(day);
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => toggleDay(day)}
+                  className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-sm font-medium transition ${
+                    active
+                      ? "bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-200"
+                      : "text-secondary-600 hover:bg-mist dark:text-secondary-300 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={`flex h-4 w-4 items-center justify-center rounded-md border transition ${
+                        active
+                          ? "border-primary-600 bg-primary-600 text-white"
+                          : "border-secondary-300 bg-white dark:border-slate-600 dark:bg-slate-800"
+                      }`}
+                    >
+                      {active ? <Check size={11} strokeWidth={3} /> : null}
+                    </span>
+                    {t(`staffManagement.weekDays.${day}`)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function PermissionSelector({
@@ -519,6 +660,20 @@ function StaffFormDialog({
                           disabled={readOnly}
                         />
                       </div>
+                      <div>
+                        <label className="label" htmlFor="staff-off-days">
+                          {t("staffManagement.offDays")}
+                        </label>
+                        <WeekdayMultiSelect
+                          value={form.offDays}
+                          onChange={(days) => onFieldChange("offDays", days)}
+                          disabled={readOnly}
+                          t={t}
+                        />
+                        <p className="mt-1 text-xs text-secondary-500">
+                          {t("staffManagement.offDaysHelper")}
+                        </p>
+                      </div>
                       <div className="md:col-span-2 xl:col-span-2">
                         <label className="label" htmlFor="staff-address">
                           {t("staffManagement.address")}
@@ -585,32 +740,6 @@ function StaffFormDialog({
                           )}
                         />
                       </div>
-                      {!isCreate ? (
-                        <div>
-                          <label
-                            className="label"
-                            htmlFor="staff-total-received"
-                          >
-                            {t("staffManagement.totalReceived")}
-                          </label>
-                          <input
-                            id="staff-total-received"
-                            className="input mt-1"
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="0.01"
-                            value={form.totalReceived}
-                            onChange={(event) =>
-                              onFieldChange("totalReceived", event.target.value)
-                            }
-                            disabled={readOnly}
-                            placeholder={t(
-                              "staffManagement.totalReceivedPlaceholder",
-                            )}
-                          />
-                        </div>
-                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -1080,6 +1209,7 @@ export default function StaffManagement({ businessId }) {
       shift: member.shift || "",
       shiftStarted: toTimeInputValue(member.shiftStarted),
       shiftEnded: toTimeInputValue(member.shiftEnded),
+      offDays: Array.isArray(member.offDays) ? member.offDays : [],
       address: member.address || "",
       compensation: member.compensation ?? "",
       salary: member.salary ?? member.compensation ?? "",
@@ -1150,6 +1280,9 @@ export default function StaffManagement({ businessId }) {
       shift: form.shift.trim(),
       shiftStarted: form.shiftStarted || null,
       shiftEnded: form.shiftEnded || null,
+      offDays: Array.isArray(form.offDays)
+        ? form.offDays.map((day) => String(day).toLowerCase())
+        : [],
       address: form.address.trim(),
       salary: form.salary === "" ? null : Number(form.salary),
       compensation: form.salary === "" ? null : Number(form.salary),
