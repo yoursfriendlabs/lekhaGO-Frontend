@@ -23,7 +23,14 @@ import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { isOwnStaffMembership } from "../../lib/accessControl";
 import { useI18n } from "../../lib/i18n.jsx";
-import { formatMaybeDate, formatMaybeDateTime } from "../../lib/dates/datetime";
+import {
+  formatMaybeDate,
+  formatMaybeDateTime,
+  WEEKDAY_KEYS,
+  formatTime12Hour,
+  toClockMinutes,
+  weekdayKeyFromDate,
+} from "../../lib/dates/datetime";
 import { formatMoney, parseMonthYear, toInitials } from "../../lib/money/formatting";
 import { calculateDuration, calculateDurationDecimal } from "../../lib/dates/datetime-calc";
 import { extractCoordinates, googleMapsUrl } from "../../lib/integrations/geo";
@@ -196,6 +203,18 @@ function AttendancePill({ status }) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
+function OffDayPill() {
+  return <Badge variant="default">Off</Badge>;
+}
+
+function formatOffDays(offDays, t) {
+  const days = Array.isArray(offDays)
+    ? offDays.filter((day) => WEEKDAY_KEYS.includes(day))
+    : [];
+  if (days.length === 0) return "—";
+  return days.map((day) => t(`staffManagement.weekDays.${day}`)).join(", ");
+}
+
 function Card({ children, className = "" }) {
   return (
     <div
@@ -357,7 +376,7 @@ function LocationDisplay({ record }) {
 
 
 
-function StaffProfileCard({ meta, loading }) {
+function StaffProfileCard({ meta, loading, t }) {
   const ini = toInitials(meta.name);
 
   return (
@@ -474,13 +493,19 @@ function StaffProfileCard({ meta, loading }) {
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2 text-xs text-secondary-400">Shift Started</span>
               <span className="text-right text-xs font-semibold text-ink dark:text-slate-200">
-                {meta.shiftStarted ? String(meta.shiftStarted).slice(0, 5) : "—"}
+                {meta.shiftStarted ? formatTime12Hour(meta.shiftStarted) : "—"}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-2 text-xs text-secondary-400">Shift Ended</span>
               <span className="text-right text-xs font-semibold text-ink dark:text-slate-200">
-                {meta.shiftEnded ? String(meta.shiftEnded).slice(0, 5) : "—"}
+                {meta.shiftEnded ? formatTime12Hour(meta.shiftEnded) : "—"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-xs text-secondary-400">Off Days</span>
+              <span className="text-right text-xs font-semibold text-ink dark:text-slate-200">
+                {formatOffDays(meta.offDays, t)}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
@@ -852,6 +877,7 @@ export default function StaffSalaryProfile() {
     shift: "",
     shiftStarted: "",
     shiftEnded: "",
+    offDays: [],
     status: "active",
     joinedAt: null,
     address: "",
@@ -867,6 +893,7 @@ export default function StaffSalaryProfile() {
 
   // Attendance
   const [attendance, setAttendance] = useState([]);
+  const [attendanceFilter, setAttendanceFilter] = useState("all");
   const [attendanceDateFrom, setAttendanceDateFrom] = useState(() =>
     dayjs().subtract(30, "day").format("YYYY-MM-DD"),
   );
@@ -883,10 +910,22 @@ export default function StaffSalaryProfile() {
     saving: false,
   });
 
-  const currentMonthYear = useMemo(
-    () => new Date().toISOString().slice(0, 7),
-    [],
-  );
+  const currentMonthYear = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }, []);
+
+  const [statsMonth, setStatsMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+
+  const statsMonthLabel = useMemo(() => {
+    if (!/^\d{4}-\d{2}$/.test(statsMonth)) return statsMonth || currentMonthYear;
+    const [y, m] = statsMonth.split("-").map(Number);
+    const date = new Date(y, m - 1, 1);
+    return date.toLocaleString(undefined, { month: "short", year: "numeric" });
+  }, [statsMonth, currentMonthYear]);
 
   // ── Loaders ──
   const loadEmployeeMeta = useCallback(async () => {
@@ -904,11 +943,14 @@ export default function StaffSalaryProfile() {
           shift: m.shift || "",
           shiftStarted: m.shiftStarted || "",
           shiftEnded: m.shiftEnded || "",
+          offDays: Array.isArray(m.offDays)
+            ? m.offDays.map((day) => String(day).toLowerCase())
+            : [],
           status: m.status || "active",
           joinedAt: m.joinedAt || m.createdAt || null,
           address: m.address || "",
           employeeId: m.employeeId || m.membershipId || String(membershipId),
-          baseSalary: Number(m.baseSalary || m.salary || 0),
+          baseSalary: Number(m.baseSalary || m.salary || m.compensation || 0),
         });
       }
     } catch (e) {
@@ -975,15 +1017,37 @@ export default function StaffSalaryProfile() {
   // ── Derived data ──
   const stats = useMemo(() => {
     const monthlySalary = Number(employeeMeta.baseSalary || 0);
+
+    const isSalary =
+      (r) => r.type === "salary" ||
+        r.type === "salary_payment" ||
+        r.type === "salaryPayment" ||
+        r.type === "paid";
+    const isAdvance =
+      (r) => r.type === "advance" ||
+        r.type === "salary_advance" ||
+        r.type === "salaryAdvance" ||
+        r.type === "advance_payment";
+
+    const amountOf = (r) => {
+      const num = Number(r.amount ?? r.amountPaid ?? r.total ?? 0);
+      return Number.isFinite(num) ? num : 0;
+    };
+
+    const monthOf = (r) => {
+      const m = String(r.monthYear || "");
+      if (/^\d{4}-\d{2}$/.test(m)) return m;
+      const parsed = parseMonthYear(r.date || r.paidAt || r.createdAt);
+      return parsed || "";
+    };
+
     let totalPaidThisMonth = 0;
     let totalAdvanceThisMonth = 0;
 
     records.forEach((r) => {
-      const recordMonthYear = r.monthYear || parseMonthYear(r.date);
-      if (recordMonthYear === currentMonthYear) {
-        if (r.type === "salary") totalPaidThisMonth += Number(r.amount || 0);
-        if (r.type === "advance") totalAdvanceThisMonth += Number(r.amount || 0);
-      }
+      if (monthOf(r) !== statsMonth) return;
+      if (isSalary(r)) totalPaidThisMonth += amountOf(r);
+      if (isAdvance(r)) totalAdvanceThisMonth += amountOf(r);
     });
 
     return {
@@ -992,11 +1056,84 @@ export default function StaffSalaryProfile() {
       totalAdvanceThisMonth,
       netRemaining: monthlySalary - totalAdvanceThisMonth - totalPaidThisMonth,
     };
-  }, [currentMonthYear, employeeMeta.baseSalary, records]);
+  }, [statsMonth, employeeMeta.baseSalary, records]);
 
-  const attendanceSummary = useMemo(() => {
-    const presentRecords = attendance.filter((r) => r.status === "present");
-    const totalHoursDecimal = presentRecords.reduce(
+  const offDaySet = useMemo(
+    () =>
+      new Set(
+        (Array.isArray(employeeMeta.offDays) ? employeeMeta.offDays : [])
+          .map((day) => String(day).toLowerCase())
+          .filter((day) => WEEKDAY_KEYS.includes(day)),
+      ),
+    [employeeMeta.offDays],
+  );
+
+  const attendanceAnalysis = useMemo(() => {
+    const todayStr = dayjs().format("YYYY-MM-DD");
+    const shiftStartMin = toClockMinutes(employeeMeta.shiftStarted);
+    let shiftEndMin = toClockMinutes(employeeMeta.shiftEnded);
+    const hasShiftTimes = shiftStartMin != null && shiftEndMin != null;
+    const overnightShift = hasShiftTimes && shiftEndMin <= shiftStartMin;
+    if (overnightShift) shiftEndMin += 1440;
+
+    const buckets = { present: [], late: [], absent: [], off: [] };
+    const workedOrder = [];
+
+    const classify = (record) => {
+      const dayKey = weekdayKeyFromDate(record.date || record.punchInTime);
+      if (dayKey && offDaySet.has(dayKey)) return "off";
+
+      const hasPunchIn = Boolean(record.punchInTime);
+      let punchMin =
+        hasPunchIn && dayjs(record.punchInTime).isValid()
+          ? dayjs(record.punchInTime).hour() * 60 +
+            dayjs(record.punchInTime).minute()
+          : null;
+      if (punchMin != null && overnightShift) {
+        punchMin += punchMin < shiftStartMin ? 1440 : 0;
+      }
+
+      if (punchMin != null && hasShiftTimes) {
+        if (punchMin > shiftEndMin) return "absent";
+        if (punchMin > shiftStartMin) return "late";
+        return "present";
+      }
+
+      const isLateArrival =
+        record.isLatePunchIn === true || record.isLate === true;
+      if (hasPunchIn) {
+        if (record.status === "present" && !isLateArrival) return "present";
+        return "late";
+      }
+
+      // No punch-in: absent counts only once the shift end (or the day) has passed.
+      if (
+        dayjs(record.date).isValid() &&
+        dayjs(record.date).format("YYYY-MM-DD") === todayStr &&
+        hasShiftTimes
+      ) {
+        const nowMin = dayjs().hour() * 60 + dayjs().minute();
+        const nowEnd = overnightShift
+          ? nowMin + (nowMin < shiftStartMin ? 1440 : 0)
+          : nowMin;
+        if (nowEnd < shiftEndMin) return "pending";
+      }
+      return "absent";
+    };
+
+    attendance.forEach((record) => {
+      const bucket = classify(record);
+      if (bucket === "off") {
+        buckets.off.push(record);
+      } else if (bucket === "pending") {
+        // not counted anywhere yet
+      } else {
+        buckets[bucket].push(record);
+        workedOrder.push(record);
+      }
+    });
+
+    const totalHoursDecimal = workedOrder.reduce(
       (sum, r) => sum + calculateDurationDecimal(r.punchInTime, r.punchOutTime),
       0,
     );
@@ -1006,12 +1143,48 @@ export default function StaffSalaryProfile() {
       totalHoursDecimal > 0 ? `${totalH}h ${totalM}m` : "0h 0m";
 
     return {
-      present: presentRecords.length,
-      absent: attendance.filter((r) => r.status !== "present").length,
-      late: attendance.filter((r) => r.isLate).length,
+      ...buckets,
       totalHours: totalHoursStr,
+      totalHoursDecimal,
     };
-  }, [attendance]);
+  }, [
+    attendance,
+    offDaySet,
+    employeeMeta.shiftStarted,
+    employeeMeta.shiftEnded,
+  ]);
+
+  const attendanceSummary = useMemo(
+    () => ({
+      present: attendanceAnalysis.present.length,
+      late: attendanceAnalysis.late.length,
+      absent: attendanceAnalysis.absent.length,
+      off: attendanceAnalysis.off.length,
+      totalHours: attendanceAnalysis.totalHours,
+    }),
+    [attendanceAnalysis],
+  );
+
+  const filterOptions = useMemo(
+    () => [
+      { key: "all", label: "All", value: attendance.length },
+      { key: "present", label: "Present", value: attendanceAnalysis.present.length },
+      { key: "late", label: "Late arrivals", value: attendanceAnalysis.late.length },
+      { key: "absent", label: "Absent", value: attendanceAnalysis.absent.length },
+    ],
+    [attendance.length, attendanceAnalysis],
+  );
+
+  const filteredAttendance = useMemo(() => {
+    if (!attendanceFilter || attendanceFilter === "all") return attendance;
+    const bucketMap = {
+      present: attendanceAnalysis.present,
+      late: attendanceAnalysis.late,
+      absent: attendanceAnalysis.absent,
+      off: attendanceAnalysis.off,
+    };
+    return bucketMap[attendanceFilter] || [];
+  }, [attendance, attendanceFilter, attendanceAnalysis]);
 
   // ── Actions ──
   const handleDeleteRecord = async () => {
@@ -1067,6 +1240,14 @@ export default function StaffSalaryProfile() {
     [canManage, isSelf, membershipId, showError],
   );
 
+  const jumpToAttendance = useCallback(
+    (filter = "all") => {
+      setAttendanceFilter(filter);
+      setActiveTab("attendance");
+    },
+    [],
+  );
+
   const tabs = [
     { key: "overview", label: "Overview" },
     { key: "attendance", label: "Attendance" },
@@ -1111,7 +1292,7 @@ export default function StaffSalaryProfile() {
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
         {/* ── Left: staff profile card (sticky on desktop) ── */}
         <div className="w-full lg:sticky lg:top-6 lg:w-72 lg:shrink-0">
-          <StaffProfileCard meta={employeeMeta} loading={loading.meta} />
+          <StaffProfileCard meta={employeeMeta} loading={loading.meta} t={t} />
         </div>
 
         {/* ── Right: tabs + content ── */}
@@ -1124,7 +1305,20 @@ export default function StaffSalaryProfile() {
           {activeTab === "overview" && (
             <div className="space-y-4">
               {/* Salary metrics */}
-              <div className={STATS_GRID_CLASS}>
+              <Card>
+                <CardHeader
+                  title="Salary summary"
+                  description="Compensation, payments and advances for the selected month."
+                  right={
+                    <MonthYearSelect
+                      className="input-compact w-auto"
+                      value={statsMonth}
+                      onChange={(e) => setStatsMonth(e.target.value)}
+                    />
+                  }
+                />
+
+                <div className={`${STATS_GRID_CLASS} p-6`}>
                 {loading.meta ? (
                   <>
                     <CardSkeleton />
@@ -1144,27 +1338,28 @@ export default function StaffSalaryProfile() {
                     <StatsCard
                       title="Balance due"
                       value={formatMoney(t, stats.netRemaining)}
-                      hint="Remaining this month"
+                      hint={statsMonthLabel}
                       icon={Clock}
                       tone={Number(stats.netRemaining) < 0 ? "danger" : "warning"}
                     />
                     <StatsCard
                       title="Advances taken"
                       value={formatMoney(t, stats.totalAdvanceThisMonth)}
-                      hint={currentMonthYear}
+                      hint={statsMonthLabel}
                       icon={FileText}
                       tone="info"
                     />
                     <StatsCard
                       title="Salary paid"
                       value={formatMoney(t, stats.totalPaidThisMonth)}
-                      hint={currentMonthYear}
+                      hint={statsMonthLabel}
                       icon={ShieldCheck}
                       tone="success"
                     />
                   </>
                 )}
               </div>
+              </Card>
 
               {/* Pay structure — with inline edit for base salary */}
               <Card>
@@ -1199,8 +1394,9 @@ export default function StaffSalaryProfile() {
                     </div>
                     <Field label="Schedule" value="Monthly" />
                     <Field label="Shift" value={employeeMeta.shift || "—"} />
-                    <Field label="Shift Started" value={employeeMeta.shiftStarted ? String(employeeMeta.shiftStarted).slice(0, 5) : "—"} />
-                    <Field label="Shift Ended" value={employeeMeta.shiftEnded ? String(employeeMeta.shiftEnded).slice(0, 5) : "—"} />
+                    <Field label="Shift Started" value={employeeMeta.shiftStarted ? formatTime12Hour(employeeMeta.shiftStarted) : "—"} />
+                    <Field label="Shift Ended" value={employeeMeta.shiftEnded ? formatTime12Hour(employeeMeta.shiftEnded) : "—"} />
+                    <Field label="Off Days" value={formatOffDays(employeeMeta.offDays, t)} />
                     <Field label="Settlement" value="Advances + partials" />
                   </div>
                 )}
@@ -1226,24 +1422,28 @@ export default function StaffSalaryProfile() {
                       value={attendanceSummary.present}
                       icon={Users}
                       tone="success"
+                      onClick={() => jumpToAttendance("present")}
                     />
                     <StatsCard
                       title="Late"
                       value={attendanceSummary.late}
                       icon={Clock}
                       tone="warning"
+                      onClick={() => jumpToAttendance("late")}
                     />
                     <StatsCard
                       title="Absent"
                       value={attendanceSummary.absent}
                       icon={Calendar}
                       tone="danger"
+                      onClick={() => jumpToAttendance("absent")}
                     />
                     <StatsCard
                       title="Hours"
                       value={attendanceSummary.totalHours}
                       icon={Timer}
                       tone="info"
+                      onClick={() => jumpToAttendance("all")}
                     />
                   </div>
                 )}
@@ -1261,9 +1461,11 @@ export default function StaffSalaryProfile() {
                 <StatsCard
                   title="Present"
                   value={attendanceSummary.present}
-                  hint={`${attendanceDateFrom} → ${attendanceDateTo}`}
+                  hint="In selected range"
                   icon={Users}
                   tone="success"
+                  onClick={() => setAttendanceFilter("present")}
+                  isActive={attendanceFilter === "present"}
                 />
                 <StatsCard
                   title="Late arrivals"
@@ -1271,6 +1473,8 @@ export default function StaffSalaryProfile() {
                   hint="In selected range"
                   icon={Clock}
                   tone="warning"
+                  onClick={() => setAttendanceFilter("late")}
+                  isActive={attendanceFilter === "late"}
                 />
                 <StatsCard
                   title="Absent"
@@ -1278,14 +1482,40 @@ export default function StaffSalaryProfile() {
                   hint="In selected range"
                   icon={Calendar}
                   tone="danger"
+                  onClick={() => setAttendanceFilter("absent")}
+                  isActive={attendanceFilter === "absent"}
                 />
                 <StatsCard
                   title="Total hours"
                   value={attendanceSummary.totalHours}
-                  hint="In selected range"
+                  hint="In this range"
                   icon={Timer}
                   tone="info"
                 />
+              </div>
+
+              {/* Filter chips */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-secondary-400">
+                  Filter
+                </span>
+                {filterOptions.map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setAttendanceFilter(opt.key)}
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                      attendanceFilter === opt.key
+                        ? "border-primary-300 bg-primary-50 text-primary-700 shadow-sm dark:border-primary-700/70 dark:bg-primary-900/30 dark:text-primary-200"
+                        : "border-secondary-200/80 bg-white/80 text-secondary-700 hover:border-secondary-300 hover:bg-mist dark:border-slate-800/70 dark:bg-slate-950/40 dark:text-secondary-300 dark:hover:border-slate-700"
+                    }`}
+                  >
+                    {opt.label}
+                    <span className="rounded-full bg-secondary-100 px-1.5 py-0.5 text-[10px] tabular-nums dark:bg-slate-800">
+                      {opt.value}
+                    </span>
+                  </button>
+                ))}
               </div>
 
               {/* Filter bar */}
@@ -1352,12 +1582,20 @@ export default function StaffSalaryProfile() {
                 <Card className="overflow-hidden">
                   <TableSkeleton rows={5} />
                 </Card>
-              ) : attendance.length === 0 ? (
+              ) : filteredAttendance.length === 0 ? (
                 <Card>
                   <div className="p-6">
                     <Empty
-                      title="No records found"
-                      description="Adjust the date range above and refresh."
+                      title={
+                        attendanceFilter !== "all"
+                          ? `No ${attendanceFilter} records in this range`
+                          : "No records found"
+                      }
+                      description={
+                        attendanceFilter !== "all"
+                          ? "Try a different date range or reset the filter."
+                          : "Adjust the date range above and refresh."
+                      }
                     />
                   </div>
                 </Card>
@@ -1380,58 +1618,79 @@ export default function StaffSalaryProfile() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
-                        {attendance.map((record) => (
-                          <tr
-                            key={record.id}
-                            className="bg-white transition hover:bg-mist/60 dark:bg-slate-900 dark:hover:bg-slate-800/30"
-                          >
-                            <td className="p-3 font-medium text-ink dark:text-slate-200">
-                              <DateDisplay date={record.date} format="YYYY-MM-DD" />
-                            </td>
-                            <td className="p-3 tabular-nums">
-                              <div className="flex flex-col items-start gap-1">
-                                <span className={record.shiftStarted || record.shift ? (record.isLatePunchIn ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-ink dark:text-slate-200'}>
-                                  {formatMaybeDateTime(record.punchInTime, "hh:mm A") || "—"}
-                                </span>
-                                {record.isLatePunchIn && (
-                                  <span className="inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/20">
-                                    Late
-                                  </span>
+                        {filteredAttendance.map((record) => {
+                          const dayKey = weekdayKeyFromDate(
+                            record.date || record.punchInTime,
+                          );
+                          const isOffDay = dayKey
+                            ? offDaySet.has(dayKey)
+                            : false;
+
+                          return (
+                            <tr
+                              key={record.id}
+                              className={`bg-white transition hover:bg-mist/60 dark:bg-slate-900 dark:hover:bg-slate-800/30 ${isOffDay ? "opacity-60" : ""}`}
+                            >
+                              <td className="p-3 font-medium text-ink dark:text-slate-200">
+                                <DateDisplay date={record.date} format="YYYY-MM-DD" />
+                              </td>
+                              <td className="p-3 tabular-nums">
+                                {isOffDay ? (
+                                  <span className="text-secondary-400">—</span>
+                                ) : (
+                                  <div className="flex flex-col items-start gap-1">
+                                    <span className={record.shiftStarted || record.shift ? (record.isLatePunchIn ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-ink dark:text-slate-200'}>
+                                      {formatMaybeDateTime(record.punchInTime, "hh:mm A") || "—"}
+                                    </span>
+                                    {record.isLatePunchIn && (
+                                      <span className="inline-flex items-center rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/20">
+                                        Late
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
-                              </div>
-                            </td>
-                            <td className="p-3 tabular-nums">
-                              <div className="flex flex-col items-start gap-1">
-                                <span className={record.punchOutTime ? (record.shiftEnded || record.shift ? (record.isEarlyPunchOut ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-ink dark:text-slate-200') : 'text-secondary-500'}>
-                                  {formatMaybeDateTime(record.punchOutTime, "hh:mm A") || "—"}
-                                </span>
-                                {record.isEarlyPunchOut && (
-                                  <span className="inline-flex items-center rounded-md bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-800 ring-1 ring-inset ring-rose-600/20 dark:bg-rose-900/20 dark:text-rose-300 dark:ring-rose-500/20">
-                                    Left Early
-                                  </span>
+                              </td>
+                              <td className="p-3 tabular-nums">
+                                {isOffDay ? (
+                                  <span className="text-secondary-400">—</span>
+                                ) : (
+                                  <div className="flex flex-col items-start gap-1">
+                                    <span className={record.punchOutTime ? (record.shiftEnded || record.shift ? (record.isEarlyPunchOut ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-semibold') : 'text-ink dark:text-slate-200') : 'text-secondary-500'}>
+                                      {formatMaybeDateTime(record.punchOutTime, "hh:mm A") || "—"}
+                                    </span>
+                                    {record.isEarlyPunchOut && (
+                                      <span className="inline-flex items-center rounded-md bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-800 ring-1 ring-inset ring-rose-600/20 dark:bg-rose-900/20 dark:text-rose-300 dark:ring-rose-500/20">
+                                        Left Early
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
-                              </div>
-                            </td>
-                            <td className="p-3">
-                              <HoursBadge
-                                duration={
-                                  record.status === "present"
-                                    ? calculateDuration(
-                                        record.punchInTime,
-                                        record.punchOutTime,
-                                      )?.formatted || null
-                                    : null
-                                }
-                              />
-                            </td>
-                            <td className="p-3">
-                              <LocationDisplay record={record} />
-                            </td>
-                            <td className="p-3">
-                              <AttendancePill status={record.status} />
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                              <td className="p-3">
+                                {isOffDay ? (
+                                  <span className="text-secondary-400">—</span>
+                                ) : (
+                                  <HoursBadge
+                                    duration={
+                                      record.status === "present"
+                                        ? calculateDuration(
+                                            record.punchInTime,
+                                            record.punchOutTime,
+                                          )?.formatted || null
+                                        : null
+                                    }
+                                  />
+                                )}
+                              </td>
+                              <td className="p-3">
+                                <LocationDisplay record={record} />
+                              </td>
+                              <td className="p-3">
+                                {isOffDay ? <OffDayPill /> : <AttendancePill status={record.status} />}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
