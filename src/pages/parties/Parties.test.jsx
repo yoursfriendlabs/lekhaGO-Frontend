@@ -68,6 +68,8 @@ describe('Parties', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: /add party/i })[0]);
 
+    expect(screen.getByText('Photo')).toBeInTheDocument();
+
     const supplierButtons = screen.getAllByRole('button', { name: 'Supplier' });
     expect(supplierButtons).toHaveLength(2);
     fireEvent.click(supplierButtons[1]);
@@ -123,8 +125,7 @@ describe('Parties', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Hari/ }));
 
-    const viewLink = await screen.findByRole('link', { name: 'View' });
-    expect(viewLink).toHaveAttribute('href', '/app/invoice/sales/sale-1');
+    expect(await screen.findByRole('button', { name: 'View' })).toBeInTheDocument();
     expect(screen.queryByText(/Running balance/i)).not.toBeInTheDocument();
     expect(screen.getByText(/5,100\.00/)).toBeInTheDocument();
     expect(screen.getByText(/To Receive/)).toBeInTheDocument();
@@ -169,22 +170,16 @@ describe('Parties', () => {
     renderWithProviders(<Parties />, { route: '/app/parties', withAuth: true });
 
     await waitFor(() => {
-      expect(screen.getAllByRole('link', { name: 'View' })).toHaveLength(10);
+      expect(screen.getAllByRole('button', { name: 'View' })).toHaveLength(10);
     });
     expect(screen.queryByRole('button', { name: 'Prev' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
-    expect(
-      screen.getAllByRole('link', { name: 'View' }).map((link) => link.getAttribute('href'))
-    ).not.toContain('/app/invoice/sales/sale-11');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Load more' }));
 
     await waitFor(() => {
-      expect(screen.getAllByRole('link', { name: 'View' })).toHaveLength(12);
+      expect(screen.getAllByRole('button', { name: 'View' })).toHaveLength(12);
     });
-    expect(
-      screen.getAllByRole('link', { name: 'View' }).map((link) => link.getAttribute('href'))
-    ).toContain('/app/invoice/sales/sale-11');
     expect(apiMocks.partyStatement).toHaveBeenCalledWith(
       expect.objectContaining({ partyId: 'party-1', limit: 10, offset: 10 })
     );

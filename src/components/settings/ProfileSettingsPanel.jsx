@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import Notice from '../ui/Notice.jsx';
+import FileUpload from '../form/FileUpload.jsx';
 import { api } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useBusinessSettings } from '../../lib/business/businessSettings';
@@ -18,6 +19,7 @@ export default function ProfileSettingsPanel({ isOwner = false }) {
     name: '',
     phone: '',
     businessName: '',
+    avatarUrl: '',
   });
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState({ type: 'info', message: '' });
@@ -33,6 +35,7 @@ export default function ProfileSettingsPanel({ isOwner = false }) {
       name: user?.name || '',
       phone: user?.phone || '',
       businessName: getBusinessName(business, user),
+      avatarUrl: user?.avatarUrl || '',
     });
   }, [business, user]);
 
@@ -55,14 +58,17 @@ export default function ProfileSettingsPanel({ isOwner = false }) {
       const payload = {
         name: form.name.trim(),
         phone: form.phone.trim(),
+        avatarUrl: form.avatarUrl.trim() || null,
         businessName: isOwner ? form.businessName.trim() : getBusinessName(business, user),
       };
       const response = await api.updateCurrentUser(payload);
       const nextSnapshot = syncSession(response, {
         user: {
           ...(user || {}),
+          ...(response?.user || {}),
           name: payload.name,
           phone: payload.phone,
+          avatarUrl: payload.avatarUrl,
         },
         business: isOwner
           ? {
@@ -108,6 +114,13 @@ export default function ProfileSettingsPanel({ isOwner = false }) {
         ) : null}
 
         <form onSubmit={handleSubmit} className="space-y-5">
+          <FileUpload
+            label={t('settingsPage.profile.photo')}
+            initialUrl={form.avatarUrl}
+            onUpload={(url) => handleChange('avatarUrl', url || '')}
+          />
+          <p className="-mt-3 text-xs text-secondary-400">{t('settingsPage.profile.photoHint')}</p>
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
               <label className="label" htmlFor="profile-name">{t('auth.name')}</label>

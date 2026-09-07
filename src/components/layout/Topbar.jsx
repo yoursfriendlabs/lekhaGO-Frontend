@@ -1,20 +1,21 @@
 import { Link } from 'react-router-dom';
-import { Clock3, LogOut, Sparkles, TriangleAlert, UserRound } from 'lucide-react';
+import { Clock3, LogOut, Sparkles, TriangleAlert } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
 import { useI18n } from '../../lib/i18n.jsx';
 import { getSubscriptionStatusState } from '../../lib/subscription.js';
 import TaskNotificationsButton from '../tasks/TaskNotificationsButton.jsx';
 import ThemeSelector from '../ui/ThemeSelector.jsx';
+import Avatar from '../ui/Avatar.jsx';
 import { formatSubscriptionDaysRemainingLabel, formatSubscriptionStatusDate } from '../subscription/SubscriptionStatusBanner.jsx';
 import UpgradeSubscriptionCta, { shouldShowUpgradeCta } from '../subscription/UpgradeSubscriptionCta.jsx';
 import BrandLogo from './BrandLogo.jsx';
 import WorkspaceSwitcher from './WorkspaceSwitcher.jsx';
 
 export default function Topbar() {
-  const { logout, role, subscription, accessControl } = useAuth();
+  const { logout, role, subscription, user } = useAuth();
   const { locale, setLocale, t } = useI18n();
 
-  const showStaffProfileLink = role === 'staff' && Boolean(accessControl?.membershipId);
+  const showProfileLink = Boolean(user?.id || user?.name);
   const subscriptionAccess = subscription?.access || null;
   const subscriptionStatus = getSubscriptionStatusState(subscription);
   const isActiveTrial = subscriptionStatus.kind === 'trial' || subscriptionStatus.kind === 'trial-expiring';
@@ -73,14 +74,20 @@ export default function Topbar() {
             {locale === 'en' ? '🇳🇵' : '🇬🇧'}
           </button>
 
-          {showStaffProfileLink ? (
+          {showProfileLink ? (
             <Link
               to="/app/profile"
-              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-2xl border border-secondary-200 bg-surface px-3 py-2 text-sm font-semibold text-ink transition-transform active:scale-95"
+              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-2xl border border-secondary-200 bg-surface px-2 py-1.5 text-sm font-semibold text-ink transition-transform active:scale-95 md:px-3"
               aria-label={t('nav.profile')}
               title={t('nav.profile')}
             >
-              <UserRound className="h-4 w-4" aria-hidden />
+              <Avatar
+                src={user?.avatarUrl}
+                name={user?.name}
+                size="sm"
+                className="rounded-lg"
+                fallbackClassName="bg-primary-100 text-primary-700"
+              />
               <span className="hidden md:inline">{t('nav.profile')}</span>
             </Link>
           ) : null}
