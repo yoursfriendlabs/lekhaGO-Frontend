@@ -922,10 +922,6 @@ function StaffFormDialog({
                                 ...(isParties && requiredPartiesLevel !== "none"
                                   ? ["none"]
                                   : []),
-                                ...(isParties &&
-                                requiredPartiesLevel === "manage"
-                                  ? ["view"]
-                                  : []),
                               ];
 
                               return (

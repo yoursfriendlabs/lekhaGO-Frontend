@@ -189,7 +189,6 @@ export function getRequiredPartiesAccessLevel(permissions) {
 
   for (const key of PARTY_DEPENDENT_PERMISSION_KEYS) {
     const level = normalizeAccessLevel(source[key]);
-    if (level === 'manage') return 'manage';
     if (level !== 'none') required = 'view';
   }
 
