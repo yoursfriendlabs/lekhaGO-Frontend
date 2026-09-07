@@ -10,7 +10,6 @@ import {
   Plus,
   Search,
   ShoppingBag,
-  Sparkles,
   Store,
   UserRound,
   Utensils,
@@ -19,12 +18,9 @@ import {
 } from "lucide-react";
 import PageHeader from "../../components/layout/PageHeader.jsx";
 import Notice from "../../components/ui/Notice.jsx";
-import PaymentMethodFields from "../../components/form/PaymentMethodFields.jsx";
-import NoteTextarea from "../../components/form/NoteTextarea.jsx";
-import QuickPaymentButtons from "../../components/form/QuickPaymentButtons.jsx";
 import QuickPartySelector from "../../components/parties/QuickPartySelector.jsx";
 import QuickActionSuccessDialog from "../../components/orders/QuickActionSuccessDialog.jsx";
-import FlexibleDateInput from "../../components/form/FlexibleDateInput.jsx";
+import QuickPosCheckoutDialog from "../../components/sales/QuickPosCheckoutDialog.jsx";
 import { Dialog } from "../../components/ui/Dialog.tsx";
 import MobileFormStepper from "../../components/form/MobileFormStepper.jsx";
 import { api } from "../../lib/api";
@@ -168,7 +164,8 @@ const emptyCheckoutForm = {
   saleDate: todayISODate(),
   invoiceNo: "",
   notes: "",
-  discount: "", // placeholder — starts empty like taxRate
+  discount: "",
+  taxRate: "",
   amountReceived: "0",
   paymentMethod: "cash",
   bankId: "",
@@ -1463,13 +1460,6 @@ export default function QuickPos() {
         <button
           type="button"
           className="btn-secondary h-11 justify-center rounded-[18px] text-sm font-bold"
-          onClick={handleReviewBill}
-        >
-          {t("Checkout") || "Checkout"}
-        </button>
-        <button
-          type="button"
-          className="btn-primary h-11 justify-center rounded-[18px] text-sm font-bold"
           onClick={() => handleSubmit("save")}
           disabled={!cart.length || submitting}
         >
@@ -1478,6 +1468,13 @@ export default function QuickPos() {
             : isTablesEnabled
               ? t("quickPos.confirmOrder") || "Confirm Order"
               : t("quickPos.quickSave")}
+        </button>
+        <button
+          type="button"
+          className="btn-primary h-11 justify-center rounded-[18px] text-sm font-bold"
+          onClick={handleReviewBill}
+        >
+          {t("quickPos.checkout")}
         </button>
       </div>
     </div>
@@ -2490,509 +2487,48 @@ export default function QuickPos() {
         </div>
       ) : null}
 
-      <Dialog
+      <QuickPosCheckoutDialog
         isOpen={checkoutOpen}
         onClose={handleCloseCheckout}
-        title={t("quickPos.confirmSale")}
-        size="full"
-        footer={
-          <div className="flex w-full flex-col gap-3 md:flex-row">
-            <button
-              type="button"
-              className="btn-secondary w-full justify-center rounded-[22px] md:w-auto md:flex-1"
-              onClick={() => handleSubmit("print")}
-              disabled={!cart.length || submitting}
-            >
-              {t("quickPos.saveAndPrint")}
-            </button>
-            <button
-              type="button"
-              className="btn-primary w-full justify-center rounded-[22px] md:w-auto md:flex-1"
-              onClick={() => handleSubmit("save")}
-              disabled={!cart.length || submitting}
-            >
-              {submitting
-                ? t("common.saving")
-                : isTablesEnabled
-                  ? t("quickPos.confirmOrder") || "Confirm Order"
-                  : t("quickPos.saveOnly")}
-            </button>
-          </div>
-        }
-      >
-        <div className="space-y-3 overflow-x-hidden">
-          {status.message ? (
-            <Notice title={status.message} tone={status.type} />
-          ) : null}
-          <div
-            className={`grid gap-2 sm:grid-cols-2 ${businessProfile?.settings?.enabledModules?.includes("tables") ? "lg:grid-cols-3" : ""}`}
-          >
-            <label className="rounded-lg border border-secondary-200 bg-white px-3 py-2 transition focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-200">
-              <span className="text-xs font-medium uppercase text-secondary-500">
-                {t("quickPos.invoiceNumber")}
-              </span>
-              <input
-                className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-ink placeholder:text-secondary-400 focus:outline-none focus:ring-0"
-                value={checkoutForm.invoiceNo}
-                onChange={(event) =>
-                  setCheckoutForm((previous) => ({
-                    ...previous,
-                    invoiceNo: event.target.value,
-                  }))
-                }
-                placeholder={suggestedInvoiceNo || t("quickPos.autoInvoice")}
-              />
-            </label>
-
-            <label className="rounded-lg border border-secondary-200 bg-white px-3 py-2 transition focus-within:border-primary-400 focus-within:ring-1 focus-within:ring-primary-200">
-              <span className="text-xs font-medium uppercase text-secondary-500">
-                {t("common.date")}
-              </span>
-              <FlexibleDateInput
-                className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-ink focus:outline-none focus:ring-0"
-                value={checkoutForm.saleDate}
-                onChange={(event) =>
-                  setCheckoutForm((previous) => ({
-                    ...previous,
-                    saleDate: event.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            {businessProfile?.settings?.enabledModules?.includes("tables") && (
-              <label className="rounded-lg border border-secondary-200 bg-white px-3 py-2 transition focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20">
-                <span className="text-xs font-medium uppercase text-secondary-500">
-                  {t("tables.tableName") || "Table"}
-                </span>
-                <select
-                  className="mt-1 w-full border-0 bg-transparent p-0 text-sm font-semibold text-ink focus:outline-none focus:ring-0"
-                  value={checkoutForm.tableId || ""}
-                  onChange={(event) =>
-                    setCheckoutForm((previous) => ({
-                      ...previous,
-                      tableId: event.target.value,
-                    }))
-                  }
-                >
-                  <option value="">No Table / Takeaway</option>
-                  {vacantTables.map((table) => (
-                    <option key={table.id} value={table.id}>
-                      {table.name}{" "}
-                      {table.capacity ? `(Cap: ${table.capacity})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-          </div>
-
-          <div className="rounded-lg border border-secondary-200 bg-mist px-3 py-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary-700">
-                  <UserRound size={18} />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-ink">
-                    {selectedParty?.name || t("quickPos.walkInCustomer")}
-                  </p>
-                  {selectedParty?.phone && (
-                    <p className="truncate text-xs text-secondary-500">
-                      {selectedParty.phone}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn-ghost rounded-md px-2 text-xs font-semibold"
-                onClick={() => setPartySelectorOpen(true)}
-              >
-                {selectedParty ? t("common.change") : t("quickPos.selectParty")}
-              </button>
-            </div>
-          </div>
-
-          {activeSessionOption === "delivery" && (
-            <div className="rounded-lg border border-secondary-200 bg-mist px-3 py-2.5 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-secondary-500 flex items-center gap-1">
-                  <Truck size={12} className="text-primary" /> Delivery Details
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDeliveryFormState({
-                      customerName:
-                        activeAttributes?.customer_name ||
-                        selectedParty?.name ||
-                        "",
-                      customerPhone:
-                        activeAttributes?.customer_phone ||
-                        selectedParty?.phone ||
-                        "",
-                      location:
-                        activeAttributes?.customer_address ||
-                        selectedParty?.address ||
-                        "",
-                      notes: checkoutForm?.notes || "",
-                    });
-                    setDeliveryFormOpen(true);
-                  }}
-                  className="text-[10px] font-bold text-primary hover:underline"
-                >
-                  Edit
-                </button>
-              </div>
-              <div className="text-xs space-y-0.5 text-ink-light">
-                <p>
-                  <span className="font-semibold text-ink">Name:</span>{" "}
-                  {activeAttributes?.customer_name || "-"}
-                </p>
-                <p>
-                  <span className="font-semibold text-ink">Phone:</span>{" "}
-                  {activeAttributes?.customer_phone || "-"}
-                </p>
-                <p>
-                  <span className="font-semibold text-ink">Location:</span>{" "}
-                  {activeAttributes?.customer_address || "-"}
-                </p>
-                {checkoutForm?.notes && (
-                  <p>
-                    <span className="font-semibold text-ink">Notes:</span>{" "}
-                    {checkoutForm.notes}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-lg border border-secondary-200 bg-white px-3 py-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase text-secondary-700">
-                {t("quickPos.billingItems", { count: cart.length })}
-              </p>
-              <button
-                type="button"
-                className="btn-ghost rounded-md px-2 text-xs"
-                onClick={() => setCheckoutOpen(false)}
-              >
-                {t("quickPos.addItems")}
-              </button>
-            </div>
-
-            <div className="mt-2 space-y-1.5 max-h-[180px] overflow-y-auto overflow-x-hidden">
-              {cart.map((item) => (
-                <div
-                  key={item.productId}
-                  className="rounded-lg border border-secondary-200 bg-white px-2 py-1.5 text-xs hover:bg-mist transition"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-ink">
-                        {item.name}
-                      </p>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-1 text-secondary-700">
-                        <span>{t("currency.symbol")}</span>
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          className="w-16 border-0 bg-transparent p-0 text-xs font-semibold text-ink-light focus:outline-none focus:ring-0"
-                          value={item.unitPrice}
-                          onChange={(e) =>
-                            updateCartPrice(item.productId, e.target.value)
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <div className="flex items-center gap-0.5 rounded-md border border-secondary-200 bg-white px-1">
-                        <button
-                          type="button"
-                          className="p-0.5 text-secondary-700 hover:text-ink"
-                          onClick={() =>
-                            updateCartQuantity(
-                              item.productId,
-                              Number(item.quantity) - 1,
-                            )
-                          }
-                        >
-                          <Minus size={10} />
-                        </button>
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          min="0"
-                          className="w-8 border-0 bg-transparent p-0 text-center text-xs font-semibold text-ink focus:outline-none focus:ring-0"
-                          value={item.quantity || ""}
-                          placeholder="0"
-                          onChange={(e) =>
-                            updateCartQuantity(item.productId, e.target.value)
-                          }
-                        />
-                        <button
-                          type="button"
-                          className="p-0.5 text-primary hover:text-primary-700"
-                          onClick={() =>
-                            updateCartQuantity(
-                              item.productId,
-                              Number(item.quantity) + 1,
-                            )
-                          }
-                        >
-                          <Plus size={10} />
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        className="p-0.5 text-rose-500 hover:text-rose-600"
-                        onClick={() => updateCartQuantity(item.productId, 0)}
-                        title={t("common.delete")}
-                      >
-                        <X size={10} />
-                      </button>
-                      <span className="font-bold text-primary-700">
-                        {money(item.lineTotal)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-            <div className="space-y-3">
-              <div className="rounded-2xl border border-amber-200/40 bg-gradient-to-br from-amber-50/60 to-yellow-50/40 px-4 py-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-700">
-                      {t("quickPos.discount")}
-                    </p>
-                    <p className="text-lg font-bold text-amber-700">
-                      {Number(checkoutForm.discount || 0) > 0
-                        ? `- ${money(totals.discountTotal)}`
-                        : t("sales.addDiscount")}
-                    </p>
-                  </div>
-                  <div className="relative flex-1 max-w-[130px] flex justify-end">
-                    <div className="relative w-full">
-                      <input
-                        className="input h-10 w-full rounded-xl border-amber-300/30 bg-white/80 pr-8 text-right font-semibold text-sm focus:border-amber-400 focus:ring-amber-100/50"
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        step="0.01"
-                        value={checkoutForm.discount || ""}
-                        onChange={(event) =>
-                          setCheckoutForm((previous) => ({
-                            ...previous,
-                            discount: event.target.value,
-                          }))
-                        }
-                        placeholder="0"
-                      />
-                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-secondary-500">
-                        {t("currency.symbol")}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-blue-200/40 bg-gradient-to-br from-blue-50/60 to-cyan-50/40 px-4 py-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 space-y-1">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-700">
-                      {t("tax") || "VAT"}
-                    </p>
-                    <p className="text-lg font-bold text-blue-700">
-                      {Number(checkoutForm.taxRate || 0) > 0
-                        ? money(totals.taxTotal)
-                        : t("sales.addTax")}
-                    </p>
-                  </div>
-                  <div className="relative flex-1 max-w-[130px] flex justify-end">
-                    <div className="relative w-full">
-                      <input
-                        className="input h-10 w-full rounded-xl border-blue-300/30 bg-white/80 pr-8 text-right font-semibold text-sm focus:border-blue-400 focus:ring-blue-100/50"
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        step="0.01"
-                        value={checkoutForm.taxRate || ""}
-                        onChange={(event) =>
-                          setCheckoutForm((previous) => ({
-                            ...previous,
-                            taxRate: event.target.value,
-                          }))
-                        }
-                        placeholder="0"
-                      />
-                      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-secondary-500">
-                        %
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-secondary-200 bg-white px-4 py-4 shadow-sm">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-500">
-                  {t("common.notes")}
-                </p>
-                <NoteTextarea
-                  className="input mt-2.5 min-h-[80px] resize-none rounded-xl text-sm border-secondary-200 focus:border-primary focus:ring-primary/10"
-                  value={checkoutForm.notes}
-                  onChange={(event) =>
-                    setCheckoutForm((previous) => ({
-                      ...previous,
-                      notes: event.target.value,
-                    }))
-                  }
-                  placeholder={t("quickPos.notesPlaceholder")}
-                />
-              </div>
-            </div>
-
-            <div className="min-w-0 space-y-3">
-              <div className="rounded-lg border border-secondary-200 bg-mist px-3 py-3">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-secondary-700">
-                    <span>{t("sales.subTotal")}</span>
-                    <span className="font-semibold text-ink">
-                      {money(totals.subTotal)}
-                    </span>
-                  </div>
-                  {totals.taxTotal > 0 && (
-                    <div className="flex items-center justify-between text-xs text-secondary-700">
-                      <span>{t("sales.taxTotal")}</span>
-                      <span className="font-semibold text-ink">
-                        {money(totals.taxTotal)}
-                      </span>
-                    </div>
-                  )}
-                  {totals.discountTotal > 0 && (
-                    <div className="flex items-center justify-between text-xs text-secondary-700">
-                      <span>{t("quickPos.discount")}</span>
-                      <span className="font-semibold text-ink">
-                        - {money(totals.discountTotal)}
-                      </span>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between border-t border-secondary-200 pt-2 text-sm font-bold text-ink">
-                    <span>{t("sales.grandTotal")}</span>
-                    <span>{money(totals.grandTotal)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-secondary-200 bg-white px-4 py-4 space-y-3 shadow-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-secondary-500">
-                    {t("services.amountReceived") || "Amount Received"}
-                  </span>
-                  <label className="flex items-center gap-2 rounded-2xl border border-secondary-200/70 bg-mist/70 px-4 py-3 text-sm font-semibold text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-secondary-300 dark:hover:bg-slate-800/60 cursor-pointer shrink-0">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded accent-primary-600 cursor-pointer"
-                      checked={isPaid}
-                      onChange={(event) => {
-                        const checked = event.target.checked;
-                        setIsPaid(checked);
-                        if (checked) {
-                          setCheckoutForm((prev) => ({
-                            ...prev,
-                            amountReceived: totals.grandTotal.toFixed(2),
-                          }));
-                        } else {
-                          setCheckoutForm((prev) => ({
-                            ...prev,
-                            amountReceived: "0",
-                          }));
-                        }
-                      }}
-                    />
-                    {t("quickPos.fullyPaid") || "Fully Paid"}
-                  </label>
-                </div>
-
-                <div className="flex w-full items-center overflow-hidden rounded-xl border border-secondary-200 bg-white shadow-2xs focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition">
-                  <span className="flex h-10 items-center bg-secondary-100 px-3 text-xs font-bold text-secondary-500 border-r border-secondary-200 shrink-0">
-                    {t("currency.symbol") || "Rs"}
-                  </span>
-                  <input
-                    className="h-10 w-full bg-transparent px-3 text-sm font-bold text-ink focus:outline-none"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="0.01"
-                    value={checkoutForm.amountReceived}
-                    onChange={(event) => {
-                      const val = event.target.value;
-                      setCheckoutForm((previous) => ({
-                        ...previous,
-                        amountReceived: val,
-                      }));
-                      const numVal = Number(val || 0);
-                      setIsPaid(numVal >= totals.grandTotal && totals.grandTotal > 0);
-                    }}
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {quickAmountOptions.map((opt, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        const val = opt.value;
-                        setCheckoutForm((prev) => ({
-                          ...prev,
-                          amountReceived: String(val.toFixed(2)),
-                        }));
-                        setIsPaid(val >= totals.grandTotal && totals.grandTotal > 0);
-                      }}
-                      className="px-2.5 py-1 rounded-xl border border-secondary-200 hover:border-primary text-xs font-bold text-ink-light bg-mist hover:bg-primary/5 transition shadow-2xs"
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-
-                {changeAmount > 0 ? (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-bold text-emerald-800 flex justify-between items-center shadow-2xs">
-                    <span className="flex items-center gap-1.5">
-                      <Sparkles size={14} className="text-emerald-600" />
-                      {t("sales.changeToReturn") || "Change to Return"}
-                    </span>
-                    <span className="text-sm font-black text-emerald-700">
-                      {money(changeAmount)}
-                    </span>
-                  </div>
-                ) : dueAmount > 0 ? (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-bold text-amber-800 flex justify-between items-center shadow-2xs">
-                    <span>{t("sales.dueAmount") || "Due Amount"}</span>
-                    <span className="text-sm font-black text-amber-700">
-                      {money(dueAmount)}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="rounded-[28px] border border-secondary-200 bg-white px-4 py-4 min-w-0">
-                <PaymentMethodFields
-                  value={checkoutForm}
-                  onChange={handleCheckoutPaymentChange}
-                  bankAccountError={bankAccountError}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </Dialog>
+        t={t}
+        money={money}
+        status={status}
+        cart={cart}
+        cartCount={cartCount}
+        totals={totals}
+        checkoutForm={checkoutForm}
+        setCheckoutForm={setCheckoutForm}
+        onPaymentChange={handleCheckoutPaymentChange}
+        bankAccountError={bankAccountError}
+        selectedParty={selectedParty}
+        onSelectParty={() => setPartySelectorOpen(true)}
+        isPaid={isPaid}
+        setIsPaid={setIsPaid}
+        showTables={Boolean(businessProfile?.settings?.enabledModules?.includes("tables"))}
+        vacantTables={vacantTables}
+        isTablesEnabled={isTablesEnabled}
+        activeSessionOption={activeSessionOption}
+        activeAttributes={activeAttributes}
+        onEditDelivery={() => {
+          setDeliveryFormState({
+            customerName:
+              activeAttributes?.customer_name || selectedParty?.name || "",
+            customerPhone:
+              activeAttributes?.customer_phone || selectedParty?.phone || "",
+            location:
+              activeAttributes?.customer_address || selectedParty?.address || "",
+            notes: checkoutForm?.notes || "",
+          });
+          setDeliveryFormOpen(true);
+        }}
+        suggestedInvoiceNo={suggestedInvoiceNo}
+        quickAmountOptions={quickAmountOptions}
+        changeAmount={changeAmount}
+        dueAmount={dueAmount}
+        submitting={submitting}
+        onSubmit={handleSubmit}
+        onEditItems={handleCloseCheckout}
+      />
 
       <QuickPartySelector
         isOpen={partySelectorOpen}

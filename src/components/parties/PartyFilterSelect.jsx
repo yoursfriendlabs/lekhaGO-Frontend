@@ -1,4 +1,5 @@
 import AsyncSearchableSelect from '../form/AsyncSearchableSelect.jsx';
+import Avatar from '../ui/Avatar.jsx';
 import { api } from '../../lib/api';
 import { useI18n } from '../../lib/i18n.jsx';
 import { toPartyLookupOption } from '../../lib/lookups.js';
@@ -64,9 +65,18 @@ export default function PartyFilterSelect({
     const phone = party.phone || '';
 
     return (
-      <div className="min-w-0">
-        <p className="truncate font-semibold text-ink">{name}</p>
-        {showPhone && phone ? <p className="truncate text-xs text-secondary-500">{phone}</p> : null}
+      <div className="flex min-w-0 items-center gap-2">
+        <Avatar
+          src={party.avatarUrl}
+          name={name}
+          size="sm"
+          className="rounded-lg"
+          fallbackClassName="bg-secondary-100 text-secondary-600"
+        />
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-ink">{name}</p>
+          {showPhone && phone ? <p className="truncate text-xs text-secondary-500">{phone}</p> : null}
+        </div>
       </div>
     );
   };
