@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '../lib/auth.jsx';
 import { I18nProvider } from '../lib/i18n.jsx';
 import { ThemeProvider } from '../lib/theme.jsx';
+import { BusinessSettingsProvider } from '../lib/business/businessSettings.jsx';
 
 export function renderWithProviders(ui, { route = '/', withAuth = false } = {}) {
   const Wrapper = ({ children }) => (
@@ -15,7 +16,13 @@ export function renderWithProviders(ui, { route = '/', withAuth = false } = {}) 
     >
       <ThemeProvider>
         <I18nProvider>
-          {withAuth ? <AuthProvider>{children}</AuthProvider> : children}
+          {withAuth ? (
+            <AuthProvider>
+              <BusinessSettingsProvider>
+                {children}
+              </BusinessSettingsProvider>
+            </AuthProvider>
+          ) : children}
         </I18nProvider>
       </ThemeProvider>
     </MemoryRouter>

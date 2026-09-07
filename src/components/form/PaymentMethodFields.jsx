@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Banknote, Landmark } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 import NoteTextarea from './NoteTextarea.jsx';
 import { api } from '../../lib/api';
@@ -24,6 +25,7 @@ export default function PaymentMethodFields({
   noteLabel,
   notePlaceholder,
   className = '',
+  variant = 'select',
 }) {
   const { t } = useI18n();
 
@@ -151,27 +153,59 @@ export default function PaymentMethodFields({
   const helperClassName = 'text-[11px] leading-5';
 
   return (
-    <div className={`grid gap-3 sm:grid-cols-2 ${className}`}>
+    <div className={`grid gap-3 ${variant === 'segmented' ? '' : 'sm:grid-cols-2'} ${className}`}>
       <div className="min-w-0">
         <label className={labelClassName}>
           {t('payments.paymentMethod')}
         </label>
 
-        <select
-          className={fieldClassName}
-          value={paymentMethod}
-          onChange={(event) => {
-            const nextMethod = event.target.value;
+        {variant === 'segmented' ? (
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { value: 'cash', label: t('payments.cash'), icon: Banknote },
+              { value: 'bank', label: t('payments.bank'), icon: Landmark },
+            ].map((option) => {
+              const active = paymentMethod === option.value;
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() =>
+                    updateValue({
+                      paymentMethod: option.value,
+                      bankId: option.value === 'bank' ? bankId : '',
+                    })
+                  }
+                  className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-bold transition ${
+                    active
+                      ? 'border-primary bg-primary text-white shadow-sm'
+                      : 'border-secondary-200 bg-white text-ink-light hover:border-primary/40 hover:bg-primary/5'
+                  }`}
+                >
+                  <Icon size={18} />
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <select
+            className={fieldClassName}
+            value={paymentMethod}
+            onChange={(event) => {
+              const nextMethod = event.target.value;
 
-            updateValue({
-              paymentMethod: nextMethod,
-              bankId: nextMethod === 'bank' ? bankId : '',
-            });
-          }}
-        >
-          <option value="cash">{t('payments.cash')}</option>
-          <option value="bank">{t('payments.bank')}</option>
-        </select>
+              updateValue({
+                paymentMethod: nextMethod,
+                bankId: nextMethod === 'bank' ? bankId : '',
+              });
+            }}
+          >
+            <option value="cash">{t('payments.cash')}</option>
+            <option value="bank">{t('payments.bank')}</option>
+          </select>
+        )}
       </div>
 
       {paymentMethod === 'bank' && (

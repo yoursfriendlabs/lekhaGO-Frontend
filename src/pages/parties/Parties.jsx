@@ -17,6 +17,8 @@ import ActionMenu from '../../components/ui/ActionMenu.jsx';
 import FlexibleDateInput from '../../components/form/FlexibleDateInput.jsx';
 import DateDisplay from '../../components/form/DateDisplay.jsx';
 import PartyFilterSelect from '../../components/parties/PartyFilterSelect.jsx';
+import Avatar from "../../components/ui/Avatar.jsx";
+import FileUpload from "../../components/form/FileUpload.jsx";
 import { Dialog } from "../../components/ui/Dialog.tsx";
 import ConfirmDialog from "../../components/ui/ConfirmDialog.jsx";
 import { api } from "../../lib/api";
@@ -62,6 +64,7 @@ const emptyForm = {
   openingBalance: 0,
   asOfDate: "",
   balanceType: "receive",
+  avatarUrl: "",
 };
 
 const makeEmptyTx = () => ({
@@ -816,6 +819,7 @@ export default function Parties() {
       openingBalance: party.openingBalance || 0,
       asOfDate: party.asOfDate || "",
       balanceType: party.balanceType || "receive",
+      avatarUrl: party.avatarUrl || "",
     });
     setIsOpen(true);
   };
@@ -1358,13 +1362,12 @@ export default function Parties() {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white transition-colors ${
-                          isSelected ? "bg-emerald-600" : "bg-slate-400"
-                        }`}
-                      >
-                        {party.name?.slice(0, 2).toUpperCase() || "P"}
-                      </div>
+                      <Avatar
+                        src={party.avatarUrl}
+                        name={party.name}
+                        size="md"
+                        fallbackClassName={isSelected ? "bg-emerald-600 text-white" : "bg-slate-400 text-white"}
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="flex items-center gap-1.5 font-semibold text-ink">
                           {party.name}
@@ -1460,9 +1463,13 @@ export default function Parties() {
             <>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-semibold text-emerald-700">
-                    {selectedPartyView.name?.slice(0, 1).toUpperCase() || "P"}
-                  </div>
+                  <Avatar
+                    src={selectedPartyView.avatarUrl}
+                    name={selectedPartyView.name}
+                    size="lg"
+                    className="rounded-2xl"
+                    fallbackClassName="bg-emerald-100 text-emerald-700"
+                  />
                   <div>
                     <p className="text-xl font-semibold text-ink">
                       {selectedPartyView.name}
@@ -1845,6 +1852,12 @@ export default function Parties() {
           {status.message ? (
             <Notice title={status.message} tone={status.type} />
           ) : null}
+          <FileUpload
+            key={editingId || "create"}
+            label={t("parties.photo")}
+            initialUrl={form.avatarUrl}
+            onUpload={(url) => setForm((prev) => ({ ...prev, avatarUrl: url || "" }))}
+          />
           <div className="grid gap-3 md:grid-cols-2">
             <div>
               <label className="label">{t("parties.partyName")}</label>
