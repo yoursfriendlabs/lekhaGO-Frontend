@@ -1257,10 +1257,19 @@ export default function Parties() {
         }
       />
 
-      {status.message ? (
+      {status.message && status.type === "info" ? (
         <Notice title={status.message} tone={status.type} />
       ) : null}
       {listError ? <Notice title={listError} tone="error" /> : null}
+
+      {status.message &&
+      (status.type === "success" || status.type === "error") ? (
+        <div className="pointer-events-none fixed inset-x-0 top-5 z-[120] flex justify-center px-4">
+          <div className="pointer-events-auto w-full max-w-sm">
+            <Notice title={status.message} tone={status.type} />
+          </div>
+        </div>
+      ) : null}
 
 
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
@@ -1849,9 +1858,6 @@ export default function Parties() {
             submitParty(false);
           }}
         >
-          {status.message ? (
-            <Notice title={status.message} tone={status.type} />
-          ) : null}
           <FileUpload
             key={editingId || "create"}
             label={t("parties.photo")}
