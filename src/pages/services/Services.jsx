@@ -1327,7 +1327,6 @@ export default function Services() {
   const statusFilterOptions = useMemo(
     () => [
       { value: "all", label: t("services.allStatuses") },
-      { value: "open", label: t("services.open") },
       { value: "in_progress", label: t("services.inProgress") },
       { value: "closed", label: t("services.closed") },
     ],
