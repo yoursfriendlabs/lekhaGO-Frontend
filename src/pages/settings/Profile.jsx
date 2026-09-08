@@ -12,7 +12,7 @@ export default function Profile() {
   const isOwner = role === 'owner';
 
   return (
-    <div className="min-w-0 max-w-6xl space-y-6 overflow-x-hidden">
+    <div className="min-w-0 space-y-6 overflow-x-hidden">
       <PageHeader 
         title={t('settingsPage.tabs.profile')} 
         subtitle={t('settingsPage.profile.subtitle') || "View and update your personal information and settings."} 
