@@ -1397,16 +1397,29 @@ export default function QuickPos() {
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <button
-              type="button"
-              className="flex items-center gap-1.5 text-xs font-semibold text-secondary-500"
-              onClick={() => setPartySelectorOpen(true)}
-            >
-              <UserRound size={12} className="text-primary-600 shrink-0" />
-              <span className="truncate">
-                {selectedParty?.name || t("quickPos.walkInCustomer")}
-              </span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-secondary-500"
+                onClick={() => setPartySelectorOpen(true)}
+              >
+                <UserRound size={12} className="text-primary-600 shrink-0" />
+                <span className="truncate">
+                  {selectedParty?.name || t("quickPos.walkInCustomer")}
+                </span>
+              </button>
+              {selectedParty ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedParty(null)}
+                  className="flex shrink-0 items-center gap-1 rounded-full border border-rose-200 bg-white px-2 py-0.5 text-[10px] font-bold text-rose-600 transition hover:bg-rose-50"
+                  title={t("common.remove")}
+                >
+                  <X size={10} />
+                  {t("common.remove")}
+                </button>
+              ) : null}
+            </div>
           </div>
           <div className="shrink-0 text-right">
             <p className="text-[10px] font-bold uppercase tracking-widest text-secondary-400">
@@ -2133,13 +2146,26 @@ export default function QuickPos() {
                   {suggestedInvoiceNo || t("quickPos.draftBill")}
                 </h3>
               </div>
-              <button
-                type="button"
-                className="btn-ghost rounded-full px-3"
-                onClick={() => setPartySelectorOpen(true)}
-              >
-                {selectedParty ? t("common.change") : t("quickPos.selectParty")}
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  className="btn-ghost rounded-full px-3"
+                  onClick={() => setPartySelectorOpen(true)}
+                >
+                  {selectedParty ? t("common.change") : t("quickPos.selectParty")}
+                </button>
+                {selectedParty ? (
+                  <button
+                    type="button"
+                    aria-label={t("common.remove")}
+                    title={t("common.remove")}
+                    className="btn-ghost rounded-full px-2 text-rose-600"
+                    onClick={() => setSelectedParty(null)}
+                  >
+                    <X size={14} />
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             {/* <div className="mt-5 rounded-[24px] border border-secondary-200 bg-mist px-4 py-3">
@@ -2502,6 +2528,7 @@ export default function QuickPos() {
         bankAccountError={bankAccountError}
         selectedParty={selectedParty}
         onSelectParty={() => setPartySelectorOpen(true)}
+        onRemoveParty={() => setSelectedParty(null)}
         isPaid={isPaid}
         setIsPaid={setIsPaid}
         showTables={Boolean(businessProfile?.settings?.enabledModules?.includes("tables"))}

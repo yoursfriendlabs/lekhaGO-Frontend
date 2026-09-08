@@ -6,6 +6,7 @@ import {
   Sparkles,
   Truck,
   UserRound,
+  X,
 } from 'lucide-react';
 import { Dialog } from '../ui/Dialog.tsx';
 import Notice from '../ui/Notice.jsx';
@@ -28,6 +29,7 @@ export default function QuickPosCheckoutDialog({
   bankAccountError,
   selectedParty,
   onSelectParty,
+  onRemoveParty,
   isPaid,
   setIsPaid,
   showTables = false,
@@ -168,13 +170,33 @@ export default function QuickPosCheckoutDialog({
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              className="btn-ghost h-9 rounded-xl px-3 text-xs font-bold"
-              onClick={onSelectParty}
-            >
-              {selectedParty ? t('common.change') : t('quickPos.selectParty')}
-            </button>
+            {selectedParty ? (
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  className="btn-ghost h-9 rounded-xl px-3 text-xs font-bold"
+                  onClick={onSelectParty}
+                >
+                  {t('common.change')}
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost h-9 flex items-center gap-1 rounded-xl px-2.5 text-xs font-bold text-rose-600"
+                  onClick={onRemoveParty}
+                  title={t('common.remove')}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn-ghost h-9 rounded-xl px-3 text-xs font-bold"
+                onClick={onSelectParty}
+              >
+                {t('quickPos.selectParty')}
+              </button>
+            )}
           </div>
         </div>
 
