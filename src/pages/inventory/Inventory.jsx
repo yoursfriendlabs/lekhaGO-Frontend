@@ -361,7 +361,6 @@ export default function Inventory() {
     ],
   );
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("stock");
   const [form, setForm] = useState(makeEmptyItem());
   const [saving, setSaving] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
@@ -971,7 +970,6 @@ export default function Inventory() {
       itemCode: generateItemCode(),
       itemType: itemTypeOptions[0]?.value || "goods",
     });
-    setActiveTab("stock");
     setIsOpen(true);
   };
 
@@ -989,7 +987,6 @@ export default function Inventory() {
     setEditingId(product.id);
     setForm(productToForm(product));
     setEditBatches(Array.isArray(product.batches) ? product.batches : []);
-    setActiveTab("stock");
     setIsOpen(true);
 
     try {
@@ -1033,7 +1030,6 @@ export default function Inventory() {
   const closeDialog = () => {
     setIsOpen(false);
     setForm(makeEmptyItem());
-    setActiveTab("stock");
     setEditingId(null);
     setEditBatches([]);
   };
@@ -2092,7 +2088,10 @@ export default function Inventory() {
           className="space-y-5"
           onSubmit={handleSubmit}
         >
-          <FormSectionCard hint={t("inventory.help")}>
+          <FormSectionCard
+            title={t("inventory.basicInfo")}
+            hint={t("inventory.help")}
+          >
             <div className="space-y-4">
               <div className="flex flex-col gap-4 md:flex-row md:items-start">
                 {/* Image Upload Zone */}
@@ -2210,6 +2209,26 @@ export default function Inventory() {
                         placeholder={t("inventory.itemCodePlaceholder")}
                       />
                     </div>
+
+                    {showJewelleryFields ? (
+                      <div>
+                        <label className="label">Metal type</label>
+                        <select
+                          id="inventory-metal-type"
+                          className="input mt-1"
+                          name="metalType"
+                          value={form.metalType}
+                          onChange={handleFormChange}
+                        >
+                          <option value="">Select metal</option>
+                          {METAL_TYPE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
 
                     <div className="sm:col-span-2">
                       <label className="label">
@@ -2355,281 +2374,201 @@ export default function Inventory() {
                   </div>
                 )}
               </div>
-
-              {/* Item Type & Metal Type Fields */}
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {showJewelleryFields ? (
-                  <div>
-                    <label className="label">Metal type</label>
-                    <select
-                      id="inventory-metal-type"
-                      className="input mt-1"
-                      name="metalType"
-                      value={form.metalType}
-                      onChange={handleFormChange}
-                    >
-                      <option value="">Select metal</option>
-                      {METAL_TYPE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : null}
-              </div>
             </div>
           </FormSectionCard>
 
-          <div className="flex border-b border-secondary-200 dark:border-slate-800 gap-6 px-1">
-            <button
-              id="inventory-stock-tab"
-              type="button"
-              onClick={() => setActiveTab("stock")}
-              className={`pb-3 text-sm font-semibold transition-all relative ${
-                activeTab === "stock"
-                  ? "text-primary"
-                  : "text-secondary-500 hover:text-ink dark:text-secondary-400 dark:hover:text-white"
-              }`}
-            >
-              {t("inventory.stockDetails")}
-              {activeTab === "stock" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-              )}
-            </button>
-            <button
-              id="inventory-other-tab"
-              type="button"
-              onClick={() => setActiveTab("other")}
-              className={`pb-3 text-sm font-semibold transition-all relative ${
-                activeTab === "other"
-                  ? "text-primary"
-                  : "text-secondary-500 hover:text-ink dark:text-secondary-400 dark:hover:text-white"
-              }`}
-            >
-              {t("inventory.otherDetails")}
-              {activeTab === "other" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-              )}
-            </button>
-          </div>
+          <FormSectionCard>
+            <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+              <h3 className="sm:col-span-2 text-sm font-bold uppercase tracking-wide text-secondary-700">
+                {t("inventory.stockDetails")}
+              </h3>
+              <h3 className="sm:col-span-2 text-sm font-bold uppercase tracking-wide text-secondary-700 lg:border-l lg:border-secondary-200 lg:pl-6 dark:border-slate-800">
+                {t("inventory.otherDetails")}
+              </h3>
 
-          <FormSectionCard
-            title={
-              activeTab === "stock"
-                ? t("inventory.stockDetails")
-                : t("inventory.otherDetails")
-            }
-          >
-            {activeTab === "stock" ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {showJewelleryFields ? (
-                  <div>
-                    <label className="label">Purity</label>
-                    {purityOptions.length > 0 ? (
-                      <select
-                        id="inventory-purity"
-                        className="input mt-1"
-                        name="purity"
-                        value={form.purity}
-                        onChange={handleFormChange}
-                      >
-                        <option value="">Select purity</option>
-                        {purityOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        id="inventory-purity"
-                        className="input mt-1"
-                        name="purity"
-                        value={form.purity}
-                        onChange={handleFormChange}
-                        placeholder="e.g. 22K or 925"
-                      />
-                    )}
+              <div>
+                <label className="label">{t("inventory.openingStock")}</label>
+                <input
+                  id="inventory-opening-stock"
+                  className="input-compact mt-1 w-full"
+                  name="openingStock"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={form.openingStock}
+                  onChange={handleFormChange}
+                />
+              </div>
+              <div>
+                <label className="label">
+                  {t("inventory.measuringUnit")}
+                </label>
+                <select
+                  id="inventory-measuring-unit"
+                  className="input-compact mt-1 w-full"
+                  value={primaryUnitSelectValue}
+                  onChange={handlePrimaryUnitChange}
+                >
+                  <option value="">
+                    {t("unitsManagement.selectPrimary")}
+                  </option>
+                  {primaryUnitChoices.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {unitsError ? (
+                  <p className="mt-2 text-xs text-rose-600">{unitsError}</p>
+                ) : null}
+                {!unitsError && unitsLoading ? (
+                  <p className="mt-2 text-xs text-secondary-500">
+                    {t("common.loading")}
+                  </p>
+                ) : null}
+                {!unitsError && !unitsLoading && unitOptions.length === 0 ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-secondary-500">
+                    <span>{t("unitsManagement.manageHint")}</span>
+                    <Link
+                      className="font-semibold text-emerald-600 hover:text-emerald-700"
+                      to={buildSettingsTabPath(UNITS_SETTINGS_TAB)}
+                    >
+                      {t("unitsManagement.manageCta")}
+                    </Link>
                   </div>
                 ) : null}
-                <div>
-                  <label className="label">{t("inventory.openingStock")}</label>
-                  <input
-                    id="inventory-opening-stock"
-                    className="input mt-1"
-                    name="openingStock"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={form.openingStock}
-                    onChange={handleFormChange}
-                  />
-                </div>
+              </div>
+              <div className="lg:col-start-3 lg:border-l lg:border-secondary-200 lg:pl-6 dark:border-slate-800">
+                <label className="label">{t("products.secondaryUnit")}</label>
+                <select
+                  id="inventory-secondary-unit"
+                  className="input-compact mt-1 w-full"
+                  value={secondaryUnitSelectValue}
+                  onChange={handleSecondaryUnitChange}
+                  disabled={!hasPrimaryUnitSelected}
+                >
+                  <option value="">
+                    {t("unitsManagement.selectSecondary")}
+                  </option>
+                  {secondaryUnitChoices.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {!hasPrimaryUnitSelected ? (
+                  <p className="mt-2 text-xs text-secondary-500">
+                    Add a primary unit first.
+                  </p>
+                ) : null}
+              </div>
+              <div>
+                <label className="label">
+                  {t("products.conversionRate")}
+                </label>
+                <input
+                  id="inventory-conversion-rate"
+                  className="input-compact mt-1 w-full"
+                  name="conversionRate"
+                  type="number"
+                  step="1"
+                  value={form.conversionRate}
+                  onChange={handleFormChange}
+                />
+              </div>
+              <div>
+                <label className="label">{t("products.salePrice")}</label>
+                <input
+                  id="inventory-sale-price"
+                  className="input-compact mt-1 w-full"
+                  name="salePrice"
+                  type="number"
+                  step="0.1"
+                  value={form.salePrice}
+                  onChange={handleFormChange}
+                />
+              </div>
+              {canViewPurchasePrice ? (
                 <div>
                   <label className="label">
-                    {t("inventory.measuringUnit")}
+                    {t("products.purchasePrice")}
                   </label>
-                  <select
-                    id="inventory-measuring-unit"
-                    className="input mt-1"
-                    value={primaryUnitSelectValue}
-                    onChange={handlePrimaryUnitChange}
-                  >
-                    <option value="">
-                      {t("unitsManagement.selectPrimary")}
-                    </option>
-                    {primaryUnitChoices.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  {unitsError ? (
-                    <p className="mt-2 text-xs text-rose-600">{unitsError}</p>
-                  ) : null}
-                  {!unitsError && unitsLoading ? (
-                    <p className="mt-2 text-xs text-secondary-500">
-                      {t("common.loading")}
-                    </p>
-                  ) : null}
-                  {!unitsError && !unitsLoading && unitOptions.length === 0 ? (
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-secondary-500">
-                      <span>{t("unitsManagement.manageHint")}</span>
-                      <Link
-                        className="font-semibold text-emerald-600 hover:text-emerald-700"
-                        to={buildSettingsTabPath(UNITS_SETTINGS_TAB)}
-                      >
-                        {t("unitsManagement.manageCta")}
-                      </Link>
-                    </div>
-                  ) : null}
-                </div>
-                <div>
-                  <label className="label">{t("products.salePrice")}</label>
                   <input
-                    id="inventory-sale-price"
-                    className="input mt-1"
-                    name="salePrice"
+                    id="inventory-purchase-price"
+                    className="input-compact mt-1 w-full"
+                    name="purchasePrice"
                     type="number"
                     step="0.1"
-                    value={form.salePrice}
+                    value={form.purchasePrice}
                     onChange={handleFormChange}
+                    readOnly={!canManagePurchasePrice}
+                    disabled={!canManagePurchasePrice}
                   />
                 </div>
-                {canViewPurchasePrice ? (
-                  <div>
-                    <label className="label">
-                      {t("products.purchasePrice")}
-                    </label>
+              ) : null}
+              <div className="lg:col-start-3 lg:border-l lg:border-secondary-200 lg:pl-6 dark:border-slate-800">
+                <label className="label">
+                  {t("products.secondaryPrice")}
+                </label>
+                <input
+                  id="inventory-secondary-sale-price"
+                  className="input-compact mt-1 w-full"
+                  name="secondarySalePrice"
+                  type="number"
+                  step="0.01"
+                  value={form.secondarySalePrice}
+                  onChange={handleFormChange}
+                />
+              </div>
+              <div className="flex flex-col justify-end">
+                <div className="flex items-center justify-between rounded-xl border border-secondary-200 bg-secondary-50/20 px-3.5 py-2.5 dark:border-slate-800 dark:bg-slate-900/50">
+                  <span className="text-sm font-semibold text-secondary-700 dark:text-secondary-300">
+                    {t("inventory.lowStockAlert")}
+                  </span>
+                  <label className="relative inline-flex cursor-pointer items-center text-xs">
                     <input
-                      id="inventory-purchase-price"
-                      className="input mt-1"
-                      name="purchasePrice"
-                      type="number"
-                      step="0.1"
-                      value={form.purchasePrice}
+                      id="inventory-low-stock-alert"
+                      type="checkbox"
+                      className="peer sr-only"
+                      name="lowStockAlert"
+                      checked={form.lowStockAlert}
                       onChange={handleFormChange}
-                      readOnly={!canManagePurchasePrice}
-                      disabled={!canManagePurchasePrice}
                     />
-                  </div>
-                ) : null}
-                <div>
-                  <label className="label">{t("inventory.mrpPrice")}</label>
-                  <input
-                    id="inventory-mrp-price"
-                    className="input mt-1"
-                    name="mrpPrice"
-                    type="number"
-                    step="0.1"
-                    value={form.mrpPrice}
-                    onChange={handleFormChange}
-                  />
+                    <div className="peer h-6 w-11 rounded-full bg-secondary-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-secondary-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:bg-slate-700"></div>
+                  </label>
                 </div>
-                {/* <div>
-                  <label className="label">{t('inventory.wholesalePrice')}</label>
-                  <input className="input mt-1" name="wholesalePrice" type="number" step="0.01" value={form.wholesalePrice} onChange={handleFormChange} />
-                </div>
+              </div>
+              {showJewelleryFields ? (
                 <div className="sm:col-span-2">
-                  <label className="label">{t('inventory.minWholesaleQty')}</label>
-                  <input className="input mt-1" name="minWholesaleQuantity" type="number" step="0.01" value={form.minWholesaleQuantity} onChange={handleFormChange} />
-                </div> */}
-              </div>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="label">{t("products.secondaryUnit")}</label>
-                  <select
-                    id="inventory-secondary-unit"
-                    className="input mt-1"
-                    value={secondaryUnitSelectValue}
-                    onChange={handleSecondaryUnitChange}
-                    disabled={!hasPrimaryUnitSelected}
-                  >
-                    <option value="">
-                      {t("unitsManagement.selectSecondary")}
-                    </option>
-                    {secondaryUnitChoices.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  {!hasPrimaryUnitSelected ? (
-                    <p className="mt-2 text-xs text-secondary-500">
-                      Add a primary unit first.
-                    </p>
-                  ) : null}
+                  <label className="label">Purity</label>
+                  {purityOptions.length > 0 ? (
+                    <select
+                      id="inventory-purity"
+                      className="input-compact mt-1 w-full"
+                      name="purity"
+                      value={form.purity}
+                      onChange={handleFormChange}
+                    >
+                      <option value="">Select purity</option>
+                      {purityOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      id="inventory-purity"
+                      className="input-compact mt-1 w-full"
+                      name="purity"
+                      value={form.purity}
+                      onChange={handleFormChange}
+                      placeholder="e.g. 22K or 925"
+                    />
+                  )}
                 </div>
-                <div>
-                  <label className="label">
-                    {t("products.conversionRate")}
-                  </label>
-                  <input
-                    id="inventory-conversion-rate"
-                    className="input mt-1"
-                    name="conversionRate"
-                    type="number"
-                    step="1"
-                    value={form.conversionRate}
-                    onChange={handleFormChange}
-                  />
-                </div>
-                <div>
-                  <label className="label">
-                    {t("products.secondaryPrice")}
-                  </label>
-                  <input
-                    id="inventory-secondary-sale-price"
-                    className="input mt-1"
-                    name="secondarySalePrice"
-                    type="number"
-                    step="0.01"
-                    value={form.secondarySalePrice}
-                    onChange={handleFormChange}
-                  />
-                </div>
-                <div className="flex flex-col justify-end">
-                  <div className="flex items-center justify-between rounded-xl border border-secondary-200 bg-secondary-50/20 px-3.5 py-2.5 dark:border-slate-800 dark:bg-slate-900/50">
-                    <span className="text-sm font-semibold text-secondary-700 dark:text-secondary-300">
-                      {t("inventory.lowStockAlert")}
-                    </span>
-                    <label className="relative inline-flex cursor-pointer items-center text-xs">
-                      <input
-                        id="inventory-low-stock-alert"
-                        type="checkbox"
-                        className="peer sr-only"
-                        name="lowStockAlert"
-                        checked={form.lowStockAlert}
-                        onChange={handleFormChange}
-                      />
-                      <div className="peer h-6 w-11 rounded-full bg-secondary-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-secondary-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none dark:bg-slate-700"></div>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
+              ) : null}
+            </div>
           </FormSectionCard>
 
           <div className="mobile-sticky-actions flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
