@@ -1,5 +1,6 @@
 export const ALL_STOCK_EXPIRED_CODE = 'ALL_STOCK_EXPIRED';
 export const INSUFFICIENT_SELLABLE_STOCK_CODE = 'INSUFFICIENT_SELLABLE_STOCK';
+export const NEAR_EXPIRY_DAYS = 90;
 
 export function todayYmd(now = new Date()) {
   const year = now.getFullYear();
@@ -12,6 +13,30 @@ export function isExpiryDateExpired(expiryDate, asOf = todayYmd()) {
   const match = String(expiryDate || '').match(/^\d{4}-\d{2}-\d{2}/);
   if (!match) return false;
   return match[0] < asOf;
+}
+
+export function ymdPlusDays(ymd, days) {
+  const match = String(ymd || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return '';
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  date.setDate(date.getDate() + Number(days));
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function isExpiryDateNear(
+  expiryDate,
+  asOf = todayYmd(),
+  days = NEAR_EXPIRY_DAYS,
+) {
+  const match = String(expiryDate || '').match(/^\d{4}-\d{2}-\d{2}/);
+  if (!match) return false;
+  const expiry = match[0];
+  if (expiry < asOf) return false;
+  const horizon = ymdPlusDays(asOf, days);
+  return Boolean(horizon) && expiry <= horizon;
 }
 
 export function getTotalStockQuantity(product = {}) {
