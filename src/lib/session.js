@@ -46,8 +46,15 @@ export function normalizeSessionPayload(payload = {}, fallback = {}) {
     ?? null;
   const normalizedProfileSource = asObject(businessProfileSource);
   const role = pickString(source.role, source.user?.role, fallbackSource.role, fallbackSource.user?.role);
-  const userSource = asObject(source.user) || asObject(fallbackSource.user);
-  const user = userSource ? { ...userSource, ...(role ? { role } : {}) } : null;
+  const userSource = asObject(source.user);
+  const fallbackUserSource = asObject(fallbackSource.user);
+  const user = (userSource || fallbackUserSource)
+    ? {
+      ...(userSource || {}),
+      ...(fallbackUserSource || {}),
+      ...(role ? { role } : {}),
+    }
+    : null;
   const businessProfile = normalizedProfileSource
     ? normalizeBusinessProfile({
       ...normalizedProfileSource,

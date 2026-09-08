@@ -63,4 +63,34 @@ describe('session helpers', () => {
     expect(snapshot.subscription?.access?.planKey).toBe('growth');
     expect(snapshot.subscription?.access?.canUseApplication).toBe(true);
   });
+
+  it('merges fallback user fields over the response user so explicit profile overrides survive', () => {
+    const snapshot = normalizeSessionPayload(
+      {
+        user: {
+          id: 'user-1',
+          name: 'Old Name',
+          email: 'old@example.com',
+          role: 'staff',
+        },
+        business: null,
+        businessProfile: null,
+        role: 'staff',
+      },
+      {
+        token: 'tok-1',
+        user: {
+          id: 'user-1',
+          name: 'New Name',
+          phone: '9800000000',
+          avatarUrl: 'https://cdn.test/avatar.jpg',
+        },
+      }
+    );
+
+    expect(snapshot.user?.id).toBe('user-1');
+    expect(snapshot.user?.name).toBe('New Name');
+    expect(snapshot.user?.phone).toBe('9800000000');
+    expect(snapshot.user?.avatarUrl).toBe('https://cdn.test/avatar.jpg');
+  });
 });
