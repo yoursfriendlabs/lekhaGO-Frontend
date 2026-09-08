@@ -122,7 +122,7 @@ export default function QuickPosCheckoutDialog({
           <Notice title={status.message} tone={status.type} />
         ) : null}
 
-        <div className="rounded-[24px] bg-ink px-4 py-4 text-white shadow-sm">
+        <div className="rounded-[24px] bg-primary px-4 py-4 text-white shadow-sm">
           <div className="flex items-end justify-between gap-3">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-white/60">
