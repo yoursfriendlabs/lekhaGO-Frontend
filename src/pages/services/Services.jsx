@@ -196,6 +196,15 @@ export default function Services() {
   const [formNotice, setFormNotice] = useState({ type: "", message: "" });
   const formNoticeTimerRef = useRef(null);
 
+  useEffect(() => {
+    if (formNotice.type !== "success" && formNotice.type !== "error") return;
+    const timer = setTimeout(
+      () => setFormNotice({ type: "", message: "" }),
+      3000,
+    );
+    return () => clearTimeout(timer);
+  }, [formNotice]);
+
   // ── Payment dialog ──
   const [payDialog, setPayDialog] = useState(null);
   const [payAmount, setPayAmount] = useState("");
