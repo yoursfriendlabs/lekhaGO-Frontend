@@ -39,6 +39,18 @@ export default function FlexibleDateInput({
   const [dropdownStyle, setDropdownStyle] = useState(null);
   const containerRef = useRef(null);
   const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
+
+  const handleAdFieldClick = () => {
+    if (disabled) return;
+    try {
+      if (typeof inputRef.current?.showPicker === 'function') {
+        inputRef.current.showPicker();
+      }
+    } catch {
+      // Some browsers reject showPicker() under certain states; ignore.
+    }
+  };
 
   const bsFromValue = useMemo(() => (value ? adISOToBsParts(value) : null), [value]);
   const fallbackBs = todayBsParts();
@@ -221,6 +233,7 @@ export default function FlexibleDateInput({
           {calendar === 'ad' ? (
             <input
               id={id}
+              ref={inputRef}
               className={inputClassName}
               name={name}
               type="date"
@@ -228,6 +241,7 @@ export default function FlexibleDateInput({
               onChange={onChange}
               disabled={disabled}
               required={required}
+              onClick={handleAdFieldClick}
             />
           ) : (
             <button
