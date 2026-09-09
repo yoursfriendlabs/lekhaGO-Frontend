@@ -582,7 +582,7 @@ export default function Dashboard() {
                 <Link id='quick-sale' className="btn-primary w-full justify-center" to={canViewFeature('quickPos') ? (businessProfile?.salesFlow?.route || '/app/pos') : '/app/sales'}>{t('dashboard.quickSale')}</Link>
               ) : null}
               {canViewFeature('purchases') ? (
-                <Link id='new-purchase' className="btn-ghost w-full justify-center" to="/app/purchases?create=1&entry=expense">{t('dashboard.newPurchase')}</Link>
+                <Link id='new-purchase' className="btn-ghost w-full justify-center" to="/app/purchases?create=1&entry=expense">{t('NewExpense')}</Link>
               ) : null}
               {tasksEnabled ? (
                 <Link className="btn-ghost w-full justify-center" to={canManageTasks ? '/app/tasks?create=1' : '/app/tasks'}>
