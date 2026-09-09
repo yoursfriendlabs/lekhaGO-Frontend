@@ -103,5 +103,12 @@ export function getNavigationForBusinessType(navigation = [], businessProfile) {
     ];
   }
 
+  const servicesIndex = normalized.findIndex((item) => item?.key === 'services');
+  const billingIndex = normalized.findIndex((item) => item?.key === 'billing');
+  if (servicesIndex >= 0 && billingIndex >= 0 && servicesIndex !== billingIndex + 1) {
+    const [servicesItem] = normalized.splice(servicesIndex, 1);
+    normalized.splice(billingIndex, 0, servicesItem);
+  }
+
   return normalized;
 }
