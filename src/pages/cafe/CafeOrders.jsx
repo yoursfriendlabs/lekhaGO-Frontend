@@ -136,7 +136,6 @@ export default function CafeOrders() {
   });
   const [items, setItems] = useState([{ ...emptyItem }]);
 
-  const salesRoute = businessProfile?.salesFlow?.route || '/app/pos';
   const [backendTables, setBackendTables] = useState([]);
   const [selectedFloorTab, setSelectedFloorTab] = useState('all');
   const [floors, setFloors] = useState([]);
@@ -763,9 +762,6 @@ export default function CafeOrders() {
         subtitle="Manage dine-in, takeaway, and ready-to-serve orders from one live board."
         action={(
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Link className="btn-ghost w-full justify-center sm:w-auto" to={salesRoute}>
-              Open POS
-            </Link>
             <button className="btn-primary w-full sm:w-auto" type="button" onClick={() => navigate('/app/pos?ref=orders')}>
               <Plus size={16} className="mr-1.5 inline" />
               New Order
