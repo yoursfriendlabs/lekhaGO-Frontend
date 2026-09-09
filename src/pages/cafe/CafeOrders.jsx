@@ -1122,10 +1122,17 @@ export default function CafeOrders() {
                       </td>
                       <td className="p-3 max-w-[220px]">
                         {Array.isArray(order.SaleItems) && order.SaleItems.length > 0 ? (
-                          <span className="truncate block font-medium" title={order.SaleItems.map(i => `${i.quantity}x ${i.Product?.name || i.name}`).join(', ')}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrderForItemsDialog(order)}
+                            className="truncate block font-medium text-left w-full hover:text-primary"
+                            title={order.SaleItems.map(i => `${i.quantity}x ${i.Product?.name || i.name}`).join(', ')}
+                          >
                             {order.SaleItems.slice(0, 2).map(i => `${i.quantity}x ${i.Product?.name || i.name}`).join(', ')}
-                            {order.SaleItems.length > 2 ? ` +${order.SaleItems.length - 2} more` : ''}
-                          </span>
+                            {order.SaleItems.length > 2 ? (
+                              <span className="font-bold text-primary"> +{order.SaleItems.length - 2} more</span>
+                            ) : ''}
+                          </button>
                         ) : (
                           <span className="text-secondary-400">No items</span>
                         )}

@@ -29,7 +29,7 @@ import PageHeader from "../../components/layout/PageHeader";
 import Notice from "../../components/ui/Notice";
 import BarGraph from "../../components/ui/BarGraph";
 import PieChart from "../../components/ui/PieChart";
-import Pagination from '../../components/ui/Pagination';
+import Pagination from "../../components/ui/Pagination";
 import PartyFilterSelect from "../../components/parties/PartyFilterSelect.jsx";
 import RefreshButton from "../../components/ui/RefreshButton.jsx";
 import FlexibleDateInput from "../../components/form/FlexibleDateInput.jsx";
@@ -39,11 +39,20 @@ import { useI18n } from "../../lib/i18n.jsx";
 import { useAuth } from "../../lib/auth";
 import { useBusinessSettings } from "../../lib/business/businessSettings";
 import dayjs, { formatMaybeDate, todayISODate } from "../../lib/dates/datetime";
-import { normalizeLookupParty, toPartyLookupOption } from '../../lib/lookups.js';
-import { getPaymentTypeDisplay, hasPaymentTypeData } from '../../lib/money/paymentType';
-import { printElement } from '../../lib/print/print';
-import { formatLedgerNote } from '../../lib/money/ledger';
-import { PartyStatementEntries, PartyStatementPrintSheet } from './PartyStatementViews.jsx';
+import {
+  normalizeLookupParty,
+  toPartyLookupOption,
+} from "../../lib/lookups.js";
+import {
+  getPaymentTypeDisplay,
+  hasPaymentTypeData,
+} from "../../lib/money/paymentType";
+import { printElement } from "../../lib/print/print";
+import { formatLedgerNote } from "../../lib/money/ledger";
+import {
+  PartyStatementEntries,
+  PartyStatementPrintSheet,
+} from "./PartyStatementViews.jsx";
 
 const EMPTY_METRIC_TOTALS = Object.freeze({
   count: 0,
@@ -160,9 +169,7 @@ function firstNumber(source, keys = []) {
 
 function normalizeStringList(value) {
   if (Array.isArray(value)) {
-    return value
-      .map((item) => String(item || "").trim())
-      .filter(Boolean);
+    return value.map((item) => String(item || "").trim()).filter(Boolean);
   }
   if (typeof value === "string") {
     return value
@@ -214,9 +221,16 @@ function DatePresetSelect({ fromValue, toValue, onChange, disabled = false }) {
     const endOfYear = today.endOf("year").format("YYYY-MM-DD");
     if (fromValue === startOfYear && toValue === endOfYear) return "year";
 
-    const startOfPrevYear = today.subtract(1, "year").startOf("year").format("YYYY-MM-DD");
-    const endOfPrevYear = today.subtract(1, "year").endOf("year").format("YYYY-MM-DD");
-    if (fromValue === startOfPrevYear && toValue === endOfPrevYear) return "prev_year";
+    const startOfPrevYear = today
+      .subtract(1, "year")
+      .startOf("year")
+      .format("YYYY-MM-DD");
+    const endOfPrevYear = today
+      .subtract(1, "year")
+      .endOf("year")
+      .format("YYYY-MM-DD");
+    if (fromValue === startOfPrevYear && toValue === endOfPrevYear)
+      return "prev_year";
 
     return "custom";
   };
@@ -255,13 +269,17 @@ function DatePresetSelect({ fromValue, toValue, onChange, disabled = false }) {
         onChange={handleSelect}
         disabled={disabled}
       >
-        <option value="" disabled>{t("analytics.filters.selectRange")}</option>
+        <option value="" disabled>
+          {t("analytics.filters.selectRange")}
+        </option>
         <option value="today">{t("dates.today")}</option>
         <option value="week">{t("analytics.filters.thisWeek")}</option>
         <option value="month">{t("ledger.thisMonth")}</option>
         <option value="year">{t("ledger.thisYear")}</option>
         <option value="prev_year">{t("analytics.filters.previousYear")}</option>
-        <option value="custom" disabled>{t("analytics.filters.customRange")}</option>
+        <option value="custom" disabled>
+          {t("analytics.filters.customRange")}
+        </option>
       </select>
     </div>
   );
@@ -858,7 +876,9 @@ function normalizeExpenseCategoryRow(item, index = 0) {
 
   return {
     rank: asNumber(item?.rank) || index + 1,
-    categoryKey: String(item?.categoryKey || item?.key || `category-${index + 1}`),
+    categoryKey: String(
+      item?.categoryKey || item?.key || `category-${index + 1}`,
+    ),
     categoryName: String(item?.categoryName || item?.name || "").trim(),
     expenseCount: asNumber(item?.expenseCount),
     lineCount: asNumber(item?.lineCount),
@@ -898,7 +918,10 @@ function normalizeExpenseAnalyticsResponse(payload = {}) {
   )
     .map((item, index) => normalizeExpenseCategoryRow(item, index))
     .sort((left, right) => right.total - left.total || left.rank - right.rank);
-  const expensesTotals = normalizeMetricTotals(source?.totals?.expenses, "cashPaid");
+  const expensesTotals = normalizeMetricTotals(
+    source?.totals?.expenses,
+    "cashPaid",
+  );
   const breakdownTotal = breakdown.reduce((sum, row) => sum + row.total, 0);
   const categorizedAmount =
     firstNumber(summarySource, ["categorizedAmount"]) ?? breakdownTotal;
@@ -1081,12 +1104,8 @@ function PopularRankingCard({
     <div className="card">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="font-serif text-xl text-ink">
-            {title}
-          </h3>
-          <p className="mt-1 text-sm text-secondary-500">
-            {subtitle}
-          </p>
+          <h3 className="font-serif text-xl text-ink">{title}</h3>
+          <p className="mt-1 text-sm text-secondary-500">{subtitle}</p>
         </div>
         <span className="rounded-full bg-secondary-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-secondary-500 dark:bg-slate-800 dark:text-secondary-300">
           Top 10
@@ -1117,9 +1136,7 @@ function PopularRankingCard({
                   key={`${row.rank}-${row.productId || row.categoryId || row.name || row.categoryName}`}
                   className="border-t border-secondary-200/70"
                 >
-                  <td className="py-3 font-semibold text-ink">
-                    #{row.rank}
-                  </td>
+                  <td className="py-3 font-semibold text-ink">#{row.rank}</td>
                   <td className="py-3">
                     <div className="min-w-0">
                       <p className="font-medium text-ink">
@@ -1138,7 +1155,8 @@ function PopularRankingCard({
                         ) : null}
                         {row.lineCount > 0 ? (
                           <span>
-                            {t("analytics.lineCount")}: {formatQuantityValue(row.lineCount)}
+                            {t("analytics.lineCount")}:{" "}
+                            {formatQuantityValue(row.lineCount)}
                           </span>
                         ) : null}
                       </div>
@@ -1306,13 +1324,17 @@ function ExpenseCategoryAnalyticsSection({
                 <p className="flex items-center justify-between gap-3">
                   <span>{t("analytics.categorizedCategories")}</span>
                   <span className="font-medium text-ink">
-                    {formatQuantityValue(analytics.summary.categorizedCategories)}
+                    {formatQuantityValue(
+                      analytics.summary.categorizedCategories,
+                    )}
                   </span>
                 </p>
                 <p className="flex items-center justify-between gap-3">
                   <span>{t("analytics.uncategorizedCategories")}</span>
                   <span className="font-medium text-ink">
-                    {formatQuantityValue(analytics.summary.uncategorizedCategories)}
+                    {formatQuantityValue(
+                      analytics.summary.uncategorizedCategories,
+                    )}
                   </span>
                 </p>
               </div>
@@ -1355,7 +1377,9 @@ function ExpenseCategoryAnalyticsSection({
                 <p className="flex items-center justify-between gap-3">
                   <span>{t("analytics.shareOfTotal")}</span>
                   <span className="font-medium text-ink">
-                    {topCategory ? formatPercentValue(topCategory.shareOfTotal) : "—"}
+                    {topCategory
+                      ? formatPercentValue(topCategory.shareOfTotal)
+                      : "—"}
                   </span>
                 </p>
               </div>
@@ -1481,19 +1505,25 @@ function ExpenseCategoryAnalyticsSection({
 
                     <div className="mt-4 grid gap-3 text-xs text-secondary-500 sm:grid-cols-2 xl:grid-cols-3">
                       <div>
-                        <p className="uppercase tracking-[0.14em]">{t("analytics.paid")}</p>
+                        <p className="uppercase tracking-[0.14em]">
+                          {t("analytics.paid")}
+                        </p>
                         <p className="mt-1 font-medium text-emerald-600 dark:text-emerald-400">
                           {formatMoney(row.cashPaid)}
                         </p>
                       </div>
                       <div>
-                        <p className="uppercase tracking-[0.14em]">{t("analytics.pending")}</p>
+                        <p className="uppercase tracking-[0.14em]">
+                          {t("analytics.pending")}
+                        </p>
                         <p className="mt-1 font-medium text-rose-600 dark:text-rose-400">
                           {formatMoney(row.pending)}
                         </p>
                       </div>
                       <div>
-                        <p className="uppercase tracking-[0.14em]">{t("analytics.expenseCount")}</p>
+                        <p className="uppercase tracking-[0.14em]">
+                          {t("analytics.expenseCount")}
+                        </p>
                         <p className="mt-1 font-medium text-ink">
                           {formatQuantityValue(row.expenseCount)}
                         </p>
@@ -1512,44 +1542,72 @@ function ExpenseCategoryAnalyticsSection({
 
 // Helpers for Party Statements (ledger)
 function formatStatementDate(value) {
-  if (!value) return '-';
+  if (!value) return "-";
   const match = String(value).match(/^\d{4}-\d{2}-\d{2}/);
   const dateStr = match ? match[0] : value;
   const parsed = dayjs(dateStr);
-  return parsed.isValid() ? parsed.format('DD/MM/YYYY') : value;
+  return parsed.isValid() ? parsed.format("DD/MM/YYYY") : value;
 }
 
 function formatLedgerText(value) {
-  const text = String(value ?? '').trim();
-  return text || '-';
+  const text = String(value ?? "").trim();
+  return text || "-";
 }
 
 function getLedgerTypeMeta(type, t) {
   const map = {
-    sale: { label: t('ledger.sale'), className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
-    purchase: { label: t('ledger.purchase'), className: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
-    expense: { label: t('purchases.expense'), className: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300' },
-    service: { label: t('ledger.service'), className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
-    payment_in: { label: t('parties.paymentIn'), className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300' },
-    payment_out: { label: t('parties.paymentOut'), className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+    sale: {
+      label: t("ledger.sale"),
+      className:
+        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    },
+    purchase: {
+      label: t("ledger.purchase"),
+      className:
+        "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+    },
+    expense: {
+      label: t("purchases.expense"),
+      className:
+        "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+    },
+    service: {
+      label: t("ledger.service"),
+      className:
+        "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+    },
+    payment_in: {
+      label: t("parties.paymentIn"),
+      className:
+        "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
+    },
+    payment_out: {
+      label: t("parties.paymentOut"),
+      className:
+        "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+    },
   };
 
-  return map[type] || {
-    label: formatLedgerText(type),
-    className: 'bg-secondary-100 text-secondary-700 dark:bg-slate-800 dark:text-secondary-300',
-  };
+  return (
+    map[type] || {
+      label: formatLedgerText(type),
+      className:
+        "bg-secondary-100 text-secondary-700 dark:bg-slate-800 dark:text-secondary-300",
+    }
+  );
 }
 
 function getBalanceToneClass(value) {
-  if (!Number.isFinite(Number(value))) return 'text-ink-light dark:text-secondary-300';
+  if (!Number.isFinite(Number(value)))
+    return "text-ink-light dark:text-secondary-300";
   const amount = Number(value);
-  if (amount > 0) return 'text-emerald-700 dark:text-emerald-300';
-  if (amount < 0) return 'text-rose-700 dark:text-rose-300';
-  return 'text-ink-light dark:text-secondary-300';
+  if (amount > 0) return "text-emerald-700 dark:text-emerald-300";
+  if (amount < 0) return "text-rose-700 dark:text-rose-300";
+  return "text-ink-light dark:text-secondary-300";
 }
 
 function getBalanceLabel(value, t) {
-  return t('ledger.currentBalance');
+  return t("ledger.currentBalance");
 }
 
 function toResolvedPartyOption(raw) {
@@ -1559,15 +1617,15 @@ function toResolvedPartyOption(raw) {
 }
 
 function toCsvCell(value) {
-  const text = String(value ?? '');
+  const text = String(value ?? "");
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
 function downloadCsv(filename, rows) {
-  const csv = rows.map((row) => row.map(toCsvCell).join(',')).join('\r\n');
-  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const csv = rows.map((row) => row.map(toCsvCell).join(",")).join("\r\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
   link.download = filename;
   document.body.appendChild(link);
@@ -1586,38 +1644,64 @@ export default function Reports() {
   // Unified Tab Resolution based on permissions
   const availableTabs = useMemo(() => {
     const list = [];
-    if (canViewFeature('reports')) {
-      if (businessProfile?.type === 'cafe') {
-        list.push({ key: 'cafe-insights', label: t('analytics.cafeInsights') || 'Cafe Sales Book', icon: Coffee });
+    if (canViewFeature("reports")) {
+      if (businessProfile?.type === "cafe") {
+        list.push({
+          key: "cafe-insights",
+          label: t("analytics.cafeInsights") || "Cafe Sales Book",
+          icon: Coffee,
+        });
       }
-      list.push({ key: 'overview', label: t('analytics.overallMix') || 'Overview', icon: PieIcon });
-      list.push({ key: 'expense', label: t('analytics.expenses') || 'Expense Analytics', icon: BarChart2 });
-      list.push({ key: 'party', label: t('ledger.statementTitle') || 'Party Statements', icon: ScrollText });
-      list.push({ key: 'timeline', label: t('analytics.timelineSummary') || 'Timeline', icon: TableProperties });
+      list.push({
+        key: "overview",
+        label: t("analytics.overallMix") || "Overview",
+        icon: PieIcon,
+      });
+      list.push({
+        key: "expense",
+        label: t("analytics.expenses") || "Expense Analytics",
+        icon: BarChart2,
+      });
+      list.push({
+        key: "party",
+        label: t("ledger.statementTitle") || "Party Statements",
+        icon: ScrollText,
+      });
+      list.push({
+        key: "timeline",
+        label: t("analytics.timelineSummary") || "Timeline",
+        icon: TableProperties,
+      });
     }
     return list;
   }, [canViewFeature, t, businessProfile]);
 
   const activeTab = useMemo(() => {
-    const requested = searchParams.get('tab');
+    const requested = searchParams.get("tab");
     if (availableTabs.some((tabObj) => tabObj.key === requested)) {
       return requested;
     }
-    return availableTabs[0]?.key || 'overview';
+    return availableTabs[0]?.key || "overview";
   }, [searchParams, availableTabs]);
 
   const handleTabChange = (key) => {
     const nextParams = new URLSearchParams(searchParams);
-    nextParams.set('tab', key);
+    nextParams.set("tab", key);
     setSearchParams(nextParams);
   };
 
   // State 1: Analytics Data (Overview, Expense, Timeline)
   const [summary, setSummary] = useState(() => EMPTY_SUMMARY);
   const [profitLoss, setProfitLoss] = useState(() => EMPTY_PROFIT_LOSS);
-  const [expenseCategoryAnalytics, setExpenseCategoryAnalytics] = useState(() => EMPTY_EXPENSE_CATEGORY_ANALYTICS);
-  const [popularItems, setPopularItems] = useState(() => EMPTY_POPULAR_ANALYTICS);
-  const [popularCategories, setPopularCategories] = useState(() => EMPTY_POPULAR_ANALYTICS);
+  const [expenseCategoryAnalytics, setExpenseCategoryAnalytics] = useState(
+    () => EMPTY_EXPENSE_CATEGORY_ANALYTICS,
+  );
+  const [popularItems, setPopularItems] = useState(
+    () => EMPTY_POPULAR_ANALYTICS,
+  );
+  const [popularCategories, setPopularCategories] = useState(
+    () => EMPTY_POPULAR_ANALYTICS,
+  );
   const [popularItemsError, setPopularItemsError] = useState("");
   const [popularCategoriesError, setPopularCategoriesError] = useState("");
   const [expenseCategoryError, setExpenseCategoryError] = useState("");
@@ -1641,26 +1725,39 @@ export default function Reports() {
     categoryKey: "",
   });
 
-  const [selectedPartyFilterOption, setSelectedPartyFilterOption] = useState(null);
-  const [selectedSupplierFilterOption, setSelectedSupplierFilterOption] = useState(null);
+  const [selectedPartyFilterOption, setSelectedPartyFilterOption] =
+    useState(null);
+  const [selectedSupplierFilterOption, setSelectedSupplierFilterOption] =
+    useState(null);
   const [expenseCategoryOptions, setExpenseCategoryOptions] = useState([]);
   const refreshModeRef = useRef(false);
 
   // State 2: Ledger Data (Party Statements)
-  const defaultFrom = useMemo(() => dayjs().startOf('month').format('YYYY-MM-DD'), []);
-  const defaultTo = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
-  const initialPartyId = searchParams.get('partyId') || '';
-  const initialFrom = searchParams.get('from') || defaultFrom;
-  const initialTo = searchParams.get('to') || defaultTo;
-  const initialOrder = searchParams.get('order') || 'desc';
+  const defaultFrom = useMemo(
+    () => dayjs().startOf("month").format("YYYY-MM-DD"),
+    [],
+  );
+  const defaultTo = useMemo(() => dayjs().format("YYYY-MM-DD"), []);
+  const initialPartyId = searchParams.get("partyId") || "";
+  const initialFrom = searchParams.get("from") || defaultFrom;
+  const initialTo = searchParams.get("to") || defaultTo;
+  const initialOrder = searchParams.get("order") || "desc";
 
-  const [ledger, setLedger] = useState({ items: [], total: 0, limit: 25, offset: 0 });
+  const [ledger, setLedger] = useState({
+    items: [],
+    total: 0,
+    limit: 25,
+    offset: 0,
+  });
   const [ledgerLoading, setLedgerLoading] = useState(false);
   const [ledgerRefreshing, setLedgerRefreshing] = useState(false);
-  const [ledgerStatus, setLedgerStatus] = useState('');
+  const [ledgerStatus, setLedgerStatus] = useState("");
   const [selectedPartyId, setSelectedPartyId] = useState(initialPartyId);
   const [selectedPartyOption, setSelectedPartyOption] = useState(null);
-  const [ledgerFilters, setLedgerFilters] = useState(() => ({ from: initialFrom, to: initialTo }));
+  const [ledgerFilters, setLedgerFilters] = useState(() => ({
+    from: initialFrom,
+    to: initialTo,
+  }));
   const [ledgerSortOrder, setLedgerSortOrder] = useState(initialOrder);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
@@ -1676,18 +1773,24 @@ export default function Reports() {
   const [cafeTypeFilter, setCafeTypeFilter] = useState("all");
 
   useEffect(() => {
-    if (!canViewFeature("reports") || activeTab !== "cafe-insights" || !businessId) return;
+    if (
+      !canViewFeature("reports") ||
+      activeTab !== "cafe-insights" ||
+      !businessId
+    )
+      return;
 
     let isActive = true;
     setCafeSalesLoading(true);
     setCafeSalesError("");
 
-    api.listSales({
-      limit: 150,
-      includeItems: "true",
-      from: filters.fromDate || undefined,
-      to: filters.toDate || undefined,
-    })
+    api
+      .listSales({
+        limit: 150,
+        includeItems: "true",
+        from: filters.fromDate || undefined,
+        to: filters.toDate || undefined,
+      })
       .then((res) => {
         if (!isActive) return;
         const items = res?.items || res || [];
@@ -1762,7 +1865,9 @@ export default function Reports() {
 
       // Order type performance
       const type = sale.attributes?.order_type || "dine_in";
-      const typeKey = ["dine_in", "takeaway", "delivery"].includes(type) ? type : "dine_in";
+      const typeKey = ["dine_in", "takeaway", "delivery"].includes(type)
+        ? type
+        : "dine_in";
       orderTypeStats[typeKey].total += total;
       orderTypeStats[typeKey].count += 1;
     });
@@ -1770,7 +1875,8 @@ export default function Reports() {
     return {
       totalSales,
       orderCount: cafeSalesList.length,
-      avgOrderValue: cafeSalesList.length > 0 ? totalSales / cafeSalesList.length : 0,
+      avgOrderValue:
+        cafeSalesList.length > 0 ? totalSales / cafeSalesList.length : 0,
       paidSales,
       dueSales,
       paidCount,
@@ -1819,7 +1925,8 @@ export default function Reports() {
   }, [cafeSalesList, cafeSearchTerm, cafeStatusFilter, cafeTypeFilter]);
 
   const renderOrderItemsSummary = (saleItems) => {
-    if (!saleItems || !Array.isArray(saleItems) || saleItems.length === 0) return "—";
+    if (!saleItems || !Array.isArray(saleItems) || saleItems.length === 0)
+      return "—";
     return (
       <div className="flex flex-wrap gap-1 max-w-xs">
         {saleItems.map((item, idx) => {
@@ -1829,7 +1936,8 @@ export default function Reports() {
               key={idx}
               className="inline-flex items-center gap-1 rounded bg-secondary-100 px-1.5 py-0.5 text-[10px] font-bold text-ink-light border border-secondary-200/50"
             >
-              {name} <span className="text-primary font-black">x{item.quantity}</span>
+              {name}{" "}
+              <span className="text-primary font-black">x{item.quantity}</span>
             </span>
           );
         })}
@@ -1839,9 +1947,10 @@ export default function Reports() {
 
   // FETCH: Categories (on mount if analytics view is allowed)
   useEffect(() => {
-    if (!canViewFeature('reports')) return;
+    if (!canViewFeature("reports")) return;
     let isActive = true;
-    api.listCategories({ type: "expense", limit: 100, offset: 0 })
+    api
+      .listCategories({ type: "expense", limit: 100, offset: 0 })
       .then((response) => {
         if (!isActive) return;
         const options = (Array.isArray(response?.items) ? response.items : [])
@@ -1860,7 +1969,7 @@ export default function Reports() {
 
   // FETCH: Analytics Data
   useEffect(() => {
-    if (!canViewFeature('reports') || activeTab === 'party') return;
+    if (!canViewFeature("reports") || activeTab === "party") return;
 
     let isActive = true;
     const isRefreshRequest = refreshModeRef.current;
@@ -2013,46 +2122,62 @@ export default function Reports() {
   ]);
 
   // FETCH: Ledger data (Party Statements)
-  const fetchLedger = useCallback(async ({ refresh = false, force = false } = {}) => {
-    if (!canViewFeature('reports') || activeTab !== 'party') return;
+  const fetchLedger = useCallback(
+    async ({ refresh = false, force = false } = {}) => {
+      if (!canViewFeature("reports") || activeTab !== "party") return;
 
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
 
-    if (refresh) setLedgerRefreshing(true);
-    else setLedgerLoading(true);
-    setLedgerStatus('');
+      if (refresh) setLedgerRefreshing(true);
+      else setLedgerLoading(true);
+      setLedgerStatus("");
 
-    try {
-      const response = await api.ledgerReport({
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
-        ...(selectedPartyId ? { partyId: selectedPartyId } : {}),
-        ...(ledgerFilters.from ? { from: ledgerFilters.from } : {}),
-        ...(ledgerFilters.to ? { to: ledgerFilters.to } : {}),
-        order: ledgerSortOrder,
-      }, { force });
+      try {
+        const response = await api.ledgerReport(
+          {
+            limit: pageSize,
+            offset: (page - 1) * pageSize,
+            ...(selectedPartyId ? { partyId: selectedPartyId } : {}),
+            ...(ledgerFilters.from ? { from: ledgerFilters.from } : {}),
+            ...(ledgerFilters.to ? { to: ledgerFilters.to } : {}),
+            order: ledgerSortOrder,
+          },
+          { force },
+        );
 
-      if (requestId !== requestIdRef.current) return;
-      setLedger(response);
-    } catch (error) {
-      if (requestId !== requestIdRef.current) return;
-      setLedgerStatus(error?.message || t('common.noData'));
+        if (requestId !== requestIdRef.current) return;
+        setLedger(response);
+      } catch (error) {
+        if (requestId !== requestIdRef.current) return;
+        setLedgerStatus(error?.message || t("common.noData"));
 
-      if (!refresh) {
-        setLedger({
-          items: [],
-          total: 0,
-          limit: pageSize,
-          offset: (page - 1) * pageSize,
-        });
+        if (!refresh) {
+          setLedger({
+            items: [],
+            total: 0,
+            limit: pageSize,
+            offset: (page - 1) * pageSize,
+          });
+        }
+      } finally {
+        if (requestId !== requestIdRef.current) return;
+        setLedgerLoading(false);
+        setLedgerRefreshing(false);
       }
-    } finally {
-      if (requestId !== requestIdRef.current) return;
-      setLedgerLoading(false);
-      setLedgerRefreshing(false);
-    }
-  }, [canViewFeature, activeTab, ledgerFilters.from, ledgerFilters.to, page, pageSize, selectedPartyId, ledgerSortOrder, t]);
+    },
+    [
+      canViewFeature,
+      activeTab,
+      ledgerFilters.from,
+      ledgerFilters.to,
+      page,
+      pageSize,
+      selectedPartyId,
+      ledgerSortOrder,
+      t,
+    ],
+  );
 
   useEffect(() => {
     fetchLedger();
@@ -2060,34 +2185,38 @@ export default function Reports() {
 
   // Sync Party parameters from the URL so party, dates, and sort all stay in sync
   useEffect(() => {
-    if (activeTab !== 'party') return;
-    const urlFrom = searchParams.get('from') || defaultFrom;
-    const urlTo = searchParams.get('to') || defaultTo;
-    const urlOrder = searchParams.get('order') || 'desc';
+    if (activeTab !== "party") return;
+    const urlFrom = searchParams.get("from") || defaultFrom;
+    const urlTo = searchParams.get("to") || defaultTo;
+    const urlOrder = searchParams.get("order") || "desc";
     setSelectedPartyId(initialPartyId);
     setLedgerSortOrder(urlOrder);
-    setLedgerFilters((prev) => (
+    setLedgerFilters((prev) =>
       prev.from === urlFrom && prev.to === urlTo
         ? prev
-        : { from: urlFrom, to: urlTo }
-    ));
-    setSelectedPartyOption((current) => (
-      initialPartyId && String(current?.value || '') === String(initialPartyId)
+        : { from: urlFrom, to: urlTo },
+    );
+    setSelectedPartyOption((current) =>
+      initialPartyId && String(current?.value || "") === String(initialPartyId)
         ? current
-        : null
-    ));
+        : null,
+    );
   }, [initialPartyId, activeTab, searchParams, defaultFrom, defaultTo]);
 
   useEffect(() => {
-    if (activeTab !== 'party' || !selectedPartyId) {
+    if (activeTab !== "party" || !selectedPartyId) {
       setSelectedPartyOption(null);
       return undefined;
     }
-    if (String(selectedPartyOption?.value || '') === String(selectedPartyId)) {
+    if (String(selectedPartyOption?.value || "") === String(selectedPartyId)) {
       return undefined;
     }
-    const matchedParty = ledger.items.find((row) => String(row.partyId || '') === String(selectedPartyId));
-    const matchedOption = matchedParty ? toResolvedPartyOption({ ...matchedParty, id: selectedPartyId }) : null;
+    const matchedParty = ledger.items.find(
+      (row) => String(row.partyId || "") === String(selectedPartyId),
+    );
+    const matchedOption = matchedParty
+      ? toResolvedPartyOption({ ...matchedParty, id: selectedPartyId })
+      : null;
 
     if (matchedOption) {
       setSelectedPartyOption(matchedOption);
@@ -2095,7 +2224,8 @@ export default function Reports() {
     }
 
     let isActive = true;
-    api.getParty(selectedPartyId)
+    api
+      .getParty(selectedPartyId)
       .then((party) => {
         if (!isActive) return;
         const option = toResolvedPartyOption(party);
@@ -2108,27 +2238,30 @@ export default function Reports() {
     };
   }, [ledger.items, selectedPartyId, selectedPartyOption, activeTab]);
 
-  const updateSearchState = useCallback((nextValues) => {
-    const nextParams = new URLSearchParams(searchParams);
-    const nextPartyId = String(nextValues.partyId || '').trim();
-    const nextFrom = String(nextValues.from || '').trim();
-    const nextTo = String(nextValues.to || '').trim();
-    const nextOrder = String(nextValues.order || '').trim();
+  const updateSearchState = useCallback(
+    (nextValues) => {
+      const nextParams = new URLSearchParams(searchParams);
+      const nextPartyId = String(nextValues.partyId || "").trim();
+      const nextFrom = String(nextValues.from || "").trim();
+      const nextTo = String(nextValues.to || "").trim();
+      const nextOrder = String(nextValues.order || "").trim();
 
-    if (nextPartyId) nextParams.set('partyId', nextPartyId);
-    else nextParams.delete('partyId');
+      if (nextPartyId) nextParams.set("partyId", nextPartyId);
+      else nextParams.delete("partyId");
 
-    if (nextFrom) nextParams.set('from', nextFrom);
-    else nextParams.delete('from');
+      if (nextFrom) nextParams.set("from", nextFrom);
+      else nextParams.delete("from");
 
-    if (nextTo) nextParams.set('to', nextTo);
-    else nextParams.delete('to');
+      if (nextTo) nextParams.set("to", nextTo);
+      else nextParams.delete("to");
 
-    if (nextOrder) nextParams.set('order', nextOrder);
-    else nextParams.delete('order');
+      if (nextOrder) nextParams.set("order", nextOrder);
+      else nextParams.delete("order");
 
-    setSearchParams(nextParams, { replace: true });
-  }, [searchParams, setSearchParams]);
+      setSearchParams(nextParams, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
 
   const formatCompactMoney = (value) => {
     return formatCurrency(asNumber(value), {
@@ -2146,25 +2279,29 @@ export default function Reports() {
     return t("currency.formatted", {
       symbol: t("currency.symbol"),
       amount: formatted,
-    }).replace(/ /g, '\u00a0');
+    }).replace(/ /g, "\u00a0");
   };
 
   // Calculations for Ledger UI
-  const statementRows = useMemo(() => ledger.items.map((row) => ({
-    ...row,
-    referenceDisplay: formatLedgerText(row.referenceNo),
-    partyDisplay: formatLedgerText(row.partyName),
-    noteDisplay: formatLedgerNote(row.note, t),
-    typeMeta: getLedgerTypeMeta(row.type, t),
-    paymentDisplay: hasPaymentTypeData(row)
-      ? getPaymentTypeDisplay(row, {
-          cashLabel: t('payments.cash'),
-          bankLabel: t('payments.bank'),
-          balancePrefix: t('payments.balancePrefix'),
-          formatMoney: (amount) => formatMoney(amount),
-        })
-      : { label: '-', balanceText: '' },
-  })), [ledger.items, t]);
+  const statementRows = useMemo(
+    () =>
+      ledger.items.map((row) => ({
+        ...row,
+        referenceDisplay: formatLedgerText(row.referenceNo),
+        partyDisplay: formatLedgerText(row.partyName),
+        noteDisplay: formatLedgerNote(row.note, t),
+        typeMeta: getLedgerTypeMeta(row.type, t),
+        paymentDisplay: hasPaymentTypeData(row)
+          ? getPaymentTypeDisplay(row, {
+              cashLabel: t("payments.cash"),
+              bankLabel: t("payments.bank"),
+              balancePrefix: t("payments.balancePrefix"),
+              formatMoney: (amount) => formatMoney(amount),
+            })
+          : { label: "-", balanceText: "" },
+      })),
+    [ledger.items, t],
+  );
 
   const hasStatementNotes = useMemo(
     () => statementRows.some((row) => Boolean(row.noteDisplay)),
@@ -2173,12 +2310,18 @@ export default function Reports() {
   const showStatementParty = !selectedPartyId;
 
   const ledgerSummary = useMemo(() => {
-    const totalDebit = statementRows.reduce((sum, row) => sum + Number(row.debit || 0), 0);
-    const totalCredit = statementRows.reduce((sum, row) => sum + Number(row.credit || 0), 0);
+    const totalDebit = statementRows.reduce(
+      (sum, row) => sum + Number(row.debit || 0),
+      0,
+    );
+    const totalCredit = statementRows.reduce(
+      (sum, row) => sum + Number(row.credit || 0),
+      0,
+    );
     const currentBalance = statementRows.length
-      ? (ledgerSortOrder === 'asc'
-          ? statementRows[statementRows.length - 1].runningBalance
-          : statementRows[0].runningBalance)
+      ? ledgerSortOrder === "asc"
+        ? statementRows[statementRows.length - 1].runningBalance
+        : statementRows[0].runningBalance
       : null;
 
     return {
@@ -2190,94 +2333,122 @@ export default function Reports() {
   }, [ledger.total, statementRows, ledgerSortOrder]);
 
   const selectedPartyLabel = selectedPartyId
-    ? selectedPartyOption?.entity?.name || selectedPartyOption?.label || t('ledger.party')
-    : t('ledger.allParties');
+    ? selectedPartyOption?.entity?.name ||
+      selectedPartyOption?.label ||
+      t("ledger.party")
+    : t("ledger.allParties");
   const hasActivePartyFilter = Boolean(selectedPartyId);
-  const hasCustomDateFilter = ledgerFilters.from !== defaultFrom || ledgerFilters.to !== defaultTo;
+  const hasCustomDateFilter =
+    ledgerFilters.from !== defaultFrom || ledgerFilters.to !== defaultTo;
   const hasAnyFilter = hasActivePartyFilter || hasCustomDateFilter;
-  const timeSpanLabel = ledgerFilters.from || ledgerFilters.to
-    ? `${t('ledger.from')}: ${formatStatementDate(ledgerFilters.from)}  ·  ${t('ledger.to')}: ${formatStatementDate(ledgerFilters.to)}`
-    : t('ledger.allTime');
+  const timeSpanLabel =
+    ledgerFilters.from || ledgerFilters.to
+      ? `${t("ledger.from")}: ${formatStatementDate(ledgerFilters.from)}  ·  ${t("ledger.to")}: ${formatStatementDate(ledgerFilters.to)}`
+      : t("ledger.allTime");
   const logoSrc = useMemo(() => {
     if (!biz?.logoUrl) return null;
-    return biz.logoUrl.startsWith('http') ? biz.logoUrl : `${API_BASE}${biz.logoUrl}`;
+    return biz.logoUrl.startsWith("http")
+      ? biz.logoUrl
+      : `${API_BASE}${biz.logoUrl}`;
   }, [biz?.logoUrl]);
   const balanceToneClass = getBalanceToneClass(ledgerSummary.currentBalance);
   const balanceLabel = getBalanceLabel(ledgerSummary.currentBalance, t);
 
   const summaryCards = [
     {
-      key: 'balance',
+      key: "balance",
       label: balanceLabel,
-      value: formatCurrency(Math.abs(ledgerSummary.currentBalance), { symbol: t('currency.symbol') }),
+      value: formatCurrency(Math.abs(ledgerSummary.currentBalance), {
+        symbol: t("currency.symbol"),
+      }),
       icon: WalletCards,
       valueClassName: balanceToneClass,
-      accentClassName: 'bg-white/80 text-primary-700 ring-1 ring-primary-100',
+      accentClassName: "bg-white/80 text-primary-700 ring-1 ring-primary-100",
     },
     {
-      key: 'debit',
-      label: t('ledger.totalDebit'),
-      value: formatCurrency(ledgerSummary.totalDebit, { symbol: t('currency.symbol') }),
+      key: "debit",
+      label: t("ledger.totalDebit"),
+      value: formatCurrency(ledgerSummary.totalDebit, {
+        symbol: t("currency.symbol"),
+      }),
       icon: ArrowDownLeft,
-      valueClassName: 'text-rose-700 dark:text-rose-300',
-      accentClassName: 'bg-rose-50 text-rose-700 ring-1 ring-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/40',
+      valueClassName: "text-rose-700 dark:text-rose-300",
+      accentClassName:
+        "bg-rose-50 text-rose-700 ring-1 ring-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:ring-rose-900/40",
     },
     {
-      key: 'credit',
-      label: t('ledger.totalCredit'),
-      value: formatCurrency(ledgerSummary.totalCredit, { symbol: t('currency.symbol') }),
+      key: "credit",
+      label: t("ledger.totalCredit"),
+      value: formatCurrency(ledgerSummary.totalCredit, {
+        symbol: t("currency.symbol"),
+      }),
       icon: ArrowUpRight,
-      valueClassName: 'text-emerald-700 dark:text-emerald-300',
-      accentClassName: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/40',
+      valueClassName: "text-emerald-700 dark:text-emerald-300",
+      accentClassName:
+        "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900/40",
     },
     {
-      key: 'entries',
-      label: t('ledger.totalEntries'),
+      key: "entries",
+      label: t("ledger.totalEntries"),
       value: String(ledgerSummary.entries),
       icon: ScrollText,
-      valueClassName: 'text-ink',
-      accentClassName: 'bg-secondary-100 text-ink-light ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700',
+      valueClassName: "text-ink",
+      accentClassName:
+        "bg-secondary-100 text-ink-light ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700",
     },
   ];
 
-  const applyLedgerQuery = useCallback((patch) => {
-    const nextPartyId = patch.partyId !== undefined ? patch.partyId : selectedPartyId;
-    const nextFrom = patch.from !== undefined ? patch.from : ledgerFilters.from;
-    const nextTo = patch.to !== undefined ? patch.to : ledgerFilters.to;
-    const nextOrder = patch.order !== undefined ? patch.order : ledgerSortOrder;
-    const partyChanged = nextPartyId !== selectedPartyId;
-    const datesChanged = nextFrom !== ledgerFilters.from || nextTo !== ledgerFilters.to;
-    const orderChanged = nextOrder !== ledgerSortOrder;
+  const applyLedgerQuery = useCallback(
+    (patch) => {
+      const nextPartyId =
+        patch.partyId !== undefined ? patch.partyId : selectedPartyId;
+      const nextFrom =
+        patch.from !== undefined ? patch.from : ledgerFilters.from;
+      const nextTo = patch.to !== undefined ? patch.to : ledgerFilters.to;
+      const nextOrder =
+        patch.order !== undefined ? patch.order : ledgerSortOrder;
+      const partyChanged = nextPartyId !== selectedPartyId;
+      const datesChanged =
+        nextFrom !== ledgerFilters.from || nextTo !== ledgerFilters.to;
+      const orderChanged = nextOrder !== ledgerSortOrder;
 
-    if (!partyChanged && !datesChanged && !orderChanged) return;
+      if (!partyChanged && !datesChanged && !orderChanged) return;
 
-    setLedgerLoading(true);
-    if (partyChanged) {
-      setSelectedPartyId(nextPartyId);
-      if (patch.partyOption !== undefined) {
-        setSelectedPartyOption(patch.partyOption);
-      } else if (!nextPartyId) {
-        setSelectedPartyOption(null);
+      setLedgerLoading(true);
+      if (partyChanged) {
+        setSelectedPartyId(nextPartyId);
+        if (patch.partyOption !== undefined) {
+          setSelectedPartyOption(patch.partyOption);
+        } else if (!nextPartyId) {
+          setSelectedPartyOption(null);
+        }
       }
-    }
-    if (datesChanged) {
-      setLedgerFilters({ from: nextFrom, to: nextTo });
-    }
-    if (orderChanged) {
-      setLedgerSortOrder(nextOrder);
-    }
-    setPage(1);
-    updateSearchState({
-      partyId: nextPartyId,
-      from: nextFrom,
-      to: nextTo,
-      order: nextOrder,
-    });
-  }, [ledgerFilters.from, ledgerFilters.to, ledgerSortOrder, selectedPartyId, updateSearchState]);
+      if (datesChanged) {
+        setLedgerFilters({ from: nextFrom, to: nextTo });
+      }
+      if (orderChanged) {
+        setLedgerSortOrder(nextOrder);
+      }
+      setPage(1);
+      updateSearchState({
+        partyId: nextPartyId,
+        from: nextFrom,
+        to: nextTo,
+        order: nextOrder,
+      });
+    },
+    [
+      ledgerFilters.from,
+      ledgerFilters.to,
+      ledgerSortOrder,
+      selectedPartyId,
+      updateSearchState,
+    ],
+  );
 
   const handleLedgerPartyChange = (option) => {
     applyLedgerQuery({
-      partyId: option?.value || '',
+      partyId: option?.value || "",
       partyOption: option || null,
     });
   };
@@ -2292,36 +2463,51 @@ export default function Reports() {
 
   const handleResetFilters = () => {
     applyLedgerQuery({
-      partyId: '',
+      partyId: "",
       partyOption: null,
       from: defaultFrom,
       to: defaultTo,
-      order: 'desc',
+      order: "desc",
     });
   };
 
   const handleDownloadExcel = () => {
     const rows = [
-      [t('ledger.statementTitle')],
-      [t('ledger.party'), selectedPartyLabel],
-      [t('common.date'), timeSpanLabel],
-      ['Exported', dayjs().format('D MMM YYYY, HH:mm')],
-      [],
-      [balanceLabel, formatCurrency(Math.abs(ledgerSummary.currentBalance), { symbol: t('currency.symbol') })],
-      [t('ledger.totalDebit'), formatCurrency(ledgerSummary.totalDebit, { symbol: t('currency.symbol') })],
-      [t('ledger.totalCredit'), formatCurrency(ledgerSummary.totalCredit, { symbol: t('currency.symbol') })],
-      [t('ledger.totalEntries'), ledgerSummary.entries],
+      [t("ledger.statementTitle")],
+      [t("ledger.party"), selectedPartyLabel],
+      [t("common.date"), timeSpanLabel],
+      ["Exported", dayjs().format("D MMM YYYY, HH:mm")],
       [],
       [
-        t('common.date'),
-        t('ledger.referenceNo'),
-        t('ledger.party'),
-        t('ledger.type'),
-        ...(hasStatementNotes ? [t('ledger.note')] : []),
-        t('payments.paymentMethod'),
-        t('ledger.debit'),
-        t('ledger.credit'),
-        t('ledger.runningBalance'),
+        balanceLabel,
+        formatCurrency(Math.abs(ledgerSummary.currentBalance), {
+          symbol: t("currency.symbol"),
+        }),
+      ],
+      [
+        t("ledger.totalDebit"),
+        formatCurrency(ledgerSummary.totalDebit, {
+          symbol: t("currency.symbol"),
+        }),
+      ],
+      [
+        t("ledger.totalCredit"),
+        formatCurrency(ledgerSummary.totalCredit, {
+          symbol: t("currency.symbol"),
+        }),
+      ],
+      [t("ledger.totalEntries"), ledgerSummary.entries],
+      [],
+      [
+        t("common.date"),
+        t("ledger.referenceNo"),
+        t("ledger.party"),
+        t("ledger.type"),
+        ...(hasStatementNotes ? [t("ledger.note")] : []),
+        t("payments.paymentMethod"),
+        t("ledger.debit"),
+        t("ledger.credit"),
+        t("ledger.runningBalance"),
       ],
       ...statementRows.map((row) => [
         formatStatementDate(row.date),
@@ -2329,25 +2515,31 @@ export default function Reports() {
         row.partyDisplay,
         row.typeMeta.label,
         ...(hasStatementNotes ? [row.noteDisplay] : []),
-        [row.paymentDisplay.label, row.paymentDisplay.balanceText].filter(Boolean).join(' - '),
-        row.debit > 0 ? formatCurrency(row.debit, { symbol: t('currency.symbol') }) : '',
-        row.credit > 0 ? formatCurrency(row.credit, { symbol: t('currency.symbol') }) : '',
-        formatCurrency(row.runningBalance, { symbol: t('currency.symbol') }),
+        [row.paymentDisplay.label, row.paymentDisplay.balanceText]
+          .filter(Boolean)
+          .join(" - "),
+        row.debit > 0
+          ? formatCurrency(row.debit, { symbol: t("currency.symbol") })
+          : "",
+        row.credit > 0
+          ? formatCurrency(row.credit, { symbol: t("currency.symbol") })
+          : "",
+        formatCurrency(row.runningBalance, { symbol: t("currency.symbol") }),
       ]),
     ];
-    downloadCsv(`ledger-${dayjs().format('YYYY-MM-DD-HHmm')}.csv`, rows);
+    downloadCsv(`ledger-${dayjs().format("YYYY-MM-DD-HHmm")}.csv`, rows);
   };
 
   const handlePrint = () => {
     const now = dayjs();
     printElement(printRef.current, {
       prepareClone: (clone) => {
-        clone.classList.add('party-statement-print');
-        clone.querySelectorAll('[data-printed-at]').forEach((node) => {
-          node.textContent = now.format('D MMM YYYY, HH:mm');
+        clone.classList.add("party-statement-print");
+        clone.querySelectorAll("[data-printed-at]").forEach((node) => {
+          node.textContent = now.format("D MMM YYYY, HH:mm");
         });
-        clone.querySelectorAll('[data-printed-date]').forEach((node) => {
-          node.textContent = now.format('D MMM YYYY');
+        clone.querySelectorAll("[data-printed-date]").forEach((node) => {
+          node.textContent = now.format("D MMM YYYY");
         });
       },
     });
@@ -2398,7 +2590,7 @@ export default function Reports() {
   };
 
   const handleRefresh = () => {
-    if (activeTab === 'party') {
+    if (activeTab === "party") {
       fetchLedger({ refresh: true, force: true });
     } else {
       if (analyticsLoading || analyticsRefreshing) return;
@@ -2490,12 +2682,7 @@ export default function Reports() {
       month: t("analytics.filters.month"),
     };
     return `${labelMap[filters.groupBy] || labelMap.auto} | ${expenseFilters.fromDate || "-"} to ${expenseFilters.toDate || "-"}`;
-  }, [
-    expenseFilters.fromDate,
-    expenseFilters.toDate,
-    filters.groupBy,
-    t,
-  ]);
+  }, [expenseFilters.fromDate, expenseFilters.toDate, filters.groupBy, t]);
 
   const availableExpenseCategoryOptions = useMemo(
     () =>
@@ -2514,13 +2701,16 @@ export default function Reports() {
           : [],
         expenseFilters.categoryKey
           ? [
-              normalizeCategoryFilterOption({
-                categoryKey: expenseFilters.categoryKey,
-                categoryName:
-                  expenseCategoryAnalytics.breakdown.find(
-                    (row) => row.categoryKey === expenseFilters.categoryKey,
-                  )?.categoryName || expenseFilters.categoryKey,
-              }, t),
+              normalizeCategoryFilterOption(
+                {
+                  categoryKey: expenseFilters.categoryKey,
+                  categoryName:
+                    expenseCategoryAnalytics.breakdown.find(
+                      (row) => row.categoryKey === expenseFilters.categoryKey,
+                    )?.categoryName || expenseFilters.categoryKey,
+                },
+                t,
+              ),
             ]
           : [],
       ),
@@ -2542,10 +2732,14 @@ export default function Reports() {
         title={t("nav.reports") || "Reports"}
         subtitle={t("analytics.subtitle")}
         action={
-          activeTab === 'party' ? (
+          activeTab === "party" ? (
             <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
-              <button className="btn-secondary min-h-[44px]" type="button" onClick={handlePrint}>
-                <Printer size={16} /> {t('ledger.printPdf')}
+              <button
+                className="btn-secondary min-h-[44px]"
+                type="button"
+                onClick={handlePrint}
+              >
+                <Printer size={16} /> {t("ledger.printPdf")}
               </button>
               <button
                 className="btn-ghost inline-flex min-h-[44px] items-center justify-center gap-2"
@@ -2554,8 +2748,11 @@ export default function Reports() {
                 disabled={isLedgerBusy}
                 aria-busy={isLedgerBusy}
               >
-                <RefreshCw size={16} className={isLedgerBusy ? 'animate-spin' : ''} />
-                {isLedgerBusy ? t('common.loading') : t('topbar.refresh')}
+                <RefreshCw
+                  size={16}
+                  className={isLedgerBusy ? "animate-spin" : ""}
+                />
+                {isLedgerBusy ? t("common.loading") : t("topbar.refresh")}
               </button>
               <button
                 className="btn-primary inline-flex min-h-[44px] items-center justify-center gap-2"
@@ -2563,7 +2760,7 @@ export default function Reports() {
                 onClick={handleDownloadExcel}
                 disabled={ledgerLoading}
               >
-                <Download size={16} /> {t('ledger.downloadExcel')}
+                <Download size={16} /> {t("ledger.downloadExcel")}
               </button>
             </div>
           ) : (
@@ -2591,8 +2788,8 @@ export default function Reports() {
               onClick={() => handleTabChange(tabObj.key)}
               className={`relative pb-3 px-2 text-sm font-semibold flex items-center gap-2 transition-colors after:absolute after:left-0 after:-bottom-[1px] after:h-0.5 after:w-full after:origin-left after:rounded-full after:transition-transform after:duration-200 after:content-[''] ${
                 isActive
-                  ? 'text-primary-600 after:scale-x-100 after:bg-primary-600 dark:text-primary-300 dark:after:bg-primary-300 font-bold'
-                  : 'text-secondary-500 after:scale-x-0 after:bg-transparent hover:text-ink-light dark:text-secondary-400 dark:hover:text-slate-200'
+                  ? "text-primary-600 after:scale-x-100 after:bg-primary-600 dark:text-primary-300 dark:after:bg-primary-300 font-bold"
+                  : "text-secondary-500 after:scale-x-0 after:bg-transparent hover:text-ink-light dark:text-secondary-400 dark:hover:text-slate-200"
               }`}
             >
               <TabIcon size={16} />
@@ -2603,7 +2800,7 @@ export default function Reports() {
       </div>
 
       {/* RENDER VIEW: OVERVIEW */}
-      {activeTab === 'overview' && (
+      {activeTab === "overview" && (
         <div className="space-y-8 animate-fadeIn">
           {/* Overview Filter box */}
           <div className="card">
@@ -2641,173 +2838,177 @@ export default function Reports() {
           </div>
 
           <ReportResultsShell loading={isBusy} t={t} className="space-y-8">
-          {/* Core Stat Cards */}
-          <div className={STATS_GRID_CLASS}>
-            <StatsCard
-              title={t("analytics.salesAndServices")}
-              value={formatMoney(summary.totals.sales.total)}
-              icon={TrendingUp}
-              tone="success"
-            >
-              {renderSummaryLines([
-                {
-                  label: t("analytics.directSales"),
-                  value: summary.totals.directSales.total,
-                  tone: "info",
-                },
-                {
-                  label: t("nav.services"),
-                  value: summary.totals.services.total,
-                  tone: "info",
-                },
-              ])}
-            </StatsCard>
-            <StatsCard
-              title={t("analytics.purchaseSpend")}
-              value={formatMoney(summary.totals.purchases.total)}
-              icon={ShoppingCart}
-              tone="default"
-            >
-              {renderSummaryLines([
-                {
-                  label: t("analytics.paid"),
-                  value: summary.totals.purchases.cashPaid,
-                  tone: "success",
-                },
-                {
-                  label: t("analytics.pending"),
-                  value: summary.totals.purchases.pending,
-                  tone: "danger",
-                },
-              ])}
-            </StatsCard>
-            <StatsCard
-              title={t("analytics.expenses")}
-              value={formatMoney(summary.totals.expenses.total)}
-              icon={Wallet}
-              tone="info"
-            >
-              {renderSummaryLines([
-                {
-                  label: t("analytics.paid"),
-                  value: summary.totals.expenses.cashPaid,
-                  tone: "warning",
-                },
-                {
-                  label: t("analytics.pending"),
-                  value: summary.totals.expenses.pending,
-                  tone: "danger",
-                },
-              ])}
-            </StatsCard>
-            <StatsCard
-              title={t("analytics.profitLoss")}
-              value={formatMoney(profitLoss.summary.profitLoss.amount)}
-              icon={BarChart2}
-              tone={
-                Number(profitLoss.summary.profitLoss.amount) < 0
-                  ? "danger"
-                  : Number(profitLoss.summary.profitLoss.amount) > 0
-                    ? "success"
-                    : "default"
-              }
-            >
-              {renderSummaryLines([
-                {
-                  label: t("analytics.salesAndServices"),
-                  value: profitLoss.summary.profitLoss.revenue,
-                  tone: "success",
-                },
-                {
-                  label: t("analytics.totalOutgoing"),
-                  value: profitLoss.summary.profitLoss.totalExpenses,
-                  tone: "warning",
-                },
-              ])}
-            </StatsCard>
-          </div>
+            {/* Core Stat Cards */}
+            <div className={STATS_GRID_CLASS}>
+              <StatsCard
+                title={t("analytics.salesAndServices")}
+                value={formatMoney(summary.totals.sales.total)}
+                icon={TrendingUp}
+                tone="success"
+              >
+                {renderSummaryLines([
+                  {
+                    label: t("analytics.directSales"),
+                    value: summary.totals.directSales.total,
+                    tone: "info",
+                  },
+                  {
+                    label: t("nav.services"),
+                    value: summary.totals.services.total,
+                    tone: "info",
+                  },
+                ])}
+              </StatsCard>
+              <StatsCard
+                title={t("analytics.purchaseSpend")}
+                value={formatMoney(summary.totals.purchases.total)}
+                icon={ShoppingCart}
+                tone="default"
+              >
+                {renderSummaryLines([
+                  {
+                    label: t("analytics.paid"),
+                    value: summary.totals.purchases.cashPaid,
+                    tone: "success",
+                  },
+                  {
+                    label: t("analytics.pending"),
+                    value: summary.totals.purchases.pending,
+                    tone: "danger",
+                  },
+                ])}
+              </StatsCard>
+              <StatsCard
+                title={t("analytics.expenses")}
+                value={formatMoney(summary.totals.expenses.total)}
+                icon={Wallet}
+                tone="info"
+              >
+                {renderSummaryLines([
+                  {
+                    label: t("analytics.paid"),
+                    value: summary.totals.expenses.cashPaid,
+                    tone: "warning",
+                  },
+                  {
+                    label: t("analytics.pending"),
+                    value: summary.totals.expenses.pending,
+                    tone: "danger",
+                  },
+                ])}
+              </StatsCard>
+              <StatsCard
+                title={t("analytics.profitLoss")}
+                value={formatMoney(profitLoss.summary.profitLoss.amount)}
+                icon={BarChart2}
+                tone={
+                  Number(profitLoss.summary.profitLoss.amount) < 0
+                    ? "danger"
+                    : Number(profitLoss.summary.profitLoss.amount) > 0
+                      ? "success"
+                      : "default"
+                }
+              >
+                {renderSummaryLines([
+                  {
+                    label: t("analytics.salesAndServices"),
+                    value: profitLoss.summary.profitLoss.revenue,
+                    tone: "success",
+                  },
+                  {
+                    label: t("analytics.totalOutgoing"),
+                    value: profitLoss.summary.profitLoss.totalExpenses,
+                    tone: "warning",
+                  },
+                ])}
+              </StatsCard>
+            </div>
 
-          {/* Charts Row */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <BarGraph
-              title={t("analytics.profitLossTrend")}
-              caption={seriesCaption}
-              data={profitLoss.series.profitLoss}
-              nameKey="label"
-              bars={[
-                {
-                  dataKey: "revenue",
-                  label: t("analytics.salesAndServices"),
-                  color: "#10b981",
-                },
-                {
-                  dataKey: "purchases",
-                  label: t("nav.purchases"),
-                  color: "#f59e0b",
-                  stackId: "outflows",
-                },
-                {
-                  dataKey: "generalExpenses",
-                  label: t("analytics.generalExpenses"),
-                  color: "#d97706",
-                  stackId: "outflows",
-                },
-                {
-                  dataKey: "salaryExpenses",
-                  label: t("staffManagement.salary"),
-                  color: "var(--color-primary-hex)",
-                  stackId: "outflows",
-                },
-                {
-                  dataKey: "profitOrLoss",
-                  label: t("analytics.profitLoss"),
-                  color: "#0f172a",
-                },
-              ]}
-              valueFormatter={formatMoney}
-              axisFormatter={formatCompactMoney}
-            />
-            <div className="card">
-              <h3 className="mb-4 font-serif text-xl text-ink font-medium">
-                {t("analytics.overallMix")}
-              </h3>
-              <div className="h-[350px]">
-                <PieChart data={pieData} height={350} valueFormatter={formatMoney} />
+            {/* Charts Row */}
+            <div className="grid gap-6 md:grid-cols-2">
+              <BarGraph
+                title={t("analytics.profitLossTrend")}
+                caption={seriesCaption}
+                data={profitLoss.series.profitLoss}
+                nameKey="label"
+                bars={[
+                  {
+                    dataKey: "revenue",
+                    label: t("analytics.salesAndServices"),
+                    color: "#10b981",
+                  },
+                  {
+                    dataKey: "purchases",
+                    label: t("nav.purchases"),
+                    color: "#f59e0b",
+                    stackId: "outflows",
+                  },
+                  {
+                    dataKey: "generalExpenses",
+                    label: t("analytics.generalExpenses"),
+                    color: "#d97706",
+                    stackId: "outflows",
+                  },
+                  {
+                    dataKey: "salaryExpenses",
+                    label: t("staffManagement.salary"),
+                    color: "var(--color-primary-hex)",
+                    stackId: "outflows",
+                  },
+                  {
+                    dataKey: "profitOrLoss",
+                    label: t("analytics.profitLoss"),
+                    color: "#0f172a",
+                  },
+                ]}
+                valueFormatter={formatMoney}
+                axisFormatter={formatCompactMoney}
+              />
+              <div className="card">
+                <h3 className="mb-4 font-serif text-xl text-ink font-medium">
+                  {t("analytics.overallMix")}
+                </h3>
+                <div className="h-[350px]">
+                  <PieChart
+                    data={pieData}
+                    height={350}
+                    valueFormatter={formatMoney}
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Rankings Table */}
-          <div className="grid gap-6 xl:grid-cols-2">
-            <PopularRankingCard
-              title={t("analytics.popularItems")}
-              subtitle={t("analytics.popularSubtitle")}
-              rows={popularItems.items}
-              loading={isBusy}
-              error={popularItemsError}
-              emptyLabel={t("analytics.noPopularItems")}
-              typeLabel={t("nav.items")}
-              t={t}
-              formatMoney={formatMoney}
-            />
-            <PopularRankingCard
-              title={t("analytics.popularCategories")}
-              subtitle={t("analytics.popularSubtitle")}
-              rows={popularCategories.items}
-              loading={isBusy}
-              error={popularCategoriesError}
-              emptyLabel={t("analytics.noPopularCategories")}
-              typeLabel={t("analytics.categoryName")}
-              t={t}
-              formatMoney={formatMoney}
-            />
-          </div>
+            {/* Rankings Table */}
+            <div className="grid gap-6 xl:grid-cols-2">
+              <PopularRankingCard
+                title={t("analytics.popularItems")}
+                subtitle={t("analytics.popularSubtitle")}
+                rows={popularItems.items}
+                loading={isBusy}
+                error={popularItemsError}
+                emptyLabel={t("analytics.noPopularItems")}
+                typeLabel={t("nav.items")}
+                t={t}
+                formatMoney={formatMoney}
+              />
+              <PopularRankingCard
+                title={t("analytics.popularCategories")}
+                subtitle={t("analytics.popularSubtitle")}
+                rows={popularCategories.items}
+                loading={isBusy}
+                error={popularCategoriesError}
+                emptyLabel={t("analytics.noPopularCategories")}
+                typeLabel={t("analytics.categoryName")}
+                t={t}
+                formatMoney={formatMoney}
+              />
+            </div>
           </ReportResultsShell>
         </div>
       )}
 
       {/* RENDER VIEW: EXPENSE ANALYTICS */}
-      {activeTab === 'expense' && (
+      {activeTab === "expense" && (
         <div className="animate-fadeIn">
           <ExpenseCategoryAnalyticsSection
             analytics={visibleExpenseCategoryAnalytics}
@@ -2827,7 +3028,7 @@ export default function Reports() {
       )}
 
       {/* RENDER VIEW: PARTY STATEMENTS */}
-      {activeTab === 'party' && (
+      {activeTab === "party" && (
         <div className="space-y-6 animate-fadeIn">
           {/* Printable Statement Block */}
           <div ref={printRef} className="space-y-6">
@@ -2862,14 +3063,14 @@ export default function Reports() {
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <div className="min-w-0 sm:col-span-2 xl:col-span-1">
-                      <label className="label">{t('ledger.party')}</label>
+                      <label className="label">{t("ledger.party")}</label>
                       <PartyFilterSelect
                         className="mt-1"
                         value={selectedPartyId}
                         selectedOption={selectedPartyOption}
                         onChange={handleLedgerPartyChange}
-                        placeholder={t('ledger.allParties')}
-                        searchPlaceholder={t('ledger.searchPlaceholder')}
+                        placeholder={t("ledger.allParties")}
+                        searchPlaceholder={t("ledger.searchPlaceholder")}
                         showPhone={false}
                       />
                     </div>
@@ -2882,24 +3083,32 @@ export default function Reports() {
                       />
                     </div>
                     <div className="min-w-0">
-                      <label className="label" htmlFor="ledger-from">{t('ledger.from')}</label>
+                      <label className="label" htmlFor="ledger-from">
+                        {t("ledger.from")}
+                      </label>
                       <div className="mt-1">
                         <FlexibleDateInput
                           id="ledger-from"
                           className="input"
                           value={ledgerFilters.from}
-                          onChange={(e) => handleLedgerDateChange('from', e.target.value)}
+                          onChange={(e) =>
+                            handleLedgerDateChange("from", e.target.value)
+                          }
                         />
                       </div>
                     </div>
                     <div className="min-w-0">
-                      <label className="label" htmlFor="ledger-to">{t('ledger.to')}</label>
+                      <label className="label" htmlFor="ledger-to">
+                        {t("ledger.to")}
+                      </label>
                       <div className="mt-1">
                         <FlexibleDateInput
                           id="ledger-to"
                           className="input"
                           value={ledgerFilters.to}
-                          onChange={(e) => handleLedgerDateChange('to', e.target.value)}
+                          onChange={(e) =>
+                            handleLedgerDateChange("to", e.target.value)
+                          }
                         />
                       </div>
                     </div>
@@ -2914,69 +3123,79 @@ export default function Reports() {
                       onClick={handleResetFilters}
                     >
                       <FilterX size={13} />
-                      {t('common.clear')}
+                      {t("common.clear")}
                     </button>
                   ) : null}
                 </div>
               </div>
 
-              <ReportResultsShell loading={isLedgerBusy} t={t} className="space-y-6">
-              {/* Stats summary cards */}
-              <div className={STATS_GRID_CLASS}>
-                {summaryCards.map((card) => (
-                  <StatsCard
-                    key={card.key}
-                    title={card.label}
-                    value={card.value}
-                    icon={card.icon}
-                    tone={
-                      card.key === 'debit'
-                        ? 'danger'
-                        : card.key === 'credit'
-                          ? 'success'
-                          : card.key === 'balance'
-                            ? 'default'
-                            : 'info'
-                    }
-                  />
-                ))}
-              </div>
-
-              {/* Transactions Table */}
-              <div className="card space-y-4">
-                {ledgerStatus ? (
-                  <Notice title={ledgerStatus} tone="error" />
-                ) : (
-                  <>
-                    <PartyStatementEntries
-                      t={t}
-                      statementRows={statementRows}
-                      showParty={showStatementParty}
-                      formatMoney={formatMoney}
-                      getBalanceToneClass={getBalanceToneClass}
-                      isBusy={isLedgerBusy}
-                      onToggleSort={() => {
-                        applyLedgerQuery({
-                          order: ledgerSortOrder === 'desc' ? 'asc' : 'desc',
-                        });
-                      }}
-                      SortIcon={ledgerSortOrder === 'desc' ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+              <ReportResultsShell
+                loading={isLedgerBusy}
+                t={t}
+                className="space-y-6"
+              >
+                {/* Stats summary cards */}
+                <div className={STATS_GRID_CLASS}>
+                  {summaryCards.map((card) => (
+                    <StatsCard
+                      key={card.key}
+                      title={card.label}
+                      value={card.value}
+                      icon={card.icon}
+                      tone={
+                        card.key === "debit"
+                          ? "danger"
+                          : card.key === "credit"
+                            ? "success"
+                            : card.key === "balance"
+                              ? "default"
+                              : "info"
+                      }
                     />
+                  ))}
+                </div>
 
-                    <Pagination
-                      page={page}
-                      pageSize={pageSize}
-                      total={ledger.total}
-                      onPageChange={setPage}
-                      onPageSizeChange={(size) => {
-                        setPageSize(size);
-                        setPage(1);
-                      }}
-                      pageSizeOptions={[10, 25, 50]}
-                    />
-                  </>
-                )}
-              </div>
+                {/* Transactions Table */}
+                <div className="card space-y-4">
+                  {ledgerStatus ? (
+                    <Notice title={ledgerStatus} tone="error" />
+                  ) : (
+                    <>
+                      <PartyStatementEntries
+                        t={t}
+                        statementRows={statementRows}
+                        showParty={showStatementParty}
+                        formatMoney={formatMoney}
+                        getBalanceToneClass={getBalanceToneClass}
+                        isBusy={isLedgerBusy}
+                        onToggleSort={() => {
+                          applyLedgerQuery({
+                            order: ledgerSortOrder === "desc" ? "asc" : "desc",
+                          });
+                        }}
+                        SortIcon={
+                          ledgerSortOrder === "desc" ? (
+                            <ArrowDown size={14} />
+                          ) : (
+                            <ArrowUp size={14} />
+                          )
+                        }
+                      />
+
+                      <Pagination
+                        page={page}
+                        pageSize={pageSize}
+                        total={ledger.total}
+                        onPageChange={setPage}
+                        onPageSizeChange={(size) => {
+                          setPageSize(size);
+                          setPage(1);
+                        }}
+                        pageSizeOptions={[10, 25, 50]}
+                      />
+                    </>
+                  )}
+                </div>
               </ReportResultsShell>
             </div>
           </div>
@@ -2984,7 +3203,7 @@ export default function Reports() {
       )}
 
       {/* RENDER VIEW: TIMELINE */}
-      {activeTab === 'timeline' && (
+      {activeTab === "timeline" && (
         <div className="space-y-6 animate-fadeIn">
           {/* Filters for Timeline */}
           <div className="card">
@@ -3022,149 +3241,161 @@ export default function Reports() {
           </div>
 
           <ReportResultsShell loading={isBusy} t={t} className="space-y-6">
-          {/* Timeline trend graphs */}
-          <div className="grid gap-6 md:grid-cols-2">
-            <BarGraph
-              title={t("analytics.salesTrend")}
-              caption={seriesCaption}
-              data={summary.series.sales}
-              nameKey="label"
-              bars={[
-                {
-                  dataKey: "received",
-                  label: t("analytics.received"),
-                  color: "#10b981",
-                },
-                {
-                  dataKey: "pending",
-                  label: t("analytics.pending"),
-                  color: "#facc15",
-                },
-              ]}
-              valueFormatter={formatMoney}
-              axisFormatter={formatCompactMoney}
-            />
-            <BarGraph
-              title={t("analytics.outgoingTrend")}
-              caption={seriesCaption}
-              data={summary.series.purchasesAndExpenses}
-              nameKey="label"
-              bars={[
-                { dataKey: "paid", label: t("analytics.paid"), color: "#d97706" },
-                {
-                  dataKey: "pending",
-                  label: t("analytics.pending"),
-                  color: "#f97316",
-                },
-              ]}
-              valueFormatter={formatMoney}
-              axisFormatter={formatCompactMoney}
-            />
-          </div>
-
-          {/* Timeline detailed table */}
-          <div className="card">
-            <div className="flex items-center justify-between gap-3 border-b border-secondary-200/80 pb-4 dark:border-slate-800">
-              <h3 className="font-serif text-2xl text-ink">
-                {t("analytics.timelineSummary")}
-              </h3>
-              <span className="text-xs text-secondary-500 font-medium">
-                {summary.series.timeline.length} {t("analytics.points")}
-              </span>
+            {/* Timeline trend graphs */}
+            <div className="grid gap-6 md:grid-cols-2">
+              <BarGraph
+                title={t("analytics.salesTrend")}
+                caption={seriesCaption}
+                data={summary.series.sales}
+                nameKey="label"
+                bars={[
+                  {
+                    dataKey: "received",
+                    label: t("analytics.received"),
+                    color: "#10b981",
+                  },
+                  {
+                    dataKey: "pending",
+                    label: t("analytics.pending"),
+                    color: "#facc15",
+                  },
+                ]}
+                valueFormatter={formatMoney}
+                axisFormatter={formatCompactMoney}
+              />
+              <BarGraph
+                title={t("analytics.outgoingTrend")}
+                caption={seriesCaption}
+                data={summary.series.purchasesAndExpenses}
+                nameKey="label"
+                bars={[
+                  {
+                    dataKey: "paid",
+                    label: t("analytics.paid"),
+                    color: "#d97706",
+                  },
+                  {
+                    dataKey: "pending",
+                    label: t("analytics.pending"),
+                    color: "#f97316",
+                  },
+                ]}
+                valueFormatter={formatMoney}
+                axisFormatter={formatCompactMoney}
+              />
             </div>
 
-            {summary.series.timeline.length === 0 ? (
-              <p className="mt-4 text-sm text-secondary-500">
-                {t("analytics.noSeries")}
-              </p>
-            ) : (
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[720px] text-sm text-secondary-700">
-                  <thead className="text-xs uppercase text-ink tracking-wider">
-                    <tr className="border-b pb-2">
-                      <th className="py-2.5 text-left">{t("analytics.period")}</th>
-                      <th className="py-2.5 text-right">
-                        {t("analytics.salesAndServices")}
-                      </th>
-                      <th className="py-2.5 text-right">{t("nav.purchases")}</th>
-                      <th className="py-2.5 text-right">{t("analytics.expenses")}</th>
-                      <th className="py-2.5 text-right">
-                        {t("analytics.profitLoss")}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {summary.series.timeline.map((row) => (
-                      <tr
-                        key={row.key}
-                        className="hover:bg-mist/50 dark:hover:bg-slate-800/15 transition-colors align-top"
-                      >
-                        <td className="py-3 pr-4 font-medium text-ink dark:text-slate-200">{row.label}</td>
-                        {renderTimelineCell(row.salesTotal, [
-                          {
-                            label: t("analytics.directSales"),
-                            value: row.directSalesTotal,
-                            tone: "info",
-                          },
-                          {
-                            label: t("nav.services"),
-                            value: row.serviceTotal,
-                            tone: "info",
-                          },
-                        ])}
-                        {renderTimelineCell(row.purchaseTotal, [
-                          {
-                            label: t("analytics.paid"),
-                            value: row.purchaseCashPaid,
-                            tone: "success",
-                          },
-                          {
-                            label: t("analytics.pending"),
-                            value: row.purchasePending,
-                            tone: "danger",
-                          },
-                        ])}
-                        {renderTimelineCell(row.expenseTotal, [
-                          {
-                            label: t("analytics.paid"),
-                            value: row.expenseCashPaid,
-                            tone: "warning",
-                          },
-                          {
-                            label: t("analytics.pending"),
-                            value: row.expensePending,
-                            tone: "danger",
-                          },
-                        ])}
-                        {renderTimelineCell(
-                          row.profitOrLoss,
-                          [
+            {/* Timeline detailed table */}
+            <div className="card">
+              <div className="flex items-center justify-between gap-3 border-b border-secondary-200/80 pb-4 dark:border-slate-800">
+                <h3 className="font-serif text-2xl text-ink">
+                  {t("analytics.timelineSummary")}
+                </h3>
+                <span className="text-xs text-secondary-500 font-medium">
+                  {summary.series.timeline.length} {t("analytics.points")}
+                </span>
+              </div>
+
+              {summary.series.timeline.length === 0 ? (
+                <p className="mt-4 text-sm text-secondary-500">
+                  {t("analytics.noSeries")}
+                </p>
+              ) : (
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full min-w-[720px] text-sm text-secondary-700">
+                    <thead className="text-xs uppercase text-ink tracking-wider">
+                      <tr className="border-b pb-2">
+                        <th className="py-2.5 text-left">
+                          {t("analytics.period")}
+                        </th>
+                        <th className="py-2.5 text-right">
+                          {t("analytics.salesAndServices")}
+                        </th>
+                        <th className="py-2.5 text-right">
+                          {t("nav.purchases")}
+                        </th>
+                        <th className="py-2.5 text-right">
+                          {t("analytics.expenses")}
+                        </th>
+                        <th className="py-2.5 text-right">
+                          {t("analytics.profitLoss")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {summary.series.timeline.map((row) => (
+                        <tr
+                          key={row.key}
+                          className="hover:bg-mist/50 dark:hover:bg-slate-800/15 transition-colors align-top"
+                        >
+                          <td className="py-3 pr-4 font-medium text-ink dark:text-slate-200">
+                            {row.label}
+                          </td>
+                          {renderTimelineCell(row.salesTotal, [
                             {
-                              label: t("analytics.totalOutgoing"),
-                              value: row.purchasesAndExpensesTotal,
+                              label: t("analytics.directSales"),
+                              value: row.directSalesTotal,
+                              tone: "info",
+                            },
+                            {
+                              label: t("nav.services"),
+                              value: row.serviceTotal,
+                              tone: "info",
+                            },
+                          ])}
+                          {renderTimelineCell(row.purchaseTotal, [
+                            {
+                              label: t("analytics.paid"),
+                              value: row.purchaseCashPaid,
+                              tone: "success",
+                            },
+                            {
+                              label: t("analytics.pending"),
+                              value: row.purchasePending,
+                              tone: "danger",
+                            },
+                          ])}
+                          {renderTimelineCell(row.expenseTotal, [
+                            {
+                              label: t("analytics.paid"),
+                              value: row.expenseCashPaid,
                               tone: "warning",
                             },
                             {
-                              label: t("analytics.salesAndServices"),
-                              value: row.salesTotal,
-                              tone: "success",
+                              label: t("analytics.pending"),
+                              value: row.expensePending,
+                              tone: "danger",
                             },
-                          ],
-                          true,
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                          ])}
+                          {renderTimelineCell(
+                            row.profitOrLoss,
+                            [
+                              {
+                                label: t("analytics.totalOutgoing"),
+                                value: row.purchasesAndExpensesTotal,
+                                tone: "warning",
+                              },
+                              {
+                                label: t("analytics.salesAndServices"),
+                                value: row.salesTotal,
+                                tone: "success",
+                              },
+                            ],
+                            true,
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </ReportResultsShell>
         </div>
       )}
 
       {/* RENDER VIEW: CAFE/RESTAURANT SALES BOOK & INSIGHTS */}
-      {activeTab === 'cafe-insights' && (
+      {activeTab === "cafe-insights" && (
         <div className="space-y-8 animate-fadeIn">
           {/* Cafe Filter Box */}
           <div className="card bg-white p-5 border border-secondary-100 shadow-sm flex flex-col md:flex-row md:items-end md:justify-between gap-4">
@@ -3178,7 +3409,9 @@ export default function Reports() {
                 />
               </div>
               <div>
-                <label className="label text-secondary-500 font-bold uppercase text-[10px] tracking-wider">{t("common.from") || "From Date"}</label>
+                <label className="label text-secondary-500 font-bold uppercase text-[10px] tracking-wider">
+                  {t("common.from") || "From Date"}
+                </label>
                 <FlexibleDateInput
                   className="input h-10 mt-1"
                   name="fromDate"
@@ -3187,7 +3420,9 @@ export default function Reports() {
                 />
               </div>
               <div>
-                <label className="label text-secondary-500 font-bold uppercase text-[10px] tracking-wider">{t("common.to") || "To Date"}</label>
+                <label className="label text-secondary-500 font-bold uppercase text-[10px] tracking-wider">
+                  {t("common.to") || "To Date"}
+                </label>
                 <FlexibleDateInput
                   className="input h-10 mt-1"
                   name="toDate"
@@ -3202,7 +3437,10 @@ export default function Reports() {
               disabled={cafeSalesLoading || isBusy}
               className="btn-secondary h-10 px-4 flex items-center justify-center gap-2 rounded-xl border border-secondary-200 hover:border-primary hover:bg-primary/5 font-semibold text-ink-light"
             >
-              <RefreshCw size={14} className={cafeSalesLoading || isBusy ? "animate-spin" : ""} />
+              <RefreshCw
+                size={14}
+                className={cafeSalesLoading || isBusy ? "animate-spin" : ""}
+              />
               {t("common.refresh") || "Refresh"}
             </button>
           </div>
@@ -3238,7 +3476,7 @@ export default function Reports() {
               loading={cafeSalesLoading}
             />
             <StatsCard
-              title={t("analytics.totalDiscount") || "Total Discount"}
+              title={t("TotalDiscount") || "Total Discount"}
               value={formatMoney(cafeStats.totalDiscount)}
               icon={TrendingDown}
               tone="danger"
@@ -3251,11 +3489,17 @@ export default function Reports() {
             {/* Column 1: Best Sellers (Popular dishes/items) */}
             <PopularRankingCard
               title={t("analytics.topSellingDishes") || "Top Selling Dishes"}
-              subtitle={t("analytics.topSellingDishesSubtitle") || "Most popular items by quantity and revenue for the selected period."}
+              subtitle={
+                t("analytics.topSellingDishesSubtitle") ||
+                "Most popular items by quantity and revenue for the selected period."
+              }
               rows={popularItems.items}
               loading={isBusy}
               error={popularItemsError}
-              emptyLabel={t("analytics.noPopularItems") || "No popular items found for this date range."}
+              emptyLabel={
+                t("analytics.noPopularItems") ||
+                "No popular items found for this date range."
+              }
               typeLabel={t("nav.items") || "Dish Name"}
               t={t}
               formatMoney={formatMoney}
@@ -3268,7 +3512,8 @@ export default function Reports() {
                   {t("analytics.orderTypesPerf") || "Order Types Performance"}
                 </h3>
                 <p className="text-sm text-secondary-500 mt-1">
-                  {t("analytics.orderTypesPerfSubtitle") || "Revenue breakdown by Dine In, Takeaway, and Delivery."}
+                  {t("analytics.orderTypesPerfSubtitle") ||
+                    "Revenue breakdown by Dine In, Takeaway, and Delivery."}
                 </p>
               </div>
 
@@ -3280,58 +3525,76 @@ export default function Reports() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {Object.entries(cafeStats.orderTypeStats).map(([type, data]) => {
-                    const pct = cafeStats.totalSales > 0 ? (data.total / cafeStats.totalSales) * 100 : 0;
-                    const labels = {
-                      dine_in: t("analytics.dineIn") || "Dine In",
-                      takeaway: t("analytics.takeaway") || "Takeaway",
-                      delivery: t("analytics.delivery") || "Delivery",
-                    };
-                    const tones = {
-                      dine_in: "bg-primary",
-                      takeaway: "bg-amber-500",
-                      delivery: "bg-emerald-500",
-                    };
-                    return (
-                      <div key={type} className="space-y-1.5">
-                        <div className="flex justify-between text-xs font-bold text-ink-light">
-                          <span>{labels[type]} ({data.count} {t("analytics.orderCount") || "orders"})</span>
-                          <span>{formatMoney(data.total)} ({pct.toFixed(0)}%)</span>
+                  {Object.entries(cafeStats.orderTypeStats).map(
+                    ([type, data]) => {
+                      const pct =
+                        cafeStats.totalSales > 0
+                          ? (data.total / cafeStats.totalSales) * 100
+                          : 0;
+                      const labels = {
+                        dine_in: t("analytics.dineIn") || "Dine In",
+                        takeaway: t("analytics.takeaway") || "Takeaway",
+                        delivery: t("analytics.delivery") || "Delivery",
+                      };
+                      const tones = {
+                        dine_in: "bg-primary",
+                        takeaway: "bg-amber-500",
+                        delivery: "bg-emerald-500",
+                      };
+                      return (
+                        <div key={type} className="space-y-1.5">
+                          <div className="flex justify-between text-xs font-bold text-ink-light">
+                            <span>
+                              {labels[type]} ({data.count}{" "}
+                              {t("analytics.orderCount") || "orders"})
+                            </span>
+                            <span>
+                              {formatMoney(data.total)} ({pct.toFixed(0)}%)
+                            </span>
+                          </div>
+                          <div className="h-3 w-full bg-secondary-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${tones[type] || "bg-slate-400"} transition-all duration-500`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-3 w-full bg-secondary-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full ${tones[type] || "bg-slate-400"} transition-all duration-500`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    },
+                  )}
                 </div>
               )}
 
               {/* Seating / Table Performance */}
               <div className="border-t border-secondary-100 pt-5 space-y-3">
                 <h4 className="text-xs uppercase font-bold text-secondary-400 tracking-wider">
-                  {t("analytics.seatingPerformance") || "Seating Section & Table Performance"}
+                  {t("analytics.seatingPerformance") ||
+                    "Seating Section & Table Performance"}
                 </h4>
                 {cafeSalesLoading ? (
                   <div className="h-28 bg-mist rounded-xl animate-pulse" />
                 ) : Object.keys(cafeStats.tableRevenue).length === 0 ? (
-                  <p className="text-sm text-secondary-500">{t("analytics.noTableSales") || "No table sales recorded."}</p>
+                  <p className="text-sm text-secondary-500">
+                    {t("analytics.noTableSales") || "No table sales recorded."}
+                  </p>
                 ) : (
                   <div className="max-h-56 overflow-y-auto border border-secondary-100 rounded-xl divide-y divide-slate-50">
                     {Object.entries(cafeStats.tableRevenue)
                       .sort((a, b) => b[1] - a[1])
                       .map(([table, rev], idx) => (
-                        <div key={table} className="p-3 flex justify-between items-center text-xs font-semibold hover:bg-mist">
+                        <div
+                          key={table}
+                          className="p-3 flex justify-between items-center text-xs font-semibold hover:bg-mist"
+                        >
                           <span className="flex items-center gap-2">
                             <span className="h-5 w-5 bg-secondary-100 rounded-md flex items-center justify-center text-[10px] text-secondary-500">
                               #{idx + 1}
                             </span>
                             {table}
                           </span>
-                          <span className="font-bold text-ink">{formatMoney(rev)}</span>
+                          <span className="font-bold text-ink">
+                            {formatMoney(rev)}
+                          </span>
                         </div>
                       ))}
                   </div>
@@ -3346,14 +3609,17 @@ export default function Reports() {
               <div>
                 <h3 className="font-serif text-xl font-medium text-ink flex items-center gap-2">
                   <BookOpen size={18} className="text-primary" />
-                  {t("analytics.cafeDetailedOrdersBook") || "Cafe Detailed Orders Book"}
+                  {t("analytics.cafeDetailedOrdersBook") ||
+                    "Cafe Detailed Orders Book"}
                 </h3>
                 <p className="text-xs text-secondary-500 mt-1">
-                  {t("analytics.cafeDetailedOrdersSubtitle") || "Full list of guest orders with their waiter names, table numbers, and exact dishes ordered."}
+                  {t("analytics.cafeDetailedOrdersSubtitle") ||
+                    "Full list of guest orders with their waiter names, table numbers, and exact dishes ordered."}
                 </p>
               </div>
               <span className="text-xs font-bold text-secondary-400 bg-mist border border-secondary-100 px-2.5 py-1 rounded-xl shrink-0">
-                {filteredCafeOrders.length} {t("analytics.orderCount") || "orders"}
+                {filteredCafeOrders.length}{" "}
+                {t("analytics.orderCount") || "orders"}
               </span>
             </div>
 
@@ -3374,10 +3640,18 @@ export default function Reports() {
                   value={cafeTypeFilter}
                   onChange={(e) => setCafeTypeFilter(e.target.value)}
                 >
-                  <option value="all">{t("analytics.allOrderTypes") || "All Order Types"}</option>
-                  <option value="dine_in">{t("analytics.dineIn") || "Dine In"}</option>
-                  <option value="takeaway">{t("analytics.takeaway") || "Takeaway"}</option>
-                  <option value="delivery">{t("analytics.delivery") || "Delivery"}</option>
+                  <option value="all">
+                    {t("analytics.allOrderTypes") || "All Order Types"}
+                  </option>
+                  <option value="dine_in">
+                    {t("analytics.dineIn") || "Dine In"}
+                  </option>
+                  <option value="takeaway">
+                    {t("analytics.takeaway") || "Takeaway"}
+                  </option>
+                  <option value="delivery">
+                    {t("analytics.delivery") || "Delivery"}
+                  </option>
                 </select>
               </div>
               <div>
@@ -3386,9 +3660,14 @@ export default function Reports() {
                   value={cafeStatusFilter}
                   onChange={(e) => setCafeStatusFilter(e.target.value)}
                 >
-                  <option value="all">{t("analytics.allPaymentStatuses") || "All Payment Statuses"}</option>
+                  <option value="all">
+                    {t("analytics.allPaymentStatuses") ||
+                      "All Payment Statuses"}
+                  </option>
                   <option value="paid">{t("analytics.paid") || "Paid"}</option>
-                  <option value="due">{t("analytics.openBillsDue") || "Open Bills (Due)"}</option>
+                  <option value="due">
+                    {t("analytics.openBillsDue") || "Open Bills (Due)"}
+                  </option>
                 </select>
               </div>
             </div>
@@ -3397,36 +3676,64 @@ export default function Reports() {
             {cafeSalesLoading ? (
               <div className="py-12 flex flex-col items-center justify-center text-secondary-500">
                 <span className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
-                <p className="text-sm font-semibold">{t("common.loading") || "Loading..."}</p>
+                <p className="text-sm font-semibold">
+                  {t("common.loading") || "Loading..."}
+                </p>
               </div>
             ) : filteredCafeOrders.length === 0 ? (
-              <p className="py-8 text-center text-sm text-secondary-400">{t("analytics.noSeries") || "No orders found."}</p>
+              <p className="py-8 text-center text-sm text-secondary-400">
+                {t("analytics.noSeries") || "No orders found."}
+              </p>
             ) : (
               <div className="overflow-x-auto border border-secondary-100 rounded-2xl bg-mist/20">
                 <table className="w-full min-w-[900px] text-xs">
                   <thead className="text-[10px] uppercase font-bold text-ink bg-mist border-b border-secondary-100">
                     <tr>
-                      <th className="p-3 text-left">{t("analytics.invoiceDate") || "Invoice / Date"}</th>
-                      <th className="p-3 text-left">{t("analytics.tableWaiter") || "Table / Waiter"}</th>
-                      <th className="p-3 text-left">{t("analytics.groupBy") || "Type"}</th>
-                      <th className="p-3 text-left">{t("analytics.dishesDrinksOrdered") || "Dishes & Drinks Ordered"}</th>
-                      <th className="p-3 text-right">{t("analytics.discount") || "Discount"}</th>
-                      <th className="p-3 text-right">{t("analytics.revenue") || "Total"}</th>
-                      <th className="p-3 text-center">{t("common.status") || "Status"}</th>
-                      <th className="p-3 text-center">{t("common.actions") || "Action"}</th>
+                      <th className="p-3 text-left">
+                        {t("analytics.invoiceDate") || "Invoice / Date"}
+                      </th>
+                      <th className="p-3 text-left">
+                        {t("analytics.tableWaiter") || "Table / Waiter"}
+                      </th>
+                      <th className="p-3 text-left">
+                        {t("analytics.groupBy") || "Type"}
+                      </th>
+                      <th className="p-3 text-left">
+                        {t("analytics.dishesDrinksOrdered") ||
+                          "Dishes & Drinks Ordered"}
+                      </th>
+                      <th className="p-3 text-right">
+                        {t("analytics.discount") || "Discount"}
+                      </th>
+                      <th className="p-3 text-right">
+                        {t("analytics.revenue") || "Total"}
+                      </th>
+                      <th className="p-3 text-center">
+                        {t("common.status") || "Status"}
+                      </th>
+                      <th className="p-3 text-center">
+                        {t("common.actions") || "Action"}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {filteredCafeOrders.map((sale) => {
-                      const table = sale.Table?.name || sale.table?.name || sale.attributes?.table_no || "Walk-in";
+                      const table =
+                        sale.Table?.name ||
+                        sale.table?.name ||
+                        sale.attributes?.table_no ||
+                        "Walk-in";
                       const waiter = sale.attributes?.waiter_name || "—";
-                      const dateText = new Date(sale.createdAt || sale.saleDate).toLocaleDateString([], {
+                      const dateText = new Date(
+                        sale.createdAt || sale.saleDate,
+                      ).toLocaleDateString([], {
                         day: "2-digit",
                         month: "short",
                         hour: "2-digit",
                         minute: "2-digit",
                       });
-                      const orderType = sale.attributes?.order_type || "dine_in";
+                      const orderType =
+                        sale.attributes?.order_type || "dine_in";
                       const typeLabels = {
                         dine_in: t("analytics.dineIn") || "Dine In",
                         takeaway: t("analytics.takeaway") || "Takeaway",
@@ -3434,44 +3741,64 @@ export default function Reports() {
                       };
 
                       return (
-                        <tr key={sale.id} className="hover:bg-mist/50 transition align-middle">
+                        <tr
+                          key={sale.id}
+                          className="hover:bg-mist/50 transition align-middle"
+                        >
                           <td className="p-3">
                             <span className="font-bold text-ink block">
                               {sale.invoiceNo || sale.id?.slice(0, 8)}
                             </span>
-                            <span className="text-[10px] text-secondary-400">{dateText}</span>
+                            <span className="text-[10px] text-secondary-400">
+                              {dateText}
+                            </span>
                           </td>
                           <td className="p-3">
-                            <span className="font-bold text-ink block">{table}</span>
-                            <span className="text-[10px] text-secondary-400">{t("staff.waiter") || "Waiter"}: {waiter}</span>
+                            <span className="font-bold text-ink block">
+                              {table}
+                            </span>
+                            <span className="text-[10px] text-secondary-400">
+                              {t("staff.waiter") || "Waiter"}: {waiter}
+                            </span>
                           </td>
                           <td className="p-3">
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${
-                              orderType === "dine_in"
-                                ? "bg-amber-50 text-amber-800 border-amber-200"
-                                : orderType === "takeaway"
-                                ? "bg-indigo-50 text-indigo-800 border-indigo-200"
-                                : "bg-emerald-50 text-emerald-800 border-emerald-200"
-                            }`}>
+                            <span
+                              className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${
+                                orderType === "dine_in"
+                                  ? "bg-amber-50 text-amber-800 border-amber-200"
+                                  : orderType === "takeaway"
+                                    ? "bg-indigo-50 text-indigo-800 border-indigo-200"
+                                    : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              }`}
+                            >
                               {typeLabels[orderType] || "Dine In"}
                             </span>
                           </td>
                           <td className="p-3">
-                            {renderOrderItemsSummary(sale.SaleItems || sale.items)}
+                            {renderOrderItemsSummary(
+                              sale.SaleItems || sale.items,
+                            )}
                           </td>
                           <td className="p-3 text-right text-rose-600 font-medium">
-                            {Number(sale.discountTotal || sale.discount || 0) > 0 ? `-${formatMoney(sale.discountTotal || sale.discount)}` : "—"}
+                            {Number(sale.discountTotal || sale.discount || 0) >
+                            0
+                              ? `-${formatMoney(sale.discountTotal || sale.discount)}`
+                              : "—"}
                           </td>
                           <td className="p-3 text-right font-bold text-ink">
                             {formatMoney(sale.grandTotal)}
                           </td>
                           <td className="p-3 text-center">
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border ${
-                              sale.status === "paid"
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                : "bg-amber-50 text-amber-700 border-amber-200"
-                            }`}>
-                              {sale.status === "paid" ? t("analytics.paid") || "Paid" : t("analytics.openBill") || "Open Bill"}
+                            <span
+                              className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                                sale.status === "paid"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-amber-50 text-amber-700 border-amber-200"
+                              }`}
+                            >
+                              {sale.status === "paid"
+                                ? t("analytics.paid") || "Paid"
+                                : t("analytics.openBill") || "Open Bill"}
                             </span>
                           </td>
                           <td className="p-3 text-center">
