@@ -6,17 +6,17 @@ const DEFAULT_DURATION = 4000;
 
 const toneStyles = {
   info: {
-    container: 'border-sky-200 bg-white text-ink shadow-sky-100/60 dark:border-sky-400/30 dark:bg-slate-900 dark:text-slate-100',
+    container: 'border-secondary-200/80 bg-white/95 text-ink shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-100',
     icon: 'text-sky-600 dark:text-sky-300',
     Icon: Info,
   },
   success: {
-    container: 'border-emerald-200 bg-white text-ink shadow-emerald-100/60 dark:border-emerald-400/30 dark:bg-slate-900 dark:text-slate-100',
+    container: 'border-secondary-200/80 bg-white/95 text-ink shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-100',
     icon: 'text-emerald-600 dark:text-emerald-300',
     Icon: CheckCircle2,
   },
   error: {
-    container: 'border-rose-200 bg-white text-ink shadow-rose-100/60 dark:border-rose-400/30 dark:bg-slate-900 dark:text-slate-100',
+    container: 'border-secondary-200/80 bg-white/95 text-ink shadow-slate-900/10 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-100',
     icon: 'text-rose-600 dark:text-rose-300',
     Icon: AlertCircle,
   },
@@ -75,7 +75,7 @@ export function SnackbarProvider({ children }) {
   return (
     <SnackbarContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex flex-col items-center gap-2 px-4 sm:items-end sm:px-6">
+      <div className="pointer-events-none fixed right-4 top-4 z-[100] flex w-full max-w-sm flex-col items-end gap-2">
         {snackbars.map((snackbar) => {
           const styles = toneStyles[snackbar.tone] || toneStyles.info;
           const Icon = styles.Icon;
@@ -83,7 +83,7 @@ export function SnackbarProvider({ children }) {
           return (
             <div
               key={snackbar.id}
-              className={`pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border px-4 py-3 shadow-xl backdrop-blur ${styles.container}`}
+              className={`pointer-events-auto flex w-full items-start gap-3 rounded-2xl border px-4 py-3 shadow-lg backdrop-blur ${styles.container}`}
               role={snackbar.tone === 'error' ? 'alert' : 'status'}
             >
               <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${styles.icon}`} aria-hidden="true" />
