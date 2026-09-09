@@ -62,6 +62,7 @@ export default function SaleInvoiceModal({
   const partyName =
     sale.partyName ||
     sale.customerName ||
+    sale.Party?.name ||
     sale.Customer?.name ||
     sale.attributes?.customer_name ||
     "Walk-in Customer";

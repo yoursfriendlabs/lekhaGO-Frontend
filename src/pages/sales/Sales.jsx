@@ -123,6 +123,17 @@ function getCustomerName(sale) {
   );
 }
 
+// ── Resolve table name from sale object (avoid showing a raw table id) ──
+function getTableName(sale) {
+  const name =
+    sale.Table?.name ||
+    sale.table?.name ||
+    sale.attributes?.table_no ||
+    '';
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return isUuid.test(String(name || '').trim()) ? '' : String(name || '').trim();
+}
+
 export default function Sales() {
   const { t } = useI18n();
   const { businessId, user, canManageFeature } = useAuth();
@@ -1616,13 +1627,16 @@ export default function Sales() {
                         metaClassName="text-[11px]"
                       />
                       <p className="mt-1 text-xs text-secondary-400 truncate">Created By: {getCreatorDisplayName(sale)}</p>
-                      {(sale.Table || sale.table || sale.tableId) && (
-                        <div className="mt-1">
-                          <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                            Table: {sale.Table?.name || sale.table?.name || sale.tableId}
-                          </span>
-                        </div>
-                      )}
+                      {(() => {
+                        const tableName = getTableName(sale);
+                        return tableName ? (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                              Table: {tableName}
+                            </span>
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
                     <div className="text-right shrink-0">
                       <StatusBadge status={sale.status} locked={isSaleLocked(sale)} cbmsStatus={sale.cbmsStatus} />
@@ -1698,13 +1712,16 @@ export default function Sales() {
                       <td className="py-2.5 pr-4 text-ink-light dark:text-secondary-300">
                         <div>{customerName || <span className="text-secondary-400">—</span>}</div>
                         <div className="text-xs text-secondary-400">Created By: {getCreatorDisplayName(sale)}</div>
-                        {(sale.Table || sale.table || sale.tableId) && (
-                          <div className="mt-1">
-                            <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                              Table: {sale.Table?.name || sale.table?.name || sale.tableId}
-                            </span>
-                          </div>
-                        )}
+                        {(() => {
+                          const tableName = getTableName(sale);
+                          return tableName ? (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                                Table: {tableName}
+                              </span>
+                            </div>
+                          ) : null;
+                        })()}
                       </td>
 
                       <td className="py-2.5 pr-4">
