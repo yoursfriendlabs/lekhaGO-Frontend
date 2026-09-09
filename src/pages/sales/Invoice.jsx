@@ -115,6 +115,7 @@ export default function Invoice() {
 const partyName = isSale
     ? record?.partyName ||
       record?.customerName ||
+      record?.Party?.name ||
       record?.Customer?.name ||
       record?.attributes?.customer_name ||
       'Walk-in Customer'

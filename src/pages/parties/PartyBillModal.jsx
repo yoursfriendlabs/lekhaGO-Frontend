@@ -74,7 +74,7 @@ export default function PartyBillModal({
   const items = rec.SaleItems || rec.PurchaseItems || [];
   const dateValue = isSale ? rec.saleDate : rec.purchaseDate;
   const partyName = isSale
-    ? rec.partyName || rec.customerName || rec.Customer?.name || rec.attributes?.customer_name || "Walk-in Customer"
+    ? rec.partyName || rec.customerName || rec.Party?.name || rec.Customer?.name || rec.attributes?.customer_name || "Walk-in Customer"
     : rec.partyName || rec.supplierName || rec.Party?.name || "—";
   const creatorName = getCreatorDisplayName(rec);
 

@@ -84,6 +84,9 @@ export function buildCafeOrderAttributes(previousAttributes = {}, nextAttributes
     table_no: asString(nextAttributes.tableNo),
     waiter_name: asString(nextAttributes.waiterName),
     guest_count: asString(nextAttributes.guestCount),
+    customer_name: asString(nextAttributes.customerName ?? nextAttributes.customer_name ?? existing.customer_name),
+    customer_phone: asString(nextAttributes.customerPhone ?? nextAttributes.customer_phone ?? existing.customer_phone),
+    customer_address: asString(nextAttributes.customerAddress ?? nextAttributes.customer_address ?? existing.customer_address),
   };
 }
 
