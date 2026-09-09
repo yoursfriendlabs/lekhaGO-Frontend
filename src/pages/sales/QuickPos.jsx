@@ -409,17 +409,6 @@ export default function QuickPos() {
     setActiveSessionOption("delivery");
     handleTableChange("");
     setTableSelectorOpen(false);
-
-    setDeliveryFormState({
-      customerName:
-        activeAttributes?.customer_name || selectedParty?.name || "",
-      customerPhone:
-        activeAttributes?.customer_phone || selectedParty?.phone || "",
-      location:
-        activeAttributes?.customer_address || selectedParty?.address || "",
-      notes: checkoutForm?.notes || "",
-    });
-    setDeliveryFormOpen(true);
   };
 
   const handleTableChange = async (tableId) => {
@@ -1119,6 +1108,24 @@ export default function QuickPos() {
       return;
     }
 
+    const isDelivery = activeSessionOption === "delivery";
+    const hasDeliveryInfo =
+      activeAttributes?.customer_name && activeAttributes?.customer_address;
+
+    if (isDelivery && !hasDeliveryInfo) {
+      setDeliveryFormState({
+        customerName:
+          activeAttributes?.customer_name || selectedParty?.name || "",
+        customerPhone:
+          activeAttributes?.customer_phone || selectedParty?.phone || "",
+        location:
+          activeAttributes?.customer_address || selectedParty?.address || "",
+        notes: checkoutForm?.notes || "",
+      });
+      setDeliveryFormOpen(true);
+      return;
+    }
+
     const isOneClickQuickSavePaid =
       !isTablesEnabled && !checkoutOpen && isPaid;
 
@@ -1509,7 +1516,7 @@ export default function QuickPos() {
     );
   }
 
-  if (isTablesEnabled && activeSessionOption === null) {
+  if (activeSessionOption === null) {
     return (
       <div className="min-w-0 space-y-5 pb-28 md:pb-0">
         <PageHeader
