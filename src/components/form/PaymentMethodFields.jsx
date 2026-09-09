@@ -161,33 +161,69 @@ export default function PaymentMethodFields({
 
         {variant === 'segmented' ? (
           <div className="grid grid-cols-2 gap-2">
-            {[
-              { value: 'cash', label: t('payments.cash'), icon: Banknote },
-              { value: 'bank', label: t('payments.bank'), icon: Landmark },
-            ].map((option) => {
-              const active = paymentMethod === option.value;
-              const Icon = option.icon;
-              return (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() =>
-                    updateValue({
-                      paymentMethod: option.value,
-                      bankId: option.value === 'bank' ? bankId : '',
-                    })
-                  }
-                  className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-bold transition ${
-                    active
-                      ? 'border-primary bg-primary text-white shadow-sm'
-                      : 'border-secondary-200 bg-white text-ink-light hover:border-primary/40 hover:bg-primary/5'
-                  }`}
-                >
-                  <Icon size={18} />
-                  {option.label}
-                </button>
-              );
-            })}
+            <button
+              type="button"
+              onClick={() =>
+                updateValue({
+                  paymentMethod: 'cash',
+                  bankId: '',
+                })
+              }
+              className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-bold transition ${
+                paymentMethod === 'cash'
+                  ? 'border-primary bg-primary text-white shadow-sm'
+                  : 'border-secondary-200 bg-white text-ink-light hover:border-primary/40 hover:bg-primary/5'
+              }`}
+            >
+              <Banknote size={18} />
+              {t('payments.cash')}
+            </button>
+
+            {bankOptions.length > 0 ? (
+              bankOptions.slice(0, 4).map((bank) => {
+                const active =
+                  paymentMethod === 'bank' && bankId === bank.value;
+                return (
+                  <button
+                    key={bank.value}
+                    type="button"
+                    title={bank.description || bank.label}
+                    onClick={() =>
+                      updateValue({
+                        paymentMethod: 'bank',
+                        bankId: bank.value,
+                      })
+                    }
+                    className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-bold transition ${
+                      active
+                        ? 'border-primary bg-primary text-white shadow-sm'
+                        : 'border-secondary-200 bg-white text-ink-light hover:border-primary/40 hover:bg-primary/5'
+                    }`}
+                  >
+                    <Landmark size={18} />
+                    <span className="truncate">{bank.label}</span>
+                  </button>
+                );
+              })
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  updateValue({
+                    paymentMethod: 'bank',
+                    bankId,
+                  })
+                }
+                className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-bold transition ${
+                  paymentMethod === 'bank'
+                    ? 'border-primary bg-primary text-white shadow-sm'
+                    : 'border-secondary-200 bg-white text-ink-light hover:border-primary/40 hover:bg-primary/5'
+                }`}
+              >
+                <Landmark size={18} />
+                {t('payments.bank')}
+              </button>
+            )}
           </div>
         ) : (
           <select
@@ -215,20 +251,20 @@ export default function PaymentMethodFields({
           </label>
 
           <SearchableSelect
-            options={bankOptions}
-            value={bankId}
-            onChange={(nextBankId) =>
-              updateValue({
-                bankId: nextBankId,
-                paymentMethod: nextBankId ? 'bank' : paymentMethod,
-              })
-            }
-            placeholder={
-              loadingBanks
-                ? t('common.loading')
-                : t('payments.selectBank')
-            }
-          />
+              options={bankOptions}
+              value={bankId}
+              onChange={(nextBankId) =>
+                updateValue({
+                  bankId: nextBankId,
+                  paymentMethod: nextBankId ? 'bank' : paymentMethod,
+                })
+              }
+              placeholder={
+                loadingBanks
+                  ? t('common.loading')
+                  : t('payments.selectBank')
+              }
+            />
 
           <div className="mt-1.5 space-y-1">
             {selectedBank && (
