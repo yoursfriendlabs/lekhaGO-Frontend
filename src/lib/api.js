@@ -1581,6 +1581,36 @@ export const api = {
       params,
       listCache(["analytics"], CACHE_TTL.short),
     ),
+  listBudgets: (params = {}) =>
+    collectionRequest(
+      "/api/budgets",
+      params,
+      listCache(["budgets"], CACHE_TTL.short),
+    ),
+  getBudget: (id) =>
+    request(
+      `/api/budgets/${id}`,
+      {},
+      listCache(detailTags("budget", id), CACHE_TTL.short),
+    ),
+  createBudget: (data) =>
+    request(
+      "/api/budgets",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["budgets", "dashboard", "analytics"]),
+    ),
+  updateBudget: (id, data) =>
+    request(
+      `/api/budgets/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([detailTags("budget", id), "budgets", "dashboard", "analytics"]),
+    ),
+  deleteBudget: (id) =>
+    request(
+      `/api/budgets/${id}`,
+      { method: "DELETE" },
+      mutationConfig([detailTags("budget", id), "budgets", "dashboard", "analytics"]),
+    ),
   getPopularItemsAnalytics: (params = {}) =>
     listRequest(
       "/api/analytics/popular-items",
