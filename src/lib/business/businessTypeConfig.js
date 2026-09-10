@@ -81,7 +81,9 @@ export function getNavigationForBusinessType(navigation = [], businessProfile) {
     ];
   }
 
-  if (!normalized.some((item) => item?.key === 'attendance')) {
+  const isPersonalWorkspace = businessProfile?.type === 'personal';
+
+  if (!isPersonalWorkspace && !normalized.some((item) => item?.key === 'attendance')) {
     const tasksIndex = normalized.findIndex((item) => item?.key === 'tasks');
     const insertIndex = tasksIndex >= 0 ? tasksIndex + 1 : Math.max(normalized.length - 2, 1);
 
@@ -92,7 +94,7 @@ export function getNavigationForBusinessType(navigation = [], businessProfile) {
     ];
   }
 
-  if (!normalized.some((item) => item?.key === 'staff')) {
+  if (!isPersonalWorkspace && !normalized.some((item) => item?.key === 'staff')) {
     const attendanceIndex = normalized.findIndex((item) => item?.key === 'attendance');
     const insertIndex = attendanceIndex >= 0 ? attendanceIndex + 1 : Math.max(normalized.length - 2, 1);
 

@@ -9,6 +9,7 @@ export const CafeOrders = lazy(() => import('../pages/cafe/CafeOrders'));
 export const Services = lazy(() => import('../pages/services/Services'));
 export const Parties = lazy(() => import('../pages/parties/Parties'));
 export const Banks = lazy(() => import('../pages/finance/Banks'));
+export const Budgets = lazy(() => import('../pages/finance/Budgets'));
 export const Reports = lazy(() => import('../pages/finance/Reports'));
 export const Tasks = lazy(() => import('../pages/tasks/Tasks'));
 export const Settings = lazy(() => import('../pages/settings/Settings'));

@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  BadgeDollarSign,
   Boxes,
   ClipboardList,
   Clock,
@@ -25,6 +26,7 @@ export const NAV_ROLE_MAP = {
   sales: ["owner", "staff", "admin", "super_admin"],
   services: ["owner", "staff", "admin", "super_admin"],
   purchases: ["owner", "staff", "admin", "super_admin"],
+  budgets: ["owner", "staff", "admin", "super_admin"],
   parties: ["owner", "staff", "admin", "super_admin"],
   tasks: ["owner", "staff", "admin", "super_admin"],
   tables: ["owner", "staff", "admin", "super_admin"],
@@ -43,6 +45,7 @@ export const NAV_ICON_MAP = {
   quickPos: Receipt,
   services: Wrench,
   purchases: ShoppingCart,
+  budgets: BadgeDollarSign,
   parties: Users,
   tasks: ListTodo,
   tables: Coffee,
@@ -73,6 +76,7 @@ export const NAV_GROUPS = [
       "services",
       "tables",
       "purchases",
+      "budgets",
     ],
   },
   {

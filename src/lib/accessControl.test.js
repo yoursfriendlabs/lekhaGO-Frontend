@@ -37,6 +37,7 @@ describe('access control helpers', () => {
 
     expect(getFeatureAccessLevel(accessControl, 'inventory', 'staff')).toBe('view');
     expect(getFeatureAccessLevel(accessControl, 'ledger', 'staff')).toBe('manage');
+    expect(getFeatureAccessLevel(normalizeAccessControl({ role: 'staff', permissions: { budgets: 'view' } }), 'budgets', 'staff')).toBe('view');
     expect(getFeatureAccessLevel(accessControl, 'sales', 'staff')).toBe('none');
   });
 
