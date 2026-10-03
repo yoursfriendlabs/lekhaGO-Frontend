@@ -18,7 +18,11 @@ import FlexibleDateInput from "../form/FlexibleDateInput.jsx";
 import ConfirmDialog from "../ui/ConfirmDialog.jsx";
 import Notice from "../ui/Notice.jsx";
 import ActionMenu from "../ui/ActionMenu.jsx";
-import { isExpiryDateExpired } from "../../lib/inventory/stockAvailability.js";
+import {
+  isExpiryDateExpired,
+  isExpiryDateNear,
+  NEAR_EXPIRY_DAYS,
+} from "../../lib/inventory/stockAvailability.js";
 
 function toDateInputValue(value) {
   if (!value) return "";
@@ -42,7 +46,7 @@ function getExpiryDateColorClass(expiryDateStr) {
     (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
   );
   if (diffDays <= 10) return "text-rose-600 dark:text-rose-400 font-semibold";
-  if (diffDays <= 20) return "text-amber-600 dark:text-amber-400 font-semibold";
+  if (diffDays <= NEAR_EXPIRY_DAYS) return "text-amber-600 dark:text-amber-400 font-semibold";
   return "text-emerald-600 dark:text-emerald-400 font-semibold";
 }
 
@@ -131,6 +135,11 @@ export default function ProductDetailDialog({
   const expiredQuantity = Number(display.expiredQuantity || 0);
   const sellableQuantity =
     display.sellableQuantity != null ? Number(display.sellableQuantity) : stock;
+  const exchangeLotExpired = Boolean(
+    exchangeLot &&
+      (exchangeLot.isExpired === true ||
+        isExpiryDateExpired(toDateInputValue(exchangeLot.expiryDate))),
+  );
 
   const applyUpdatedProduct = (updated) => {
     if (!updated) return;
@@ -464,7 +473,7 @@ export default function ProductDetailDialog({
             <div className="space-y-2">
               <p className="text-sm text-secondary-600">
                 {t("inventory.stockLotsTabHint") ||
-                  "Edit expiry on any lot. Exchange and destroy are only for expired lots."}
+                  "Edit expiry on any lot. Exchange is for expired or near-expiry lots; destroy is only for expired lots."}
               </p>
               {actionError ? <Notice title={actionError} tone="error" /> : null}
               {loading ? (
@@ -480,13 +489,17 @@ export default function ProductDetailDialog({
                   const expiry = toDateInputValue(batch.expiryDate);
                   const expired =
                     batch.isExpired === true || isExpiryDateExpired(expiry);
+                  const near =
+                    batch.isNearExpiry === true || isExpiryDateNear(expiry);
                   return (
                     <div
                       key={batch.id || `lot-${index}`}
                       className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2.5 ${
                         expired
                           ? "border-rose-200 bg-rose-50/80 dark:border-rose-900/50 dark:bg-rose-950/20"
-                          : "border-secondary-200/80 bg-white dark:border-slate-800 dark:bg-slate-950/50"
+                          : near
+                            ? "border-amber-200 bg-amber-50/80 dark:border-amber-900/50 dark:bg-amber-950/20"
+                            : "border-secondary-200/80 bg-white dark:border-slate-800 dark:bg-slate-950/50"
                       }`}
                     >
                       <div className="min-w-0">
@@ -516,7 +529,7 @@ export default function ProductDetailDialog({
                           {unitLabel ? ` ${unitLabel}` : ""}
                         </span>
                         {canManageInventory ? (
-                          expired ? (
+                          expired || near ? (
                             <ActionMenu
                               label={t("common.actions")}
                               actions={[
@@ -532,17 +545,22 @@ export default function ProductDetailDialog({
                                   icon: RefreshCw,
                                   onClick: () => openExchange(batch),
                                 },
-                                {
-                                  label: t("inventory.destroyLot") || "Destroy",
-                                  icon: Trash2,
-                                  tone: "danger",
-                                  onClick: () => {
-                                    setActionError("");
-                                    setExchangeLot(null);
-                                    setEditLot(null);
-                                    setDestroyLot(batch);
-                                  },
-                                },
+                                ...(expired
+                                  ? [
+                                      {
+                                        label:
+                                          t("inventory.destroyLot") || "Destroy",
+                                        icon: Trash2,
+                                        tone: "danger",
+                                        onClick: () => {
+                                          setActionError("");
+                                          setExchangeLot(null);
+                                          setEditLot(null);
+                                          setDestroyLot(batch);
+                                        },
+                                      },
+                                    ]
+                                  : []),
                               ]}
                             />
                           ) : (
@@ -833,14 +851,18 @@ export default function ProductDetailDialog({
           </p>
           <div>
             <p className="text-xs uppercase tracking-wide text-secondary-400">
-              {t("inventory.expiredLot")}
+              {exchangeLotExpired
+                ? t("inventory.expiredLot")
+                : t("inventory.nearExpiryLot")}
             </p>
             <p className="mt-1 text-sm font-medium text-ink">
               {exchangeLot?.batchNumber
                 ? `${t("inventory.batchNumber")}: ${exchangeLot.batchNumber}`
                 : t("inventory.noBatchNumber") || "No batch no."}
             </p>
-            <p className="text-xs text-rose-600">
+            <p
+              className={`text-xs ${exchangeLotExpired ? "text-rose-600" : "text-amber-600"}`}
+            >
               {exchangeLot?.expiryDate ? (
                 <DateDisplay date={exchangeLot.expiryDate} />
               ) : null}

@@ -31,6 +31,7 @@ import StatsCard, { STATS_GRID_CLASS } from '../../components/ui/StatsCard.jsx';
 import RefreshButton from '../../components/ui/RefreshButton.jsx';
 import FlexibleDateInput from '../../components/form/FlexibleDateInput.jsx';
 import DateDisplay from '../../components/form/DateDisplay.jsx';
+import SaleInvoiceModal from './SaleInvoiceModal.jsx';
 import { buildPaymentPayload, normalizePaymentFields, requiresBankSelection } from '../../lib/money/payments';
 import { useIsMobile } from '../../hooks/useIsMobile.js';
 import {
@@ -122,11 +123,22 @@ function getCustomerName(sale) {
   );
 }
 
+// ── Resolve table name from sale object (avoid showing a raw table id) ──
+function getTableName(sale) {
+  const name =
+    sale.Table?.name ||
+    sale.table?.name ||
+    sale.attributes?.table_no ||
+    '';
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return isUuid.test(String(name || '').trim()) ? '' : String(name || '').trim();
+}
+
 export default function Sales() {
   const { t } = useI18n();
   const { businessId, user, canManageFeature } = useAuth();
   const canManageSales = canManageFeature('sales');
-  const { businessProfile } = useBusinessSettings();
+  const { businessProfile, settings: bizSettings } = useBusinessSettings();
   const [searchParams, setSearchParams] = useSearchParams();
   const isMobile = useIsMobile();
   const createIntentHandledRef = useRef(false);
@@ -213,6 +225,7 @@ export default function Sales() {
   const [deletingSaleId, setDeletingSaleId] = useState('');
   const [savingSale, setSavingSale] = useState(false);
   const [payDialog, setPayDialog] = useState(null);
+  const [saleInvoice, setSaleInvoice] = useState(null);
   const [payAmount, setPayAmount] = useState('');
   const [payPaymentMethod, setPayPaymentMethod] = useState('cash');
   const [payBankId, setPayBankId] = useState('');
@@ -828,9 +841,9 @@ export default function Sales() {
     }
 
     actions.push(
-      { label: 'View Bill', icon: FileText, to: `/app/invoice/sales/${sale.id}` },
-      { label: 'Print Bill', icon: Printer, to: `/app/invoice/sales/${sale.id}?print=1` },
-      { label: 'Print Thermal', icon: Printer, to: `/app/invoice/sales/${sale.id}?thermal=1` },
+      { label: 'View Bill', icon: FileText, onClick: () => openSaleBill(sale, false) },
+      { label: 'Print Bill', icon: Printer, onClick: () => openSaleBill(sale, false) },
+      { label: 'Print Thermal', icon: Printer, onClick: () => openSaleBill(sale, true) },
     );
 
     if (canManageSales && locked && !cancelled) {
@@ -953,6 +966,15 @@ export default function Sales() {
     setPayPaymentMethod('cash');
     setPayBankId('');
     setPayError('');
+  };
+
+  const openSaleBill = async (sale, thermal = false) => {
+    try {
+      const full = await api.getSale(sale.id);
+      setSaleInvoice({ sale: full, initialThermal: thermal });
+    } catch {
+      setSaleInvoice({ sale, initialThermal: thermal });
+    }
   };
 
   const handleRecordPayment = async (e) => {
@@ -1605,13 +1627,16 @@ export default function Sales() {
                         metaClassName="text-[11px]"
                       />
                       <p className="mt-1 text-xs text-secondary-400 truncate">Created By: {getCreatorDisplayName(sale)}</p>
-                      {(sale.Table || sale.table || sale.tableId) && (
-                        <div className="mt-1">
-                          <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                            Table: {sale.Table?.name || sale.table?.name || sale.tableId}
-                          </span>
-                        </div>
-                      )}
+                      {(() => {
+                        const tableName = getTableName(sale);
+                        return tableName ? (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                              Table: {tableName}
+                            </span>
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
                     <div className="text-right shrink-0">
                       <StatusBadge status={sale.status} locked={isSaleLocked(sale)} cbmsStatus={sale.cbmsStatus} />
@@ -1687,13 +1712,16 @@ export default function Sales() {
                       <td className="py-2.5 pr-4 text-ink-light dark:text-secondary-300">
                         <div>{customerName || <span className="text-secondary-400">—</span>}</div>
                         <div className="text-xs text-secondary-400">Created By: {getCreatorDisplayName(sale)}</div>
-                        {(sale.Table || sale.table || sale.tableId) && (
-                          <div className="mt-1">
-                            <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                              Table: {sale.Table?.name || sale.table?.name || sale.tableId}
-                            </span>
-                          </div>
-                        )}
+                        {(() => {
+                          const tableName = getTableName(sale);
+                          return tableName ? (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
+                                Table: {tableName}
+                              </span>
+                            </div>
+                          ) : null;
+                        })()}
                       </td>
 
                       <td className="py-2.5 pr-4">
@@ -1865,6 +1893,20 @@ export default function Sales() {
           </div>
         </div>
       )}
+
+      {saleInvoice ? (
+        <SaleInvoiceModal
+          sale={saleInvoice.sale}
+          bizSettings={bizSettings}
+          money={money}
+          t={t}
+          initialThermal={saleInvoice.initialThermal}
+          onClose={() => setSaleInvoice(null)}
+          onReprinted={(updated) => {
+            if (updated) setSaleInvoice((cur) => (cur ? { ...cur, sale: updated } : cur));
+          }}
+        />
+      ) : null}
 
     </div>
   );

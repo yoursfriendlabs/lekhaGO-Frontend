@@ -68,6 +68,8 @@ describe('Parties', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: /add party/i })[0]);
 
+    expect(screen.getByText('Photo')).toBeInTheDocument();
+
     const supplierButtons = screen.getAllByRole('button', { name: 'Supplier' });
     expect(supplierButtons).toHaveLength(2);
     fireEvent.click(supplierButtons[1]);
@@ -123,10 +125,63 @@ describe('Parties', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /Hari/ }));
 
-    const viewLink = await screen.findByRole('link', { name: 'View' });
-    expect(viewLink).toHaveAttribute('href', '/app/invoice/sales/sale-1');
+    expect(await screen.findByRole('button', { name: 'View' })).toBeInTheDocument();
     expect(screen.queryByText(/Running balance/i)).not.toBeInTheDocument();
     expect(screen.getByText(/5,100\.00/)).toBeInTheDocument();
     expect(screen.getByText(/To Receive/)).toBeInTheDocument();
+  });
+
+  it('loads more party transactions with infinite scroll instead of pagination', async () => {
+    window.localStorage.setItem('mms_token', 'token-123');
+    window.localStorage.setItem('mms_role', 'owner');
+    window.localStorage.setItem('mms_business_id', 'business-123');
+    window.localStorage.setItem('mms_user', JSON.stringify({ id: 'user-1', name: 'Owner', role: 'owner' }));
+
+    const party = {
+      id: 'party-1',
+      name: 'Hari',
+      phone: '9800000000',
+      type: 'customer',
+      currentAmount: 0,
+    };
+    const allItems = Array.from({ length: 12 }, (_, index) => ({
+      id: `sale-${index + 1}`,
+      type: 'sale',
+      date: '2026-08-01',
+      totalAmount: 100,
+      paidAmount: 0,
+      dueAmount: 100,
+      amount: 0,
+      runningBalance: -100,
+      paymentType: { method: 'cash', label: 'cash' },
+    }));
+
+    apiMocks.listParties.mockResolvedValue({ items: [party], total: 1 });
+    apiMocks.partyStatement.mockImplementation(async (params = {}) => {
+      const offset = Number(params.offset || 0);
+      const limit = Number(params.limit || 10);
+      return {
+        party,
+        items: allItems.slice(offset, offset + limit),
+        summary: { totalRows: allItems.length, runningBalance: -100 },
+      };
+    });
+
+    renderWithProviders(<Parties />, { route: '/app/parties', withAuth: true });
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'View' })).toHaveLength(10);
+    });
+    expect(screen.queryByRole('button', { name: 'Prev' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Next' })).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Load more' }));
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: 'View' })).toHaveLength(12);
+    });
+    expect(apiMocks.partyStatement).toHaveBeenCalledWith(
+      expect.objectContaining({ partyId: 'party-1', limit: 10, offset: 10 })
+    );
   });
 });

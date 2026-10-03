@@ -5,6 +5,7 @@ const PERMISSION_KEYS = [
   'sales',
   'services',
   'purchases',
+  'budgets',
   'quickExpenses',
   'parties',
   'tasks',
@@ -97,6 +98,7 @@ const FEATURE_PERMISSION_MAP = {
   sales: 'sales',
   services: 'services',
   purchases: 'purchases',
+  budgets: 'budgets',
   quickExpenses: 'quickExpenses',
   parties: 'parties',
   tasks: 'tasks',
@@ -189,7 +191,6 @@ export function getRequiredPartiesAccessLevel(permissions) {
 
   for (const key of PARTY_DEPENDENT_PERMISSION_KEYS) {
     const level = normalizeAccessLevel(source[key]);
-    if (level === 'manage') return 'manage';
     if (level !== 'none') required = 'view';
   }
 

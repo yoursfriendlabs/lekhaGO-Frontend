@@ -7,10 +7,34 @@ import {
   Zap,
 } from 'lucide-react';
 
+const DEFAULT_CATEGORY_IDS = ['food', 'transport', 'utilities'];
+
 import { api } from '../lib/api';
 import { useI18n } from '../lib/i18n.jsx';
 
 export const CUSTOM_EXPENSE_CATEGORY = '__custom__';
+export const SAVED_CUSTOM_PREFIX = 'saved-custom-';
+
+function isSavedCustomId(id) {
+  return String(id || '').startsWith(SAVED_CUSTOM_PREFIX);
+}
+
+function readStoredArray(key) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredArray(key, values) {
+  try {
+    localStorage.setItem(key, JSON.stringify(values));
+  } catch {
+    // ignore storage errors
+  }
+}
 
 const CATEGORY_STYLES = [
   {
@@ -89,8 +113,11 @@ function dedupeByLabel(categories = []) {
 }
 
 export function resolveExpenseCategoryLabel(categories, categoryId, customCategory, t) {
-  if (categoryId === CUSTOM_EXPENSE_CATEGORY) {
-    return String(customCategory || '').trim() || t('quickExpense.customExpense');
+  if (categoryId === CUSTOM_EXPENSE_CATEGORY || isSavedCustomId(categoryId)) {
+    const saved = isSavedCustomId(categoryId)
+      ? categories.find((category) => category.id === categoryId)
+      : null;
+    return String(customCategory?.trim() || saved?.label || '').trim() || t('quickExpense.customExpense');
   }
 
   return categories.find((category) => category.id === categoryId)?.label || '';
@@ -123,8 +150,8 @@ export function resolveExpenseCategoryPayload(categories, categoryId, customCate
     };
   }
 
-  if (categoryId === CUSTOM_EXPENSE_CATEGORY) {
-    const slug = toSlug(customName);
+  if (categoryId === CUSTOM_EXPENSE_CATEGORY || isSavedCustomId(categoryId)) {
+    const slug = toSlug(categoryId === CUSTOM_EXPENSE_CATEGORY ? customName : (selectedCategory?.label || customName));
     return {
       categoryKey: slug ? `custom-${slug}` : CUSTOM_EXPENSE_CATEGORY,
       categoryName,
@@ -146,6 +173,24 @@ export function useExpenseCategories({ businessId, includeCustom = true } = {}) 
   const [managedCategories, setManagedCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const removedKey = `mms_expense_categories_removed_${businessId || 'none'}`;
+  const customKey = `mms_expense_categories_custom_${businessId || 'none'}`;
+
+  const [removedDefaults, setRemovedDefaults] = useState(
+    () => new Set(readStoredArray(removedKey)),
+  );
+  const [customCategories, setCustomCategories] = useState(() =>
+    readStoredArray(customKey).filter((c) => c && c.id && c.name),
+  );
+
+  useEffect(() => {
+    setRemovedDefaults(new Set(readStoredArray(removedKey)));
+    setCustomCategories(
+      readStoredArray(customKey).filter((c) => c && c.id && c.name),
+    );
+  }, [removedKey, customKey]);
+
 
   useEffect(() => {
     let active = true;
@@ -180,30 +225,85 @@ export function useExpenseCategories({ businessId, includeCustom = true } = {}) 
   }, [businessId]);
 
   const categories = useMemo(() => {
-    const defaults = buildDefaultCategories(t);
+    const defaults = buildDefaultCategories(t).filter(
+      (category) => !removedDefaults.has(category.id),
+    );
     const managed = managedCategories
       .map((category, index) => normalizeExpenseCategory(category, defaults.length + index))
       .filter(Boolean);
 
     const merged = dedupeByLabel([...managed, ...defaults]);
 
-    if (!includeCustom) return merged;
+    const savedCustoms = customCategories.map((custom, index) => ({
+      id: `${SAVED_CUSTOM_PREFIX}${custom.id}`,
+      value: `${SAVED_CUSTOM_PREFIX}${custom.id}`,
+      label: custom.name,
+      rawId: custom.id,
+      icon: Tag,
+      ...getStyleAt(merged.length + index),
+    }));
+
+    const withCustoms = dedupeByLabel([...merged, ...savedCustoms]);
+
+    if (!includeCustom) return withCustoms;
 
     return [
-      ...merged,
+      ...withCustoms,
       {
         id: CUSTOM_EXPENSE_CATEGORY,
         value: CUSTOM_EXPENSE_CATEGORY,
         label: t('quickExpense.categories.custom'),
         icon: Tag,
-        ...getStyleAt(merged.length),
+        ...getStyleAt(withCustoms.length),
       },
     ];
-  }, [includeCustom, managedCategories, t]);
+  }, [includeCustom, managedCategories, removedDefaults, customCategories, t]);
+
+  const removeDefaultCategory = (id) => {
+    if (!DEFAULT_CATEGORY_IDS.includes(id)) return;
+    setRemovedDefaults((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      writeStoredArray(removedKey, Array.from(next));
+      return next;
+    });
+  };
+
+  const createCustomId = () =>
+    `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+
+  const addCustomCategory = (name) => {
+    const clean = String(name || '').trim();
+    if (!clean) return null;
+    const existing = customCategories.find(
+      (c) => String(c.name).toLowerCase() === clean.toLowerCase(),
+    );
+    if (existing) return `${SAVED_CUSTOM_PREFIX}${existing.id}`;
+    const newCustom = { id: createCustomId(), name: clean };
+    setCustomCategories((prev) => {
+      const next = [...prev, newCustom];
+      writeStoredArray(customKey, next);
+      return next;
+    });
+    return `${SAVED_CUSTOM_PREFIX}${newCustom.id}`;
+  };
+
+  const removeCustomCategory = (id) => {
+    if (!isSavedCustomId(id)) return;
+    const customId = String(id).slice(SAVED_CUSTOM_PREFIX.length);
+    setCustomCategories((prev) => {
+      const next = prev.filter((c) => c.id !== customId);
+      writeStoredArray(customKey, next);
+      return next;
+    });
+  };
 
   return {
     categories,
     loading,
     error,
+    removeDefaultCategory,
+    addCustomCategory,
+    removeCustomCategory,
   };
 }

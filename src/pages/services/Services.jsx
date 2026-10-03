@@ -196,6 +196,15 @@ export default function Services() {
   const [formNotice, setFormNotice] = useState({ type: "", message: "" });
   const formNoticeTimerRef = useRef(null);
 
+  useEffect(() => {
+    if (formNotice.type !== "success" && formNotice.type !== "error") return;
+    const timer = setTimeout(
+      () => setFormNotice({ type: "", message: "" }),
+      3000,
+    );
+    return () => clearTimeout(timer);
+  }, [formNotice]);
+
   // ── Payment dialog ──
   const [payDialog, setPayDialog] = useState(null);
   const [payAmount, setPayAmount] = useState("");
@@ -1327,7 +1336,6 @@ export default function Services() {
   const statusFilterOptions = useMemo(
     () => [
       { value: "all", label: t("services.allStatuses") },
-      { value: "open", label: t("services.open") },
       { value: "in_progress", label: t("services.inProgress") },
       { value: "closed", label: t("services.closed") },
     ],

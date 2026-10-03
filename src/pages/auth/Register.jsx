@@ -182,7 +182,8 @@ export default function Register() {
           data.subscription || null,
           data.business || null,
           data.businessProfile || null,
-          data.accessControl || data.user?.accessControl || null
+          data.accessControl || data.user?.accessControl || null,
+          data
         );
         navigate('/app');
         return;

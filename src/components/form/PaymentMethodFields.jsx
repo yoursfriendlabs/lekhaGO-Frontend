@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Banknote, Landmark } from 'lucide-react';
 import SearchableSelect from './SearchableSelect';
 import NoteTextarea from './NoteTextarea.jsx';
 import { api } from '../../lib/api';
@@ -24,6 +25,7 @@ export default function PaymentMethodFields({
   noteLabel,
   notePlaceholder,
   className = '',
+  variant = 'select',
 }) {
   const { t } = useI18n();
 
@@ -151,27 +153,95 @@ export default function PaymentMethodFields({
   const helperClassName = 'text-[11px] leading-5';
 
   return (
-    <div className={`grid gap-3 sm:grid-cols-2 ${className}`}>
+    <div className={`grid gap-3 ${variant === 'segmented' ? '' : 'sm:grid-cols-2'} ${className}`}>
       <div className="min-w-0">
         <label className={labelClassName}>
           {t('payments.paymentMethod')}
         </label>
 
-        <select
-          className={fieldClassName}
-          value={paymentMethod}
-          onChange={(event) => {
-            const nextMethod = event.target.value;
+        {variant === 'segmented' ? (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                updateValue({
+                  paymentMethod: 'cash',
+                  bankId: '',
+                })
+              }
+              className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-bold transition ${
+                paymentMethod === 'cash'
+                  ? 'border-primary bg-primary text-white shadow-sm'
+                  : 'border-secondary-200 bg-white text-ink-light hover:border-primary/40 hover:bg-primary/5'
+              }`}
+            >
+              <Banknote size={18} />
+              {t('payments.cash')}
+            </button>
 
-            updateValue({
-              paymentMethod: nextMethod,
-              bankId: nextMethod === 'bank' ? bankId : '',
-            });
-          }}
-        >
-          <option value="cash">{t('payments.cash')}</option>
-          <option value="bank">{t('payments.bank')}</option>
-        </select>
+            {bankOptions.length > 0 ? (
+              bankOptions.slice(0, 4).map((bank) => {
+                const active =
+                  paymentMethod === 'bank' && bankId === bank.value;
+                return (
+                  <button
+                    key={bank.value}
+                    type="button"
+                    title={bank.description || bank.label}
+                    onClick={() =>
+                      updateValue({
+                        paymentMethod: 'bank',
+                        bankId: bank.value,
+                      })
+                    }
+                    className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-bold transition ${
+                      active
+                        ? 'border-primary bg-primary text-white shadow-sm'
+                        : 'border-secondary-200 bg-white text-ink-light hover:border-primary/40 hover:bg-primary/5'
+                    }`}
+                  >
+                    <Landmark size={18} />
+                    <span className="truncate">{bank.label}</span>
+                  </button>
+                );
+              })
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  updateValue({
+                    paymentMethod: 'bank',
+                    bankId,
+                  })
+                }
+                className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-bold transition ${
+                  paymentMethod === 'bank'
+                    ? 'border-primary bg-primary text-white shadow-sm'
+                    : 'border-secondary-200 bg-white text-ink-light hover:border-primary/40 hover:bg-primary/5'
+                }`}
+              >
+                <Landmark size={18} />
+                {t('payments.bank')}
+              </button>
+            )}
+          </div>
+        ) : (
+          <select
+            className={fieldClassName}
+            value={paymentMethod}
+            onChange={(event) => {
+              const nextMethod = event.target.value;
+
+              updateValue({
+                paymentMethod: nextMethod,
+                bankId: nextMethod === 'bank' ? bankId : '',
+              });
+            }}
+          >
+            <option value="cash">{t('payments.cash')}</option>
+            <option value="bank">{t('payments.bank')}</option>
+          </select>
+        )}
       </div>
 
       {paymentMethod === 'bank' && (
@@ -181,20 +251,20 @@ export default function PaymentMethodFields({
           </label>
 
           <SearchableSelect
-            options={bankOptions}
-            value={bankId}
-            onChange={(nextBankId) =>
-              updateValue({
-                bankId: nextBankId,
-                paymentMethod: nextBankId ? 'bank' : paymentMethod,
-              })
-            }
-            placeholder={
-              loadingBanks
-                ? t('common.loading')
-                : t('payments.selectBank')
-            }
-          />
+              options={bankOptions}
+              value={bankId}
+              onChange={(nextBankId) =>
+                updateValue({
+                  bankId: nextBankId,
+                  paymentMethod: nextBankId ? 'bank' : paymentMethod,
+                })
+              }
+              placeholder={
+                loadingBanks
+                  ? t('common.loading')
+                  : t('payments.selectBank')
+              }
+            />
 
           <div className="mt-1.5 space-y-1">
             {selectedBank && (

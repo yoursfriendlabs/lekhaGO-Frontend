@@ -492,9 +492,27 @@ export const api = {
       "/api/auth/me",
       {},
       listCache(
-        ["auth-me", "subscription", "business-profile"],
+        ["auth-me", "subscription", "business-profile", "workspaces"],
         CACHE_TTL.short,
       ),
+    ),
+  listWorkspaces: () =>
+    request(
+      "/api/auth/businesses",
+      {},
+      listCache(["workspaces", "auth-me"], CACHE_TTL.short),
+    ),
+  createWorkspace: (data) =>
+    request(
+      "/api/auth/businesses",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        "workspaces",
+        "auth-me",
+        "subscription",
+        "business-profile",
+        "business-settings",
+      ]),
     ),
   updateCurrentUser: (data) =>
     request(
@@ -505,6 +523,7 @@ export const api = {
         "subscription",
         "business-profile",
         "business-settings",
+        "workspaces",
       ]),
     ),
   changePassword: (data) =>
@@ -1330,6 +1349,12 @@ export const api = {
       params,
       listCache(["reports", "purchases"], CACHE_TTL.report),
     ),
+  dayBookReport: (params = {}, options = {}) =>
+    request(
+      buildListPath("/api/reports/day-book", params),
+      {},
+      listCache(["reports", "day-book", "banks"], CACHE_TTL.short, options),
+    ),
   stockLedgerReport: (params = {}, options = {}) =>
     listRequest(
       "/api/reports/stock-ledger",
@@ -1561,6 +1586,36 @@ export const api = {
       "/api/analytics/expenses",
       params,
       listCache(["analytics"], CACHE_TTL.short),
+    ),
+  listBudgets: (params = {}) =>
+    collectionRequest(
+      "/api/budgets",
+      params,
+      listCache(["budgets"], CACHE_TTL.short),
+    ),
+  getBudget: (id) =>
+    request(
+      `/api/budgets/${id}`,
+      {},
+      listCache(detailTags("budget", id), CACHE_TTL.short),
+    ),
+  createBudget: (data) =>
+    request(
+      "/api/budgets",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["budgets", "dashboard", "analytics"]),
+    ),
+  updateBudget: (id, data) =>
+    request(
+      `/api/budgets/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([detailTags("budget", id), "budgets", "dashboard", "analytics"]),
+    ),
+  deleteBudget: (id) =>
+    request(
+      `/api/budgets/${id}`,
+      { method: "DELETE" },
+      mutationConfig([detailTags("budget", id), "budgets", "dashboard", "analytics"]),
     ),
   getPopularItemsAnalytics: (params = {}) =>
     listRequest(

@@ -114,6 +114,12 @@ function getPurchaseDueAmount(p) {
     0,
   );
 }
+function cleanInvoiceNo(raw) {
+  const value = String(raw == null ? "" : raw).trim();
+  if (!value) return value;
+  const match = value.match(/(\d+)\s*$/);
+  return match ? match[1] : value;
+}
 function getVatAmount(lineTotal, taxRate) {
   return (Number(lineTotal || 0) * Number(taxRate || 0)) / 100;
 }
@@ -1482,20 +1488,6 @@ setInvoiceOrder(purchase);
                       />
                     </div>
                   </div>
-                  {isExpense && (
-                    <div>
-                      <label className="label">
-                        {t("purchases.payeeName")}
-                      </label>
-                      <input
-                        className="input mt-1"
-                        name="partyName"
-                        value={header.partyName}
-                        onChange={handleHeaderChange}
-                        placeholder={t("purchases.payeeHint")}
-                      />
-                    </div>
-                  )}
                   <div>
                     <label className="label">{t("purchases.invoiceNo")}</label>
                     <input
@@ -1509,7 +1501,7 @@ setInvoiceOrder(purchase);
                       }
                     />
                   </div>
-                  <div className="min-w-0 xl:col-span-2">
+                  <div>
                     <label className="label">
                       {t("purchases.purchaseDate")}
                     </label>
@@ -2055,28 +2047,39 @@ setInvoiceOrder(purchase);
                 </div>
               )}
               <div className="mt-4 border-t border-secondary-200/70 pt-4 dark:border-slate-700/60">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                   <div className="flex-1">
                     <label className="label">{t("purchases.totalPaid")}</label>
-                    <input
-                      className="input mt-1"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.01"
-                      min="0"
-                      value={
-                        isPaid
-                          ? totals.grandTotal.toFixed(2)
-                          : header.amountReceived
-                      }
-                      disabled={isPaid}
-                      onChange={(e) =>
-                        setHeader((p) => ({
-                          ...p,
-                          amountReceived: e.target.value,
-                        }))
-                      }
-                    />
+                    <div className="mt-1 flex items-center gap-3">
+                      <input
+                        className="input flex-1"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        min="0"
+                        value={
+                          isPaid
+                            ? totals.grandTotal.toFixed(2)
+                            : header.amountReceived
+                        }
+                        disabled={isPaid}
+                        onChange={(e) =>
+                          setHeader((p) => ({
+                            ...p,
+                            amountReceived: e.target.value,
+                          }))
+                        }
+                      />
+                      <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm font-semibold text-ink-light dark:text-secondary-300">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded accent-primary-600"
+                          checked={isPaid}
+                          onChange={(e) => setIsPaid(e.target.checked)}
+                        />
+                        {t("services.fullyPaid")}
+                      </label>
+                    </div>
                     <QuickPaymentButtons
                       disabled={totals.grandTotal <= 0}
                       onNoPayment={() => applyQuickPaidAmount(0)}
@@ -2090,15 +2093,6 @@ setInvoiceOrder(purchase);
                       }
                     />
                   </div>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-secondary-200/70 bg-mist/70 px-4 py-3 text-sm font-semibold text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-secondary-300 dark:hover:bg-slate-800/60">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded accent-primary-600"
-                      checked={isPaid}
-                      onChange={(e) => setIsPaid(e.target.checked)}
-                    />
-                    {t("services.fullyPaid")}
-                  </label>
                 </div>
                 {dueAmount > 0 && (
                   <div className="mt-3 flex items-center gap-2 rounded-xl border border-rose-200/70 bg-rose-50/60 px-3 py-2.5 text-sm dark:border-rose-800/40 dark:bg-rose-900/20">
@@ -2194,7 +2188,7 @@ setInvoiceOrder(purchase);
             ) : null}
             <div className="rounded-[22px] bg-mist p-4 text-sm dark:bg-slate-900/60">
               <p className="font-semibold text-ink dark:text-slate-200">
-                {payDialog.invoiceNo || payDialog.id.slice(0, 8)}
+                {cleanInvoiceNo(payDialog.invoiceNo) || payDialog.id.slice(0, 8)}
               </p>
               {getSupplierName(payDialog) && (
                 <p className="text-secondary-500">
@@ -2374,7 +2368,7 @@ setInvoiceOrder(purchase);
                         )}
                       </div>
                       <p className="mt-2 truncate font-semibold text-ink">
-                        {purchase.invoiceNo || purchase.id.slice(0, 8)}
+                        {cleanInvoiceNo(purchase.invoiceNo) || purchase.id.slice(0, 8)}
                       </p>
                       <p className="mt-0.5 text-xs text-secondary-500">
                         <DateDisplay date={purchase.purchaseDate} format="ddd DD, MMM" />
@@ -2467,7 +2461,7 @@ setInvoiceOrder(purchase);
                       className="border-t border-secondary-200/70"
                     >
                       <td className="py-2.5 pr-4 font-medium text-ink dark:text-slate-200">
-                        {purchase.invoiceNo || purchase.id.slice(0, 8)}
+                        {cleanInvoiceNo(purchase.invoiceNo) || purchase.id.slice(0, 8)}
                       </td>
                       <td className="py-2.5 pr-4">
                         <span
@@ -2589,7 +2583,7 @@ setInvoiceOrder(purchase);
                   <ThermalReceipt
                     biz={bizSettings}
                     receiptType="Expense Receipt"
-                    invoiceNo={invoiceOrder.invoiceNo || invoiceOrder.id?.slice(0, 8)}
+                    invoiceNo={cleanInvoiceNo(invoiceOrder.invoiceNo) || invoiceOrder.id?.slice(0, 8)}
                     date={<DateDisplay date={invoiceOrder.purchaseDate} format="MMMM D, YYYY" mode="inline" />}
                     partyName={getSupplierName(invoiceOrder) || "—"}
                     creatorName={getCreatorDisplayName(invoiceOrder)}
@@ -2622,7 +2616,7 @@ setInvoiceOrder(purchase);
                   <InvoiceHeader
                     biz={bizSettings}
                     invoiceType="Expense Bill"
-                    invoiceNo={invoiceOrder.invoiceNo || invoiceOrder.id?.slice(0, 8)}
+                    invoiceNo={cleanInvoiceNo(invoiceOrder.invoiceNo) || invoiceOrder.id?.slice(0, 8)}
                     date={<DateDisplay date={invoiceOrder.purchaseDate} format="MMMM D, YYYY" mode="inline" />}
                     status={invoiceOrder.status}
                     statusColor="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
@@ -2771,7 +2765,7 @@ setInvoiceOrder(purchase);
         description={
           deletePurchase
             ? t("purchases.deleteConfirm", {
-                name: deletePurchase.invoiceNo || deletePurchase.id.slice(0, 8),
+                name: cleanInvoiceNo(deletePurchase.invoiceNo) || deletePurchase.id.slice(0, 8),
               })
             : t("common.confirmDelete")
         }
@@ -2814,7 +2808,7 @@ setInvoiceOrder(purchase);
           <p className="text-sm leading-6 text-secondary-700">
             {cancelPurchase
               ? t("purchases.cancelConfirm", {
-                  name: cancelPurchase.invoiceNo || cancelPurchase.id.slice(0, 8),
+                  name: cleanInvoiceNo(cancelPurchase.invoiceNo) || cancelPurchase.id.slice(0, 8),
                 })
               : ""}
           </p>
@@ -2850,7 +2844,7 @@ setInvoiceOrder(purchase);
             <div className="space-y-4 p-6">
               {statusError ? <Notice title={statusError} tone="error" /> : null}
               <div className="rounded-xl bg-mist p-3 text-sm dark:bg-slate-900/60">
-                <p className="font-semibold text-ink dark:text-slate-200">{statusDialog.invoiceNo || statusDialog.id.slice(0, 8)}</p>
+                <p className="font-semibold text-ink dark:text-slate-200">{cleanInvoiceNo(statusDialog.invoiceNo) || statusDialog.id.slice(0, 8)}</p>
               </div>
               <div className="space-y-2">
                 {PURCHASE_STATUS_STEPS.map((step) => {

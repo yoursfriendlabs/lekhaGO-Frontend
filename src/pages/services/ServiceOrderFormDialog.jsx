@@ -1287,13 +1287,13 @@ export default function ServiceOrderFormDialog({
                               />
                             </div>
 
-                            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-                              <div>
-                                <label className="label">
-                                  {t("services.amountReceived")}
-                                </label>
+                            <div>
+                              <label className="label">
+                                {t("services.amountReceived")}
+                              </label>
+                              <div className="mt-1 flex flex-wrap items-center gap-2">
                                 <input
-                                  className="input mt-1"
+                                  className="input flex-1 min-w-[140px]"
                                   type="number"
                                   step="0.01"
                                   min="0"
@@ -1307,33 +1307,35 @@ export default function ServiceOrderFormDialog({
                                     setAmountReceived(e.target.value)
                                   }
                                 />
-                                <QuickPaymentButtons
-                                  disabled={totals.grandTotal <= 0}
-                                  onNoPayment={() =>
-                                    applyQuickReceivedAmount(0)
-                                  }
-                                  onHalfPayment={() =>
-                                    applyQuickReceivedAmount(
-                                      totals.grandTotal / 2,
-                                    )
-                                  }
-                                  onFullPayment={() =>
-                                    applyQuickReceivedAmount(
-                                      totals.grandTotal,
-                                      { markPaid: true },
-                                    )
-                                  }
-                                />
+                                <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-secondary-200/70 bg-mist/70 px-4 py-3 text-sm font-semibold text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-secondary-300 dark:hover:bg-slate-800/60">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded accent-primary-600"
+                                    checked={isPaid}
+                                    onChange={(e) =>
+                                      setIsPaid(e.target.checked)
+                                    }
+                                  />
+                                  {t("services.fullyPaid")}
+                                </label>
                               </div>
-                              <label className="flex cursor-pointer items-center gap-2 rounded-2xl border border-secondary-200/70 bg-mist/70 px-4 py-3 text-sm font-semibold text-ink-light transition hover:bg-secondary-100 dark:border-slate-700/60 dark:bg-slate-900/40 dark:text-secondary-300 dark:hover:bg-slate-800/60">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded accent-primary-600"
-                                  checked={isPaid}
-                                  onChange={(e) => setIsPaid(e.target.checked)}
-                                />
-                                {t("services.fullyPaid")}
-                              </label>
+                              <QuickPaymentButtons
+                                disabled={totals.grandTotal <= 0}
+                                onNoPayment={() =>
+                                  applyQuickReceivedAmount(0)
+                                }
+                                onHalfPayment={() =>
+                                  applyQuickReceivedAmount(
+                                    totals.grandTotal / 2,
+                                  )
+                                }
+                                onFullPayment={() =>
+                                  applyQuickReceivedAmount(
+                                    totals.grandTotal,
+                                    { markPaid: true },
+                                  )
+                                }
+                              />
                             </div>
 
                             {totals.due > 0 ? (

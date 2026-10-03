@@ -4,6 +4,7 @@ import {
   getStockAvailabilityMessage,
   isAllStockExpired,
   isExpiryDateExpired,
+  isExpiryDateNear,
 } from './stockAvailability';
 
 describe('stockAvailability', () => {
@@ -11,6 +12,16 @@ describe('stockAvailability', () => {
     expect(isExpiryDateExpired('2026-08-01', '2026-08-23')).toBe(true);
     expect(isExpiryDateExpired('2026-08-23', '2026-08-23')).toBe(false);
     expect(isExpiryDateExpired('', '2026-08-23')).toBe(false);
+  });
+
+  it('treats lots expiring within 3 months as near expiry', () => {
+    expect(isExpiryDateNear('2026-11-20', '2026-08-23')).toBe(true);
+    expect(isExpiryDateNear('2026-11-21', '2026-08-23')).toBe(true);
+    expect(isExpiryDateNear('2026-11-22', '2026-08-23')).toBe(false);
+    expect(isExpiryDateNear('2026-08-20', '2026-08-23')).toBe(false);
+    expect(isExpiryDateNear('2026-10-01', '2026-08-23', 45)).toBe(true);
+    expect(isExpiryDateNear('2026-11-01', '2026-08-23', 45)).toBe(false);
+    expect(isExpiryDateNear('', '2026-08-23')).toBe(false);
   });
 
   it('prefers sellableQuantity from the API', () => {

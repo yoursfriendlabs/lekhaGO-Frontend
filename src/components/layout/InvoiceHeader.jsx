@@ -38,7 +38,7 @@ export default function InvoiceHeader({ biz = {}, invoiceType, invoiceNo, date, 
           ) : null}
 
           <div className="min-w-0">
-            <h1 className={`font-serif font-bold text-ink leading-tight ${logoSrc ? 'text-2xl' : 'text-3xl'}`}>
+            <h1 className={`font-serif font-bold text-red-600 leading-tight ${logoSrc ? 'text-2xl' : 'text-3xl'}`}>
               {biz.companyName || 'PasalManager'}
             </h1>
 

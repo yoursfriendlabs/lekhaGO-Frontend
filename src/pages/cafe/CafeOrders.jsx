@@ -136,7 +136,6 @@ export default function CafeOrders() {
   });
   const [items, setItems] = useState([{ ...emptyItem }]);
 
-  const salesRoute = businessProfile?.salesFlow?.route || '/app/pos';
   const [backendTables, setBackendTables] = useState([]);
   const [selectedFloorTab, setSelectedFloorTab] = useState('all');
   const [floors, setFloors] = useState([]);
@@ -763,9 +762,6 @@ export default function CafeOrders() {
         subtitle="Manage dine-in, takeaway, and ready-to-serve orders from one live board."
         action={(
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Link className="btn-ghost w-full justify-center sm:w-auto" to={salesRoute}>
-              Open POS
-            </Link>
             <button className="btn-primary w-full sm:w-auto" type="button" onClick={() => navigate('/app/pos?ref=orders')}>
               <Plus size={16} className="mr-1.5 inline" />
               New Order
@@ -1126,10 +1122,17 @@ export default function CafeOrders() {
                       </td>
                       <td className="p-3 max-w-[220px]">
                         {Array.isArray(order.SaleItems) && order.SaleItems.length > 0 ? (
-                          <span className="truncate block font-medium" title={order.SaleItems.map(i => `${i.quantity}x ${i.Product?.name || i.name}`).join(', ')}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOrderForItemsDialog(order)}
+                            className="truncate block font-medium text-left w-full hover:text-primary"
+                            title={order.SaleItems.map(i => `${i.quantity}x ${i.Product?.name || i.name}`).join(', ')}
+                          >
                             {order.SaleItems.slice(0, 2).map(i => `${i.quantity}x ${i.Product?.name || i.name}`).join(', ')}
-                            {order.SaleItems.length > 2 ? ` +${order.SaleItems.length - 2} more` : ''}
-                          </span>
+                            {order.SaleItems.length > 2 ? (
+                              <span className="font-bold text-primary"> +{order.SaleItems.length - 2} more</span>
+                            ) : ''}
+                          </button>
                         ) : (
                           <span className="text-secondary-400">No items</span>
                         )}

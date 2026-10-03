@@ -96,6 +96,7 @@ export function normalizeLookupParty(raw = {}) {
     currentAmount: toLookupAmount(
       pickFirstDefined(raw.currentAmount, party.currentAmount, raw.balance, party.balance)
     ),
+    avatarUrl: String(pickFirstDefined(raw.avatarUrl, party.avatarUrl)).trim(),
   };
 }
 

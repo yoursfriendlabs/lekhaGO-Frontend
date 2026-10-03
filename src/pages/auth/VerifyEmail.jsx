@@ -308,7 +308,8 @@ export default function VerifyEmail() {
           subscription,
           response?.business || context?.business || null,
           response?.businessProfile || context?.businessProfile || null,
-          response?.accessControl || response?.user?.accessControl || context?.accessControl || context?.user?.accessControl || null
+          response?.accessControl || response?.user?.accessControl || context?.accessControl || context?.user?.accessControl || null,
+          response
         );
         navigate('/app');
         return;

@@ -81,7 +81,9 @@ export function getNavigationForBusinessType(navigation = [], businessProfile) {
     ];
   }
 
-  if (!normalized.some((item) => item?.key === 'attendance')) {
+  const isPersonalWorkspace = businessProfile?.type === 'personal';
+
+  if (!isPersonalWorkspace && !normalized.some((item) => item?.key === 'attendance')) {
     const tasksIndex = normalized.findIndex((item) => item?.key === 'tasks');
     const insertIndex = tasksIndex >= 0 ? tasksIndex + 1 : Math.max(normalized.length - 2, 1);
 
@@ -92,7 +94,7 @@ export function getNavigationForBusinessType(navigation = [], businessProfile) {
     ];
   }
 
-  if (!normalized.some((item) => item?.key === 'staff')) {
+  if (!isPersonalWorkspace && !normalized.some((item) => item?.key === 'staff')) {
     const attendanceIndex = normalized.findIndex((item) => item?.key === 'attendance');
     const insertIndex = attendanceIndex >= 0 ? attendanceIndex + 1 : Math.max(normalized.length - 2, 1);
 
@@ -101,6 +103,13 @@ export function getNavigationForBusinessType(navigation = [], businessProfile) {
       { key: 'staff', label: 'Staff', route: '/app/staff' },
       ...normalized.slice(insertIndex),
     ];
+  }
+
+  const servicesIndex = normalized.findIndex((item) => item?.key === 'services');
+  const billingIndex = normalized.findIndex((item) => item?.key === 'billing');
+  if (servicesIndex >= 0 && billingIndex >= 0 && servicesIndex !== billingIndex + 1) {
+    const [servicesItem] = normalized.splice(servicesIndex, 1);
+    normalized.splice(billingIndex, 0, servicesItem);
   }
 
   return normalized;

@@ -17,6 +17,8 @@ import ActionMenu from '../../components/ui/ActionMenu.jsx';
 import FlexibleDateInput from '../../components/form/FlexibleDateInput.jsx';
 import DateDisplay from '../../components/form/DateDisplay.jsx';
 import PartyFilterSelect from '../../components/parties/PartyFilterSelect.jsx';
+import Avatar from "../../components/ui/Avatar.jsx";
+import FileUpload from "../../components/form/FileUpload.jsx";
 import { Dialog } from "../../components/ui/Dialog.tsx";
 import ConfirmDialog from "../../components/ui/ConfirmDialog.jsx";
 import { api } from "../../lib/api";
@@ -33,6 +35,9 @@ import {
 import { toPartyLookupOption } from '../../lib/lookups.js';
 import { usePartyStore } from "../../stores/parties";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useBusinessSettings } from "../../lib/business/businessSettings.jsx";
+import PartyBillModal from "./PartyBillModal.jsx";
+import PartyServiceBillModal from "./PartyServiceBillModal.jsx";
 import {
   Plus,
   Bell,
@@ -59,6 +64,7 @@ const emptyForm = {
   openingBalance: 0,
   asOfDate: "",
   balanceType: "receive",
+  avatarUrl: "",
 };
 
 const makeEmptyTx = () => ({
@@ -200,9 +206,6 @@ const SUCCESS_NOTICE_TIMEOUT_MS = 3000;
 
 // Row types that have a corresponding update API on the backend
 const EDITABLE_TX_TYPES = new Set([
-  "sale",
-  "service",
-  "purchase",
   "payment_in",
   "payment_out",
 ]);
@@ -237,6 +240,8 @@ function getTransactionViewPath(row) {
     case "purchase":
     case "expense":
       return `/app/invoice/purchases/${row.id}`;
+    case "service":
+      return `/app/services`;
     default:
       return null;
   }
@@ -311,11 +316,39 @@ function mergeUniqueParties(existing = [], incoming = []) {
   return merged;
 }
 
+function statementRowKey(row) {
+  return `${row?.type || "row"}-${row?.id || ""}`;
+}
+
+function mergeUniqueStatementRows(existing = [], incoming = []) {
+  const seen = new Set();
+  const merged = [];
+
+  [...existing, ...incoming].forEach((row) => {
+    const key = statementRowKey(row);
+    if (!row?.id || seen.has(key)) return;
+    seen.add(key);
+    merged.push(row);
+  });
+
+  return merged;
+}
+
 export default function Parties() {
   // const { canManageFeature } = useAuth();
   const { t } = useI18n();
+  const { settings: bizSettings } = useBusinessSettings();
   const canManageParties = true;
   const navigate = useNavigate();
+
+  const money = (value) =>
+    t("currency.formatted", {
+      symbol: t("currency.symbol"),
+      amount: Number(value || 0).toFixed(2),
+    });
+
+  const [billView, setBillView] = useState(null);
+  const [serviceBill, setServiceBill] = useState(null);
   const {
     upsert: upsertParty,
     remove: removeParty,
@@ -357,7 +390,6 @@ export default function Parties() {
   const [isOpen, setIsOpen] = useState(false);
   const [txState, dispatchTx] = useReducer(txReducer, txInitialState);
   const [selectedTxPartyOption, setSelectedTxPartyOption] = useState(null);
-  const [txPage, setTxPage] = useState(1);
   const [deleteParty, setDeleteParty] = useState(null);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteTx, setDeleteTx] = useState(null);
@@ -365,11 +397,17 @@ export default function Parties() {
   const [partyTotal, setPartyTotal] = useState(0);
   const [loadingMoreParties, setLoadingMoreParties] = useState(false);
   const [partyHasMore, setPartyHasMore] = useState(false);
+  const [loadingMoreTx, setLoadingMoreTx] = useState(false);
+  const [txHasMore, setTxHasMore] = useState(false);
   const partyListScrollRef = useRef(null);
   const partyListSentinelRef = useRef(null);
   const partyDetailRef = useRef(null);
   const txSectionRef = useRef(null);
+  const txListScrollRef = useRef(null);
+  const txListSentinelRef = useRef(null);
   const partyListSessionRef = useRef(0);
+  const txListSessionRef = useRef(0);
+  const txLoadingMoreRef = useRef(false);
   const submitPartyRequestRef = useRef(false);
   const saveAndNewRef = useRef(false);
   const supportsIntersectionObserver =
@@ -557,60 +595,153 @@ export default function Parties() {
     }
   }, [loadingParties, parties, selectedId]);
 
-  useEffect(() => {
-    setTxPage(1);
-  }, [selectedId]);
+  const applyStatementParty = useCallback(
+    (party) => {
+      if (!party?.id) return;
 
-  useEffect(() => {
-    if (!selectedId) {
-      setStatementData(normalizePartyStatementResponse());
-      setStatementError("");
-      return;
-    }
+      upsertParty(party);
+      setParties((prev) =>
+        prev.map((item) => (item.id === party.id ? { ...item, ...party } : item)),
+      );
+    },
+    [upsertParty],
+  );
 
-    let isActive = true;
+  const loadStatementPage = useCallback(
+    async ({
+      offset = 0,
+      append = false,
+      session = txListSessionRef.current,
+    } = {}) => {
+      if (!selectedId) {
+        txLoadingMoreRef.current = false;
+        setStatementData(normalizePartyStatementResponse());
+        setStatementError("");
+        setTxHasMore(false);
+        setStatementLoading(false);
+        setLoadingMoreTx(false);
+        return;
+      }
 
-    async function loadStatement() {
-      setStatementData(normalizePartyStatementResponse());
-      setStatementLoading(true);
-      setStatementError("");
+      if (append) {
+        if (txLoadingMoreRef.current) return;
+        txLoadingMoreRef.current = true;
+        setLoadingMoreTx(true);
+      } else {
+        txLoadingMoreRef.current = false;
+        setStatementData(normalizePartyStatementResponse());
+        setStatementLoading(true);
+        setStatementError("");
+        setTxHasMore(false);
+      }
 
       try {
         const data = await api.partyStatement({
           partyId: selectedId,
           limit: TX_PAGE_SIZE,
-          offset: (txPage - 1) * TX_PAGE_SIZE,
+          offset,
           order: txSortOrder,
         });
+
+        if (session !== txListSessionRef.current) return;
+
         const normalized = normalizePartyStatementResponse(data);
+        const nextItems = normalized.rows;
+        const total = Number(normalized.summary.totalRows ?? nextItems.length);
 
-        if (!isActive) return;
-        setStatementData(normalized);
-
-        if (normalized.party?.id) {
-          upsertParty(normalized.party);
-          setParties((prev) =>
-            prev.map((party) =>
-              party.id === normalized.party.id
-                ? { ...party, ...normalized.party }
-                : party,
-            ),
-          );
-        }
+        setStatementError("");
+        setStatementData((previous) =>
+          append
+            ? {
+                ...normalized,
+                rows: mergeUniqueStatementRows(previous.rows, nextItems),
+              }
+            : normalized,
+        );
+        setTxHasMore(offset + nextItems.length < total);
+        applyStatementParty(normalized.party);
       } catch (err) {
-        if (!isActive) return;
+        if (session !== txListSessionRef.current) return;
+
         setStatementError(err.message);
-        setStatementData(normalizePartyStatementResponse());
+
+        if (!append) {
+          setStatementData(normalizePartyStatementResponse());
+          setTxHasMore(false);
+        }
       } finally {
-        if (isActive) setStatementLoading(false);
+        if (session !== txListSessionRef.current) return;
+
+        if (append) {
+          txLoadingMoreRef.current = false;
+          setLoadingMoreTx(false);
+        } else {
+          setStatementLoading(false);
+        }
       }
+    },
+    [applyStatementParty, selectedId, txSortOrder],
+  );
+
+  useEffect(() => {
+    const session = txListSessionRef.current + 1;
+    txListSessionRef.current = session;
+
+    if (txListScrollRef.current) {
+      txListScrollRef.current.scrollTop = 0;
     }
 
-    loadStatement();
-    return () => {
-      isActive = false;
-    };
-  }, [selectedId, statementReloadKey, txPage, txSortOrder, upsertParty]);
+    txLoadingMoreRef.current = false;
+    setLoadingMoreTx(false);
+    setTxHasMore(false);
+    loadStatementPage({ offset: 0, append: false, session });
+  }, [loadStatementPage, selectedId, statementReloadKey, txSortOrder]);
+
+  useEffect(() => {
+    const root = txListScrollRef.current;
+    const sentinel = txListSentinelRef.current;
+
+    if (
+      !supportsIntersectionObserver ||
+      !root ||
+      !sentinel ||
+      !txHasMore ||
+      statementLoading ||
+      loadingMoreTx ||
+      statementError
+    ) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (!entry?.isIntersecting) return;
+
+        loadStatementPage({
+          offset: statementData.rows.length,
+          append: true,
+          session: txListSessionRef.current,
+        });
+      },
+      {
+        root,
+        rootMargin: "120px 0px",
+        threshold: 0.1,
+      },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [
+    loadStatementPage,
+    loadingMoreTx,
+    statementData.rows.length,
+    statementError,
+    statementLoading,
+    supportsIntersectionObserver,
+    txHasMore,
+  ]);
 
 
   const selectedParty = useMemo(
@@ -638,10 +769,6 @@ export default function Parties() {
   const selectedPartyWhatsAppLink = getWhatsAppLink(
     selectedPartyView?.phone,
     selectedPartyWhatsAppMessage,
-  );
-  const totalTxPages = Math.max(
-    1,
-    Math.ceil(statementData.summary.totalRows / TX_PAGE_SIZE),
   );
   const partySummaryCards = [
     {
@@ -692,6 +819,7 @@ export default function Parties() {
       openingBalance: party.openingBalance || 0,
       asOfDate: party.asOfDate || "",
       balanceType: party.balanceType || "receive",
+      avatarUrl: party.avatarUrl || "",
     });
     setIsOpen(true);
   };
@@ -786,6 +914,26 @@ export default function Parties() {
 
     await openEditTransaction(row);
   };
+
+  const openBill = async (row) => {
+    if (!row?.id) return;
+    if (row.type === "service") {
+      setServiceBill(row);
+      return;
+    }
+    const isSale = row.type === "sale";
+    if (!isSale && row.type !== "purchase" && row.type !== "expense") return;
+    setBillView(null);
+    try {
+      const full = isSale
+        ? await api.getSale(row.id)
+        : await api.getPurchase(row.id);
+      setBillView({ record: full, type: isSale ? "sale" : "purchase" });
+    } catch {
+      setBillView({ record: row, type: isSale ? "sale" : "purchase" });
+    }
+  };
+
 
   const closeTxDialog = () => {
     setSelectedTxPartyOption(null);
@@ -1031,7 +1179,6 @@ export default function Parties() {
 
       if (nextPartyId) {
         if (nextPartyId !== selectedId) {
-          setTxPage(1);
           setSelectedId(nextPartyId);
         } else {
           // Same party — just refresh the statement without changing page or selectedId
@@ -1110,10 +1257,19 @@ export default function Parties() {
         }
       />
 
-      {status.message ? (
+      {status.message && status.type === "info" ? (
         <Notice title={status.message} tone={status.type} />
       ) : null}
       {listError ? <Notice title={listError} tone="error" /> : null}
+
+      {status.message &&
+      (status.type === "success" || status.type === "error") ? (
+        <div className="pointer-events-none fixed inset-x-0 top-5 z-[120] flex justify-center px-4">
+          <div className="pointer-events-auto w-full max-w-sm">
+            <Notice title={status.message} tone={status.type} />
+          </div>
+        </div>
+      ) : null}
 
 
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
@@ -1215,13 +1371,12 @@ export default function Parties() {
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white transition-colors ${
-                          isSelected ? "bg-emerald-600" : "bg-slate-400"
-                        }`}
-                      >
-                        {party.name?.slice(0, 2).toUpperCase() || "P"}
-                      </div>
+                      <Avatar
+                        src={party.avatarUrl}
+                        name={party.name}
+                        size="md"
+                        fallbackClassName={isSelected ? "bg-emerald-600 text-white" : "bg-slate-400 text-white"}
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="flex items-center gap-1.5 font-semibold text-ink">
                           {party.name}
@@ -1317,9 +1472,13 @@ export default function Parties() {
             <>
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-100 text-lg font-semibold text-emerald-700">
-                    {selectedPartyView.name?.slice(0, 1).toUpperCase() || "P"}
-                  </div>
+                  <Avatar
+                    src={selectedPartyView.avatarUrl}
+                    name={selectedPartyView.name}
+                    size="lg"
+                    className="rounded-2xl"
+                    fallbackClassName="bg-emerald-100 text-emerald-700"
+                  />
                   <div>
                     <p className="text-xl font-semibold text-ink">
                       {selectedPartyView.name}
@@ -1440,7 +1599,6 @@ export default function Parties() {
                     type="button"
                     onClick={() => {
                       setTxSortOrder((prev) => (prev === "desc" ? "asc" : "desc"));
-                      setTxPage(1);
                     }}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-secondary-200 bg-white text-secondary-700 transition hover:bg-mist hover:text-ink active:scale-95 dark:border-slate-800 dark:bg-slate-950 dark:text-secondary-400 dark:hover:bg-slate-900 dark:hover:text-slate-100"
                     title={txSortOrder === "desc" ? "Newest First" : "Oldest First"}
@@ -1468,7 +1626,10 @@ export default function Parties() {
                 <Notice title={statementError} tone="error" />
               ) : null}
 
-              <div className="space-y-2">
+              <div
+                ref={txListScrollRef}
+                className="max-h-[calc((7.5rem*10)+(0.5rem*9))] space-y-2 overflow-y-auto overscroll-contain pr-1"
+              >
                 {statementLoading ? (
                   <p className="py-3 text-sm text-secondary-500">
                     {t("common.loading")}
@@ -1486,7 +1647,7 @@ export default function Parties() {
 
                     return (
                       <div
-                        key={`${row.type}-${row.id}`}
+                        key={statementRowKey(row)}
                         className="rounded-2xl border border-secondary-200 bg-white p-3"
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -1539,13 +1700,14 @@ export default function Parties() {
                           <div className="flex shrink-0 flex-col items-end gap-2">
                             <div className="flex items-center gap-1">
                               {viewPath ? (
-                                <Link
-                                  to={viewPath}
+                                <button
+                                  type="button"
+                                  onClick={() => openBill(row)}
                                   className="inline-flex items-center gap-1 rounded-md bg-mist px-2 py-1 text-xs font-semibold text-ink-light transition-all hover:bg-secondary-100 active:scale-95"
                                 >
                                   <Eye size={12} />
                                   {t("common.view")}
-                                </Link>
+                                </button>
                               ) : null}
                               {canManageParties &&
                               EDITABLE_TX_TYPES.has(row.type) &&
@@ -1613,34 +1775,69 @@ export default function Parties() {
                     );
                   })
                 )}
+
+                {txHasMore ? (
+                  <div
+                    ref={txListSentinelRef}
+                    className="h-4"
+                    aria-hidden="true"
+                  />
+                ) : null}
               </div>
 
-              {totalTxPages > 1 && (
-                <div className="flex items-center justify-between pt-2 text-sm text-secondary-500">
+              {!statementLoading && statementData.rows.length > 0 ? (
+                <div className="flex items-center justify-between gap-2 pt-2 text-xs text-secondary-500">
                   <span>
-                    {statementData.summary.totalRows} transactions · page{" "}
-                    {txPage} of {totalTxPages}
+                    {t("pagination.showing", {
+                      start: 1,
+                      end: statementData.rows.length,
+                      total:
+                        statementData.summary.totalRows ||
+                        statementData.rows.length,
+                    })}
                   </span>
-                  <div className="flex gap-2">
+                  {loadingMoreTx ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-500" />
+                      {t("common.loading")}
+                    </span>
+                  ) : statementError && txHasMore ? (
                     <button
                       type="button"
-                      disabled={txPage === 1}
-                      onClick={() => setTxPage((prev) => prev - 1)}
-                      className="rounded-lg border border-secondary-200 px-3 py-1 text-xs disabled:opacity-40"
+                      className="font-semibold text-rose-600 transition hover:text-rose-700"
+                      onClick={() =>
+                        loadStatementPage({
+                          offset: statementData.rows.length,
+                          append: true,
+                          session: txListSessionRef.current,
+                        })
+                      }
                     >
-                      Prev
+                      {t("pagination.retryLoadMore")}
                     </button>
-                    <button
-                      type="button"
-                      disabled={txPage === totalTxPages}
-                      onClick={() => setTxPage((prev) => prev + 1)}
-                      className="rounded-lg border border-secondary-200 px-3 py-1 text-xs disabled:opacity-40"
-                    >
-                      Next
-                    </button>
-                  </div>
+                  ) : txHasMore ? (
+                    supportsIntersectionObserver ? (
+                      <span>{t("pagination.scrollToLoadMore")}</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="font-semibold text-emerald-600 transition hover:text-emerald-700"
+                        onClick={() =>
+                          loadStatementPage({
+                            offset: statementData.rows.length,
+                            append: true,
+                            session: txListSessionRef.current,
+                          })
+                        }
+                      >
+                        {t("pagination.loadMore")}
+                      </button>
+                    )
+                  ) : statementData.summary.totalRows > TX_PAGE_SIZE ? (
+                    <span>{t("pagination.allLoaded")}</span>
+                  ) : null}
                 </div>
-              )}
+              ) : null}
             </>
           ) : (
             <p className="text-sm text-secondary-500">{t("parties.noParties")}</p>
@@ -1661,9 +1858,12 @@ export default function Parties() {
             submitParty(false);
           }}
         >
-          {status.message ? (
-            <Notice title={status.message} tone={status.type} />
-          ) : null}
+          <FileUpload
+            key={editingId || "create"}
+            label={t("parties.photo")}
+            initialUrl={form.avatarUrl}
+            onUpload={(url) => setForm((prev) => ({ ...prev, avatarUrl: url || "" }))}
+          />
           <div className="grid gap-3 md:grid-cols-2">
             <div>
               <label className="label">{t("parties.partyName")}</label>
@@ -1915,6 +2115,27 @@ export default function Parties() {
         description={t("parties.messages.confirmDeleteTransaction")}
         confirming={deleteTxSubmitting}
       />
+
+      {billView ? (
+        <PartyBillModal
+          record={billView.record}
+          type={billView.type}
+          bizSettings={bizSettings}
+          money={money}
+          t={t}
+          onClose={() => setBillView(null)}
+          onRefreshed={(updated) => {
+            if (updated) setBillView((cur) => (cur ? { ...cur, record: updated } : cur));
+          }}
+        />
+      ) : null}
+
+      {serviceBill ? (
+        <PartyServiceBillModal
+          record={serviceBill}
+          onClose={() => setServiceBill(null)}
+        />
+      ) : null}
     </div>
   );
 }
