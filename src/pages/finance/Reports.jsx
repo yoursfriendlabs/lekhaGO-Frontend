@@ -53,6 +53,7 @@ import {
   PartyStatementEntries,
   PartyStatementPrintSheet,
 } from "./PartyStatementViews.jsx";
+import DayBookReport from "../../components/finance/DayBookReport.jsx";
 
 const EMPTY_METRIC_TOTALS = Object.freeze({
   count: 0,
@@ -1658,6 +1659,11 @@ export default function Reports() {
         icon: PieIcon,
       });
       list.push({
+        key: "day-book",
+        label: t("dayBook.tab"),
+        icon: BookOpen,
+      });
+      list.push({
         key: "expense",
         label: t("analytics.expenses") || "Expense Analytics",
         icon: BarChart2,
@@ -2798,6 +2804,9 @@ export default function Reports() {
           );
         })}
       </div>
+
+      {/* RENDER VIEW: DAY BOOK */}
+      {activeTab === "day-book" && <DayBookReport />}
 
       {/* RENDER VIEW: OVERVIEW */}
       {activeTab === "overview" && (

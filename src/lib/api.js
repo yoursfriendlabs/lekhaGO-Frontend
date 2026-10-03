@@ -1349,6 +1349,12 @@ export const api = {
       params,
       listCache(["reports", "purchases"], CACHE_TTL.report),
     ),
+  dayBookReport: (params = {}, options = {}) =>
+    request(
+      buildListPath("/api/reports/day-book", params),
+      {},
+      listCache(["reports", "day-book", "banks"], CACHE_TTL.short, options),
+    ),
   stockLedgerReport: (params = {}, options = {}) =>
     listRequest(
       "/api/reports/stock-ledger",
