@@ -348,10 +348,9 @@ export default function DayBookReport() {
 
         <div className="grid gap-3 border-t border-secondary-200/70 pt-4 sm:grid-cols-[minmax(0,14rem)_1fr] dark:border-slate-800/60">
           <div className="min-w-0">
-            <label className="label" htmlFor="day-book-account">{t("dayBook.account")}</label>
             <select
               id="day-book-account"
-              className="input mt-1"
+              className="input"
               value={accountId}
               onChange={(event) => toggleAccount(event.target.value)}
             >
@@ -365,10 +364,9 @@ export default function DayBookReport() {
           </div>
           <form className="flex flex-wrap items-end gap-2" onSubmit={handleSearchSubmit}>
             <div className="min-w-[180px] flex-1">
-              <label className="label" htmlFor="day-book-search">{t("common.search")}</label>
               <input
                 id="day-book-search"
-                className="input mt-1"
+                className="input"
                 value={search}
                 placeholder={t("dayBook.searchPlaceholder")}
                 onChange={(event) => setSearch(event.target.value)}

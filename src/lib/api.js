@@ -224,6 +224,17 @@ function buildCacheKey(method, path, businessId) {
   return `${method}:${businessId || "default"}:${path}`;
 }
 
+function isMissingSalaryEndpoint(err) {
+  // The localStorage fallback only exists for builds talking to a backend that
+  // predates the salary-records API. Only a genuinely absent route (404/405) or
+  // a network failure (no status) counts as "missing"; auth/permission/
+  // validation/server errors must propagate so the UI can report them instead
+  // of silently pretending a rejected write succeeded.
+  if (!err) return true;
+  if (!err.status) return true;
+  return err.status === 404 || err.status === 405;
+}
+
 async function request(path, options = {}, config = {}) {
   const method = (options.method || "GET").toUpperCase();
   const token = getToken();
@@ -710,6 +721,7 @@ export const api = {
       {},
       listCache(["staff", "salary-records"], CACHE_TTL.short),
     ).catch((err) => {
+      if (!isMissingSalaryEndpoint(err)) throw err;
       console.warn(
         "Backend salary-records endpoint not found. Falling back to local storage.",
         err,
@@ -746,6 +758,7 @@ export const api = {
         return { records: existing, record: newRecord };
       })
       .catch((err) => {
+        if (!isMissingSalaryEndpoint(err)) throw err;
         console.warn(
           "Backend salary-records endpoint not found. Falling back to local storage.",
           err,
@@ -773,6 +786,7 @@ export const api = {
       { method: "DELETE" },
       mutationConfig(["staff", "salary-records"]),
     ).catch((err) => {
+      if (!isMissingSalaryEndpoint(err)) throw err;
       console.warn(
         "Backend salary-records endpoint not found. Falling back to local storage.",
         err,

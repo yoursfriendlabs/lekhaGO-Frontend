@@ -158,7 +158,7 @@ export default function DayBookDateFilter({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+      <div className="grid gap-3 sm:grid-cols-2 sm:items-end">
         <div className="min-w-0">
           <label className="label" htmlFor="day-book-from">{t('dayBook.from')}</label>
           <div className="mt-1">
@@ -181,8 +181,8 @@ export default function DayBookDateFilter({
             />
           </div>
         </div>
-        <p className="flex items-center gap-1.5 pb-2 text-xs font-semibold text-secondary-600 dark:text-secondary-400">
-          <CalendarRange size={14} className="shrink-0 text-primary" />
+        <p className="-mt-4 flex items-center justify-end gap-1.5 text-[10px] font-medium text-secondary-600 sm:col-span-2 dark:text-secondary-400">
+          <CalendarRange size={10} className="shrink-0 text-primary" />
           <span className="truncate">{describeRange(from, to, t)}</span>
         </p>
       </div>
