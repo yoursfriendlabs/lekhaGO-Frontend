@@ -1549,6 +1549,7 @@ export default function StaffManagement({ businessId }) {
                         setSalaryMember(member);
                         setSalaryOpen(true);
                       },
+                      hidden: !canManageStaff,
                     },
                     canManageStaff &&
                       !isOwner && {
@@ -1674,6 +1675,7 @@ export default function StaffManagement({ businessId }) {
                             setSalaryMember(member);
                             setSalaryOpen(true);
                           },
+                          hidden: !canManageStaff,
                         },
                         !isOwner && {
                           label: t("SalaryProfile", "Salary Details"),
