@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { studentsTranslations } from './studentsTranslations';
 
 const dictionaries = {
   en: {
+    students: studentsTranslations.en,
     locale: 'English',
     languages: {
       en: 'English',
@@ -89,6 +91,7 @@ const dictionaries = {
       tagline: 'Inventory, sales, service',
     },
     nav: {
+      students: 'Students',
       dashboard: 'Dashboard',
       products: 'Items',
       inventory: 'Inventory',
@@ -404,6 +407,7 @@ const dictionaries = {
       permissionInventoryRequiredHint: 'Inventory view is required while Quick POS, Sales, Services, or Purchases is enabled. None is unavailable.',
       permissionPartiesRequiredHint: 'Party access is required while Sales, Purchases, Services, or Quick POS is enabled, so staff can select or create a customer. None is unavailable.',
       permissionGroups: {
+        students: 'Students & courses',
         operations: 'Operations',
         sensitive: 'Sensitive data',
         finance: 'Finance',
@@ -412,6 +416,7 @@ const dictionaries = {
         more: 'More',
       },
       permissionGroupHints: {
+        students: 'Registration, course fees, and student attendance.',
         operations: 'Control which day-to-day modules this staff member can open.',
         sensitive: 'Hide cost from counter staff even if they can see inventory and sell items.',
         finance: 'Reports, ledger, and bank accounts.',
@@ -420,6 +425,8 @@ const dictionaries = {
         more: 'Additional modules for this business.',
       },
       permissionFeatures: {
+        students: 'Students & fees',
+        studentAttendance: 'Student attendance',
         reports: 'Reports',
         quickPos: 'Quick POS',
         sales: 'Sales invoices',
@@ -440,6 +447,8 @@ const dictionaries = {
         billing: 'Billing counter',
       },
       permissionFeatureHints: {
+        students: 'View students and fees. Manage also allows registration, enrollments, payments, and course setup.',
+        studentAttendance: 'View class rosters. Manage also allows marking attendance, without access to fees.',
         quickPos: 'Create walk-in counter sales. Does not include the full sales invoice list unless Sales is also granted.',
         sales: 'View and manage the full sales invoice history, edits, and cancellations.',
         purchasePrice: 'See product cost in inventory. Manage also allows editing purchase price.',
@@ -2382,6 +2391,7 @@ const dictionaries = {
     },
   },
   ne: {
+    students: studentsTranslations.ne,
     locale: 'नेपाली',
     languages: {
       en: 'English',
@@ -2456,6 +2466,7 @@ const dictionaries = {
       tagline: 'स्टक, बिक्री, सेवा',
     },
     nav: {
+      students: 'विद्यार्थी',
       dashboard: 'ड्यासबोर्ड',
       products: 'आइटम',
       inventory: 'स्टक',
@@ -2771,6 +2782,7 @@ const dictionaries = {
       permissionInventoryRequiredHint: 'Quick POS, Sales, Services वा Purchases सक्रिय हुँदा Inventory view आवश्यक छ। None उपलब्ध छैन।',
       permissionPartiesRequiredHint: 'Sales, Purchases, Services वा Quick POS सक्रिय हुँदा पार्टी पहुँच आवश्यक छ, ताकि स्टाफले ग्राहक छान्न वा नयाँ बनाउन सकून्। None उपलब्ध छैन।',
       permissionGroups: {
+        students: 'विद्यार्थी र पाठ्यक्रम',
         operations: 'सञ्चालन',
         sensitive: 'संवेदनशील डाटा',
         finance: 'वित्त',
@@ -2779,6 +2791,7 @@ const dictionaries = {
         more: 'थप',
       },
       permissionGroupHints: {
+        students: 'दर्ता, पाठ्यक्रम शुल्क र विद्यार्थी हाजिरी।',
         operations: 'यो स्टाफले कुन दैनिक मोड्युल खोल्न पाउँछन् नियन्त्रण गर्नुहोस्।',
         sensitive: 'काउन्टर स्टाफलाई इन्भेन्टरी र बिक्री देखे पनि खरिद मूल्य लुकाउनुहोस्।',
         finance: 'रिपोर्ट, लेजर र बैंक खाता।',
@@ -2787,6 +2800,8 @@ const dictionaries = {
         more: 'यो व्यवसायका थप मोड्युलहरू।',
       },
       permissionFeatures: {
+        students: 'विद्यार्थी र शुल्क',
+        studentAttendance: 'विद्यार्थी हाजिरी',
         reports: 'रिपोर्टहरू',
         quickPos: 'Quick POS',
         sales: 'बिक्री बिल',
@@ -2807,6 +2822,8 @@ const dictionaries = {
         billing: 'बिलिङ काउन्टर',
       },
       permissionFeatureHints: {
+        students: 'विद्यार्थी र शुल्क हेर्नुहोस्। व्यवस्थापनले दर्ता, भर्ना, भुक्तानी र पाठ्यक्रम पनि समेट्छ।',
+        studentAttendance: 'कक्षा सूची हेर्नुहोस्। व्यवस्थापनले शुल्कको पहुँचबिना हाजिरी राख्न पनि दिन्छ।',
         quickPos: 'काउन्टरबाट छिटो बिक्री बनाउनुहोस्। Sales अनुमति नदिएसम्म पूरा बिल सूची देखिँदैन।',
         sales: 'पूरा बिक्री बिल इतिहास, सम्पादन र रद्द हेर्नुहोस् वा व्यवस्थापन गर्नुहोस्।',
         purchasePrice: 'इन्भेन्टरीमा उत्पादनको लागत देखाउनुहोस्। Manage ले खरिद मूल्य सम्पादन पनि दिन्छ।',

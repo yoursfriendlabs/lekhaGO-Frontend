@@ -26,6 +26,7 @@ export default function PaymentMethodFields({
   notePlaceholder,
   className = '',
   variant = 'select',
+  allowBankPayments = true,
 }) {
   const { t } = useI18n();
 
@@ -33,10 +34,10 @@ export default function PaymentMethodFields({
   const [loadingBanks, setLoadingBanks] = useState(false);
   const [bankError, setBankError] = useState('');
 
-  const paymentMethod = getEffectivePaymentMethod(
+  const paymentMethod = allowBankPayments ? getEffectivePaymentMethod(
     value.paymentMethod,
     value.bankId
-  );
+  ) : 'cash';
 
   const bankId = String(value.bankId || '').trim();
 
@@ -56,6 +57,7 @@ export default function PaymentMethodFields({
   };
 
   useEffect(() => {
+    if (!allowBankPayments) return;
     let isMounted = true;
 
     const loadBanks = async () => {
@@ -89,10 +91,10 @@ export default function PaymentMethodFields({
     return () => {
       isMounted = false;
     };
-  }, [t]);
+  }, [t, allowBankPayments]);
 
   useEffect(() => {
-    if (!bankId || banks.some((bank) => bank.id === bankId)) return;
+    if (!allowBankPayments || !bankId || banks.some((bank) => bank.id === bankId)) return;
 
     let isMounted = true;
 
@@ -113,7 +115,7 @@ export default function PaymentMethodFields({
     return () => {
       isMounted = false;
     };
-  }, [bankId, banks]);
+  }, [bankId, banks, allowBankPayments]);
 
   const bankOptions = useMemo(
     () =>
@@ -179,7 +181,7 @@ export default function PaymentMethodFields({
               {t('payments.cash')}
             </button>
 
-            {bankOptions.length > 0 ? (
+            {allowBankPayments && (bankOptions.length > 0 ? (
               bankOptions.slice(0, 4).map((bank) => {
                 const active =
                   paymentMethod === 'bank' && bankId === bank.value;
@@ -223,10 +225,11 @@ export default function PaymentMethodFields({
                 <Landmark size={18} />
                 {t('payments.bank')}
               </button>
-            )}
+            ))}
           </div>
         ) : (
           <select
+            aria-label={t('payments.paymentMethod')}
             className={fieldClassName}
             value={paymentMethod}
             onChange={(event) => {
@@ -239,12 +242,12 @@ export default function PaymentMethodFields({
             }}
           >
             <option value="cash">{t('payments.cash')}</option>
-            <option value="bank">{t('payments.bank')}</option>
+            {allowBankPayments && <option value="bank">{t('payments.bank')}</option>}
           </select>
         )}
       </div>
 
-      {paymentMethod === 'bank' && (
+      {allowBankPayments && paymentMethod === 'bank' && (
         <div className="min-w-0">
           <label className={labelClassName}>
             {t('payments.bankAccount')}
@@ -305,6 +308,7 @@ export default function PaymentMethodFields({
           </label>
 
           <NoteTextarea
+            aria-label={noteLabel || t('payments.paymentNote')}
             className={noteFieldClassName}
             value={value.paymentNote || ''}
             onChange={(event) =>

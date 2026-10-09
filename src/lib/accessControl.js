@@ -19,6 +19,8 @@ const PERMISSION_KEYS = [
   'billing',
   'attendance',
   'purchasePrice',
+  'students',
+  'studentAttendance',
 ];
 
 const ACCESS_LEVELS = ['none', 'view', 'manage'];
@@ -51,6 +53,9 @@ const PARTY_DEPENDENT_PERMISSION_KEYS = [
 
 const CAFE_PERMISSION_KEYS = new Set(['tables', 'orders', 'billing']);
 
+/** Students & Courses add-on keys: only shown when the business has the add-on. */
+const STUDENT_PERMISSION_KEYS = new Set(['students', 'studentAttendance']);
+
 /** Permission keys hidden from the staff permission editor unless cafe modules are on. */
 const STAFF_PERMISSION_UI_HIDDEN_KEYS = new Set([
   'analytics',
@@ -79,6 +84,8 @@ const STAFF_PERMISSION_UI_ORDER = [
   'tables',
   'orders',
   'billing',
+  'students',
+  'studentAttendance',
 ];
 
 export const STAFF_PERMISSION_UI_GROUPS = [
@@ -87,6 +94,7 @@ export const STAFF_PERMISSION_UI_GROUPS = [
   { id: 'finance', keys: ['reports', 'banking'] },
   { id: 'team', keys: ['staff', 'attendance', 'settings'] },
   { id: 'cafe', keys: ['tables', 'orders', 'billing'] },
+  { id: 'students', keys: ['students', 'studentAttendance'] },
 ];
 
 const FEATURE_PERMISSION_MAP = {
@@ -119,6 +127,8 @@ const FEATURE_PERMISSION_MAP = {
   tables: 'tables',
   attendance: 'attendance',
   purchasePrice: 'purchasePrice',
+  students: 'students',
+  studentAttendance: 'studentAttendance',
 };
 
 const SUBSCRIPTION_FEATURE_ALIASES = {
@@ -198,9 +208,13 @@ export function getRequiredPartiesAccessLevel(permissions) {
 }
 
 /**
- * Standard staff permission rows. Cafe modules stay hidden unless includeCafeModules is true.
+ * Standard staff permission rows. Cafe modules stay hidden unless includeCafeModules is true,
+ * and student modules unless includeStudentModules is true.
  */
-export function getStaffPermissionUiFeatures(features = [], { includeCafeModules = false } = {}) {
+export function getStaffPermissionUiFeatures(
+  features = [],
+  { includeCafeModules = false, includeStudentModules = false } = {},
+) {
   const byKey = new Map();
 
   (Array.isArray(features) ? features : []).forEach((feature) => {
@@ -220,6 +234,10 @@ export function getStaffPermissionUiFeatures(features = [], { includeCafeModules
       (STAFF_PERMISSION_UI_HIDDEN_KEYS.has(permissionKey) || STAFF_PERMISSION_UI_HIDDEN_KEYS.has(rawKey))
       && !(includeCafeModules && isCafeKey)
     ) {
+      return;
+    }
+
+    if (STUDENT_PERMISSION_KEYS.has(permissionKey) && !includeStudentModules) {
       return;
     }
 

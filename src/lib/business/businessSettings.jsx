@@ -56,7 +56,8 @@ function getBusinessDisplayName(business) {
 }
 
 export function BusinessSettingsProvider({ children }) {
-  const { businessId, business, businessProfile: authBusinessProfile } = useAuth();
+  const { businessId, business, businessProfile: authBusinessProfile, canViewFeature } = useAuth();
+  const canViewSettings = canViewFeature('settings');
   // Start from cache so invoices render instantly on first paint
   const [settings, setSettings] = useState(() => readCache(getBusinessId()));
   const [businessProfile, setBusinessProfile] = useState(() => readProfileCache(getBusinessId()));
@@ -108,7 +109,7 @@ export function BusinessSettingsProvider({ children }) {
     setLoading(true);
     try {
       const [settingsData, profileData] = await Promise.all([
-        api.getBusinessSettings(),
+        canViewSettings ? api.getBusinessSettings() : Promise.resolve(authBusinessProfile?.settings || {}),
         api.getBusinessProfile(),
       ]);
       applySettings(settingsData, bid);
@@ -118,7 +119,7 @@ export function BusinessSettingsProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [applyBusinessProfile, applySettings]);
+  }, [applyBusinessProfile, applySettings, canViewSettings, authBusinessProfile]);
 
   useEffect(() => {
     const bid = businessId || getBusinessId();

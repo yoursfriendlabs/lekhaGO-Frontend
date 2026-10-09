@@ -79,6 +79,12 @@ Named exports correspond to REST resources: `getProducts`, `createSale`, `getPar
 - Business context must be set in Topbar before making most API calls; missing `businessId` causes API errors
 - `components/orders/DynamicAttributes.jsx` handles custom order fields; `components/form/FileUpload.jsx` handles `POST /api/uploads/attachment`
 
+### Students add-on
+
+/app/students provides registration, enrollments, fee dues, attendance, and course/shift setup. The backend's businessProfile.addons controls availability; subscriptions alone do not enable it. The students permission controls profiles and fees; studentAttendance controls class rosters and marking. Tutors see only Attendance. The Staff permission editor offers the backend Tutor preset when this add-on is enabled.
+
+Student API helpers live in lib/api.js, UI helpers and validations in lib/students.js, translations in lib/studentsTranslations.js, and screens in pages/students/. Enrollment fees are existing service bills. Later payments settle the student's oldest unpaid bills first. Keep shared finance caches invalidated after fee mutations.
+
 ### Deployment
 
 Dockerfile + `nginx.conf` for containerized static hosting.

@@ -9,6 +9,7 @@ import {
   withOwnProfileNavItem,
 } from "@/lib/accessControl";
 import { NAV_ROLE_MAP, groupNavItems } from "./navConfig.js";
+import { hasStudentsAddon } from "@/lib/students";
 
 export function useAppNavigation() {
   const t = useI18n().t;
@@ -57,6 +58,7 @@ export function useAppNavigation() {
       if (item?.key === "purchases") return { ...item, label: t("nav.expenses") };
       if (item?.key === "attendance") return { ...item, label: t("nav.attendance") };
       if (item?.key === "staff") return { ...item, label: t("nav.staff") };
+      if (item?.key === "students") return { ...item, label: t("nav.students") };
       if (item?.key === "quickPos") return { ...item, label: t("nav.quickPos") || item.label };
       if (item?.key === "sales" && String(item?.route || "").includes("/sales")) {
         return { ...item, label: t("nav.salesInvoices") };
@@ -71,6 +73,9 @@ export function useAppNavigation() {
         { key: "attendance", label: t("nav.attendance"), route: "/app/attendance" },
         { key: "settings", label: t("nav.settings"), route: "/app/settings" },
       ];
+      if (hasStudentsAddon(businessProfile) && (hasFeatureAccess("students") || hasFeatureAccess("studentAttendance"))) {
+        nextItems.push({ key: "students", label: t("nav.students"), route: "/app/students" });
+      }
     } else {
       nextItems = expandNavigationForPermissions(navigation, hasFeatureAccess)
         .filter((item) => {
@@ -81,7 +86,12 @@ export function useAppNavigation() {
             ["owner", "staff"]
           ).includes(role);
         })
-        .filter((item) => hasFeatureAccess(getNavItemPermissionKey(item)));
+        .filter((item) => (
+          // Tutors only have student attendance access but still open this tab.
+          item?.key === "students"
+            ? hasStudentsAddon(businessProfile) && (hasFeatureAccess("students") || hasFeatureAccess("studentAttendance"))
+            : hasFeatureAccess(getNavItemPermissionKey(item))
+        ));
     }
 
     return withOwnProfileNavItem(nextItems, {

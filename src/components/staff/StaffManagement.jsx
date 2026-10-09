@@ -39,6 +39,7 @@ import {
 import { formatMaybeDate, todayISODate, WEEKDAY_KEYS } from "../../lib/dates/datetime";
 import { useAuth } from "../../lib/auth";
 import { useBusinessSettings } from "../../lib/business/businessSettings";
+import { hasStudentsAddon } from "../../lib/students";
 import { useI18n } from "../../lib/i18n.jsx";
 import { EMPTY_STAFF_SUMMARY, normalizeStaffMeta } from "../../lib/business/staff";
 
@@ -375,6 +376,9 @@ function StaffFormDialog({
   const [activeTab, setActiveTab] = useState("general");
   const scrollRef = useRef(null);
   const { businessProfile } = useBusinessSettings();
+  const tutorPreset = hasStudentsAddon(businessProfile)
+    ? meta.categories?.find((category) => category.key === "tutor")
+    : null;
   const isCreate = mode === "create";
   const readOnly = mode === "view";
   const levels = meta.accessLevels;
@@ -384,8 +388,8 @@ function StaffFormDialog({
     businessProfile?.type === "hospitality" ||
     Boolean(businessProfile?.settings?.enabledModules?.includes("tables"));
   const visibleFeatures = useMemo(
-    () => getStaffPermissionUiFeatures(meta.features, { includeCafeModules }),
-    [meta.features, includeCafeModules],
+    () => getStaffPermissionUiFeatures(meta.features, { includeCafeModules, includeStudentModules: hasStudentsAddon(businessProfile) }),
+    [meta.features, includeCafeModules, businessProfile],
   );
   const permissionGroups = useMemo(
     () => groupStaffPermissionUiFeatures(visibleFeatures),
@@ -855,6 +859,18 @@ function StaffFormDialog({
                       <p className="mt-1 max-w-3xl text-sm text-secondary-500">
                         {t("staffManagement.permissionsSubtitle")}
                       </p>
+                      {tutorPreset && !readOnly && form.role !== "owner" && (
+                        <div className="mt-3 space-y-2">
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => onFieldChange("tutorPreset", tutorPreset.defaultPermissions)}
+                          >
+                            {t("students.staff.applyTutor")}
+                          </button>
+                          <p className="text-xs text-secondary-500">{t("students.staff.tutorHint")}</p>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-800/50 dark:bg-sky-950/30 dark:text-sky-100">
@@ -1199,7 +1215,7 @@ export default function StaffManagement({ businessId }) {
       phone: member.user?.phone || "",
       password: "",
       role,
-      staffCategory: resolveStaffCategoryForRole(role),
+      staffCategory: member.staffCategory || resolveStaffCategoryForRole(role),
       jobTitle: member.jobTitle || "",
       joinedDate: toDateInputValue(member.joinedDate || member.joinedAt),
       shift: member.shift || "",
@@ -1235,6 +1251,9 @@ export default function StaffManagement({ businessId }) {
 
   const handleFieldChange = (field, value) => {
     setForm((current) => {
+      if (field === "tutorPreset") {
+        return { ...current, staffCategory: "tutor", permissions: enforcePermissionDependencies(value) };
+      }
       if (field === "role") {
         return {
           ...current,
@@ -1269,7 +1288,7 @@ export default function StaffManagement({ businessId }) {
       name: form.name.trim(),
       phone: form.phone.trim(),
       role: form.role,
-      staffCategory: resolveStaffCategoryForRole(form.role),
+      staffCategory: form.role === "owner" ? "owner" : form.staffCategory || CUSTOM_STAFF_CATEGORY,
       jobTitle: form.jobTitle.trim(),
       joinedDate: form.joinedDate || null,
       joinedAt: form.joinedDate || null,

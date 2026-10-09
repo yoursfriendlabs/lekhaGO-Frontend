@@ -370,7 +370,8 @@ export function AuthProvider({ children }) {
   }, [token]);
 
   useEffect(() => {
-    if (!SHOULD_BOOTSTRAP_AUTH || !token || !businessId || typeof api.getSubscription !== 'function') {
+    // Staff receive subscription access in /auth/me; /subscription is owner-only.
+    if (!SHOULD_BOOTSTRAP_AUTH || !token || !businessId || role === 'staff' || typeof api.getSubscription !== 'function') {
       return undefined;
     }
 
@@ -388,7 +389,7 @@ export function AuthProvider({ children }) {
     return () => {
       active = false;
     };
-  }, [token, businessId, updateSubscription]);
+  }, [token, businessId, role, updateSubscription]);
 
   const subscriptionAccess = useMemo(
     () => subscription?.access || null,

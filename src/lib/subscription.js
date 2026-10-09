@@ -32,6 +32,8 @@ const ALL_FEATURES = [
   'attendance',
   'tables',
   'billing',
+  'students',
+  'studentattendance',
 ];
 
 const DEFAULT_PLAN_FEATURES = {
@@ -51,6 +53,9 @@ const DEFAULT_PLAN_FEATURES = {
     'attendance',
     'tables',
     'billing',
+    // Sold as a separate add-on, which the backend checks per business.
+    'students',
+    'studentattendance',
   ]),
   growth: new Set(ALL_FEATURES),
   custom: new Set(ALL_FEATURES),

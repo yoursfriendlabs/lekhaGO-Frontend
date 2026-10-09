@@ -1688,6 +1688,130 @@ export const api = {
       mutationConfig([detailTags("table", id), "tables"]),
     ),
 
+  // Students & Courses add-on (/api/students). Course fees are service bills
+  // and party payments on the backend, so fee changes also refresh parties,
+  // services and money reports.
+  listStudentCourses: (params = {}, options = {}) =>
+    collectionRequest(
+      "/api/students/courses",
+      params,
+      listCache(["student-courses"], CACHE_TTL.short, options),
+    ),
+  createStudentCourse: (data) =>
+    request(
+      "/api/students/courses",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["student-courses"]),
+    ),
+  updateStudentCourse: (id, data) =>
+    request(
+      `/api/students/courses/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig(["student-courses", "students"]),
+    ),
+  deleteStudentCourse: (id) =>
+    request(
+      `/api/students/courses/${id}`,
+      { method: "DELETE" },
+      mutationConfig(["student-courses"]),
+    ),
+  listStudentShifts: (params = {}, options = {}) =>
+    collectionRequest(
+      "/api/students/shifts",
+      params,
+      listCache(["student-shifts"], CACHE_TTL.short, options),
+    ),
+  createStudentShift: (data) =>
+    request(
+      "/api/students/shifts",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["student-shifts"]),
+    ),
+  updateStudentShift: (id, data) =>
+    request(
+      `/api/students/shifts/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig(["student-shifts", "students", "student-attendance"]),
+    ),
+  deleteStudentShift: (id) =>
+    request(
+      `/api/students/shifts/${id}`,
+      { method: "DELETE" },
+      mutationConfig(["student-shifts"]),
+    ),
+  listStudents: (params = {}, options = {}) =>
+    collectionRequest(
+      "/api/students",
+      params,
+      listCache(["students"], CACHE_TTL.short, options),
+    ),
+  getStudent: (id) =>
+    request(
+      `/api/students/${id}`,
+      {},
+      listCache(detailTags("student", id), CACHE_TTL.short, { force: true }),
+    ),
+  createStudent: (data) =>
+    request(
+      "/api/students",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["students", "student-dues", "student-attendance", "parties", "party-statements", "services", "reports", "banks", "dashboard"]),
+    ),
+  updateStudent: (id, data) =>
+    request(
+      `/api/students/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([detailTags("student", id), "students", "student-attendance", "parties", "party-statements"]),
+    ),
+  deleteStudent: (id) =>
+    request(
+      `/api/students/${id}`,
+      { method: "DELETE" },
+      mutationConfig([detailTags("student", id), "students"]),
+    ),
+  createEnrollment: (data) =>
+    request(
+      "/api/students/enrollments",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["students", "student", "student-dues", "student-attendance", "parties", "party-statements", "services", "reports", "banks", "dashboard"]),
+    ),
+  updateEnrollment: (id, data) =>
+    request(
+      `/api/students/enrollments/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig(["students", "student", "student-dues", "student-attendance"]),
+    ),
+  collectEnrollmentFee: (id, data) =>
+    request(
+      `/api/students/enrollments/${id}/payments`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["students", "student", "student-dues", "parties", "party-statements", "party-transactions", "sales", "services", "reports", "banks", "dashboard"]),
+    ),
+  listStudentDues: (params = {}, options = {}) =>
+    request(
+      buildListPath("/api/students/dues", params),
+      {},
+      listCache(["student-dues"], CACHE_TTL.short, options),
+    ),
+  getStudentRoster: (params = {}) =>
+    request(
+      buildListPath("/api/students/attendance/roster", params),
+      {},
+      listCache(["student-attendance"], CACHE_TTL.short, { force: true }),
+    ),
+  markStudentAttendance: (data) =>
+    request(
+      "/api/students/attendance",
+      { method: "PUT", body: JSON.stringify(data) },
+      mutationConfig(["student-attendance", "student"]),
+    ),
+  listStudentAttendance: (params = {}) =>
+    request(
+      buildListPath("/api/students/attendance", params),
+      {},
+      listCache(["student-attendance"], CACHE_TTL.short, { force: true }),
+    ),
+
   // Reports whether the backend is accepting event streams. Checked once per
   // session so we never open an EventSource the server will just reject.
   getEventsStatus: () => request("/api/events/status"),

@@ -43,6 +43,7 @@ import {
   Settings,
   Staff,
   StaffSalaryProfile,
+  Students,
   Tables,
   Tasks,
 } from './pages';
@@ -245,6 +246,7 @@ export default function AppShell() {
                     )}
                   />
                   <Route path="parties" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="parties"><Parties /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
+                  <Route path="students" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKeys={['students', 'studentAttendance']}><Students /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="tables" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="tables"><Tables /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="billing" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKeys={['billing', 'sales', 'quickPos']}><CashierBilling /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route
