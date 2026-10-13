@@ -45,6 +45,9 @@ function pickLedgerItems(payload) {
  * @property {string | null} partyName
  * @property {string | null} status
  * @property {string} note
+ * @property {number} totalAmount
+ * @property {number} paidAmount
+ * @property {number} amount
  * @property {number} debit
  * @property {number} credit
  * @property {number | null} runningBalance
@@ -61,7 +64,10 @@ function pickLedgerItems(payload) {
 
 /**
  * Normalize a single backend ledger row without changing accounting direction.
- * Debit, credit, and running balance are trusted from the backend as-is.
+ * Running balance is trusted from the backend as-is. Debit/credit only carry
+ * the still-unpaid remainder from the backend, so a fully paid bill would
+ * arrive with both sides 0 and render as an amount-less row. Show the full
+ * transaction amount (totalAmount) on its natural side instead.
  *
  * @param {Partial<LedgerRow> & { paymentType?: Partial<LedgerPaymentType> }} row
  * @returns {LedgerRow}
@@ -74,18 +80,35 @@ export function normalizeLedgerRow(row = {}) {
     ? paymentTypeRaw.bank
     : {};
 
+  const entryType = String(row?.type || '').trim();
+  const totalAmount = toNumber(row?.totalAmount ?? row?.total_amount);
+  const rowAmount = toNumber(row?.amount);
+  const fullAmount = totalAmount > 0 ? totalAmount : rowAmount;
+  let debit = toNumber(row?.debit);
+  let credit = toNumber(row?.credit);
+  if (fullAmount > 0) {
+    if (entryType === 'sale' || entryType === 'service' || entryType === 'payment_out') {
+      debit = fullAmount;
+    } else if (entryType === 'purchase' || entryType === 'expense' || entryType === 'payment_in') {
+      credit = fullAmount;
+    }
+  }
+
   return {
     ...row,
     id: row?.id || row?.referenceNo || `${row?.type || 'entry'}-${row?.date || ''}`,
-    type: String(row?.type || '').trim(),
+    type: entryType,
     referenceNo: row?.referenceNo || null,
     date: row?.date || '',
     partyId: row?.partyId || null,
     partyName: row?.partyName || null,
     status: row?.status || null,
     note: String(row?.note || row?.notes || '').trim(),
-    debit: toNumber(row?.debit),
-    credit: toNumber(row?.credit),
+    totalAmount,
+    paidAmount: toNumber(row?.paidAmount ?? row?.paid_amount),
+    amount: rowAmount,
+    debit,
+    credit,
     runningBalance: toNullableNumber(row?.runningBalance),
     paymentType: {
       method: String(paymentTypeRaw?.method || paymentTypeRaw?.paymentMethod || '').trim().toLowerCase(),

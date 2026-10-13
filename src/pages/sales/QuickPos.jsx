@@ -1224,17 +1224,13 @@ export default function QuickPos() {
         useSaleStore.getState().invalidate();
       }
 
-      // Sync table status in database
+      // Sync table status in database — a placed order keeps the table
+      // occupied until it is manually released; payment alone does not
+      // vacate the table.
       if (payload.tableId) {
-        if (payload.status === "paid") {
-          await api
-            .updateTable(payload.tableId, { status: "vacant" })
-            .catch(() => null);
-        } else {
-          await api
-            .updateTable(payload.tableId, { status: "occupied" })
-            .catch(() => null);
-        }
+        await api
+          .updateTable(payload.tableId, { status: "occupied" })
+          .catch(() => null);
       }
 
       const nextSequences = await api.getNextSequences().catch(() => null);

@@ -1267,7 +1267,7 @@ export default function Inventory() {
   return (
     <div id="inventory-page" className="space-y-8">
       {toast.message ? (
-        <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+92px)] left-4 right-4 z-[80] md:left-auto md:right-6 md:w-full md:max-w-sm">
+        <div className="fixed top-[calc(env(safe-area-inset-top)+5.5rem)] left-auto right-4 z-[1010] w-full max-w-sm sm:right-6">
           <Notice title={toast.message} tone={toast.type || "success"} />
         </div>
       ) : null}
@@ -1294,6 +1294,10 @@ export default function Inventory() {
           </div>
         }
       />
+
+      {status.message ? (
+        <Notice title={status.message} tone={status.type} />
+      ) : null}
 
       {/* Inventory Stats Cards */}
       <div id="inventory-stats-grid" className={STATS_GRID_CLASS}>
@@ -1351,10 +1355,6 @@ export default function Inventory() {
           isActive={stockFilter === "unsold" || sortKey === "leastPopular"}
         />
       </div>
-
-      {status.message ? (
-        <Notice title={status.message} tone={status.type} />
-      ) : null}
 
       <div id="inventory-items-card" className="card">
         <div className="flex flex-wrap items-center justify-between gap-3">

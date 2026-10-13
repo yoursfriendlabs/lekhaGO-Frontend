@@ -391,9 +391,10 @@ export default function CashierBilling() {
 
       const updatedSale = await api.updateSale(activeSale.id, salePayload);
 
-      // Clean/Vacate the table
+      // Keep the table occupied after payment too — it is released via the
+      // manual "Release table" action, not when the bill is settled.
       if (activeSale.tableId) {
-        await api.updateTable(activeSale.tableId, { status: isPaidBill ? 'vacant' : 'occupied' });
+        await api.updateTable(activeSale.tableId, { status: 'occupied' });
       }
 
       setSuccessState({
