@@ -205,6 +205,7 @@ function DatePresetSelect({ fromValue, toValue, onChange, disabled = false }) {
   const today = dayjs();
 
   const getPreset = () => {
+    if (!fromValue && !toValue) return "all";
     if (!fromValue || !toValue) return "";
 
     const todayStr = today.format("YYYY-MM-DD");
@@ -255,6 +256,9 @@ function DatePresetSelect({ fromValue, toValue, onChange, disabled = false }) {
     } else if (val === "prev_year") {
       from = today.subtract(1, "year").startOf("year").format("YYYY-MM-DD");
       to = today.subtract(1, "year").endOf("year").format("YYYY-MM-DD");
+    } else if (val === "all") {
+      onChange("", "");
+      return;
     }
     if (from && to) {
       onChange(from, to);
@@ -273,6 +277,7 @@ function DatePresetSelect({ fromValue, toValue, onChange, disabled = false }) {
         <option value="" disabled>
           {t("analytics.filters.selectRange")}
         </option>
+        <option value="all">{t("ledger.allTime")}</option>
         <option value="today">{t("dates.today")}</option>
         <option value="week">{t("analytics.filters.thisWeek")}</option>
         <option value="month">{t("ledger.thisMonth")}</option>
@@ -1739,11 +1744,10 @@ export default function Reports() {
   const refreshModeRef = useRef(false);
 
   // State 2: Ledger Data (Party Statements)
-  const defaultFrom = useMemo(
-    () => dayjs().startOf("month").format("YYYY-MM-DD"),
-    [],
-  );
-  const defaultTo = useMemo(() => dayjs().format("YYYY-MM-DD"), []);
+  // Default to full history so old statements are visible on open; narrowing
+  // to a month/year is still possible via the date preset or custom inputs.
+  const defaultFrom = useMemo(() => "", []);
+  const defaultTo = useMemo(() => "", []);
   const initialPartyId = searchParams.get("partyId") || "";
   const initialFrom = searchParams.get("from") || defaultFrom;
   const initialTo = searchParams.get("to") || defaultTo;
