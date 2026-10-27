@@ -54,6 +54,13 @@ import {
   PartyStatementPrintSheet,
 } from "./PartyStatementViews.jsx";
 import DayBookReport from "../../components/finance/DayBookReport.jsx";
+import RestaurantReportsPanel from "../restaurant/RestaurantReportsPanel.jsx";
+import GuestRegisterPanel from "../hotel/GuestRegisterPanel.jsx";
+import OccupancyReportPanel from "../hotel/OccupancyReportPanel.jsx";
+import {
+  hasRestaurantAddon,
+  isHotelBusiness,
+} from "../../lib/business/hospitality.js";
 
 const EMPTY_METRIC_TOTALS = Object.freeze({
   count: 0,
@@ -1656,6 +1663,25 @@ export default function Reports() {
           key: "cafe-insights",
           label: t("analytics.cafeInsights") || "Cafe Sales Book",
           icon: Coffee,
+        });
+      }
+      if (hasRestaurantAddon(businessProfile)) {
+        list.push({
+          key: "restaurant",
+          label: t("restaurant.reports.tab") || "Restaurant",
+          icon: Coffee,
+        });
+      }
+      if (isHotelBusiness(businessProfile)) {
+        list.push({
+          key: "guest-register",
+          label: t("hotel.reports.guestRegister") || "Guest register",
+          icon: Users,
+        });
+        list.push({
+          key: "occupancy",
+          label: t("hotel.reports.occupancy") || "Occupancy",
+          icon: CalendarRange,
         });
       }
       list.push({
@@ -3406,6 +3432,24 @@ export default function Reports() {
           </ReportResultsShell>
         </div>
       )}
+
+      {activeTab === "restaurant" && hasRestaurantAddon(businessProfile) ? (
+        <div className="animate-fadeIn">
+          <RestaurantReportsPanel from={filters.fromDate} to={filters.toDate} />
+        </div>
+      ) : null}
+
+      {activeTab === "guest-register" && isHotelBusiness(businessProfile) ? (
+        <div className="animate-fadeIn">
+          <GuestRegisterPanel from={filters.fromDate} to={filters.toDate} />
+        </div>
+      ) : null}
+
+      {activeTab === "occupancy" && isHotelBusiness(businessProfile) ? (
+        <div className="animate-fadeIn">
+          <OccupancyReportPanel from={filters.fromDate} to={filters.toDate} />
+        </div>
+      ) : null}
 
       {/* RENDER VIEW: CAFE/RESTAURANT SALES BOOK & INSIGHTS */}
       {activeTab === "cafe-insights" && (
