@@ -380,12 +380,19 @@ function StaffFormDialog({
   const levels = meta.accessLevels;
   const includeCafeModules =
     businessProfile?.modules?.orders === true ||
+    businessProfile?.modules?.kitchen === true ||
     businessProfile?.type === "cafe" ||
     businessProfile?.type === "hospitality" ||
     Boolean(businessProfile?.settings?.enabledModules?.includes("tables"));
+  const includeHotelModules =
+    businessProfile?.modules?.hotel === true ||
+    businessProfile?.type === "hotel";
   const visibleFeatures = useMemo(
-    () => getStaffPermissionUiFeatures(meta.features, { includeCafeModules }),
-    [meta.features, includeCafeModules],
+    () => getStaffPermissionUiFeatures(meta.features, {
+      includeCafeModules,
+      includeHotelModules,
+    }),
+    [meta.features, includeCafeModules, includeHotelModules],
   );
   const permissionGroups = useMemo(
     () => groupStaffPermissionUiFeatures(visibleFeatures),
