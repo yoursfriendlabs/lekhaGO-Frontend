@@ -238,6 +238,11 @@ const partyName = isSale
                           {item.Product?.companyName && (
                             <span className="ml-2 text-xs text-secondary-400">{item.Product.companyName}</span>
                           )}
+                          {item.note ? (
+                            <span className="mt-0.5 block text-xs font-normal italic text-secondary-500">
+                              {item.note}
+                            </span>
+                          ) : null}
                         </td>
                         <td className="py-3 text-right text-secondary-700 dark:text-secondary-400">
                           {Number(item.quantity || 0).toFixed(2)}
@@ -268,16 +273,33 @@ const partyName = isSale
                   <span>{money(record.subTotal)}</span>
                 </div>
               )}
-              {Number(record.taxTotal || 0) > 0 && (
-                <div className="flex justify-between text-secondary-500">
-                  <span>Tax</span>
-                  <span>{money(record.taxTotal)}</span>
-                </div>
-              )}
               {Number(record.discountTotal || record.discount || 0) > 0 && (
                 <div className="flex justify-between text-rose-600 dark:text-rose-400 font-medium">
                   <span>Discount</span>
                   <span>-{money(record.discountTotal || record.discount)}</span>
+                </div>
+              )}
+              {Number(record.serviceChargeTotal || 0) > 0 && (
+                <div className="flex justify-between text-secondary-500">
+                  <span>
+                    Service charge
+                    {Number(record.serviceChargeRate || 0) > 0
+                      ? ` (${Number(record.serviceChargeRate)}%)`
+                      : ''}
+                  </span>
+                  <span>{money(record.serviceChargeTotal)}</span>
+                </div>
+              )}
+              {Number(record.packagingChargeTotal || 0) > 0 && (
+                <div className="flex justify-between text-secondary-500">
+                  <span>Packaging</span>
+                  <span>{money(record.packagingChargeTotal)}</span>
+                </div>
+              )}
+              {Number(record.taxTotal || 0) > 0 && (
+                <div className="flex justify-between text-secondary-500">
+                  <span>Tax</span>
+                  <span>{money(record.taxTotal)}</span>
                 </div>
               )}
               <div className="flex justify-between border-t border-secondary-200/70 pt-3 font-bold text-ink dark:border-slate-700 dark:text-white">
@@ -322,11 +344,15 @@ const partyName = isSale
                   quantity: item.quantity,
                   unitPrice: item.unitPrice,
                   lineTotal: item.lineTotal,
+                  note: item.note || '',
                 }))}
                 totals={{
                   subTotal: record.subTotal,
                   taxTotal: record.taxTotal,
                   discountTotal: record.discountTotal,
+                  serviceChargeTotal: record.serviceChargeTotal,
+                  serviceChargeRate: record.serviceChargeRate,
+                  packagingChargeTotal: record.packagingChargeTotal,
                   grandTotal: record.grandTotal,
                   amountReceived: totalReceived,
                   dueAmount: dueAmount,
@@ -395,6 +421,9 @@ const partyName = isSale
                         <td className="py-2 pr-4 font-medium">
                           {item.Product?.name || item.description || '—'}
                           {item.Product?.companyName ? <span className="ml-2 text-xs">({item.Product.companyName})</span> : null}
+                          {item.note ? (
+                            <span className="mt-0.5 block text-xs italic text-secondary-600">{item.note}</span>
+                          ) : null}
                         </td>
                         <td className="py-2 text-right">{Number(item.quantity || 0).toFixed(2)}</td>
                         <td className="py-2 text-right">{money(item.unitPrice)}</td>
@@ -410,14 +439,31 @@ const partyName = isSale
                 {Number(record.subTotal || 0) > 0 ? (
                   <div className="flex justify-between"><span>Subtotal</span><span>{money(record.subTotal)}</span></div>
                 ) : null}
-                {Number(record.taxTotal || 0) > 0 ? (
-                  <div className="flex justify-between"><span>Tax</span><span>{money(record.taxTotal)}</span></div>
-                ) : null}
                 {Number(record.discountTotal || record.discount || 0) > 0 ? (
-                  <div className="flex justify-between text-rose-600 font-medium">
+                  <div className="flex justify-between">
                     <span>Discount</span>
                     <span>-{money(record.discountTotal || record.discount)}</span>
                   </div>
+                ) : null}
+                {Number(record.serviceChargeTotal || 0) > 0 ? (
+                  <div className="flex justify-between">
+                    <span>
+                      Service charge
+                      {Number(record.serviceChargeRate || 0) > 0
+                        ? ` (${Number(record.serviceChargeRate)}%)`
+                        : ''}
+                    </span>
+                    <span>{money(record.serviceChargeTotal)}</span>
+                  </div>
+                ) : null}
+                {Number(record.packagingChargeTotal || 0) > 0 ? (
+                  <div className="flex justify-between">
+                    <span>Packaging</span>
+                    <span>{money(record.packagingChargeTotal)}</span>
+                  </div>
+                ) : null}
+                {Number(record.taxTotal || 0) > 0 ? (
+                  <div className="flex justify-between"><span>Tax</span><span>{money(record.taxTotal)}</span></div>
                 ) : null}
                 <div className="flex justify-between border-t border-black pt-2 text-base font-bold">
                   <span>Grand Total</span><span>{money(record.grandTotal)}</span>
