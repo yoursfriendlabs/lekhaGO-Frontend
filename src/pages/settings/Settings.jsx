@@ -17,6 +17,10 @@ import TablesFloorsSettingsPanel from '../../components/settings/TablesFloorsSet
 import { api, API_BASE } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useBusinessSettings } from '../../lib/business/businessSettings';
+import {
+  hasRestaurantAddon,
+  showServiceChargeSettings,
+} from '../../lib/business/hospitality';
 import { useI18n } from '../../lib/i18n.jsx';
 import { EMPTY_STAFF_SUMMARY } from '../../lib/business/staff';
 import { getSubscriptionGuard, getSubscriptionStatusState, humanizeKey } from '../../lib/subscription';
@@ -41,11 +45,14 @@ const EMPTY = {
   email: '',
   panVat: '',
   logoUrl: '',
+  serviceChargeRate: '0',
+  defaultTaxRate: '0',
   irdModeEnabled: false,
   cbmsSyncEnabled: false,
   cbmsUsername: '',
   cbmsPassword: '',
   cbmsPasswordSet: false,
+  uiPreferences: {},
 };
 
 const PROFILE_TAB_KEYS = [PROFILE_SETTINGS_TAB, APPEARANCE_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB, ACCOUNT_SETTINGS_TAB];
@@ -703,6 +710,76 @@ export default function Settings() {
                       {t('settingsPage.general.panVatHint')}
                     </p>
                   </div>
+
+                  {showServiceChargeSettings(businessProfile) ? (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <label className="label" htmlFor="serviceChargeRate">
+                          {t('settingsPage.general.serviceChargeRate') || 'Service charge %'}
+                        </label>
+                        <input
+                          id="serviceChargeRate"
+                          className="input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.serviceChargeRate ?? ''}
+                          onChange={(event) => handleChange('serviceChargeRate', event.target.value)}
+                        />
+                        <p className="text-xs text-secondary-400">
+                          {t('settingsPage.general.serviceChargeHint') || 'Applied to dine-in restaurant bills when the order does not set its own rate.'}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="label" htmlFor="defaultTaxRate">
+                          {t('settingsPage.general.defaultTaxRate') || 'Default VAT %'}
+                        </label>
+                        <input
+                          id="defaultTaxRate"
+                          className="input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={form.defaultTaxRate ?? ''}
+                          onChange={(event) => handleChange('defaultTaxRate', event.target.value)}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {hasRestaurantAddon(businessProfile) ? (
+                    <div className="rounded-2xl border border-secondary-200/80 p-4 dark:border-slate-700/80">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <label className="label" htmlFor="autoPrintKot">
+                            {t('settingsPage.general.autoPrintKot') || 'Auto-print KOT on send'}
+                          </label>
+                          <p className="mt-1 text-sm text-secondary-500">
+                            {t('settingsPage.general.autoPrintKotHint') || 'Print a kitchen ticket automatically when pending items are sent.'}
+                          </p>
+                        </div>
+                        <button
+                          id="autoPrintKot"
+                          type="button"
+                          role="switch"
+                          aria-checked={Boolean(form.uiPreferences?.autoPrintKot)}
+                          disabled={generalLocked}
+                          onClick={() => handleUiPreferenceChange('autoPrintKot', !form.uiPreferences?.autoPrintKot)}
+                          className={`relative mt-1 inline-flex h-7 w-12 shrink-0 items-center rounded-full transition ${
+                            form.uiPreferences?.autoPrintKot
+                              ? 'bg-emerald-600'
+                              : 'bg-slate-300 dark:bg-slate-600'
+                          } ${generalLocked ? 'cursor-not-allowed opacity-60' : ''}`}
+                        >
+                          <span
+                            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                              form.uiPreferences?.autoPrintKot ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="rounded-2xl border border-secondary-200/80 p-4 dark:border-slate-700/80">
                     <div className="flex items-start justify-between gap-4">
