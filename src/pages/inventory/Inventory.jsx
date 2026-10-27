@@ -39,7 +39,9 @@ import ActionMenu from "../../components/ui/ActionMenu.jsx";
 import FlexibleDateInput from "../../components/form/FlexibleDateInput.jsx";
 import DateDisplay from "../../components/form/DateDisplay.jsx";
 import ProductDetailDialog from "../../components/inventory/ProductDetailDialog.jsx";
+import RecipeEditor from "../../components/inventory/RecipeEditor.jsx";
 import { formatDateBoth } from "../../lib/dates/nepaliDate.js";
+import { hasRestaurantAddon } from "../../lib/business/hospitality.js";
 
 const makeEmptyItem = () => ({
   name: "",
@@ -64,6 +66,7 @@ const makeEmptyItem = () => ({
   imageUrl: "",
   expiryDate: "",
   batchNumber: "",
+  stockMode: "self",
 });
 
 const parseNumber = (value) => {
@@ -84,7 +87,12 @@ const toDateInputValue = (value) => {
 
 const buildProductPayload = (
   form,
-  { includePurchasePrice = true, includeLotFields = true } = {},
+  {
+    includePurchasePrice = true,
+    includeLotFields = true,
+    includeIsActive = false,
+    includeStockMode = false,
+  } = {},
 ) => ({
   name: form.name,
   companyName: String(form.companyName || "").trim() || null,
@@ -108,6 +116,11 @@ const buildProductPayload = (
   openingStock: parseNumber(form.openingStock),
   lowStockAlert: form.lowStockAlert,
   imageUrl: form.imageUrl || null,
+  // Old backends default missing isActive to false — always send true on create.
+  ...(includeIsActive ? { isActive: true } : {}),
+  ...(includeStockMode && form.stockMode
+    ? { stockMode: form.stockMode }
+    : {}),
   ...(includeLotFields
     ? {
         expiryDate: form.expiryDate || null,
@@ -164,6 +177,7 @@ function productToForm(product = {}) {
     minWholesaleQuantity: String(product.minWholesaleQuantity ?? ""),
     lowStockAlert: Boolean(product.lowStockAlert),
     imageUrl: product.imageUrl || "",
+    stockMode: String(product.stockMode || "self").toLowerCase(),
     expiryDate: toDateInputValue(product.expiryDate),
     batchNumber: product.batchNumber || "",
   };
@@ -694,6 +708,7 @@ export default function Inventory() {
         product.sellableQuantity ?? product.stockOnHand ?? product.openingStock ?? 0,
       ),
       hasExpiredStock: Boolean(product.hasExpiredStock) || Number(product.expiredQuantity || 0) > 0,
+      stockMode: String(product.stockMode || 'self').toLowerCase(),
     }));
   }, [products]);
 
@@ -1080,6 +1095,8 @@ export default function Inventory() {
       const payload = buildProductPayload(form, {
         includePurchasePrice: canManagePurchasePrice,
         includeLotFields: !editingId,
+        includeIsActive: !editingId,
+        includeStockMode: hasRestaurantAddon(businessProfile),
       });
       const optimisticCategory = selectedCategory
         ? {
@@ -1500,6 +1517,11 @@ export default function Inventory() {
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-ink truncate">
                       {item.name}
+                      {item.stockMode === "recipe" ? (
+                        <span className="ml-2 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                          {t("inventory.recipe.tag") || "Recipe"}
+                        </span>
+                      ) : null}
                     </p>
                     <p className="text-xs text-secondary-500 truncate">
                       {[
@@ -1523,11 +1545,19 @@ export default function Inventory() {
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p
-                      className={`text-xs font-semibold rounded-full px-2 py-0.5 ${item.quantity <= 0 ? "bg-rose-100 text-rose-700" : item.quantity <= 5 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
-                    >
-                      {item.quantity.toFixed(2)} {item.unit || ""}
-                    </p>
+                    {item.stockMode === "recipe" || item.stockMode === "none" ? (
+                      <p className="text-xs font-semibold rounded-full px-2 py-0.5 bg-secondary-100 text-secondary-600">
+                        {item.stockMode === "recipe"
+                          ? (t("inventory.recipe.tag") || "Recipe")
+                          : (t("inventory.recipe.modeNone") || "No stock")}
+                      </p>
+                    ) : (
+                      <p
+                        className={`text-xs font-semibold rounded-full px-2 py-0.5 ${item.quantity <= 0 ? "bg-rose-100 text-rose-700" : item.quantity <= 5 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
+                      >
+                        {item.quantity.toFixed(2)} {item.unit || ""}
+                      </p>
+                    )}
                   </div>
                 </div>
                 {item.expiryDate && (
@@ -2570,6 +2600,31 @@ export default function Inventory() {
               ) : null}
             </div>
           </FormSectionCard>
+
+          {hasRestaurantAddon(businessProfile) && editingId ? (
+            <FormSectionCard
+              title={t("inventory.recipe.title") || "Recipe"}
+              hint={t("inventory.recipe.hint") || "Ingredients used when this menu item is sold."}
+            >
+              <RecipeEditor
+                productId={editingId}
+                salePrice={parseNumber(form.salePrice)}
+                canViewCost={canViewPurchasePrice}
+                canManage={canManageInventory}
+                onRecipeSaved={(result) => {
+                  if (result?.stockMode) {
+                    setForm((previous) => ({
+                      ...previous,
+                      stockMode: String(result.stockMode),
+                    }));
+                  }
+                  patchProduct(editingId, {
+                    stockMode: result?.stockMode,
+                  });
+                }}
+              />
+            </FormSectionCard>
+          ) : null}
 
           <div className="mobile-sticky-actions flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <button
