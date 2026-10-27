@@ -86,6 +86,11 @@ export default function ThermalReceipt({
                     @{money(item.unitPrice)}
                   </span>
                 )}
+                {item.note ? (
+                  <span className="block text-[10px] text-secondary-700 italic">
+                    {item.note}
+                  </span>
+                ) : null}
               </td>
               <td className="py-1 text-right whitespace-nowrap">
                 {Number(item.quantity || 0).toFixed(0)}
@@ -109,16 +114,34 @@ export default function ThermalReceipt({
             <span>{money(totals.subTotal)}</span>
           </div>
         )}
-        {totals.taxTotal !== undefined && Number(totals.taxTotal) > 0 && (
-          <div className="flex justify-between">
-            <span>Tax:</span>
-            <span>{money(totals.taxTotal)}</span>
-          </div>
-        )}
         {totals.discountTotal !== undefined && Number(totals.discountTotal) > 0 && (
           <div className="flex justify-between text-ink">
             <span>Discount:</span>
             <span>-{money(totals.discountTotal)}</span>
+          </div>
+        )}
+        {Number(totals.serviceChargeTotal) > 0 && (
+          <div className="flex justify-between">
+            <span>
+              Service charge
+              {Number(totals.serviceChargeRate) > 0
+                ? ` (${Number(totals.serviceChargeRate)}%)`
+                : ''}
+              :
+            </span>
+            <span>{money(totals.serviceChargeTotal)}</span>
+          </div>
+        )}
+        {Number(totals.packagingChargeTotal) > 0 && (
+          <div className="flex justify-between">
+            <span>Packaging:</span>
+            <span>{money(totals.packagingChargeTotal)}</span>
+          </div>
+        )}
+        {totals.taxTotal !== undefined && Number(totals.taxTotal) > 0 && (
+          <div className="flex justify-between">
+            <span>Tax:</span>
+            <span>{money(totals.taxTotal)}</span>
           </div>
         )}
         <div className="flex justify-between font-bold border-t border-dashed border-black pt-1">
