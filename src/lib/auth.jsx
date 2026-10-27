@@ -46,7 +46,7 @@ export function AuthProvider({ children }) {
   const [canCreateBusiness, setCanCreateBusinessState] = useState(false);
   const [canCreatePersonal, setCanCreatePersonalState] = useState(false);
   const [creatableWorkspaceTypes, setCreatableWorkspaceTypesState] = useState([]);
-  const [extraBusinessTypes, setExtraBusinessTypesState] = useState(['retail', 'cafe']);
+  const [extraBusinessTypes, setExtraBusinessTypesState] = useState(['retail', 'cafe', 'hotel']);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(() => {
     const storedToken = getToken();
@@ -292,7 +292,7 @@ export function AuthProvider({ children }) {
     setCanCreateBusinessState(false);
     setCanCreatePersonalState(false);
     setCreatableWorkspaceTypesState([]);
-    setExtraBusinessTypesState(['retail', 'cafe']);
+    setExtraBusinessTypesState(['retail', 'cafe', 'hotel']);
     setWorkspaceBusy(false);
     setSessionLoading(false);
   }, []);

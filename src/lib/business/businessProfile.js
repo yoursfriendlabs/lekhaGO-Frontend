@@ -1,3 +1,5 @@
+import { resolveCanonicalBusinessType } from './hospitality';
+
 const DEFAULT_BUSINESS_TYPES = [
   {
     value: "retail",
@@ -620,6 +622,119 @@ const DEFAULT_BUSINESS_TYPES = [
       service: [],
     },
   },
+  {
+    value: "hotel",
+    label: "Hotel / Lodge",
+    description:
+      "Rooms, front desk, guest stays, and optional restaurant add-on for room service.",
+    navigation: [
+      { key: "dashboard", label: "Dashboard", route: "/app" },
+      { key: "frontDesk", label: "Front desk", route: "/app/hotel" },
+      { key: "rooms", label: "Rooms", route: "/app/hotel/rooms" },
+      { key: "inventory", label: "Inventory", route: "/app/inventory" },
+      { key: "sales", label: "POS", route: "/app/pos" },
+      { key: "services", label: "Room bills", route: "/app/services" },
+      { key: "tables", label: "Tables", route: "/app/tables" },
+      { key: "purchases", label: "Expenses", route: "/app/purchases" },
+      { key: "parties", label: "Guests", route: "/app/parties" },
+      { key: "ledger", label: "Ledger", route: "/app/ledger" },
+      { key: "analytics", label: "Analytics", route: "/app/analytics" },
+      { key: "settings", label: "Settings", route: "/app/settings" },
+    ],
+    modules: {
+      inventory: true,
+      sales: true,
+      orders: false,
+      purchases: true,
+      parties: true,
+      tasks: true,
+      ledger: true,
+      analytics: true,
+      services: true,
+      cafePos: true,
+      jewelleryService: false,
+      tables: true,
+      hotel: true,
+      kitchen: false,
+      recipes: false,
+    },
+    inventory: {
+      title: "Inventory",
+      subtitle: "Track minibar, supplies, and saleable items for the property.",
+      showJewelleryFields: false,
+      showCafeFields: true,
+      itemTypes: [
+        {
+          value: "goods",
+          label: "Stock Item",
+          description: "Physical product tracked in inventory.",
+        },
+        {
+          value: "menu_item",
+          label: "Menu Item",
+          description: "Food or drink sold at the restaurant or room service.",
+        },
+        {
+          value: "ingredient",
+          label: "Ingredient",
+          description: "Raw material used in recipes.",
+        },
+        {
+          value: "service",
+          label: "Charge",
+          description: "Non-stock fee or room night charge item.",
+        },
+      ],
+    },
+    salesFlow: {
+      mode: "cafe",
+      title: "Hotel POS",
+      navLabel: "POS",
+      createLabel: "New Sale",
+      route: "/app/pos",
+      attributeSectionTitle: "Sale Information",
+      attributeSectionHint: "Optional guest or room notes for the counter.",
+    },
+    servicesFlow: {
+      enabled: true,
+      title: "Room bills",
+      navLabel: "Room bills",
+      route: "/app/services",
+    },
+    dashboard: {
+      salesLabel: "Sales",
+      servicesLabel: "Room bills",
+    },
+    settings: {
+      enabledModules: [
+        "dashboard",
+        "hotel",
+        "inventory",
+        "sales",
+        "services",
+        "purchases",
+        "parties",
+        "tables",
+        "ledger",
+        "analytics",
+        "settings",
+      ],
+      defaultOrderFlow: "direct_sale",
+      defaultOrderChannel: "counter",
+      serviceChargeRate: "0",
+      defaultTaxRate: "0",
+      uiPreferences: {
+        inventoryMode: "cafe",
+        salesExperience: "cafe_pos",
+        showJewelleryPanels: false,
+        showCafePanels: true,
+      },
+    },
+    dynamicFields: {
+      sale: [],
+      service: [],
+    },
+  },
 ];
 
 function clone(value) {
@@ -666,13 +781,15 @@ export function getFallbackBusinessTypes() {
 }
 
 export function getDefaultBusinessProfile(type = "retail") {
+  const canonical = resolveCanonicalBusinessType(type);
   const match =
-    DEFAULT_BUSINESS_TYPES.find((entry) => entry.value === type) ||
+    DEFAULT_BUSINESS_TYPES.find((entry) => entry.value === canonical) ||
     DEFAULT_BUSINESS_TYPES[0];
   const profile = clone(match);
   return {
     business: null,
     type: profile.value,
+    addons: [],
     ...profile,
   };
 }
@@ -680,10 +797,21 @@ export function getDefaultBusinessProfile(type = "retail") {
 export function normalizeBusinessProfile(profile) {
   const requestedType = profile?.type || profile?.business?.type || "retail";
   const base = getDefaultBusinessProfile(requestedType);
+  const addons = Array.isArray(profile?.addons)
+    ? profile.addons
+    : Array.isArray(profile?.business?.addons)
+      ? profile.business.addons
+      : Array.isArray(base.addons)
+        ? base.addons
+        : [];
 
   return {
     ...base,
     ...(profile || {}),
+    type: resolveCanonicalBusinessType(
+      profile?.type || profile?.business?.type || base.type,
+    ),
+    addons,
     business: {
       ...(base.business || {}),
       ...(profile?.business || {}),

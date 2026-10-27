@@ -22,6 +22,7 @@ function typeLabel(item, t) {
   if (item?.label && item.label !== item.type) return item.label;
   if (item?.type === 'retail') return t('workspaces.typeRetail');
   if (item?.type === 'cafe') return t('workspaces.typeCafe');
+  if (item?.type === 'hotel') return t('workspaces.typeHotel');
   return item?.label || item?.type || t('workspaces.business');
 }
 
@@ -32,6 +33,7 @@ function roleLabel(item, t) {
 function workspaceTypeLabel(type, t) {
   if (isPersonalWorkspaceType(type)) return t('workspaces.personal');
   if (type === 'cafe') return t('workspaces.typeCafe');
+  if (type === 'hotel') return t('workspaces.typeHotel');
   return t('workspaces.typeRetail');
 }
 
