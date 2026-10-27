@@ -32,6 +32,9 @@ const ALL_FEATURES = [
   'attendance',
   'tables',
   'billing',
+  'kitchen',
+  'frontDesk',
+  'housekeeping',
 ];
 
 const DEFAULT_PLAN_FEATURES = {
@@ -51,6 +54,9 @@ const DEFAULT_PLAN_FEATURES = {
     'attendance',
     'tables',
     'billing',
+    'kitchen',
+    'frontDesk',
+    'housekeeping',
   ]),
   growth: new Set(ALL_FEATURES),
   custom: new Set(ALL_FEATURES),

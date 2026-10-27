@@ -61,7 +61,7 @@ describe('workspace helpers', () => {
       canCreateWorkspace: true,
       canCreateBusiness: true,
       canCreatePersonal: false,
-      creatableWorkspaceTypes: ['retail', 'cafe'],
+      creatableWorkspaceTypes: ['retail', 'cafe', 'hotel'],
     });
 
     expect(resolveWorkspaceCreationOptions([
@@ -84,7 +84,7 @@ describe('workspace helpers', () => {
 
     expect(payload.canCreateBusiness).toBe(true);
     expect(payload.canCreatePersonal).toBe(false);
-    expect(payload.creatableWorkspaceTypes).toEqual(['retail', 'cafe']);
+    expect(payload.creatableWorkspaceTypes).toEqual(['retail', 'cafe', 'hotel']);
   });
 
   it('ignores payloads that do not include workspace fields', () => {

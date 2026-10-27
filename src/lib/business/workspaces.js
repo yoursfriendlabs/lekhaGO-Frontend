@@ -1,4 +1,4 @@
-export const EXTRA_BUSINESS_TYPES = Object.freeze(['retail', 'cafe']);
+export const EXTRA_BUSINESS_TYPES = Object.freeze(['retail', 'cafe', 'hotel']);
 export const PERSONAL_WORKSPACE_TYPE = 'personal';
 
 function asObject(value) {

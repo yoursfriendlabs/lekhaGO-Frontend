@@ -1705,6 +1705,412 @@ export const api = {
   // Reports whether the backend is accepting event streams. Checked once per
   // session so we never open an EventSource the server will just reject.
   getEventsStatus: () => request("/api/events/status"),
+
+  // --- Restaurant add-on (only call when hasRestaurantAddon) ---
+  getProductRecipe: (productId) =>
+    request(
+      `/api/products/${productId}/recipe`,
+      {},
+      listCache(detailTags("product-recipe", productId), CACHE_TTL.short),
+    ),
+  putProductRecipe: (productId, data) =>
+    request(
+      `/api/products/${productId}/recipe`,
+      { method: "PUT", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("product-recipe", productId),
+        detailTags("product", productId),
+        "products",
+      ]),
+    ),
+
+  getRestaurantFloor: (params = {}, options = {}) =>
+    listRequest(
+      "/api/restaurant/floor",
+      params,
+      listCache(["restaurant-floor", "restaurant-orders"], CACHE_TTL.short, options),
+    ),
+  getRestaurantOrders: (params = {}, options = {}) =>
+    listRequest(
+      "/api/restaurant/orders",
+      params,
+      listCache(["restaurant-orders"], CACHE_TTL.short, options),
+    ),
+  getRestaurantOrder: (id, options = {}) =>
+    request(
+      `/api/restaurant/orders/${id}`,
+      {},
+      listCache(detailTags("restaurant-order", id), CACHE_TTL.short, options),
+    ),
+  createRestaurantOrder: (data) =>
+    request(
+      "/api/restaurant/orders",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["restaurant-floor", "restaurant-orders", "tables"]),
+    ),
+  updateRestaurantOrder: (id, data) =>
+    request(
+      `/api/restaurant/orders/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("restaurant-order", id),
+        "restaurant-floor",
+        "restaurant-orders",
+      ]),
+    ),
+  addRestaurantOrderItems: (id, data) =>
+    request(
+      `/api/restaurant/orders/${id}/items`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("restaurant-order", id),
+        "restaurant-floor",
+        "restaurant-orders",
+        "restaurant-kitchen",
+      ]),
+    ),
+  updateRestaurantOrderItem: (orderId, itemId, data) =>
+    request(
+      `/api/restaurant/orders/${orderId}/items/${itemId}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("restaurant-order", orderId),
+        "restaurant-floor",
+        "restaurant-orders",
+      ]),
+    ),
+  deleteRestaurantOrderItem: (orderId, itemId) =>
+    request(
+      `/api/restaurant/orders/${orderId}/items/${itemId}`,
+      { method: "DELETE" },
+      mutationConfig([
+        detailTags("restaurant-order", orderId),
+        "restaurant-floor",
+        "restaurant-orders",
+      ]),
+    ),
+  voidRestaurantOrderItem: (orderId, itemId, data) =>
+    request(
+      `/api/restaurant/orders/${orderId}/items/${itemId}/void`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("restaurant-order", orderId),
+        "restaurant-floor",
+        "restaurant-orders",
+        "restaurant-kitchen",
+        "products",
+      ]),
+    ),
+  updateRestaurantOrderItemStatus: (orderId, itemId, data) =>
+    request(
+      `/api/restaurant/orders/${orderId}/items/${itemId}/status`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("restaurant-order", orderId),
+        "restaurant-kitchen",
+        "restaurant-floor",
+        "restaurant-orders",
+      ]),
+    ),
+  sendRestaurantKot: (id) =>
+    request(
+      `/api/restaurant/orders/${id}/kot`,
+      { method: "POST", body: JSON.stringify({}) },
+      mutationConfig([
+        detailTags("restaurant-order", id),
+        "restaurant-floor",
+        "restaurant-orders",
+        "restaurant-kitchen",
+      ]),
+    ),
+  getRestaurantKots: (id) =>
+    request(
+      `/api/restaurant/orders/${id}/kots`,
+      {},
+      listCache(detailTags("restaurant-kots", id), CACHE_TTL.short),
+    ),
+  updateRestaurantKotStatus: (orderId, kotNo, data) =>
+    request(
+      `/api/restaurant/orders/${orderId}/kots/${kotNo}/status`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("restaurant-order", orderId),
+        "restaurant-kitchen",
+        "restaurant-floor",
+        "restaurant-orders",
+      ]),
+    ),
+  moveRestaurantOrder: (id, data) =>
+    request(
+      `/api/restaurant/orders/${id}/move`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("restaurant-order", id),
+        "restaurant-floor",
+        "restaurant-orders",
+        "tables",
+      ]),
+    ),
+  mergeRestaurantOrders: (id, data) =>
+    request(
+      `/api/restaurant/orders/${id}/merge`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("restaurant-order", id),
+        "restaurant-floor",
+        "restaurant-orders",
+        "tables",
+      ]),
+    ),
+  cancelRestaurantOrder: (id, data) =>
+    request(
+      `/api/restaurant/orders/${id}/cancel`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("restaurant-order", id),
+        "restaurant-floor",
+        "restaurant-orders",
+        "restaurant-kitchen",
+        "tables",
+      ]),
+    ),
+  previewRestaurantBill: (id, data = {}) =>
+    request(
+      `/api/restaurant/orders/${id}/bill-preview`,
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+  settleRestaurantOrder: (id, data = {}) =>
+    request(
+      `/api/restaurant/orders/${id}/settle`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("restaurant-order", id),
+        "restaurant-floor",
+        "restaurant-orders",
+        "restaurant-kitchen",
+        "sales",
+        "tables",
+        "dashboard",
+        "products",
+        "parties",
+      ]),
+    ),
+  getRestaurantKitchen: (params = {}, options = {}) =>
+    listRequest(
+      "/api/restaurant/kitchen",
+      params,
+      listCache(["restaurant-kitchen"], CACHE_TTL.short, options),
+    ),
+  getRestaurantVoidsReport: (params = {}) =>
+    request("/api/restaurant/reports/voids", { params }),
+  getRestaurantFoodCostReport: (params = {}) =>
+    request("/api/restaurant/reports/food-cost", { params }),
+  getRestaurantWaitersReport: (params = {}) =>
+    request("/api/restaurant/reports/waiters", { params }),
+
+  // --- Hotel business type (only call when isHotelBusiness) ---
+  getHotelRoomTypes: (params = {}, options = {}) =>
+    listRequest(
+      "/api/hotel/room-types",
+      params,
+      listCache(["hotel-room-types"], CACHE_TTL.short, options),
+    ),
+  createHotelRoomType: (data) =>
+    request(
+      "/api/hotel/room-types",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["hotel-room-types"]),
+    ),
+  updateHotelRoomType: (id, data) =>
+    request(
+      `/api/hotel/room-types/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([detailTags("hotel-room-type", id), "hotel-room-types", "hotel-rooms"]),
+    ),
+  deleteHotelRoomType: (id) =>
+    request(
+      `/api/hotel/room-types/${id}`,
+      { method: "DELETE" },
+      mutationConfig([detailTags("hotel-room-type", id), "hotel-room-types"]),
+    ),
+  getHotelRooms: (params = {}, options = {}) =>
+    listRequest(
+      "/api/hotel/rooms",
+      params,
+      listCache(["hotel-rooms"], CACHE_TTL.short, options),
+    ),
+  createHotelRoom: (data) =>
+    request(
+      "/api/hotel/rooms",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["hotel-rooms", "hotel-board"]),
+    ),
+  updateHotelRoom: (id, data) =>
+    request(
+      `/api/hotel/rooms/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([detailTags("hotel-room", id), "hotel-rooms", "hotel-board"]),
+    ),
+  deleteHotelRoom: (id) =>
+    request(
+      `/api/hotel/rooms/${id}`,
+      { method: "DELETE" },
+      mutationConfig([detailTags("hotel-room", id), "hotel-rooms", "hotel-board"]),
+    ),
+  updateHotelRoomHousekeeping: (id, data) =>
+    request(
+      `/api/hotel/rooms/${id}/housekeeping`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("hotel-room", id),
+        "hotel-rooms",
+        "hotel-board",
+        "hotel-housekeeping",
+      ]),
+    ),
+  getHotelBoard: (params = {}, options = {}) =>
+    listRequest(
+      "/api/hotel/board",
+      params,
+      listCache(["hotel-board", "hotel-stays"], CACHE_TTL.short, options),
+    ),
+  getHotelAvailability: (params = {}) =>
+    request("/api/hotel/availability", { params }),
+  getHotelHousekeeping: (params = {}, options = {}) =>
+    listRequest(
+      "/api/hotel/housekeeping",
+      params,
+      listCache(["hotel-housekeeping"], CACHE_TTL.short, options),
+    ),
+  getHotelStays: (params = {}, options = {}) =>
+    listRequest(
+      "/api/hotel/stays",
+      params,
+      listCache(["hotel-stays"], CACHE_TTL.short, options),
+    ),
+  getHotelStay: (id, options = {}) =>
+    request(
+      `/api/hotel/stays/${id}`,
+      {},
+      listCache(detailTags("hotel-stay", id), CACHE_TTL.short, options),
+    ),
+  createHotelStay: (data) =>
+    request(
+      "/api/hotel/stays",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["hotel-stays", "hotel-board", "hotel-rooms", "parties"]),
+    ),
+  updateHotelStay: (id, data) =>
+    request(
+      `/api/hotel/stays/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("hotel-stay", id),
+        "hotel-stays",
+        "hotel-board",
+      ]),
+    ),
+  checkInHotelStay: (id, data = {}) =>
+    request(
+      `/api/hotel/stays/${id}/check-in`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("hotel-stay", id),
+        "hotel-stays",
+        "hotel-board",
+        "hotel-rooms",
+        "hotel-housekeeping",
+      ]),
+    ),
+  cancelHotelStay: (id, data) =>
+    request(
+      `/api/hotel/stays/${id}/cancel`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("hotel-stay", id),
+        "hotel-stays",
+        "hotel-board",
+        "hotel-rooms",
+      ]),
+    ),
+  noShowHotelStay: (id, data = {}) =>
+    request(
+      `/api/hotel/stays/${id}/no-show`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("hotel-stay", id),
+        "hotel-stays",
+        "hotel-board",
+        "hotel-rooms",
+      ]),
+    ),
+  moveHotelStay: (id, data) =>
+    request(
+      `/api/hotel/stays/${id}/move`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("hotel-stay", id),
+        "hotel-stays",
+        "hotel-board",
+        "hotel-rooms",
+        "hotel-housekeeping",
+      ]),
+    ),
+  addHotelStayPayment: (id, data) =>
+    request(
+      `/api/hotel/stays/${id}/payments`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("hotel-stay", id),
+        "hotel-stays",
+        "hotel-board",
+        "parties",
+        "dashboard",
+      ]),
+    ),
+  addHotelStayCharges: (id, data) =>
+    request(
+      `/api/hotel/stays/${id}/charges`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("hotel-stay", id),
+        "hotel-stays",
+        "sales",
+        "products",
+        "parties",
+        "dashboard",
+      ]),
+    ),
+  getHotelStayFolio: (id) =>
+    request(
+      `/api/hotel/stays/${id}/folio`,
+      {},
+      listCache(detailTags("hotel-folio", id), CACHE_TTL.short),
+    ),
+  previewHotelCheckOut: (id, data = {}) =>
+    request(
+      `/api/hotel/stays/${id}/check-out/preview`,
+      { method: "POST", body: JSON.stringify(data) },
+    ),
+  checkOutHotelStay: (id, data = {}) =>
+    request(
+      `/api/hotel/stays/${id}/check-out`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("hotel-stay", id),
+        "hotel-stays",
+        "hotel-board",
+        "hotel-rooms",
+        "hotel-housekeeping",
+        "services",
+        "parties",
+        "dashboard",
+      ]),
+    ),
+  getHotelGuestRegister: (params = {}) =>
+    request("/api/hotel/guest-register", { params }),
+  getHotelOccupancyReport: (params = {}) =>
+    request("/api/hotel/reports/occupancy", { params }),
 };
 
 export { toQueryKey };

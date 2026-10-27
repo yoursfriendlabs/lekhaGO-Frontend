@@ -11,6 +11,9 @@ export const SSE_EVENTS = {
   SALES_CHANGED: 'mms:sse:sales-changed',
   TASKS_CHANGED: 'mms:sse:tasks-changed',
   TABLES_CHANGED: 'mms:sse:tables-changed',
+  RESTAURANT_ORDERS_CHANGED: 'mms:sse:restaurant-orders-changed',
+  KITCHEN_CHANGED: 'mms:sse:kitchen-changed',
+  HOTEL_CHANGED: 'mms:sse:hotel-changed',
   CONNECTED: 'mms:sse:connected',
 };
 
@@ -30,6 +33,18 @@ const EVENT_MAP = {
   'tables-changed': {
     windowEvent: SSE_EVENTS.TABLES_CHANGED,
     invalidateTags: ['tables'],
+  },
+  'restaurant-orders-changed': {
+    windowEvent: SSE_EVENTS.RESTAURANT_ORDERS_CHANGED,
+    invalidateTags: ['restaurant-floor', 'restaurant-orders', 'restaurant-kitchen', 'tables'],
+  },
+  'kitchen-changed': {
+    windowEvent: SSE_EVENTS.KITCHEN_CHANGED,
+    invalidateTags: ['restaurant-kitchen', 'restaurant-orders', 'restaurant-floor'],
+  },
+  'hotel-changed': {
+    windowEvent: SSE_EVENTS.HOTEL_CHANGED,
+    invalidateTags: ['hotel-board', 'hotel-stays', 'hotel-rooms', 'hotel-housekeeping'],
   },
 };
 

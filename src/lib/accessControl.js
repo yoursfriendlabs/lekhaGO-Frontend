@@ -17,6 +17,9 @@ const PERMISSION_KEYS = [
   'tables',
   'orders',
   'billing',
+  'kitchen',
+  'frontDesk',
+  'housekeeping',
   'attendance',
   'purchasePrice',
 ];
@@ -49,14 +52,18 @@ const PARTY_DEPENDENT_PERMISSION_KEYS = [
   'billing',
 ];
 
-const CAFE_PERMISSION_KEYS = new Set(['tables', 'orders', 'billing']);
+const CAFE_PERMISSION_KEYS = new Set(['tables', 'orders', 'billing', 'kitchen']);
+const HOTEL_PERMISSION_KEYS = new Set(['frontDesk', 'housekeeping']);
 
-/** Permission keys hidden from the staff permission editor unless cafe modules are on. */
+/** Permission keys hidden from the staff permission editor unless cafe/hotel modules are on. */
 const STAFF_PERMISSION_UI_HIDDEN_KEYS = new Set([
   'analytics',
   'tables',
   'orders',
   'billing',
+  'kitchen',
+  'frontDesk',
+  'housekeeping',
 ]);
 
 /** Preferred display order for the staff permission editor. */
@@ -79,6 +86,9 @@ const STAFF_PERMISSION_UI_ORDER = [
   'tables',
   'orders',
   'billing',
+  'kitchen',
+  'frontDesk',
+  'housekeeping',
 ];
 
 export const STAFF_PERMISSION_UI_GROUPS = [
@@ -86,7 +96,8 @@ export const STAFF_PERMISSION_UI_GROUPS = [
   { id: 'sensitive', keys: ['purchasePrice'] },
   { id: 'finance', keys: ['reports', 'banking'] },
   { id: 'team', keys: ['staff', 'attendance', 'settings'] },
-  { id: 'cafe', keys: ['tables', 'orders', 'billing'] },
+  { id: 'cafe', keys: ['tables', 'orders', 'billing', 'kitchen'] },
+  { id: 'hotel', keys: ['frontDesk', 'housekeeping'] },
 ];
 
 const FEATURE_PERMISSION_MAP = {
@@ -117,6 +128,11 @@ const FEATURE_PERMISSION_MAP = {
   banks: 'banking',
   billing: 'billing',
   tables: 'tables',
+  kitchen: 'kitchen',
+  frontDesk: 'frontDesk',
+  rooms: 'frontDesk',
+  housekeeping: 'housekeeping',
+  hotel: 'frontDesk',
   attendance: 'attendance',
   purchasePrice: 'purchasePrice',
 };
@@ -128,6 +144,11 @@ const SUBSCRIPTION_FEATURE_ALIASES = {
   analytics: 'reports',
   ledger: 'reports',
   banking: 'banks',
+  kitchen: 'orders',
+  frontDesk: 'services',
+  housekeeping: 'services',
+  hotel: 'services',
+  rooms: 'services',
 };
 
 function asObject(value) {
@@ -198,9 +219,12 @@ export function getRequiredPartiesAccessLevel(permissions) {
 }
 
 /**
- * Standard staff permission rows. Cafe modules stay hidden unless includeCafeModules is true.
+ * Standard staff permission rows. Cafe/hotel modules stay hidden unless those modules are on.
  */
-export function getStaffPermissionUiFeatures(features = [], { includeCafeModules = false } = {}) {
+export function getStaffPermissionUiFeatures(features = [], {
+  includeCafeModules = false,
+  includeHotelModules = false,
+} = {}) {
   const byKey = new Map();
 
   (Array.isArray(features) ? features : []).forEach((feature) => {
@@ -216,9 +240,11 @@ export function getStaffPermissionUiFeatures(features = [], { includeCafeModules
     }
 
     const isCafeKey = CAFE_PERMISSION_KEYS.has(permissionKey) || CAFE_PERMISSION_KEYS.has(rawKey);
+    const isHotelKey = HOTEL_PERMISSION_KEYS.has(permissionKey) || HOTEL_PERMISSION_KEYS.has(rawKey);
+    const allowHidden = (includeCafeModules && isCafeKey) || (includeHotelModules && isHotelKey);
     if (
       (STAFF_PERMISSION_UI_HIDDEN_KEYS.has(permissionKey) || STAFF_PERMISSION_UI_HIDDEN_KEYS.has(rawKey))
-      && !(includeCafeModules && isCafeKey)
+      && !allowHidden
     ) {
       return;
     }
