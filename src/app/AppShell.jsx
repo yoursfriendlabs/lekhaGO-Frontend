@@ -15,6 +15,10 @@ import { getSubscriptionGuard, getSubscriptionStatusState } from '../lib/subscri
 import { buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB } from '../lib/business/settingsTabs';
 import { useSSE } from '../hooks/useSSE';
 import {
+  canUseHotelApis,
+  canUseRestaurantApis,
+} from '../lib/business/hospitality';
+import {
   ActivationOnlyRoute,
   EmailActivationRequiredRoute,
   InvoiceAccessRoute,
@@ -31,13 +35,20 @@ import {
   CafeOrders,
   CashierBilling,
   Dashboard,
+  HotelFrontDesk,
+  HotelHousekeeping,
+  HotelRooms,
+  HotelStay,
   Inventory,
   Invoice,
+  Kitchen,
   Parties,
   Profile,
   Purchases,
   QuickPos,
   Reports,
+  RestaurantFloor,
+  RestaurantOrder,
   Sales,
   Services,
   Settings,
@@ -84,9 +95,16 @@ export default function AppShell() {
   const showVerificationBanner = hasUnverifiedEmail(user);
   const requiresActivation = isStaffActivationRequired(user, role);
   const servicesEnabled = businessProfile?.modules?.services !== false;
+  const restaurantAddonEnabled = canUseRestaurantApis(businessProfile);
+  const hotelEnabled = canUseHotelApis(businessProfile);
   const cafeOrdersEnabled = businessProfile?.modules?.orders === true || businessProfile?.type === 'cafe' || businessProfile?.settings?.enabledModules?.includes('tables');
   const salesRoute = businessProfile?.salesFlow?.route || '/app/pos';
   const posPageElement = <QuickPos />;
+  const ordersPageElement = restaurantAddonEnabled
+    ? <RestaurantFloor />
+    : cafeOrdersEnabled
+      ? <CafeOrders />
+      : <Navigate to={salesRoute} replace />;
   const subscriptionGuard = getSubscriptionGuard(subscription);
   const subscriptionStatusState = getSubscriptionStatusState(subscription);
   const hasRecoverableBusinessMismatch = role === 'owner' && subscriptionAccess?.guard === 'business_missing';
@@ -223,8 +241,80 @@ export default function AppShell() {
                     element={(
                       <EmailActivationRequiredRoute>
                         <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
-                          <SubscriptionFeatureRoute featureKey="orders">
-                            {cafeOrdersEnabled ? <CafeOrders /> : <Navigate to={salesRoute} replace />}
+                          <SubscriptionFeatureRoute featureKeys={['orders', 'billing', 'sales', 'kitchen']}>
+                            {ordersPageElement}
+                          </SubscriptionFeatureRoute>
+                        </RoleGuard>
+                      </EmailActivationRequiredRoute>
+                    )}
+                  />
+                  <Route
+                    path="orders/:orderId"
+                    element={(
+                      <EmailActivationRequiredRoute>
+                        <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
+                          <SubscriptionFeatureRoute featureKeys={['orders', 'billing', 'sales', 'kitchen']}>
+                            {restaurantAddonEnabled ? <RestaurantOrder /> : <Navigate to={salesRoute} replace />}
+                          </SubscriptionFeatureRoute>
+                        </RoleGuard>
+                      </EmailActivationRequiredRoute>
+                    )}
+                  />
+                  <Route
+                    path="kitchen"
+                    element={(
+                      <EmailActivationRequiredRoute>
+                        <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
+                          <SubscriptionFeatureRoute featureKey="kitchen">
+                            {restaurantAddonEnabled ? <Kitchen /> : <Navigate to={salesRoute} replace />}
+                          </SubscriptionFeatureRoute>
+                        </RoleGuard>
+                      </EmailActivationRequiredRoute>
+                    )}
+                  />
+                  <Route
+                    path="hotel"
+                    element={(
+                      <EmailActivationRequiredRoute>
+                        <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
+                          <SubscriptionFeatureRoute featureKey="frontDesk">
+                            {hotelEnabled ? <HotelFrontDesk /> : <Navigate to="/app" replace />}
+                          </SubscriptionFeatureRoute>
+                        </RoleGuard>
+                      </EmailActivationRequiredRoute>
+                    )}
+                  />
+                  <Route
+                    path="hotel/rooms"
+                    element={(
+                      <EmailActivationRequiredRoute>
+                        <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
+                          <SubscriptionFeatureRoute featureKey="frontDesk">
+                            {hotelEnabled ? <HotelRooms /> : <Navigate to="/app" replace />}
+                          </SubscriptionFeatureRoute>
+                        </RoleGuard>
+                      </EmailActivationRequiredRoute>
+                    )}
+                  />
+                  <Route
+                    path="hotel/stays/:stayId"
+                    element={(
+                      <EmailActivationRequiredRoute>
+                        <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
+                          <SubscriptionFeatureRoute featureKey="frontDesk">
+                            {hotelEnabled ? <HotelStay /> : <Navigate to="/app" replace />}
+                          </SubscriptionFeatureRoute>
+                        </RoleGuard>
+                      </EmailActivationRequiredRoute>
+                    )}
+                  />
+                  <Route
+                    path="hotel/housekeeping"
+                    element={(
+                      <EmailActivationRequiredRoute>
+                        <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
+                          <SubscriptionFeatureRoute featureKey="housekeeping">
+                            {hotelEnabled ? <HotelHousekeeping /> : <Navigate to="/app" replace />}
                           </SubscriptionFeatureRoute>
                         </RoleGuard>
                       </EmailActivationRequiredRoute>
