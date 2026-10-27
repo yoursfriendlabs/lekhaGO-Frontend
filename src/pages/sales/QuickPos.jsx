@@ -37,7 +37,10 @@ import { useIsMobile } from "../../hooks/useIsMobile.js";
 import { useSSEEvent, SSE_EVENTS } from "../../hooks/useSSE.js";
 import { useProductStore } from "../../stores/products";
 import { useSaleStore } from "../../stores/sales";
-import { checkNewAndReadyOrders } from "../../lib/business/cafeOrders.js";
+import {
+  checkNewAndReadyOrders,
+  isCafeOrderFlowEnabled,
+} from "../../lib/business/cafeOrders.js";
 import SaleInvoiceModal from "./SaleInvoiceModal.jsx";
 import {
   getSellableQuantity,
@@ -190,6 +193,12 @@ export default function QuickPos() {
   const isTablesEnabled = useMemo(() => {
     return businessProfile?.settings?.enabledModules?.includes("tables");
   }, [businessProfile]);
+  // Standard (retail) shops bill straight from the cart: no order-type picker,
+  // no table map and no kitchen notifications.
+  const isCafeOrderFlow = useMemo(
+    () => isCafeOrderFlowEnabled(businessProfile),
+    [businessProfile],
+  );
   const navigate = useNavigate();
   const isMobile = useIsMobile("(max-width: 1023px)");
   const { invalidate: invalidateProducts } = useProductStore();
@@ -321,32 +330,19 @@ export default function QuickPos() {
     Promise.all([
       api.listProducts({ limit: 1000 }),
       api.getNextSequences().catch(() => null),
-      api.getTables({ isActive: "true", limit: 100 }).catch(() => null),
-      api.listCategories({ type: "table", limit: 100 }).catch(() => null),
     ])
-      .then(
-        ([
-          productResponse,
-          sequenceResponse,
-          tablesResponse,
-          categoriesResponse,
-        ]) => {
-          if (!isActive) return;
-          const normalizedProducts = (productResponse?.items || [])
-            .map(normalizePosProduct)
-            .filter((product) => product.id);
+      .then(([productResponse, sequenceResponse]) => {
+        if (!isActive) return;
+        const normalizedProducts = (productResponse?.items || [])
+          .map(normalizePosProduct)
+          .filter((product) => product.id);
 
-          setProducts(normalizedProducts);
-          setSuggestedInvoiceNo(sequenceResponse?.nextSaleInvoiceNo || "");
-          setAllTables(tablesResponse?.items || []);
-          setFloors(categoriesResponse?.items || []);
-        },
-      )
+        setProducts(normalizedProducts);
+        setSuggestedInvoiceNo(sequenceResponse?.nextSaleInvoiceNo || "");
+      })
       .catch((error) => {
         if (!isActive) return;
         setProducts([]);
-        setAllTables([]);
-        setFloors([]);
         setStatus({ type: "error", message: error.message });
       })
       .finally(() => {
@@ -358,7 +354,32 @@ export default function QuickPos() {
     };
   }, [businessId]);
 
+  useEffect(() => {
+    if (!businessId || !isCafeOrderFlow) {
+      setAllTables([]);
+      setFloors([]);
+      return;
+    }
+
+    let isActive = true;
+
+    Promise.all([
+      api.getTables({ isActive: "true", limit: 100 }).catch(() => null),
+      api.listCategories({ type: "table", limit: 100 }).catch(() => null),
+    ]).then(([tablesResponse, categoriesResponse]) => {
+      if (!isActive) return;
+      setAllTables(tablesResponse?.items || []);
+      setFloors(categoriesResponse?.items || []);
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [businessId, isCafeOrderFlow]);
+
   const refreshRealtimeData = async () => {
+    if (!isCafeOrderFlow) return;
+
     try {
       const [salesResponse, tablesResponse] = await Promise.all([
         api.listSales({ limit: 120 }).catch(() => ({ items: [] })),
@@ -389,7 +410,7 @@ export default function QuickPos() {
 
   // Polling for real-time table status and order ready notifications as fallback
   useEffect(() => {
-    if (!businessId) return;
+    if (!businessId || !isCafeOrderFlow) return;
 
     if (
       typeof Notification !== "undefined" &&
@@ -403,7 +424,7 @@ export default function QuickPos() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [businessId, isTablesEnabled]);
+  }, [businessId, isCafeOrderFlow, isTablesEnabled]);
 
   const handleSelectDelivery = () => {
     setActiveSessionOption("delivery");
@@ -1151,13 +1172,22 @@ export default function QuickPos() {
       const isPaidBill =
         totals.grandTotal === 0 || resolvedReceivedAmount >= totals.grandTotal;
 
-      const currentOrderType =
-        activeSessionOption || activeAttributes?.order_type || "dine_in";
       const orderStatus = activeAttributes?.order_status || "new";
       const matchedTable = allTables.find(
         (t) => String(t.id) === String(checkoutForm.tableId),
       );
       const resolvedTableNo = matchedTable ? matchedTable.name : "";
+
+      // Only cafe / restaurant bills carry kitchen routing fields. A retail
+      // sale that picked them up would show as a new order needing cooking.
+      const orderRoutingAttributes = isCafeOrderFlow
+        ? {
+            order_status: orderStatus,
+            order_type:
+              activeSessionOption || activeAttributes?.order_type || "dine_in",
+            table_no: resolvedTableNo || activeAttributes?.table_no || "",
+          }
+        : {};
 
       const payload = {
         ...headerFields,
@@ -1175,10 +1205,7 @@ export default function QuickPos() {
         grandTotal: totals.grandTotal,
         attributes: {
           ...(activeAttributes || {}),
-          order_status: orderStatus,
-          order_type:
-            activeSessionOption || activeAttributes?.order_type || "dine_in",
-          table_no: resolvedTableNo || activeAttributes?.table_no || "",
+          ...orderRoutingAttributes,
           customer_name:
             selectedParty?.name || activeAttributes?.customer_name || "",
           customer_phone:
@@ -1512,7 +1539,7 @@ export default function QuickPos() {
     );
   }
 
-  if (activeSessionOption === null) {
+  if (isCafeOrderFlow && activeSessionOption === null) {
     return (
       <div className="min-w-0 space-y-5 pb-28 md:pb-0">
         <PageHeader
