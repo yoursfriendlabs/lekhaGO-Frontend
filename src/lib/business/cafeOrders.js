@@ -48,6 +48,26 @@ export function normalizeCafeOrderStatus(value) {
   return CAFE_ORDER_STATUS_SET.has(normalized) ? normalized : 'new';
 }
 
+/**
+ * Cafe / restaurant order flow. Standard (retail) shops never have it, so the
+ * table map, order-type picker and kitchen notifications must stay off there.
+ */
+export function isCafeOrderFlowEnabled(profile) {
+  if (!profile) return false;
+  if (profile.modules?.orders === true) return true;
+  if (profile.type === 'cafe') return true;
+  return Boolean(profile.settings?.enabledModules?.includes('tables'));
+}
+
+/**
+ * A retail sale carries no order_status, so only sales that actually declare
+ * one count as cafe orders.
+ */
+export function hasCafeOrderStatus(sale = {}) {
+  const attributes = sale?.attributes && typeof sale.attributes === 'object' ? sale.attributes : {};
+  return Boolean(asString(attributes.order_status));
+}
+
 export function getCafeOrderStatusMeta(status) {
   return CAFE_ORDER_STATUSES.find((entry) => entry.value === normalizeCafeOrderStatus(status)) || CAFE_ORDER_STATUSES[0];
 }
@@ -201,6 +221,7 @@ export function checkNewAndReadyOrders(ordersList) {
   const messages = [];
 
   ordersList.forEach((order) => {
+    if (!hasCafeOrderStatus(order)) return;
     const meta = getCafeOrderAttributes(order);
     const orderStatus = meta.orderStatus;
     const tableNo = meta.tableNo || 'Counter';
