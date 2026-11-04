@@ -2711,6 +2711,10 @@ export default function Inventory() {
           if (!updated?.id) return;
           useProductStore.getState().patchProduct(updated.id, updated);
           setDetailProductHint(updated);
+          // Lot changes (exchange, destroy, expiry) move the expired and
+          // sellable counts the list shows, so read the list again.
+          invalidateProducts(listParams);
+          fetchProducts(listParams, true).catch(() => {});
           fetchStats();
         }}
       />
