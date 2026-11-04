@@ -296,6 +296,8 @@ export default function Services() {
   const [header, setHeader] = useState(() => makeEmptyHeader());
   const [hasDeliveryDate, setHasDeliveryDate] = useState(true);
   const [vacantTables, setVacantTables] = useState([]);
+  const [tableNames, setTableNames] = useState({});
+  const tableLookupTried = useRef(new Set());
   const [items, setItems] = useState([]);
   const quantityInputRef = useRef(null);
   const descriptionInputRef = useRef(null);
@@ -1009,6 +1011,36 @@ export default function Services() {
       console.error('Failed to load vacant tables', err);
     }
   };
+
+  // List rows only carry a tableId, so look the names up. Orders without a
+  // table (every Standard shop) never trigger this.
+  useEffect(() => {
+    if (!businessId) return;
+    const missing = safeServiceList
+      .filter((order) => order.tableId && !order.Table?.name && !order.table?.name)
+      .map((order) => String(order.tableId))
+      .filter((id) => !tableLookupTried.current.has(id));
+    if (!missing.length) return;
+    // A deleted table never comes back, so each id is only looked up once.
+    missing.forEach((id) => tableLookupTried.current.add(id));
+    let active = true;
+    api.getTables({ limit: 200 })
+      .then((data) => {
+        if (!active) return;
+        const items = data?.items || (Array.isArray(data) ? data : []);
+        setTableNames((previous) => {
+          const next = { ...previous };
+          items.forEach((table) => {
+            if (table?.id) next[table.id] = table.name;
+          });
+          return next;
+        });
+      })
+      .catch(() => null);
+    return () => {
+      active = false;
+    };
+  }, [businessId, safeServiceList]);
 
   const openDialog = async () => {
     if (!canManageServices) return;
@@ -1759,6 +1791,7 @@ export default function Services() {
         setStatusFilter={setStatusFilter}
         listLoading={listLoading}
         safeServiceList={safeServiceList}
+        tableNames={tableNames}
         pagedServices={pagedServices}
         isGym={isGym}
         openStatusDialog={openStatusDialog}
