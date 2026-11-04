@@ -103,7 +103,6 @@ export default function ServiceInvoiceModal({
                       amountReceived: invoiceOrder.receivedTotal,
                       dueAmount: Math.max(Number(invoiceTotals.grandTotal || 0) - Number(invoiceOrder.receivedTotal || 0), 0),
                     }}
-                    notes={invoiceOrder.notes}
                     extraFields={[
                       ...(invoiceJewellery.metalType ? [{ label: "Metal", value: invoiceJewellery.metalType }] : []),
                       ...(invoiceJewellery.metalPurity ? [{ label: "Purity", value: invoiceJewellery.metalPurity }] : []),

@@ -14,7 +14,6 @@ export default function ThermalReceipt({
   tableName = '',
   items = [],
   totals = {},
-  notes = '',
   extraFields = [],
   reprintLabel = '',
 }) {
@@ -173,16 +172,6 @@ export default function ThermalReceipt({
                 <span className="text-ink-light">{field.value}</span>
               </div>
             ))}
-          </div>
-        </>
-      )}
-
-      {/* Notes */}
-      {notes && (
-        <>
-          <div className="border-t border-dashed border-black my-2" />
-          <div className="text-[10px] text-ink-light italic whitespace-pre-wrap">
-            Note: {notes}
           </div>
         </>
       )}

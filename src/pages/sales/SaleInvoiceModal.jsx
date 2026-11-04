@@ -135,7 +135,6 @@ export default function SaleInvoiceModal({
                   amountReceived: totalReceived,
                   dueAmount: dueAmount,
                 }}
-                notes={sale.notes}
                 reprintLabel={reprintLabel}
               />
             </div>
