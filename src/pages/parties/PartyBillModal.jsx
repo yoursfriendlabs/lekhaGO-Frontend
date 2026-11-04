@@ -100,7 +100,7 @@ export default function PartyBillModal({
               className={`btn ${!isThermal ? "btn-primary bg-primary text-white hover:bg-primary-600" : "btn-secondary"}`}
               onClick={() => setIsThermal(false)}
             >
-              {isSale ? "Standard Service Bill" : "Standard Bill"}
+              Standard A4 Bill
             </button>
             <button
               type="button"
