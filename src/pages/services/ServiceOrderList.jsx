@@ -27,6 +27,10 @@ import {
   TABLE_ROW_OPTIONS,
 } from "./serviceOrderUtils.js";
 
+function tableNameFor(order, tableNames) {
+  return order.Table?.name || order.table?.name || (order.tableId ? tableNames[order.tableId] : "") || "";
+}
+
 export default function ServiceOrderList({
   t,
   money,
@@ -53,6 +57,7 @@ export default function ServiceOrderList({
   setStatusFilter,
   listLoading,
   safeServiceList,
+  tableNames = {},
   pagedServices,
   isGym,
   openStatusDialog,
@@ -257,10 +262,10 @@ export default function ServiceOrderList({
                             <p className="text-xs text-secondary-500">
                               Created by {getCreatorDisplayName(order)}
                             </p>
-                            {(order.Table || order.table || order.tableId) && (
+                            {tableNameFor(order, tableNames) && (
                               <div className="mt-1">
                                 <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                                  Table: {order.Table?.name || order.table?.name || order.tableId}
+                                  Table: {tableNameFor(order, tableNames)}
                                 </span>
                               </div>
                             )}
@@ -410,10 +415,10 @@ export default function ServiceOrderList({
                           <div className="text-xs text-secondary-400">
                             Created by {getCreatorDisplayName(order)}
                           </div>
-                          {(order.Table || order.table || order.tableId) && (
+                          {tableNameFor(order, tableNames) && (
                             <div className="mt-1">
                               <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
-                                Table: {order.Table?.name || order.table?.name || order.tableId}
+                                Table: {tableNameFor(order, tableNames)}
                               </span>
                             </div>
                           )}
