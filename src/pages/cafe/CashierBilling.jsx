@@ -482,7 +482,7 @@ export default function CashierBilling() {
           tone="default"
         />
         <StatsCard
-          title="Active Tables"
+          title="Occupied Tables"
           value={stats.occupied}
           icon={Clock}
           tone="warning"
