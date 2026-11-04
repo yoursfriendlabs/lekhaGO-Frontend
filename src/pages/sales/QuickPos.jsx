@@ -513,9 +513,7 @@ export default function QuickPos() {
         });
         setActiveAttributes(fullSale?.attributes || {});
       } else {
-        await api
-          .updateTable(tableId, { status: "occupied" })
-          .catch(() => null);
+        // Opening an empty table does not occupy it; the first saved item does.
         ignoreAutoSaveRef.current = true;
         setCart([]);
         setEditingId(null);
@@ -880,6 +878,9 @@ export default function QuickPos() {
           useSaleStore.getState().invalidate();
           if (created?.id) {
             setEditingId(created.id);
+            await api
+              .updateTable(currentActiveTableId, { status: "occupied" })
+              .catch(() => null);
             if (created?.SaleItems) {
               setCart((prevCart) =>
                 prevCart.map((cartItem) => {
