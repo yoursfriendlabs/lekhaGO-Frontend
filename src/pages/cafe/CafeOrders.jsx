@@ -1181,7 +1181,7 @@ export default function CafeOrders() {
                           <button
                             type="button"
                             className="rounded-lg p-1.5 text-secondary-500 hover:bg-secondary-100"
-                            onClick={() => navigate(`/app/pos?tableId=${order.tableId || ''}&ref=orders`)}
+                            onClick={() => navigate(`/app/pos?saleId=${order.id}&ref=orders`)}
                             title="Edit"
                           >
                             <Pencil size={14} />
@@ -1467,7 +1467,7 @@ export default function CafeOrders() {
                               type="button"
                               title="Edit order"
                               className="rounded-xl p-2 text-secondary-500 transition hover:bg-secondary-100 hover:text-ink"
-                              onClick={() => navigate(`/app/pos?tableId=${order.tableId || ''}&ref=orders`)}
+                              onClick={() => navigate(`/app/pos?saleId=${order.id}&ref=orders`)}
                             >
                               <Pencil size={15} />
                             </button>
