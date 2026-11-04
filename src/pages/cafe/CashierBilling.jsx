@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useId, useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Coffee,
@@ -30,6 +30,45 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { useSnackbar } from '../../lib/snackbar.jsx';
 import { todayISODate } from '../../lib/dates/datetime';
 import { buildPaymentPayload, requiresBankSelection } from '../../lib/money/payments';
+
+const TAX_RATE_PRESETS = [0, 5, 13, 15];
+
+function TaxRateField({ value, onChange }) {
+  const inputId = useId();
+  return (
+    <>
+      <label className="label" htmlFor={inputId}>Tax Rate (%)</label>
+      <input
+        id={inputId}
+        type="number"
+        min="0"
+        max="100"
+        step="0.01"
+        inputMode="decimal"
+        className="input h-10 mt-1"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="0"
+      />
+      <div className="mt-1.5 flex flex-wrap gap-1">
+        {TAX_RATE_PRESETS.map((rate) => (
+          <button
+            key={rate}
+            type="button"
+            onClick={() => onChange(String(rate))}
+            className={`px-2 py-0.5 rounded-lg border text-[11px] font-semibold transition ${
+              Number(value || 0) === rate
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-secondary-200 bg-white text-secondary-600 hover:border-primary'
+            }`}
+          >
+            {rate}%
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
 
 export default function CashierBilling() {
   const { t } = useI18n();
@@ -223,7 +262,7 @@ export default function CashierBilling() {
     const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
     const discountAmount = Math.max(Number(checkoutForm.discount || 0), 0);
     const beforeTax = Math.max(subTotal - discountAmount, 0);
-    const taxRate = Number(checkoutForm.taxRate || 0);
+    const taxRate = Math.min(Math.max(Number(checkoutForm.taxRate || 0), 0), 100);
     const taxTotal = (beforeTax * taxRate) / 100;
     const grandTotal = beforeTax + taxTotal;
 
@@ -283,7 +322,7 @@ export default function CashierBilling() {
       const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
       const discountAmount = Number(prev.discount || 0);
       const beforeTax = Math.max(subTotal - discountAmount, 0);
-      const nextGrand = beforeTax + (beforeTax * Number(nextTaxRate || 0)) / 100;
+      const nextGrand = beforeTax + (beforeTax * Math.min(Math.max(Number(nextTaxRate || 0), 0), 100)) / 100;
 
       return {
         ...prev,
@@ -351,7 +390,7 @@ export default function CashierBilling() {
         amountReceived: apiAmountReceived,
         discount: computedTotals.discountTotal,
         discountTotal: computedTotals.discountTotal,
-        taxRate: Number(checkoutForm.taxRate || 0),
+        taxRate: Math.min(Math.max(Number(checkoutForm.taxRate || 0), 0), 100),
         taxTotal: computedTotals.taxTotal,
         grandTotal: computedTotals.grandTotal,
         subTotal: computedTotals.subTotal,
@@ -824,17 +863,7 @@ export default function CashierBilling() {
                   />
                 </div>
                 <div>
-                  <label className="label">Tax Rate (%)</label>
-                  <select
-                    className="input h-10 mt-1"
-                    value={checkoutForm.taxRate}
-                    onChange={(e) => handleTaxRateChange(e.target.value)}
-                  >
-                    <option value="0">0% (No Tax)</option>
-                    <option value="5">5%</option>
-                    <option value="13">13% (VAT)</option>
-                    <option value="15">15%</option>
-                  </select>
+                  <TaxRateField value={checkoutForm.taxRate} onChange={handleTaxRateChange} />
                 </div>
               </div>
 
@@ -1107,17 +1136,7 @@ export default function CashierBilling() {
                     />
                   </div>
                   <div>
-                    <label className="label">Tax Rate (%)</label>
-                    <select
-                      className="input h-10 mt-1"
-                      value={checkoutForm.taxRate}
-                      onChange={(e) => handleTaxRateChange(e.target.value)}
-                    >
-                      <option value="0">0% (No Tax)</option>
-                      <option value="5">5%</option>
-                      <option value="13">13% (VAT)</option>
-                      <option value="15">15%</option>
-                    </select>
+                    <TaxRateField value={checkoutForm.taxRate} onChange={handleTaxRateChange} />
                   </div>
                 </div>
 
