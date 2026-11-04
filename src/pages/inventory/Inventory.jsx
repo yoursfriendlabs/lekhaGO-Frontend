@@ -5,6 +5,7 @@ import Notice from "../../components/ui/Notice";
 import Pagination from "../../components/ui/Pagination";
 import FormSectionCard from "../../components/ui/FormSectionCard.jsx";
 import CategorySearchCreateField from "../../components/inventory/CategorySearchCreateField.jsx";
+import UnitQuickCreate from "../../components/inventory/UnitQuickCreate.jsx";
 import { Dialog } from "../../components/ui/Dialog.tsx";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth.jsx";
@@ -924,6 +925,26 @@ export default function Inventory() {
       unitId: "",
       primaryUnit: cleanUnitLabel(value.slice("legacy:".length)),
     }));
+  };
+
+  // A unit added from the form joins the list and is picked straight away.
+  const handleUnitCreated = (unit, slot) => {
+    if (!unit?.id) return;
+    setUnitOptions((previous) =>
+      [...previous.filter((option) => String(option.id) !== String(unit.id)), unit].sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || "")),
+      ),
+    );
+    setUnitsError("");
+    setForm((previous) =>
+      slot === "secondary"
+        ? { ...previous, secondaryUnit: getUnitText(unit) }
+        : {
+            ...previous,
+            unitId: String(unit.id),
+            primaryUnit: cleanUnitLabel(unit.name || unit.symbol || ""),
+          },
+    );
   };
 
   const handleSecondaryUnitChange = (event) => {
@@ -2448,6 +2469,10 @@ export default function Inventory() {
                     </option>
                   ))}
                 </select>
+                <UnitQuickCreate
+                  idPrefix="inventory-primary-unit-new"
+                  onCreated={(unit) => handleUnitCreated(unit, "primary")}
+                />
                 {unitsError ? (
                   <p className="mt-2 text-xs text-rose-600">{unitsError}</p>
                 ) : null}
@@ -2490,7 +2515,12 @@ export default function Inventory() {
                   <p className="mt-2 text-xs text-secondary-500">
                     Add a primary unit first.
                   </p>
-                ) : null}
+                ) : (
+                  <UnitQuickCreate
+                    idPrefix="inventory-secondary-unit-new"
+                    onCreated={(unit) => handleUnitCreated(unit, "secondary")}
+                  />
+                )}
               </div>
               <div>
                 <label className="label">
