@@ -7,6 +7,7 @@ import { printElement, printThermalReceipt } from "@/lib/print/print";
 import { getIrdReprintLabel } from "@/lib/compliance/ird";
 import { api } from "@/lib/api";
 import dayjs from "@/lib/dates/datetime";
+import { formatTaxLabel, getBillTaxRate } from "@/lib/money/taxLabel";
 
 const PRINT_CLONE = {
   prepareClone: (clone) => {
@@ -138,6 +139,7 @@ export default function PartyBillModal({
                 }))}
                 totals={{
                   subTotal: rec.subTotal,
+                  taxRate: getBillTaxRate(rec, items),
                   taxTotal: rec.taxTotal,
                   discountTotal: rec.discountTotal,
                   grandTotal: rec.grandTotal,
@@ -222,7 +224,7 @@ export default function PartyBillModal({
                   <div className="flex justify-between"><span>Subtotal</span><span>{money(rec.subTotal)}</span></div>
                 ) : null}
                 {Number(rec.taxTotal || 0) > 0 ? (
-                  <div className="flex justify-between"><span>Tax</span><span>{money(rec.taxTotal)}</span></div>
+                  <div className="flex justify-between"><span>{formatTaxLabel(getBillTaxRate(rec, items))}</span><span>{money(rec.taxTotal)}</span></div>
                 ) : null}
                 {Number(rec.discountTotal || rec.discount || 0) > 0 ? (
                   <div className="flex justify-between text-rose-600 font-medium">

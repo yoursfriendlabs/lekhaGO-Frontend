@@ -1,4 +1,5 @@
 import { formatCurrency } from '../../lib/money/currency';
+import { formatTaxLabel } from '../../lib/money/taxLabel';
 
 function money(val) {
   return formatCurrency(val);
@@ -139,7 +140,7 @@ export default function ThermalReceipt({
         )}
         {totals.taxTotal !== undefined && Number(totals.taxTotal) > 0 && (
           <div className="flex justify-between">
-            <span>Tax:</span>
+            <span>{formatTaxLabel(totals.taxRate)}:</span>
             <span>{money(totals.taxTotal)}</span>
           </div>
         )}
