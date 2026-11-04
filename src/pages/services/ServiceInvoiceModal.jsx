@@ -48,7 +48,7 @@ export default function ServiceInvoiceModal({
                   className={`btn ${!isThermalInvoice ? 'btn-primary bg-primary text-white hover:bg-primary-600' : 'btn-secondary'}`}
                   onClick={() => setIsThermalInvoice(false)}
                 >
-                  Standard Service Bill
+                  Standard A4 Bill
                 </button>
                 <button
                   type="button"
