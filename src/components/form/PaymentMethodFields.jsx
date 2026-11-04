@@ -25,7 +25,7 @@ export default function PaymentMethodFields({
   noteLabel,
   notePlaceholder,
   className = '',
-  variant = 'select',
+  variant = 'segmented',
 }) {
   const { t } = useI18n();
 
