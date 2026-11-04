@@ -6,6 +6,7 @@ import { getCreatorDisplayName } from "@/lib/records";
 import { printElement, printThermalReceipt } from "@/lib/print/print";
 import { getIrdReprintLabel } from "@/lib/compliance/ird";
 import dayjs from "@/lib/dates/datetime";
+import { formatTaxLabel, getBillTaxRate } from "@/lib/money/taxLabel";
 
 export default function SaleInvoiceModal({
   sale,
@@ -129,6 +130,7 @@ export default function SaleInvoiceModal({
                 }))}
                 totals={{
                   subTotal: sale.subTotal,
+                  taxRate: getBillTaxRate(sale, items),
                   taxTotal: sale.taxTotal,
                   discountTotal: sale.discountTotal,
                   grandTotal: sale.grandTotal,
@@ -211,7 +213,7 @@ export default function SaleInvoiceModal({
                   <div className="flex justify-between"><span>Subtotal</span><span>{money(sale.subTotal)}</span></div>
                 ) : null}
                 {Number(sale.taxTotal || 0) > 0 ? (
-                  <div className="flex justify-between"><span>Tax</span><span>{money(sale.taxTotal)}</span></div>
+                  <div className="flex justify-between"><span>{formatTaxLabel(getBillTaxRate(sale, items))}</span><span>{money(sale.taxTotal)}</span></div>
                 ) : null}
                 {Number(sale.discountTotal || sale.discount || 0) > 0 ? (
                   <div className="flex justify-between text-rose-600 font-medium">

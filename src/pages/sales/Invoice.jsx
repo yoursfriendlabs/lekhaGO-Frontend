@@ -12,6 +12,7 @@ import { printElement, printThermalReceipt } from '../../lib/print/print';
 import dayjs, { formatMaybeDate } from '../../lib/dates/datetime';
 import ThermalReceipt from '../../components/print/ThermalReceipt';
 import DateDisplay from '../../components/form/DateDisplay.jsx';
+import { formatTaxLabel, getBillTaxRate } from '../../lib/money/taxLabel';
 
 function fmt(dateStr) {
   return formatMaybeDate(dateStr, 'MMMM D, YYYY');
@@ -40,6 +41,7 @@ export default function Invoice() {
   const isThermalView = searchParams.get('thermal') === '1';
   const dateValue = isSale ? record?.saleDate : record?.purchaseDate;
   const items = record?.PurchaseItems || record?.SaleItems || [];
+  const taxLabel = formatTaxLabel(getBillTaxRate(record, items));
   const isLockedInvoice = isIrdLocked(record);
   // First print of a locked invoice stays unlabeled (original). Later prints show Copy of Original – N.
   const reprintLabel = getIrdReprintLabel(record);
@@ -298,7 +300,7 @@ const partyName = isSale
               )}
               {Number(record.taxTotal || 0) > 0 && (
                 <div className="flex justify-between text-secondary-500">
-                  <span>Tax</span>
+                  <span>{taxLabel}</span>
                   <span>{money(record.taxTotal)}</span>
                 </div>
               )}
@@ -349,6 +351,7 @@ const partyName = isSale
                 totals={{
                   subTotal: record.subTotal,
                   taxTotal: record.taxTotal,
+                  taxRate: getBillTaxRate(record, items),
                   discountTotal: record.discountTotal,
                   serviceChargeTotal: record.serviceChargeTotal,
                   serviceChargeRate: record.serviceChargeRate,
@@ -462,7 +465,7 @@ const partyName = isSale
                   </div>
                 ) : null}
                 {Number(record.taxTotal || 0) > 0 ? (
-                  <div className="flex justify-between"><span>Tax</span><span>{money(record.taxTotal)}</span></div>
+                  <div className="flex justify-between"><span>{taxLabel}</span><span>{money(record.taxTotal)}</span></div>
                 ) : null}
                 <div className="flex justify-between border-t border-black pt-2 text-base font-bold">
                   <span>Grand Total</span><span>{money(record.grandTotal)}</span>

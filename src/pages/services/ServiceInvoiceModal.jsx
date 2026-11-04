@@ -3,6 +3,7 @@ import InvoiceHeader from "@/components/layout/InvoiceHeader";
 import ThermalReceipt from "@/components/print/ThermalReceipt";
 import { getCreatorDisplayName } from "@/lib/records";
 import dayjs from "@/lib/dates/datetime";
+import { formatTaxLabel, getBillTaxRate } from "@/lib/money/taxLabel";
 import { AttachmentStrip } from "./ServiceOrderAttachments.jsx";
 
 export default function ServiceInvoiceModal({
@@ -98,6 +99,7 @@ export default function ServiceInvoiceModal({
                     totals={{
                       subTotal: invoiceTotals.subTotal,
                       taxTotal: invoiceTotals.taxTotal,
+                      taxRate: getBillTaxRate(invoiceOrder, invoiceItems),
                       discountTotal: invoiceTotals.discountTotal,
                       grandTotal: invoiceTotals.grandTotal,
                       amountReceived: invoiceOrder.receivedTotal,
@@ -373,7 +375,7 @@ export default function ServiceInvoiceModal({
                       </div>
                     ) : null}
                     <div className="flex justify-between text-black">
-                      <span>{t("services.taxTotal")}</span>
+                      <span>{formatTaxLabel(getBillTaxRate(invoiceOrder, invoiceItems), t("services.taxTotal"))}</span>
                       <span>{money(invoiceTotals.taxTotal)}</span>
                     </div>
                     {showGoldJewelleryDetails &&
