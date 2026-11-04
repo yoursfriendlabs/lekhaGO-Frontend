@@ -1,4 +1,5 @@
 import { formatCurrency } from '../../lib/money/currency';
+import { formatTaxLabel } from '../../lib/money/taxLabel';
 
 function money(val) {
   return formatCurrency(val);
@@ -14,7 +15,6 @@ export default function ThermalReceipt({
   tableName = '',
   items = [],
   totals = {},
-  notes = '',
   extraFields = [],
   reprintLabel = '',
 }) {
@@ -140,7 +140,7 @@ export default function ThermalReceipt({
         )}
         {totals.taxTotal !== undefined && Number(totals.taxTotal) > 0 && (
           <div className="flex justify-between">
-            <span>Tax:</span>
+            <span>{formatTaxLabel(totals.taxRate)}:</span>
             <span>{money(totals.taxTotal)}</span>
           </div>
         )}
@@ -173,16 +173,6 @@ export default function ThermalReceipt({
                 <span className="text-ink-light">{field.value}</span>
               </div>
             ))}
-          </div>
-        </>
-      )}
-
-      {/* Notes */}
-      {notes && (
-        <>
-          <div className="border-t border-dashed border-black my-2" />
-          <div className="text-[10px] text-ink-light italic whitespace-pre-wrap">
-            Note: {notes}
           </div>
         </>
       )}

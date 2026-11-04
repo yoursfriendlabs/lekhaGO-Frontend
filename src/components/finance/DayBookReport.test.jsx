@@ -116,13 +116,19 @@ describe('DayBookReport', () => {
     }));
   });
 
-  it('narrows the entry list to one account without touching the balances', async () => {
+  it('narrows the figures and the entry list to one account', async () => {
     renderWithProviders(<DayBookReport />, { route: '/app/reports', withAuth: true });
     await waitFor(() => expect(apiMocks.dayBookReport).toHaveBeenCalled());
+    expect(await screen.findByText('+Rs 2,600.00')).toBeTruthy();
+    expect(screen.getByText('Walk-in')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: /Nabil Bank/ }));
 
     await waitFor(() => expect(lastQuery()).toMatchObject({ accountId: 'bank-1' }));
+    // The headline figures are the bank's own, and a cash entry is not listed
+    // even when the server sends it back.
+    expect(await screen.findByText('+Rs 1,300.00')).toBeTruthy();
+    expect(screen.queryByText('Walk-in')).toBeNull();
     // The chosen account shows up as a removable scope, and a second click clears it.
     const chip = await screen.findByRole('button', { name: /^Nabil Bank$/ });
     fireEvent.click(chip);

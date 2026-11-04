@@ -61,6 +61,7 @@ import {
 } from "../../lib/lookups.js";
 import { getIrdReprintLabel, isIrdCancelled, isIrdLocked } from "../../lib/compliance/ird";
 import QuickExpense from "../../components/expenses/QuickExpenses.jsx";
+import { formatTaxLabel, getBillTaxRate } from "../../lib/money/taxLabel";
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -2595,13 +2596,13 @@ setInvoiceOrder(purchase);
                     }))}
                     totals={{
                       subTotal: invoiceOrder.subTotal,
+                      taxRate: getBillTaxRate(invoiceOrder),
                       taxTotal: invoiceOrder.taxTotal,
                       discountTotal: invoiceOrder.discountTotal,
                       grandTotal: invoiceOrder.grandTotal,
                       amountReceived: invoiceOrder.amountReceived,
                       dueAmount: getPurchaseDueAmount(invoiceOrder),
                     }}
-                    notes={invoiceOrder.notes}
                     reprintLabel={invoiceReprintLabel}
                   />
                 </div>
@@ -2718,7 +2719,7 @@ setInvoiceOrder(purchase);
                     )}
                     {Number(invoiceOrder.taxTotal || 0) > 0 && (
                       <div className="flex justify-between text-black">
-                        <span>Tax</span>
+                        <span>{formatTaxLabel(getBillTaxRate(invoiceOrder))}</span>
                         <span>{money(invoiceOrder.taxTotal)}</span>
                       </div>
                     )}

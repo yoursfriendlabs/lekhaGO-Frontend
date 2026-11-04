@@ -450,7 +450,8 @@ function listCache(tags, ttlMs = CACHE_TTL.list, options = {}) {
 }
 
 function mutationConfig(...tags) {
-  return { invalidateTags: uniqueTags(tags.flat()) };
+  // Callers pass detailTags() arrays inside the list, so flatten all the way down.
+  return { invalidateTags: uniqueTags(tags.flat(Infinity)) };
 }
 
 function unwrapList(payload) {

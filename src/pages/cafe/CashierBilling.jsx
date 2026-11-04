@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useId, useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Coffee,
@@ -30,6 +30,45 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { useSnackbar } from '../../lib/snackbar.jsx';
 import { todayISODate } from '../../lib/dates/datetime';
 import { buildPaymentPayload, requiresBankSelection } from '../../lib/money/payments';
+
+const TAX_RATE_PRESETS = [0, 5, 13, 15];
+
+function TaxRateField({ value, onChange }) {
+  const inputId = useId();
+  return (
+    <>
+      <label className="label" htmlFor={inputId}>Tax Rate (%)</label>
+      <input
+        id={inputId}
+        type="number"
+        min="0"
+        max="100"
+        step="0.01"
+        inputMode="decimal"
+        className="input h-10 mt-1"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="0"
+      />
+      <div className="mt-1.5 flex flex-wrap gap-1">
+        {TAX_RATE_PRESETS.map((rate) => (
+          <button
+            key={rate}
+            type="button"
+            onClick={() => onChange(String(rate))}
+            className={`px-2 py-0.5 rounded-lg border text-[11px] font-semibold transition ${
+              Number(value || 0) === rate
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-secondary-200 bg-white text-secondary-600 hover:border-primary'
+            }`}
+          >
+            {rate}%
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
 
 export default function CashierBilling() {
   const { t } = useI18n();
@@ -176,7 +215,7 @@ export default function CashierBilling() {
 
       setActiveSale(fullSale);
       setCheckoutForm({
-        amountReceived: String(correctGrandTotal.toFixed(2)),
+        amountReceived: String(Math.max(correctGrandTotal - Number(fullSale.amountReceived || 0), 0).toFixed(2)),
         discount: String(fullSale.discount || 0),
         taxRate: String(fullSale.taxRate || 0),
         paymentMethod: fullSale.paymentMethod || 'cash',
@@ -223,7 +262,7 @@ export default function CashierBilling() {
     const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
     const discountAmount = Math.max(Number(checkoutForm.discount || 0), 0);
     const beforeTax = Math.max(subTotal - discountAmount, 0);
-    const taxRate = Number(checkoutForm.taxRate || 0);
+    const taxRate = Math.min(Math.max(Number(checkoutForm.taxRate || 0), 0), 100);
     const taxTotal = (beforeTax * taxRate) / 100;
     const grandTotal = beforeTax + taxTotal;
 
@@ -235,11 +274,15 @@ export default function CashierBilling() {
     };
   }, [activeSale, checkoutForm.discount, checkoutForm.taxRate]);
 
+  // A bill can be part paid already; the amount field is only what is collected now.
+  const alreadyPaid = Math.max(Number(activeSale?.amountReceived || 0), 0);
+  const balanceDue = Math.max(computedTotals.grandTotal - alreadyPaid, 0);
+
   const changeAmount = useMemo(() => {
     const received = Number(checkoutForm.amountReceived || 0);
-    const total = computedTotals.grandTotal;
+    const total = balanceDue;
     return Math.max(received - total, 0);
-  }, [checkoutForm.amountReceived, computedTotals.grandTotal]);
+  }, [checkoutForm.amountReceived, balanceDue]);
 
   // Adjust received amount dynamically on discount changes
   const handleDiscountChange = (val) => {
@@ -262,7 +305,7 @@ export default function CashierBilling() {
       return {
         ...prev,
         discount: nextDiscount,
-        amountReceived: String(nextGrand.toFixed(2)),
+        amountReceived: String(Math.max(nextGrand - alreadyPaid, 0).toFixed(2)),
       };
     });
   };
@@ -283,19 +326,19 @@ export default function CashierBilling() {
       const subTotal = items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0);
       const discountAmount = Number(prev.discount || 0);
       const beforeTax = Math.max(subTotal - discountAmount, 0);
-      const nextGrand = beforeTax + (beforeTax * Number(nextTaxRate || 0)) / 100;
+      const nextGrand = beforeTax + (beforeTax * Math.min(Math.max(Number(nextTaxRate || 0), 0), 100)) / 100;
 
       return {
         ...prev,
         taxRate: nextTaxRate,
-        amountReceived: String(nextGrand.toFixed(2)),
+        amountReceived: String(Math.max(nextGrand - alreadyPaid, 0).toFixed(2)),
       };
     });
   };
 
   // Quick cash amount pad calculation
   const quickAmountOptions = useMemo(() => {
-    const total = computedTotals.grandTotal;
+    const total = balanceDue;
     if (total <= 0) return [];
 
     const options = [{ label: 'Exact', value: total }];
@@ -313,7 +356,7 @@ export default function CashierBilling() {
     if (round1000 > round500) options.push({ label: `Rs. ${round1000}`, value: round1000 });
 
     return options;
-  }, [computedTotals.grandTotal]);
+  }, [balanceDue]);
 
   // Complete Payment & Vacate Seating
   const handleCheckout = async (e) => {
@@ -321,6 +364,12 @@ export default function CashierBilling() {
     if (submitting || !activeSale) return;
 
     const received = Number(checkoutForm.amountReceived || 0);
+
+    const hasCustomer = Boolean(activeSale.partyId || activeSale.Party?.id);
+    if (!hasCustomer && alreadyPaid + received + 0.009 < computedTotals.grandTotal) {
+      setStatus({ type: 'error', message: t('quickPos.walkInDueBlocked') });
+      return;
+    }
 
     if (requiresBankSelection(checkoutForm, received)) {
       setStatus({ type: 'error', message: 'Please select a bank account for bank transactions.' });
@@ -331,8 +380,9 @@ export default function CashierBilling() {
       setSubmitting(true);
       setStatus({ type: 'info', message: '' });
 
-      const isPaidBill = received >= computedTotals.grandTotal;
-      const apiAmountReceived = isPaidBill ? computedTotals.grandTotal : received;
+      const totalPaid = alreadyPaid + received;
+      const isPaidBill = totalPaid >= computedTotals.grandTotal;
+      const apiAmountReceived = isPaidBill ? computedTotals.grandTotal : totalPaid;
 
       const paymentPayload = {
         paymentMethod: checkoutForm.paymentMethod,
@@ -351,7 +401,7 @@ export default function CashierBilling() {
         amountReceived: apiAmountReceived,
         discount: computedTotals.discountTotal,
         discountTotal: computedTotals.discountTotal,
-        taxRate: Number(checkoutForm.taxRate || 0),
+        taxRate: Math.min(Math.max(Number(checkoutForm.taxRate || 0), 0), 100),
         taxTotal: computedTotals.taxTotal,
         grandTotal: computedTotals.grandTotal,
         subTotal: computedTotals.subTotal,
@@ -482,7 +532,7 @@ export default function CashierBilling() {
           tone="default"
         />
         <StatsCard
-          title="Active Tables"
+          title="Occupied Tables"
           value={stats.occupied}
           icon={Clock}
           tone="warning"
@@ -824,17 +874,7 @@ export default function CashierBilling() {
                   />
                 </div>
                 <div>
-                  <label className="label">Tax Rate (%)</label>
-                  <select
-                    className="input h-10 mt-1"
-                    value={checkoutForm.taxRate}
-                    onChange={(e) => handleTaxRateChange(e.target.value)}
-                  >
-                    <option value="0">0% (No Tax)</option>
-                    <option value="5">5%</option>
-                    <option value="13">13% (VAT)</option>
-                    <option value="15">15%</option>
-                  </select>
+                  <TaxRateField value={checkoutForm.taxRate} onChange={handleTaxRateChange} />
                 </div>
               </div>
 
@@ -860,6 +900,18 @@ export default function CashierBilling() {
                   <span>Grand Total</span>
                   <span className="text-primary">{formatMoney(computedTotals.grandTotal)}</span>
                 </div>
+                {alreadyPaid > 0 && (
+                  <>
+                    <div className="flex justify-between text-emerald-700 font-medium">
+                      <span>Already Paid</span>
+                      <span>-{formatMoney(alreadyPaid)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-ink">
+                      <span>Balance Due</span>
+                      <span>{formatMoney(balanceDue)}</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Financial Transaction Input */}
@@ -867,7 +919,7 @@ export default function CashierBilling() {
                 <p className="text-xs font-bold uppercase tracking-wide text-secondary-400">Payment Collection</p>
 
                 <div className="space-y-1.5">
-                  <label className="label">Amount Received</label>
+                  <label className="label">{alreadyPaid > 0 ? "Collect Now" : "Amount Received"}</label>
                   <div className="flex w-full items-center overflow-hidden rounded-xl border border-secondary-200 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition">
                     <span className="flex h-11 items-center bg-secondary-100 px-3.5 text-sm font-semibold text-secondary-500 border-r border-secondary-200 shrink-0">
                       {t("currency.symbol") || "Rs"}
@@ -1107,17 +1159,7 @@ export default function CashierBilling() {
                     />
                   </div>
                   <div>
-                    <label className="label">Tax Rate (%)</label>
-                    <select
-                      className="input h-10 mt-1"
-                      value={checkoutForm.taxRate}
-                      onChange={(e) => handleTaxRateChange(e.target.value)}
-                    >
-                      <option value="0">0% (No Tax)</option>
-                      <option value="5">5%</option>
-                      <option value="13">13% (VAT)</option>
-                      <option value="15">15%</option>
-                    </select>
+                    <TaxRateField value={checkoutForm.taxRate} onChange={handleTaxRateChange} />
                   </div>
                 </div>
 
@@ -1143,6 +1185,18 @@ export default function CashierBilling() {
                     <span>Grand Total</span>
                     <span className="text-primary">{formatMoney(computedTotals.grandTotal)}</span>
                   </div>
+                  {alreadyPaid > 0 && (
+                    <>
+                      <div className="flex justify-between text-emerald-700 font-medium">
+                        <span>Already Paid</span>
+                        <span>-{formatMoney(alreadyPaid)}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-ink">
+                        <span>Balance Due</span>
+                        <span>{formatMoney(balanceDue)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Financial Transaction Input */}
@@ -1150,7 +1204,7 @@ export default function CashierBilling() {
                   <p className="text-xs font-bold uppercase tracking-wide text-secondary-400">Payment Collection</p>
 
                   <div className="space-y-1.5">
-                    <label className="label">Amount Received</label>
+                    <label className="label">{alreadyPaid > 0 ? "Collect Now" : "Amount Received"}</label>
                     <div className="flex w-full items-center overflow-hidden rounded-xl border border-secondary-200 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10 transition">
                       <span className="flex h-11 items-center bg-secondary-100 px-3.5 text-sm font-semibold text-secondary-500 border-r border-secondary-200 shrink-0">
                         {t("currency.symbol") || "Rs"}
