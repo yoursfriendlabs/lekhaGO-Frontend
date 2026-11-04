@@ -2601,7 +2601,6 @@ setInvoiceOrder(purchase);
                       amountReceived: invoiceOrder.amountReceived,
                       dueAmount: getPurchaseDueAmount(invoiceOrder),
                     }}
-                    notes={invoiceOrder.notes}
                     reprintLabel={invoiceReprintLabel}
                   />
                 </div>

@@ -357,7 +357,6 @@ const partyName = isSale
                   amountReceived: totalReceived,
                   dueAmount: dueAmount,
                 }}
-                notes={record.notes}
                 reprintLabel={reprintLabel}
               />
             </div>

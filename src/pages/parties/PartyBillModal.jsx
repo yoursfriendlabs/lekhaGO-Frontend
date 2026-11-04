@@ -144,7 +144,6 @@ export default function PartyBillModal({
                   amountReceived: received,
                   dueAmount: dueAmount,
                 }}
-                notes={rec.notes}
                 reprintLabel={reprintLabel}
               />
             </div>
