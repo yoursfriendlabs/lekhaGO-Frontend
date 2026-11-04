@@ -365,6 +365,12 @@ export default function CashierBilling() {
 
     const received = Number(checkoutForm.amountReceived || 0);
 
+    const hasCustomer = Boolean(activeSale.partyId || activeSale.Party?.id);
+    if (!hasCustomer && alreadyPaid + received + 0.009 < computedTotals.grandTotal) {
+      setStatus({ type: 'error', message: t('quickPos.walkInDueBlocked') });
+      return;
+    }
+
     if (requiresBankSelection(checkoutForm, received)) {
       setStatus({ type: 'error', message: 'Please select a bank account for bank transactions.' });
       return;

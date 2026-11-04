@@ -1213,6 +1213,17 @@ export default function QuickPos() {
         ? totals.grandTotal
         : Math.min(Math.max(Number(checkoutForm.amountReceived || 0), 0), totals.grandTotal);
 
+    // Credit is tracked against a customer, so a walk-in sale cannot stay due.
+    // Table orders are the exception: they stay open until the billing counter.
+    if (
+      !selectedParty?.id &&
+      !checkoutForm.tableId &&
+      resolvedReceivedAmount + 0.009 < totals.grandTotal
+    ) {
+      setStatus({ type: "error", message: t("quickPos.walkInDueBlocked") });
+      return;
+    }
+
     if (requiresBankSelection(checkoutForm, resolvedReceivedAmount)) {
       setStatus({ type: "error", message: bankRequiredMessage });
       return;
