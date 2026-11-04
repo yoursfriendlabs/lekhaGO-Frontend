@@ -765,6 +765,11 @@ export default function Sales() {
       setStatus({ type: 'error', message: t('payments.bankRequired') });
       return;
     }
+    // Credit is tracked against a customer, so a walk-in sale cannot stay due.
+    if (!header.partyId && receivedAmount + 0.009 < Number(totals.grandTotal || 0)) {
+      setStatus({ type: 'error', message: t('quickPos.walkInDueBlocked') });
+      return;
+    }
 
     try {
       setSavingSale(true);

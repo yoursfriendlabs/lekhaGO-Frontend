@@ -69,10 +69,11 @@ function downloadCsv(rows, filename) {
  * reads cash in hand and every bank balance from one screen.
  *
  * Two rules hold throughout. Balances and charts always cover the whole span,
- * because a balance that honoured a search box would not be a balance. The
- * entry list underneath is the only thing the filters touch — which is why the
- * money in and money out figures double as the direction filter, and the
- * account cards double as the account filter.
+ * because a balance that honoured a search box would not be a balance. Picking
+ * an account narrows the headline figures and the entry list to that account;
+ * search and direction only ever touch the entry list — which is why the money
+ * in and money out figures double as the direction filter, and the account
+ * cards double as the account filter.
  */
 export default function DayBookReport() {
   const { t } = useI18n();
@@ -178,8 +179,16 @@ export default function DayBookReport() {
   };
 
   const accounts = report.accounts || [];
-  const totals = report.totals || EMPTY_REPORT.totals;
-  const entries = report.entries || [];
+  const selectedAccount = accountId ? accounts.find((account) => account.id === accountId) : null;
+  // With an account picked, the headline figures are that account's own.
+  const totals = selectedAccount
+    ? { ...EMPTY_GROUP, ...selectedAccount }
+    : report.totals || EMPTY_REPORT.totals;
+  // Older servers ignore accountId and direction, so hold the list to them here too.
+  const entries = (report.entries || []).filter((entry) => (
+    (!accountId || entry.accountId === accountId)
+    && (!direction || entry.kind === direction)
+  ));
   const isRange = Boolean(report.from && report.to && report.from !== report.to);
   // A bank's stored balance is a live figure, so it only lines up with a
   // closing balance when the span ends today.

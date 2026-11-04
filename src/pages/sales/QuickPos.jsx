@@ -40,6 +40,7 @@ import { useSaleStore } from "../../stores/sales";
 import {
   checkNewAndReadyOrders,
   isCafeOrderFlowEnabled,
+  normalizeCafeOrderStatus,
 } from "../../lib/business/cafeOrders.js";
 import SaleInvoiceModal from "./SaleInvoiceModal.jsx";
 import {
@@ -181,6 +182,7 @@ const MOBILE_PRODUCT_PAGE_SIZE = 9;
 export default function QuickPos() {
   const [searchParams] = useSearchParams();
   const queryTableId = searchParams.get("tableId") || "";
+  const querySaleId = searchParams.get("saleId") || "";
   const queryRef = searchParams.get("ref") || "";
   const queryCheckout = searchParams.get("checkout") || "";
 
@@ -219,9 +221,13 @@ export default function QuickPos() {
   const [selectedStatusFilter, setSelectedStatusFilter] = useState("all");
   const [activeTableId, setActiveTableId] = useState("");
   const [editingId, setEditingId] = useState(null);
+  // Status of the saved order in the cart. Auto-save writes amountReceived 0,
+  // so it must only ever touch orders that are still due.
+  const editingSaleStatusRef = useRef("");
   const [tableSelectorOpen, setTableSelectorOpen] = useState(false);
   const [activeSessionOption, setActiveSessionOption] = useState(() => {
     if (queryTableId) return "dine_in";
+    if (querySaleId) return "takeaway";
     return null;
   });
   const [deliveryFormOpen, setDeliveryFormOpen] = useState(false);
@@ -432,6 +438,71 @@ export default function QuickPos() {
     setTableSelectorOpen(false);
   };
 
+  // Puts a saved order back into the cart so it can be changed and saved again.
+  const applySaleToPos = (fullSale, tableId) => {
+    if (
+      fullSale?.isLocked === true ||
+      fullSale?.isLocked === "true" ||
+      fullSale?.isLocked === 1
+    ) {
+      ignoreAutoSaveRef.current = true;
+      setCart([]);
+      setEditingId(null);
+      setDeletedItemIds([]);
+      showError(
+        "This IRD tax invoice is locked and cannot be edited from POS.",
+      );
+      return false;
+    }
+    const saleItems = fullSale?.SaleItems || [];
+
+    const mappedCart = saleItems.map((item) => {
+      const product = productsById[String(item.productId)];
+      const uPrice = String(item.unitPrice || 0);
+      return {
+        id: item.id,
+        productId: item.productId,
+        name: product?.name || item.productName || "Unknown Product",
+        categoryName: product?.categoryName || "",
+        quantity: Number(item.quantity || 0),
+        unitType: item.unitType || "primary",
+        unitPrice: uPrice,
+        taxRate: Number(item.taxRate || 0),
+        lineTotal: Number(item.lineTotal || 0).toFixed(2),
+        primaryUnit: product?.primaryUnit || "",
+        secondaryUnit: product?.secondaryUnit || "",
+        conversionRate: Number(
+          item.conversionRate || product?.conversionRate || 0,
+        ),
+        secondarySalePrice: Number(product?.secondarySalePrice || 0),
+        salePrice: Number(product?.salePrice || product?.sellingPrice || 0),
+        stockOnHand: Number(product?.stockOnHand || 0),
+      };
+    });
+
+    ignoreAutoSaveRef.current = true;
+    editingSaleStatusRef.current = fullSale.status || "";
+    setEditingId(fullSale.id);
+    setCart(mappedCart);
+    setDeletedItemIds([]);
+
+    setCheckoutForm({
+      saleDate: fullSale.saleDate || todayISODate(),
+      invoiceNo: fullSale.invoiceNo || "",
+      notes: fullSale.notes || "",
+      discount: fullSale.discount ? String(fullSale.discount) : "",
+      amountReceived: String(fullSale.amountReceived || 0),
+      paymentMethod: fullSale.paymentMethod || "cash",
+      bankId: fullSale.bankId || "",
+      paymentNote: fullSale.paymentNote || "",
+      tableId: tableId ? String(tableId) : "",
+    });
+    setActiveAttributes(fullSale?.attributes || {});
+    const party = fullSale?.Party || fullSale?.party;
+    setSelectedParty(party?.id ? party : null);
+    return true;
+  };
+
   const handleTableChange = async (tableId) => {
     setActiveTableId(tableId);
     setCheckoutForm((prev) => ({ ...prev, tableId }));
@@ -447,75 +518,30 @@ export default function QuickPos() {
 
     setLoading(true);
     try {
-      const activeSales = await api.listSales({ limit: 120 });
-      const activeOrder = (activeSales?.items || []).find(
-        (sale) =>
-          String(sale.tableId) === String(tableId) && sale.status === "due",
+      const activeSales = await api.listSales({ limit: 120 }, { force: true });
+      const tableSales = (activeSales?.items || []).filter(
+        (sale) => String(sale.tableId) === String(tableId),
       );
+      const tableIsOccupied =
+        allTables.find((table) => String(table.id) === String(tableId))
+          ?.status === "occupied";
+      // An unpaid order first. Failing that, an occupied table still shows the
+      // order sitting on it, even if it was paid when it was placed.
+      const activeOrder =
+        tableSales.find((sale) => sale.status === "due") ||
+        (tableIsOccupied
+          ? tableSales.find(
+              (sale) =>
+                sale.status !== "cancelled" &&
+                normalizeCafeOrderStatus(sale.attributes?.order_status) !==
+                  "completed",
+            )
+          : null);
 
       if (activeOrder) {
-        const fullSale = await api.getSale(activeOrder.id);
-        if (
-          fullSale?.isLocked === true ||
-          fullSale?.isLocked === "true" ||
-          fullSale?.isLocked === 1
-        ) {
-          ignoreAutoSaveRef.current = true;
-          setCart([]);
-          setEditingId(null);
-          setDeletedItemIds([]);
-          showError(
-            "This IRD tax invoice is locked and cannot be edited from POS.",
-          );
-          return;
-        }
-        const saleItems = fullSale?.SaleItems || [];
-
-        const mappedCart = saleItems.map((item) => {
-          const product = productsById[String(item.productId)];
-          const uPrice = String(item.unitPrice || 0);
-          return {
-            id: item.id,
-            productId: item.productId,
-            name: product?.name || item.productName || "Unknown Product",
-            categoryName: product?.categoryName || "",
-            quantity: Number(item.quantity || 0),
-            unitType: item.unitType || "primary",
-            unitPrice: uPrice,
-            taxRate: Number(item.taxRate || 0),
-            lineTotal: Number(item.lineTotal || 0).toFixed(2),
-            primaryUnit: product?.primaryUnit || "",
-            secondaryUnit: product?.secondaryUnit || "",
-            conversionRate: Number(
-              item.conversionRate || product?.conversionRate || 0,
-            ),
-            secondarySalePrice: Number(product?.secondarySalePrice || 0),
-            salePrice: Number(product?.salePrice || product?.sellingPrice || 0),
-            stockOnHand: Number(product?.stockOnHand || 0),
-          };
-        });
-
-        ignoreAutoSaveRef.current = true;
-        setEditingId(activeOrder.id);
-        setCart(mappedCart);
-        setDeletedItemIds([]);
-
-        setCheckoutForm({
-          saleDate: fullSale.saleDate || todayISODate(),
-          invoiceNo: fullSale.invoiceNo || "",
-          notes: fullSale.notes || "",
-          discount: fullSale.discount ? String(fullSale.discount) : "",
-          amountReceived: String(fullSale.amountReceived || 0),
-          paymentMethod: fullSale.paymentMethod || "cash",
-          bankId: fullSale.bankId || "",
-          paymentNote: fullSale.paymentNote || "",
-          tableId: String(tableId),
-        });
-        setActiveAttributes(fullSale?.attributes || {});
+        applySaleToPos(await api.getSale(activeOrder.id), tableId);
       } else {
-        await api
-          .updateTable(tableId, { status: "occupied" })
-          .catch(() => null);
+        // Opening an empty table does not occupy it; the first saved item does.
         ignoreAutoSaveRef.current = true;
         setCart([]);
         setEditingId(null);
@@ -542,6 +568,32 @@ export default function QuickPos() {
       }
     }
   }, [businessProfile]);
+
+  // Editing from the cafe orders board: open that exact order, including
+  // takeaway and delivery orders that have no table to look it up by.
+  useEffect(() => {
+    if (!querySaleId || queryTableId || products.length === 0) return;
+    let active = true;
+    setLoading(true);
+    api
+      .getSale(querySaleId)
+      .then((fullSale) => {
+        if (!active || !fullSale?.id) return;
+        const tableId = fullSale.tableId ? String(fullSale.tableId) : "";
+        setActiveSessionOption(
+          tableId ? "dine_in" : fullSale.attributes?.order_type === "delivery" ? "delivery" : "takeaway",
+        );
+        setActiveTableId(tableId);
+        applySaleToPos(fullSale, tableId);
+      })
+      .catch((err) => showError(err.message || "Failed to load the order."))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [querySaleId, queryTableId, products.length]);
 
   useEffect(() => {
     if (queryTableId && allTables.length > 0 && products.length > 0) {
@@ -775,6 +827,7 @@ export default function QuickPos() {
       const currentSelectedParty = selectedPartyRef.current;
 
       if (currentSubmitting || !currentActiveTableId) return;
+      if (currentEditingId && editingSaleStatusRef.current !== "due") return;
 
       try {
         if (currentCart.length === 0) {
@@ -879,7 +932,11 @@ export default function QuickPos() {
           const created = await api.createSale(payload);
           useSaleStore.getState().invalidate();
           if (created?.id) {
+            editingSaleStatusRef.current = "due";
             setEditingId(created.id);
+            await api
+              .updateTable(currentActiveTableId, { status: "occupied" })
+              .catch(() => null);
             if (created?.SaleItems) {
               setCart((prevCart) =>
                 prevCart.map((cartItem) => {
@@ -1155,6 +1212,17 @@ export default function QuickPos() {
       : isPaid
         ? totals.grandTotal
         : Math.min(Math.max(Number(checkoutForm.amountReceived || 0), 0), totals.grandTotal);
+
+    // Credit is tracked against a customer, so a walk-in sale cannot stay due.
+    // Table orders are the exception: they stay open until the billing counter.
+    if (
+      !selectedParty?.id &&
+      !checkoutForm.tableId &&
+      resolvedReceivedAmount + 0.009 < totals.grandTotal
+    ) {
+      setStatus({ type: "error", message: t("quickPos.walkInDueBlocked") });
+      return;
+    }
 
     if (requiresBankSelection(checkoutForm, resolvedReceivedAmount)) {
       setStatus({ type: "error", message: bankRequiredMessage });
