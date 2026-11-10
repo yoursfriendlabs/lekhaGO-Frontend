@@ -39,8 +39,8 @@ import { useProductStore } from "../../stores/products";
 import { useSaleStore } from "../../stores/sales";
 import {
   checkNewAndReadyOrders,
+  findActiveTableOrder,
   isCafeOrderFlowEnabled,
-  normalizeCafeOrderStatus,
 } from "../../lib/business/cafeOrders.js";
 import SaleInvoiceModal from "./SaleInvoiceModal.jsx";
 import {
@@ -525,18 +525,9 @@ export default function QuickPos() {
       const tableIsOccupied =
         allTables.find((table) => String(table.id) === String(tableId))
           ?.status === "occupied";
-      // An unpaid order first. Failing that, an occupied table still shows the
-      // order sitting on it, even if it was paid when it was placed.
-      const activeOrder =
-        tableSales.find((sale) => sale.status === "due") ||
-        (tableIsOccupied
-          ? tableSales.find(
-              (sale) =>
-                sale.status !== "cancelled" &&
-                normalizeCafeOrderStatus(sale.attributes?.order_status) !==
-                  "completed",
-            )
-          : null);
+      const activeOrder = findActiveTableOrder(tableSales, tableId, {
+        occupied: tableIsOccupied,
+      });
 
       if (activeOrder) {
         applySaleToPos(await api.getSale(activeOrder.id), tableId);

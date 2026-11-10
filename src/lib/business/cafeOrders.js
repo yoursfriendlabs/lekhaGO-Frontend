@@ -161,6 +161,25 @@ export function buildCafeTableMap(orders = [], tables = getDefaultCafeTables()) 
   });
 }
 
+/**
+ * The order sitting on a table: an unpaid one first. Failing that, an occupied
+ * table still shows its open order, even if it was paid when it was placed.
+ */
+export function findActiveTableOrder(sales = [], tableId, { occupied = false } = {}) {
+  if (!tableId) return null;
+  const tableSales = sales.filter((sale) => String(sale.tableId) === String(tableId));
+  const dueOrder = tableSales.find((sale) => sale.status === 'due');
+  if (dueOrder) return dueOrder;
+  if (!occupied) return null;
+  return (
+    tableSales.find(
+      (sale) =>
+        sale.status !== 'cancelled' &&
+        normalizeCafeOrderStatus(sale.attributes?.order_status) !== 'completed',
+    ) || null
+  );
+}
+
 export function getNextCafeOrderStatus(status) {
   const currentIndex = CAFE_ORDER_STATUSES.findIndex((entry) => entry.value === normalizeCafeOrderStatus(status));
   if (currentIndex === -1) return null;

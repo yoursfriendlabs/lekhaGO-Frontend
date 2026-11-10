@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkNewAndReadyOrders, isCafeOrderFlowEnabled } from './cafeOrders';
+import { checkNewAndReadyOrders, findActiveTableOrder, isCafeOrderFlowEnabled } from './cafeOrders';
 import { getDefaultBusinessProfile } from './businessProfile';
 
 describe('cafe order flow gate', () => {
@@ -35,5 +35,26 @@ describe('kitchen notifications', () => {
     ]);
 
     expect(messages.map((entry) => entry.type)).toEqual(['kitchen', 'waiter']);
+  });
+});
+
+describe('active table order', () => {
+  const paidOpen = { id: 'a', tableId: 't1', status: 'paid', attributes: { order_status: 'new' } };
+  const paidDone = { id: 'b', tableId: 't1', status: 'paid', attributes: { order_status: 'completed' } };
+  const due = { id: 'c', tableId: 't1', status: 'due', attributes: { order_status: 'ready' } };
+
+  it('finds an order paid when it was placed on an occupied table', () => {
+    expect(findActiveTableOrder([paidDone, paidOpen], 't1', { occupied: true })).toBe(paidOpen);
+  });
+
+  it('prefers the unpaid order', () => {
+    expect(findActiveTableOrder([paidOpen, due], 't1', { occupied: true })).toBe(due);
+    expect(findActiveTableOrder([due], 't1')).toBe(due);
+  });
+
+  it('ignores completed orders and other tables', () => {
+    expect(findActiveTableOrder([paidDone], 't1', { occupied: true })).toBeNull();
+    expect(findActiveTableOrder([paidOpen], 't2', { occupied: true })).toBeNull();
+    expect(findActiveTableOrder([paidOpen], 't1')).toBeNull();
   });
 });
