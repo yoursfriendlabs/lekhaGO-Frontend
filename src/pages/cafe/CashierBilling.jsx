@@ -28,10 +28,22 @@ import { useAuth } from '../../lib/auth';
 import { useBusinessSettings } from '../../lib/business/businessSettings.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useSnackbar } from '../../lib/snackbar.jsx';
+import { useSSEEvent, SSE_EVENTS } from '../../hooks/useSSE.js';
+import { findActiveTableOrder, getCafeOrderAttributes, getCafeOrderStatusMeta } from '../../lib/business/cafeOrders.js';
 import { todayISODate } from '../../lib/dates/datetime';
 import { buildPaymentPayload, requiresBankSelection } from '../../lib/money/payments';
 
 const TAX_RATE_PRESETS = [0, 5, 13, 15];
+
+// A sale can carry the same product twice; the counter shows each once.
+function uniqueSaleItems(items = []) {
+  const seen = new Set();
+  return items.filter((item) => {
+    if (seen.has(item.productId)) return false;
+    seen.add(item.productId);
+    return true;
+  });
+}
 
 function TaxRateField({ value, onChange }) {
   const inputId = useId();
@@ -110,13 +122,13 @@ export default function CashierBilling() {
   const [cancellingOrderId, setCancellingOrderId] = useState('');
 
   // Load Tables & Active Unpaid Sales
-  const loadData = async () => {
+  const loadData = async ({ silent = false } = {}) => {
     if (!businessId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const [tablesResponse, salesResponse, categoriesResponse] = await Promise.all([
         api.getTables({ isActive: 'true', limit: 100 }),
-        api.listSales({ limit: 120 }),
+        api.listSales({ limit: 120, includeItems: 'true' }),
         api.listCategories({ type: 'table', limit: 100 }).catch(() => null),
       ]);
 
@@ -124,8 +136,7 @@ export default function CashierBilling() {
       setTables(Array.isArray(items) ? items : []);
 
       const saleItems = salesResponse?.items || salesResponse || [];
-      const dueSales = Array.isArray(saleItems) ? saleItems.filter((s) => s.status === 'due') : [];
-      setSales(dueSales);
+      setSales(Array.isArray(saleItems) ? saleItems : []);
 
       setFloors(categoriesResponse?.items || []);
     } catch (err) {
@@ -139,10 +150,14 @@ export default function CashierBilling() {
     loadData();
   }, [businessId]);
 
-  // Map Tables with their corresponding Active Unpaid Sales
+  useSSEEvent(SSE_EVENTS.SALES_CHANGED, () => {
+    if (!submitting) loadData({ silent: true });
+  });
+
+  // Each table with the order sitting on it — unpaid, or paid when placed but not yet completed
   const tableMap = useMemo(() => {
     return tables.map((table) => {
-      const activeSale = sales.find((s) => String(s.tableId) === String(table.id));
+      const activeSale = findActiveTableOrder(sales, table.id, { occupied: table.status === 'occupied' });
       return {
         ...table,
         activeSale,
@@ -156,7 +171,9 @@ export default function CashierBilling() {
     const total = tableMap.length;
     const occupied = tableMap.filter((t) => t.occupied).length;
     const vacant = total - occupied;
-    const openBillAmount = sales.reduce((sum, s) => sum + Number(s.dueAmount || s.grandTotal || 0), 0);
+    const openBillAmount = sales
+      .filter((s) => s.status === 'due')
+      .reduce((sum, s) => sum + Number(s.dueAmount || s.grandTotal || 0), 0);
 
     return { total, occupied, vacant, openBillAmount };
   }, [tableMap, sales]);
@@ -507,7 +524,7 @@ export default function CashierBilling() {
         subtitle="Manage checkouts, collect payments, and vacate cafe tables in real time."
         action={
           <button
-            onClick={loadData}
+            onClick={() => loadData()}
             disabled={loading}
             className="btn-secondary h-11 px-4 gap-2 flex items-center justify-center rounded-2xl"
           >
@@ -651,13 +668,20 @@ export default function CashierBilling() {
               {filteredTables.map((table) => {
                 const isSelected = selectedTable?.id === table.id;
                 const hasOrder = Boolean(table.activeSale);
-                const orderAmount = table.activeSale?.dueAmount || table.activeSale?.grandTotal || 0;
+                const isPaidOrder = table.activeSale?.status === 'paid';
+                const orderAmount = isPaidOrder
+                  ? table.activeSale.grandTotal || 0
+                  : table.activeSale?.dueAmount || table.activeSale?.grandTotal || 0;
+                const orderItems = uniqueSaleItems(table.activeSale?.SaleItems || []);
+                const orderStatusMeta = hasOrder
+                  ? getCafeOrderStatusMeta(getCafeOrderAttributes(table.activeSale).orderStatus)
+                  : null;
 
                 return (
                   <button
                     key={table.id}
                     onClick={() => handleSelectTable(table)}
-                    className={`card bg-white p-5 border text-left flex flex-col justify-between h-40 transition relative group ${
+                    className={`card bg-white p-5 border text-left flex flex-col justify-between min-h-40 transition relative group ${
                       isSelected
                         ? 'border-primary ring-2 ring-primary/20 shadow-md'
                         : table.occupied
@@ -691,12 +715,37 @@ export default function CashierBilling() {
                           </span>
                         </div>
                       </div>
+
+                      {hasOrder && (
+                        <div className="mt-3 space-y-1.5">
+                          {orderStatusMeta && (
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold border ${orderStatusMeta.tone}`}>
+                              {orderStatusMeta.label}
+                            </span>
+                          )}
+                          {orderItems.length > 0 && (
+                            <ul className="space-y-0.5 text-xs text-secondary-600">
+                              {orderItems.slice(0, 3).map((item) => (
+                                <li key={item.id} className="truncate">
+                                  <span className="font-semibold text-ink">{Number(item.quantity || 0)}x</span>{' '}
+                                  {item.Product?.name || item.productName || item.name || 'Item'}
+                                </li>
+                              ))}
+                              {orderItems.length > 3 && (
+                                <li className="font-semibold text-primary">+{orderItems.length - 3} more</li>
+                              )}
+                            </ul>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-4 border-t border-slate-50 pt-3 flex items-center justify-between w-full">
                       {hasOrder ? (
                         <div>
-                          <p className="text-[9px] uppercase tracking-wider text-secondary-400 font-semibold">Active Bill</p>
+                          <p className={`text-[9px] uppercase tracking-wider font-semibold ${isPaidOrder ? 'text-emerald-600' : 'text-secondary-400'}`}>
+                            {isPaidOrder ? 'Paid' : 'Active Bill'}
+                          </p>
                           <p className="text-base font-bold text-ink">{formatMoney(orderAmount)}</p>
                         </div>
                       ) : table.occupied ? (
