@@ -52,7 +52,7 @@ export default function GuestStatementSheet({ stay, folio, sheetRef }) {
         <p><strong>{L('hotel.board.room', 'Room')}:</strong> {stayRoomName(stay) || '—'}</p>
         <p><strong>{L('hotel.booking.checkIn', 'Check-in')}:</strong> {displayDate(checkIn)}</p>
         <p><strong>{L('hotel.booking.checkOut', 'Check-out')}:</strong> {displayDate(checkOut)}</p>
-        <p><strong>{L('hotel.booking.nights', 'Nights')}:</strong> {nights}</p>
+        <p><strong>{L('hotel.booking.nightsLabel', 'Nights')}:</strong> {nights}</p>
         {stay?.guestPhone || stay?.party?.phone ? (
           <p><strong>{L('hotel.booking.guestPhone', 'Phone')}:</strong> {stay.guestPhone || stay.party.phone}</p>
         ) : null}

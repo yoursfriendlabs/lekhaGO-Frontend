@@ -1903,11 +1903,11 @@ export const api = {
       listCache(["restaurant-kitchen"], CACHE_TTL.short, options),
     ),
   getRestaurantVoidsReport: (params = {}) =>
-    request("/api/restaurant/reports/voids", { params }),
+    request(buildListPath("/api/restaurant/reports/voids", params)),
   getRestaurantFoodCostReport: (params = {}) =>
-    request("/api/restaurant/reports/food-cost", { params }),
+    request(buildListPath("/api/restaurant/reports/food-cost", params)),
   getRestaurantWaitersReport: (params = {}) =>
-    request("/api/restaurant/reports/waiters", { params }),
+    request(buildListPath("/api/restaurant/reports/waiters", params)),
 
   // --- Hotel business type (only call when isHotelBusiness) ---
   getHotelRoomTypes: (params = {}, options = {}) =>
@@ -1976,7 +1976,7 @@ export const api = {
       listCache(["hotel-board", "hotel-stays"], CACHE_TTL.short, options),
     ),
   getHotelAvailability: (params = {}) =>
-    request("/api/hotel/availability", { params }),
+    request(buildListPath("/api/hotel/availability", params)),
   getHotelHousekeeping: (params = {}, options = {}) =>
     listRequest(
       "/api/hotel/housekeeping",
@@ -2109,9 +2109,9 @@ export const api = {
       ]),
     ),
   getHotelGuestRegister: (params = {}) =>
-    request("/api/hotel/guest-register", { params }),
+    request(buildListPath("/api/hotel/guest-register", params)),
   getHotelOccupancyReport: (params = {}) =>
-    request("/api/hotel/reports/occupancy", { params }),
+    request(buildListPath("/api/hotel/reports/occupancy", params)),
 };
 
 export { toQueryKey };

@@ -188,7 +188,7 @@ export function roomRate(room) {
 
 export function roomOptionLabel(t, room) {
   const typeName = room?.roomTypeName || room?.roomType?.name || '';
-  return [room?.name, typeName, money(t, roomRate(room))].filter(Boolean).join(' · ');
+  return [room?.name, typeName, money(t, roomRate(room))].filter(Boolean).join(' Â· ');
 }
 
 export function stayRoomName(stay) {

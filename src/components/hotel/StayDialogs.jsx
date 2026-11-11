@@ -547,11 +547,19 @@ export function DatesDialog({ stay, onClose, onDone }) {
     >
       <div>
         <label className="label">{L('hotel.booking.checkIn', 'Check-in')}</label>
-        <FlexibleDateInput value={checkInDate} onChange={setCheckInDate} disabled={!reserved} />
+        <FlexibleDateInput
+          value={checkInDate}
+          onChange={(event) => setCheckInDate(event.target.value)}
+          disabled={!reserved}
+        />
       </div>
       <div>
         <label className="label">{L('hotel.booking.checkOut', 'Check-out')}</label>
-        <FlexibleDateInput value={checkOutDate} onChange={setCheckOutDate} required />
+        <FlexibleDateInput
+          value={checkOutDate}
+          onChange={(event) => setCheckOutDate(event.target.value)}
+          required
+        />
       </div>
       <p className="text-xs text-secondary-500">
         {nights} {nights === 1 ? L('hotel.booking.night', 'night') : L('hotel.booking.nights', 'nights')}

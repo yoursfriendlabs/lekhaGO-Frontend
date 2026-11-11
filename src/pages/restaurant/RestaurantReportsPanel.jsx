@@ -77,11 +77,11 @@ export default function RestaurantReportsPanel({ from: fromProp, to: toProp } = 
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <label className="label">{t('common.from') || 'From'}</label>
-          <FlexibleDateInput value={from} onChange={setFrom} />
+          <FlexibleDateInput value={from} onChange={(event) => setFrom(event.target.value)} />
         </div>
         <div>
           <label className="label">{t('common.to') || 'To'}</label>
-          <FlexibleDateInput value={to} onChange={setTo} />
+          <FlexibleDateInput value={to} onChange={(event) => setTo(event.target.value)} />
         </div>
         <div className="flex gap-1">
           {[

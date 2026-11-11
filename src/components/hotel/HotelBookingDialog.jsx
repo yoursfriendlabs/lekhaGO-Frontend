@@ -239,13 +239,17 @@ export default function HotelBookingDialog({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className="label">{L('hotel.booking.checkIn', 'Check-in')}</label>
-              <FlexibleDateInput value={form.checkInDate} onChange={handleCheckInChange} required />
+              <FlexibleDateInput
+                value={form.checkInDate}
+                onChange={(event) => handleCheckInChange(event.target.value)}
+                required
+              />
             </div>
             <div>
               <label className="label">{L('hotel.booking.checkOut', 'Check-out')}</label>
               <FlexibleDateInput
                 value={form.checkOutDate}
-                onChange={(value) => patch({ checkOutDate: value })}
+                onChange={(event) => patch({ checkOutDate: event.target.value })}
                 required
               />
             </div>
