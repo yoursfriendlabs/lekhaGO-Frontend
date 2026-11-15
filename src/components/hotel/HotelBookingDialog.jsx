@@ -128,7 +128,11 @@ export default function HotelBookingDialog({
     if (!canCheckInNow && form.checkInNow) patch({ checkInNow: false });
   }, [canCheckInNow, form.checkInNow]);
 
-  const handleCheckInChange = (value) => {
+  // FlexibleDateInput calls onChange with an event-like { target: { value } }.
+  const dateValue = (input) => (typeof input === 'string' ? input : input?.target?.value || '');
+
+  const handleCheckInChange = (input) => {
+    const value = dateValue(input);
     if (!value) return patch({ checkInDate: '' });
     const next = { checkInDate: value };
     if (!form.checkOutDate || form.checkOutDate <= value) next.checkOutDate = addDaysISO(value, 1);
@@ -245,7 +249,7 @@ export default function HotelBookingDialog({
               <label className="label">{L('hotel.booking.checkOut', 'Check-out')}</label>
               <FlexibleDateInput
                 value={form.checkOutDate}
-                onChange={(value) => patch({ checkOutDate: value })}
+                onChange={(input) => patch({ checkOutDate: dateValue(input) })}
                 required
               />
             </div>
