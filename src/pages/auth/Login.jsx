@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { api } from '../../lib/api';
 import { hasUnverifiedEmail } from '../../lib/authFlow';
@@ -39,12 +39,32 @@ const BRAND_STATS = [
   { value: '24/7', key: 'statSupport' },
 ];
 
+const DEMO_CREDENTIALS = {
+  email: 'baniyasatyam012+demo@gmail.com',
+  password: '12345678',
+};
+
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { setSession, switchWorkspace } = useAuth();
   const { t } = useI18n();
-  const [form, setForm] = useState({ email: '', password: '', businessId: '' });
+  const isDemoLogin = searchParams.get('demo') === '1';
+  const [form, setForm] = useState(() => ({
+    email: isDemoLogin ? DEMO_CREDENTIALS.email : '',
+    password: isDemoLogin ? DEMO_CREDENTIALS.password : '',
+    businessId: '',
+  }));
+
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      email: isDemoLogin ? DEMO_CREDENTIALS.email : '',
+      password: isDemoLogin ? DEMO_CREDENTIALS.password : '',
+    }));
+  }, [isDemoLogin]);
+
   const [status, setStatus] = useState(() => {
     const routedNotice = location.state?.notice;
     if (routedNotice?.message) return routedNotice;
@@ -129,8 +149,12 @@ export default function Login() {
         <div className="w-full max-w-md space-y-8">
           <div className="text-center login-animate-fade-down">
             <BrandLogo className="mx-auto block h-10 w-full max-w-[220px]" />
-            <h1 className="mt-6 text-4xl font-bold tracking-tight text-ink">{t('auth.loginTitle')}</h1>
-            <p className="mt-3 text-lg text-secondary-600">{t('auth.loginHeroSubtitle')}</p>
+            <h1 className="mt-6 text-4xl font-bold tracking-tight text-ink">
+              {t(isDemoLogin ? 'auth.demoLoginTitle' : 'auth.loginTitle')}
+            </h1>
+            <p className="mt-3 text-lg text-secondary-600">
+              {t(isDemoLogin ? 'auth.demoLoginHeroSubtitle' : 'auth.loginHeroSubtitle')}
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="login-animate-fade-up space-y-6">

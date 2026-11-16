@@ -2212,6 +2212,8 @@ const dictionaries = {
     auth: {
       loginTitle: 'Welcome back',
       loginSubtitle: 'Log in to continue managing your shop.',
+      demoLoginTitle: 'Demo Login',
+      demoLoginHeroSubtitle: 'Sign in to explore the PasalManager demo',
       registerTitle: 'Create your account',
       registerSubtitle: 'Start tracking sales and inventory in minutes.',
       name: 'Name',
@@ -4599,6 +4601,8 @@ const dictionaries = {
     auth: {
       loginTitle: 'फेरि स्वागत छ',
       loginSubtitle: 'प्रवेश गरेर व्यवस्थापन सुरु गर्नुहोस्।',
+      demoLoginTitle: 'Demo Login',
+      demoLoginHeroSubtitle: 'Sign in to explore the PasalManager demo',
       registerTitle: 'खाता बनाउनुहोस्',
       registerSubtitle: 'छिट्टै बिक्री र स्टक ट्र्याक गर्नुहोस्।',
       name: 'नाम',
