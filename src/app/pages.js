@@ -36,3 +36,12 @@ export const HotelFrontDesk = lazy(() => import('../pages/hotel/HotelFrontDesk')
 export const HotelRooms = lazy(() => import('../pages/hotel/HotelRooms'));
 export const HotelStay = lazy(() => import('../pages/hotel/HotelStay'));
 export const HotelHousekeeping = lazy(() => import('../pages/hotel/HotelHousekeeping'));
+export const Students = lazy(() => import('../pages/students/Students'));
+export const StudentDetail = lazy(() => import('../pages/students/StudentDetail'));
+export const StudentAttendance = lazy(() => import('../pages/students/StudentAttendance'));
+export const StudentAttendanceHistory = lazy(() => import('../pages/students/StudentAttendanceHistory'));
+export const StudentDues = lazy(() => import('../pages/students/StudentDues'));
+export const StudentEnrollments = lazy(() => import('../pages/students/StudentEnrollments'));
+export const StudentCourses = lazy(() => import('../pages/students/StudentCourses'));
+export const StudentShifts = lazy(() => import('../pages/students/StudentShifts'));
+export const StudentEnrollmentRedirect = lazy(() => import('../pages/students/StudentEnrollmentRedirect'));

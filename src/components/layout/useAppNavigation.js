@@ -8,11 +8,12 @@ import {
   getNavItemPermissionKey,
   withOwnProfileNavItem,
 } from "@/lib/accessControl";
+import { getStudentAccess } from "@/lib/students/access.js";
 import { NAV_ROLE_MAP, groupNavItems } from "./navConfig.js";
 
 export function useAppNavigation() {
   const t = useI18n().t;
-  const { role, hasFeatureAccess, accessControl } = useAuth();
+  const { role, hasFeatureAccess, canManageFeature, accessControl } = useAuth();
   const { businessProfile } = useBusinessSettings();
   const isGeneralStaff = accessControl?.staffCategory === "general_staff";
 
@@ -81,7 +82,19 @@ export function useAppNavigation() {
             ["owner", "staff"]
           ).includes(role);
         })
-        .filter((item) => hasFeatureAccess(getNavItemPermissionKey(item)));
+        .map((item) => {
+          if (item?.key !== "students") return item;
+          // Tutors only get attendance, so send them straight there.
+          const access = getStudentAccess(hasFeatureAccess, canManageFeature);
+          if (!access.canViewAttendance) return null;
+          return {
+            ...item,
+            label: t("nav.students"),
+            route: access.attendanceOnly ? "/app/students/attendance" : "/app/students",
+          };
+        })
+        .filter(Boolean)
+        .filter((item) => item.key === "students" || hasFeatureAccess(getNavItemPermissionKey(item)));
     }
 
     return withOwnProfileNavItem(nextItems, {
@@ -89,7 +102,7 @@ export function useAppNavigation() {
       membershipId,
       label: t("nav.profile"),
     });
-  }, [accessControl, businessProfile, hasFeatureAccess, isGeneralStaff, role, t]);
+  }, [accessControl, businessProfile, canManageFeature, hasFeatureAccess, isGeneralStaff, role, t]);
 
   const navGroups = useMemo(() => groupNavItems(visibleNavItems), [visibleNavItems]);
 

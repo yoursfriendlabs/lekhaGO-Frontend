@@ -3,6 +3,7 @@ import Pagination from "@/components/ui/Pagination";
 import RefreshButton from "@/components/ui/RefreshButton.jsx";
 import PaymentTypeSummary from "@/components/form/PaymentTypeSummary.jsx";
 import PageHeader from "@/components/layout/PageHeader";
+import { Link } from "react-router-dom";
 import PartyFilterSelect from "@/components/parties/PartyFilterSelect.jsx";
 import CreatorFilterSelect from "@/components/form/CreatorFilterSelect.jsx";
 import ActionMenu from "@/components/ui/ActionMenu.jsx";
@@ -31,6 +32,17 @@ function tableNameFor(order, tableNames) {
   return order.Table?.name || order.table?.name || (order.tableId ? tableNames[order.tableId] : "") || "";
 }
 
+function CourseFeeLink({ t, enrollmentId }) {
+  return (
+    <Link
+      to={`/app/students/enrollment/${enrollmentId}`}
+      className="inline-flex items-center rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-bold text-sky-700 hover:underline dark:bg-sky-500/10 dark:text-sky-300"
+    >
+      {t("students.servicesFilter.badge")}
+    </Link>
+  );
+}
+
 export default function ServiceOrderList({
   t,
   money,
@@ -50,6 +62,8 @@ export default function ServiceOrderList({
   setCreatedByFilterId,
   storeTypeFilter,
   setStoreTypeFilter,
+  courseFeesFilter,
+  setCourseFeesFilter,
   refreshingServices,
   refreshServices,
   statusFilterOptions,
@@ -189,6 +203,18 @@ export default function ServiceOrderList({
                 onClick={() => setStatusFilter(option.value)}
               />
             ))}
+            {setCourseFeesFilter ? (
+              <select
+                className="input min-h-[36px] w-auto rounded-full py-1 text-xs"
+                aria-label={t("students.servicesFilter.label")}
+                value={courseFeesFilter || ""}
+                onChange={(e) => setCourseFeesFilter(e.target.value)}
+              >
+                <option value="">{t("students.servicesFilter.hide")}</option>
+                <option value="include">{t("students.servicesFilter.include")}</option>
+                <option value="only">{t("students.servicesFilter.only")}</option>
+              </select>
+            ) : null}
           </div>
         </div>
 
@@ -229,6 +255,9 @@ export default function ServiceOrderList({
                           <p className="truncate text-base font-semibold text-ink">
                             {order.orderNo || order.id.slice(0, 8)}
                           </p>
+                          {setCourseFeesFilter && order.enrollmentId ? (
+                            <CourseFeeLink t={t} enrollmentId={order.enrollmentId} />
+                          ) : null}
                           {canManageServices ? (
                             <button
                               type="button"
@@ -405,6 +434,11 @@ export default function ServiceOrderList({
                       <tr key={order.id} className={rowClass}>
                         <td className="py-3 pr-4 font-medium text-ink dark:text-slate-200">
                           {order.orderNo || order.id.slice(0, 8)}
+                          {setCourseFeesFilter && order.enrollmentId ? (
+                            <div className="mt-1">
+                              <CourseFeeLink t={t} enrollmentId={order.enrollmentId} />
+                            </div>
+                          ) : null}
                         </td>
                         <td className="py-3 pr-4 text-ink-light dark:text-secondary-300">
                           <div>

@@ -32,10 +32,14 @@ import {
   enforcePermissionDependencies,
   getPermissionKeyForFeature,
   getRequiredPartiesAccessLevel,
+  getManagedFeatureKeys,
   getStaffPermissionUiFeatures,
   groupStaffPermissionUiFeatures,
   hasInventoryDependentAccess,
+  normalizePermissionMap,
+  omitStudentPermissions,
 } from "../../lib/accessControl";
+import { hasStudentsAddon } from "../../lib/students/access";
 import { formatMaybeDate, todayISODate, WEEKDAY_KEYS } from "../../lib/dates/datetime";
 import { useAuth } from "../../lib/auth";
 import { useBusinessSettings } from "../../lib/business/businessSettings";
@@ -387,13 +391,25 @@ function StaffFormDialog({
   const includeHotelModules =
     businessProfile?.modules?.hotel === true ||
     businessProfile?.type === "hotel";
+  const includeStudentModules = hasStudentsAddon(businessProfile);
   const visibleFeatures = useMemo(
     () => getStaffPermissionUiFeatures(meta.features, {
       includeCafeModules,
       includeHotelModules,
+      includeStudentModules,
     }),
-    [meta.features, includeCafeModules, includeHotelModules],
+    [meta.features, includeCafeModules, includeHotelModules, includeStudentModules],
   );
+  // Tutor preset: attendance only. Uses the server's preset when it sends one.
+  const applyTutorPreset = () => {
+    const serverPreset = (meta.categories || []).find((category) => category.key === "tutor");
+    const preset = serverPreset?.defaultPermissions
+      || normalizePermissionMap({ studentAttendance: "manage", attendance: "manage" });
+    getManagedFeatureKeys().forEach((key) => {
+      if (key === "analytics") return;
+      onPermissionChange(key, preset[key] || "none");
+    });
+  };
   const permissionGroups = useMemo(
     () => groupStaffPermissionUiFeatures(visibleFeatures),
     [visibleFeatures],
@@ -882,6 +898,15 @@ function StaffFormDialog({
                                 `staffManagement.permissionGroups.${group.id}`,
                               ) || group.id}
                             </h4>
+                            {group.id === "students" && !readOnly ? (
+                              <button
+                                type="button"
+                                className="mt-2 rounded-full border border-secondary-200 px-3 py-1 text-xs font-semibold text-ink-light hover:bg-mist"
+                                onClick={applyTutorPreset}
+                              >
+                                {t("staffManagement.tutorPreset")}
+                              </button>
+                            ) : null}
                             {(() => {
                               const hintKey = `staffManagement.permissionGroupHints.${group.id}`;
                               const hint = t(hintKey);
@@ -1051,6 +1076,8 @@ function StaffFormDialog({
 export default function StaffManagement({ businessId }) {
   const { t } = useI18n();
   const { canManageFeature, canViewFeature, subscription } = useAuth();
+  const { businessProfile } = useBusinessSettings();
+  const studentsAddonEnabled = hasStudentsAddon(businessProfile);
   const canManageStaff = canManageFeature("staff");
   const canViewStaff = canViewFeature("staff");
 
@@ -1270,7 +1297,11 @@ export default function StaffManagement({ businessId }) {
 
     if (!canManageStaff) return;
 
-    const finalPermissions = enforcePermissionDependencies(form.permissions);
+    const enforcedPermissions = enforcePermissionDependencies(form.permissions);
+    // Shops without the students add-on keep sending exactly what they sent before.
+    const finalPermissions = studentsAddonEnabled
+      ? enforcedPermissions
+      : omitStudentPermissions(enforcedPermissions);
 
     const payload = {
       name: form.name.trim(),

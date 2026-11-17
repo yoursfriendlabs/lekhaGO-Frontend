@@ -449,6 +449,22 @@ function listCache(tags, ttlMs = CACHE_TTL.list, options = {}) {
   };
 }
 
+/** Anything that bills or collects a course fee touches these lists. */
+const STUDENT_MONEY_TAGS = [
+  "student",
+  "students",
+  "student-enrollments",
+  "student-courses",
+  "student-dues",
+  "student-roster",
+  "services",
+  "parties",
+  "party-statements",
+  "reports",
+  "dashboard",
+  "banks",
+];
+
 function mutationConfig(...tags) {
   // Callers pass detailTags() arrays inside the list, so flatten all the way down.
   return { invalidateTags: uniqueTags(tags.flat(Infinity)) };
@@ -2112,6 +2128,146 @@ export const api = {
     request("/api/hotel/guest-register", { params }),
   getHotelOccupancyReport: (params = {}) =>
     request("/api/hotel/reports/occupancy", { params }),
+
+  // --- Students & courses add-on (only call when hasStudentsAddon) ---
+  listStudents: (params = {}, options = {}) =>
+    listRequest(
+      "/api/students",
+      params,
+      listCache(["students"], CACHE_TTL.short, options),
+    ),
+  getStudent: (id, options = {}) =>
+    request(
+      `/api/students/${id}`,
+      {},
+      listCache(detailTags("student", id), CACHE_TTL.short, options),
+    ),
+  createStudent: (data) =>
+    request(
+      "/api/students",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([...STUDENT_MONEY_TAGS]),
+    ),
+  updateStudent: (id, data) =>
+    request(
+      `/api/students/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([detailTags("student", id), "students", "parties"]),
+    ),
+  deleteStudent: (id) =>
+    request(
+      `/api/students/${id}`,
+      { method: "DELETE" },
+      mutationConfig([detailTags("student", id), "students"]),
+    ),
+  listStudentCourses: (params = {}, options = {}) =>
+    listRequest(
+      "/api/students/courses",
+      params,
+      listCache(["student-courses"], CACHE_TTL.short, options),
+    ),
+  getStudentCourse: (id, options = {}) =>
+    request(
+      `/api/students/courses/${id}`,
+      {},
+      listCache(detailTags("student-course", id), CACHE_TTL.short, options),
+    ),
+  createStudentCourse: (data) =>
+    request(
+      "/api/students/courses",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["student-courses"]),
+    ),
+  updateStudentCourse: (id, data) =>
+    request(
+      `/api/students/courses/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([detailTags("student-course", id), "student-courses"]),
+    ),
+  deleteStudentCourse: (id) =>
+    request(
+      `/api/students/courses/${id}`,
+      { method: "DELETE" },
+      mutationConfig([detailTags("student-course", id), "student-courses"]),
+    ),
+  listStudentShifts: (params = {}, options = {}) =>
+    listRequest(
+      "/api/students/shifts",
+      params,
+      listCache(["student-shifts"], CACHE_TTL.short, options),
+    ),
+  createStudentShift: (data) =>
+    request(
+      "/api/students/shifts",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig(["student-shifts"]),
+    ),
+  updateStudentShift: (id, data) =>
+    request(
+      `/api/students/shifts/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig(["student-shifts", "student-roster"]),
+    ),
+  deleteStudentShift: (id) =>
+    request(
+      `/api/students/shifts/${id}`,
+      { method: "DELETE" },
+      mutationConfig(["student-shifts"]),
+    ),
+  listStudentEnrollments: (params = {}, options = {}) =>
+    listRequest(
+      "/api/students/enrollments",
+      params,
+      listCache(["student-enrollments"], CACHE_TTL.short, options),
+    ),
+  getStudentEnrollment: (id, options = {}) =>
+    request(
+      `/api/students/enrollments/${id}`,
+      {},
+      listCache(detailTags("student-enrollment", id), CACHE_TTL.short, options),
+    ),
+  createStudentEnrollment: (data) =>
+    request(
+      "/api/students/enrollments",
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([...STUDENT_MONEY_TAGS]),
+    ),
+  updateStudentEnrollment: (id, data) =>
+    request(
+      `/api/students/enrollments/${id}`,
+      { method: "PATCH", body: JSON.stringify(data) },
+      mutationConfig([
+        detailTags("student-enrollment", id),
+        "student",
+        "students",
+        "student-enrollments",
+        "student-courses",
+        "student-roster",
+        "student-dues",
+      ]),
+    ),
+  collectStudentFee: (enrollmentId, data) =>
+    request(
+      `/api/students/enrollments/${enrollmentId}/payments`,
+      { method: "POST", body: JSON.stringify(data) },
+      mutationConfig([detailTags("student-enrollment", enrollmentId), ...STUDENT_MONEY_TAGS]),
+    ),
+  getStudentDues: (params = {}, options = {}) =>
+    listRequest(
+      "/api/students/dues",
+      params,
+      listCache(["student-dues"], CACHE_TTL.short, options),
+    ),
+  getStudentRoster: (params = {}) =>
+    listRequest("/api/students/attendance/roster", params),
+  saveStudentAttendance: (data) =>
+    request(
+      "/api/students/attendance",
+      { method: "PUT", body: JSON.stringify(data) },
+      mutationConfig(["student", "student-attendance", "student-roster"]),
+    ),
+  listStudentAttendance: (params = {}) =>
+    listRequest("/api/students/attendance", params),
 };
 
 export { toQueryKey };

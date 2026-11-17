@@ -1,3 +1,5 @@
+import { withStudentsNavItem } from '../students/access.js';
+
 const RETAIL_BUSINESS_TYPE = 'retail';
 const RETAIL_SALES_LABEL = 'Quick POS';
 const RETAIL_SALES_ROUTE = '/app/pos';
@@ -112,5 +114,5 @@ export function getNavigationForBusinessType(navigation = [], businessProfile) {
     normalized.splice(billingIndex, 0, servicesItem);
   }
 
-  return normalized;
+  return withStudentsNavItem(normalized, businessProfile);
 }
