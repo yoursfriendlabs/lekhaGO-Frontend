@@ -8,6 +8,7 @@ import {
   Coffee,
   ContactRound,
   FileText,
+  GraduationCap,
   LayoutDashboard,
   ListTodo,
   Receipt,
@@ -38,6 +39,7 @@ export const NAV_ROLE_MAP = {
   frontDesk: ["owner", "staff", "admin", "super_admin"],
   rooms: ["owner", "staff", "admin", "super_admin"],
   housekeeping: ["owner", "staff", "admin", "super_admin"],
+  students: ["owner", "staff", "admin", "super_admin"],
   attendance: ["staff"],
   staff: ["owner", "staff", "admin", "super_admin"],
   reports: ["owner", "staff", "admin", "super_admin"],
@@ -61,6 +63,7 @@ export const NAV_ICON_MAP = {
   frontDesk: BedDouble,
   rooms: BedDouble,
   housekeeping: Sparkles,
+  students: GraduationCap,
   attendance: Clock,
   staff: ContactRound,
   "staff-salary": ContactRound,
@@ -97,7 +100,7 @@ export const NAV_GROUPS = [
   {
     id: "people",
     labelKey: "nav.groups.people",
-    keys: ["parties", "tasks", "staff", "attendance", "profile", "staff-salary"],
+    keys: ["students", "parties", "tasks", "staff", "attendance", "profile", "staff-salary"],
   },
   {
     id: "insights",

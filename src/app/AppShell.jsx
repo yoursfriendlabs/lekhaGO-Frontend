@@ -14,6 +14,7 @@ import { hasUnverifiedEmail, isStaffActivationRequired } from '../lib/authFlow';
 import { getSubscriptionGuard, getSubscriptionStatusState } from '../lib/subscription';
 import { buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB } from '../lib/business/settingsTabs';
 import { useSSE } from '../hooks/useSSE';
+import StudentsRoute from '../components/students/StudentsRoute.jsx';
 import {
   canUseHotelApis,
   canUseRestaurantApis,
@@ -54,9 +55,30 @@ import {
   Settings,
   Staff,
   StaffSalaryProfile,
+  StudentAttendance,
+  StudentAttendanceHistory,
+  StudentCourses,
+  StudentDetail,
+  StudentDues,
+  StudentEnrollmentRedirect,
+  StudentEnrollments,
+  StudentShifts,
+  Students,
   Tables,
   Tasks,
 } from './pages';
+
+const STUDENT_ROUTES = [
+  { path: 'students', need: 'students', Page: Students },
+  { path: 'students/attendance', need: 'attendance', Page: StudentAttendance },
+  { path: 'students/attendance/history', need: 'attendance', Page: StudentAttendanceHistory },
+  { path: 'students/dues', need: 'students', Page: StudentDues },
+  { path: 'students/enrollments', need: 'students', Page: StudentEnrollments },
+  { path: 'students/courses', need: 'students', Page: StudentCourses },
+  { path: 'students/shifts', need: 'attendance', Page: StudentShifts },
+  { path: 'students/enrollment/:enrollmentId', need: 'students', Page: StudentEnrollmentRedirect },
+  { path: 'students/:studentId', need: 'students', Page: StudentDetail },
+];
 
 function StaffOrPersonalProfileRoute() {
   const { role, accessControl } = useAuth();
@@ -320,6 +342,21 @@ export default function AppShell() {
                       </EmailActivationRequiredRoute>
                     )}
                   />
+                  {STUDENT_ROUTES.map(({ path, need, Page }) => (
+                    <Route
+                      key={path}
+                      path={path}
+                      element={(
+                        <EmailActivationRequiredRoute>
+                          <RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}>
+                            <StudentsRoute need={need}>
+                              <Page />
+                            </StudentsRoute>
+                          </RoleGuard>
+                        </EmailActivationRequiredRoute>
+                      )}
+                    />
+                  ))}
                   <Route path="sales" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="sales"><Sales /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="pos" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="quickPos">{posPageElement}</SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route

@@ -19,6 +19,7 @@ import ConfirmDialog from "../../components/ui/ConfirmDialog.jsx";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useBusinessSettings } from "../../lib/business/businessSettings";
+import { hasStudentsAddon } from "../../lib/students/access";
 import { getServicesDisplayLabel } from "../../lib/business/businessTypeConfig.js";
 import { useI18n } from "../../lib/i18n.jsx";
 import { printElement, printThermalReceipt } from "../../lib/print/print.js";
@@ -174,6 +175,13 @@ export default function Services() {
   // ── List state ──
   const [statusFilter, setStatusFilter] = useState("all");
   const [storeTypeFilter, setStoreTypeFilter] = useState("all");
+  // Students add-on only: course-fee bills are hidden from this list unless asked for.
+  const studentsEnabled = hasStudentsAddon(businessProfile);
+  const [courseFeesFilter, setCourseFeesFilter] = useState(() => {
+    const requested = searchParams.get("courseFees");
+    return requested === "include" || requested === "only" ? requested : "";
+  });
+  const activeCourseFeesFilter = studentsEnabled ? courseFeesFilter : "";
   const [listError, setListError] = useState("");
   const [listNotice, setListNotice] = useState({ type: "", message: "" });
 
@@ -335,8 +343,9 @@ export default function Services() {
       ...(partyFilterId ? { partyId: partyFilterId } : {}),
       ...(createdByFilterId ? { createdBy: createdByFilterId } : {}),
       ...(storeTypeFilter !== "all" ? { storeType: storeTypeFilter } : {}),
+      ...(activeCourseFeesFilter ? { courseFees: activeCourseFeesFilter } : {}),
     }),
-    [createdByFilterId, page, pageSize, partyFilterId, statusFilter, storeTypeFilter],
+    [activeCourseFeesFilter, createdByFilterId, page, pageSize, partyFilterId, statusFilter, storeTypeFilter],
   );
 
   const updatePartyDropdownPosition = useCallback(() => {
@@ -404,7 +413,7 @@ export default function Services() {
 
   useEffect(() => {
     setPage(1);
-  }, [createdByFilterId, partyFilterId, statusFilter, storeTypeFilter]);
+  }, [activeCourseFeesFilter, createdByFilterId, partyFilterId, statusFilter, storeTypeFilter]);
 
   useEffect(() => {
     const search = debouncedPartyQuery.trim();
@@ -1784,6 +1793,8 @@ export default function Services() {
         setCreatedByFilterId={setCreatedByFilterId}
         storeTypeFilter={storeTypeFilter}
         setStoreTypeFilter={setStoreTypeFilter}
+        courseFeesFilter={studentsEnabled ? courseFeesFilter : undefined}
+        setCourseFeesFilter={studentsEnabled ? setCourseFeesFilter : undefined}
         refreshingServices={refreshingServices}
         refreshServices={refreshServices}
         statusFilterOptions={statusFilterOptions}

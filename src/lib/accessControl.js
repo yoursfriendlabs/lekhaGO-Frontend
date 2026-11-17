@@ -22,6 +22,8 @@ const PERMISSION_KEYS = [
   'housekeeping',
   'attendance',
   'purchasePrice',
+  'students',
+  'studentAttendance',
 ];
 
 const ACCESS_LEVELS = ['none', 'view', 'manage'];
@@ -54,6 +56,7 @@ const PARTY_DEPENDENT_PERMISSION_KEYS = [
 
 const CAFE_PERMISSION_KEYS = new Set(['tables', 'orders', 'billing', 'kitchen']);
 const HOTEL_PERMISSION_KEYS = new Set(['frontDesk', 'housekeeping']);
+const STUDENT_PERMISSION_KEYS = new Set(['students', 'studentAttendance']);
 
 /** Permission keys hidden from the staff permission editor unless cafe/hotel modules are on. */
 const STAFF_PERMISSION_UI_HIDDEN_KEYS = new Set([
@@ -64,6 +67,8 @@ const STAFF_PERMISSION_UI_HIDDEN_KEYS = new Set([
   'kitchen',
   'frontDesk',
   'housekeeping',
+  'students',
+  'studentAttendance',
 ]);
 
 /** Preferred display order for the staff permission editor. */
@@ -89,6 +94,8 @@ const STAFF_PERMISSION_UI_ORDER = [
   'kitchen',
   'frontDesk',
   'housekeeping',
+  'students',
+  'studentAttendance',
 ];
 
 export const STAFF_PERMISSION_UI_GROUPS = [
@@ -98,6 +105,7 @@ export const STAFF_PERMISSION_UI_GROUPS = [
   { id: 'team', keys: ['staff', 'attendance', 'settings'] },
   { id: 'cafe', keys: ['tables', 'orders', 'billing', 'kitchen'] },
   { id: 'hotel', keys: ['frontDesk', 'housekeeping'] },
+  { id: 'students', keys: ['students', 'studentAttendance'] },
 ];
 
 const FEATURE_PERMISSION_MAP = {
@@ -135,6 +143,8 @@ const FEATURE_PERMISSION_MAP = {
   hotel: 'frontDesk',
   attendance: 'attendance',
   purchasePrice: 'purchasePrice',
+  students: 'students',
+  studentAttendance: 'studentAttendance',
 };
 
 const SUBSCRIPTION_FEATURE_ALIASES = {
@@ -149,6 +159,10 @@ const SUBSCRIPTION_FEATURE_ALIASES = {
   housekeeping: 'services',
   hotel: 'services',
   rooms: 'services',
+  // The students add-on is switched on per business by a platform admin;
+  // plans do not gate it separately.
+  students: 'services',
+  studentAttendance: 'services',
 };
 
 function asObject(value) {
@@ -224,6 +238,7 @@ export function getRequiredPartiesAccessLevel(permissions) {
 export function getStaffPermissionUiFeatures(features = [], {
   includeCafeModules = false,
   includeHotelModules = false,
+  includeStudentModules = false,
 } = {}) {
   const byKey = new Map();
 
@@ -241,7 +256,10 @@ export function getStaffPermissionUiFeatures(features = [], {
 
     const isCafeKey = CAFE_PERMISSION_KEYS.has(permissionKey) || CAFE_PERMISSION_KEYS.has(rawKey);
     const isHotelKey = HOTEL_PERMISSION_KEYS.has(permissionKey) || HOTEL_PERMISSION_KEYS.has(rawKey);
-    const allowHidden = (includeCafeModules && isCafeKey) || (includeHotelModules && isHotelKey);
+    const isStudentKey = STUDENT_PERMISSION_KEYS.has(permissionKey) || STUDENT_PERMISSION_KEYS.has(rawKey);
+    const allowHidden = (includeCafeModules && isCafeKey)
+      || (includeHotelModules && isHotelKey)
+      || (includeStudentModules && isStudentKey);
     if (
       (STAFF_PERMISSION_UI_HIDDEN_KEYS.has(permissionKey) || STAFF_PERMISSION_UI_HIDDEN_KEYS.has(rawKey))
       && !allowHidden
@@ -541,6 +559,15 @@ export function canViewFeature(accessControl, featureKey, fallbackRole = '') {
 export function canManageFeature(accessControl, featureKey, fallbackRole = '') {
   const level = getFeatureAccessLevel(accessControl, featureKey, fallbackRole);
   return level === null ? null : level === 'manage';
+}
+
+/** Drop the students add-on keys, so shops without it send the same payload as before. */
+export function omitStudentPermissions(permissions) {
+  const source = asObject(permissions);
+  if (!source) return permissions;
+  const next = { ...source };
+  STUDENT_PERMISSION_KEYS.forEach((key) => { delete next[key]; });
+  return next;
 }
 
 export function getManagedFeatureKeys() {

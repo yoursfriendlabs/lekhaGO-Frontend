@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { studentsEn } from './students/strings.js';
 
 const dictionaries = {
   en: {
@@ -124,6 +125,7 @@ const dictionaries = {
       tables: 'Tables',
       billing: 'Billing Counter',
       orders: 'Orders',
+      students: 'Students',
       groups: {
         overview: 'Overview',
         operations: 'Operations',
@@ -418,14 +420,17 @@ const dictionaries = {
         finance: 'Finance',
         team: 'Team & admin',
         cafe: 'Cafe / restaurant',
+        students: 'Students',
         more: 'More',
       },
+      tutorPreset: 'Use Tutor preset (attendance only)',
       permissionGroupHints: {
         operations: 'Control which day-to-day modules this staff member can open.',
         sensitive: 'Hide cost from counter staff even if they can see inventory and sell items.',
         finance: 'Reports, ledger, and bank accounts.',
         team: 'Staff records, attendance, and business settings.',
         cafe: 'Tables, kitchen orders, and billing counter.',
+        students: 'Tutors usually get Student attendance only; they never see fees.',
         more: 'Additional modules for this business.',
       },
       permissionFeatures: {
@@ -2426,6 +2431,7 @@ const dictionaries = {
         waiters: 'Waiters',
       },
     },
+    students: studentsEn,
   },
   ne: {
     locale: 'नेपाली',
@@ -2533,6 +2539,7 @@ const dictionaries = {
       tables: 'टेबल',
       billing: 'बिलिङ काउन्टर',
       orders: 'अर्डर',
+      students: 'विद्यार्थी',
       groups: {
         overview: 'अवलोकन',
         operations: 'सञ्चालन',
@@ -2827,6 +2834,7 @@ const dictionaries = {
         finance: 'वित्त',
         team: 'टोली र एडमिन',
         cafe: 'क्याफे / रेस्टुरेन्ट',
+        students: 'विद्यार्थी',
         more: 'थप',
       },
       permissionGroupHints: {
