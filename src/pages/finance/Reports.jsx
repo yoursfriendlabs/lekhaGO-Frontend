@@ -3815,7 +3815,7 @@ export default function Reports() {
                               {table}
                             </span>
                             <span className="text-[10px] text-secondary-400">
-                              {t("staff.waiter") || "Waiter"}: {waiter}
+                              {t("analytics.waiter") || "Waiter"}: {waiter}
                             </span>
                           </td>
                           <td className="p-3">

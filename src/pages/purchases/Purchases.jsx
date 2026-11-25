@@ -342,6 +342,11 @@ const [mobileStep, setMobileStep] = useState("details");
     [header.amountReceived, isPaid, totals.grandTotal],
   );
   const dueAmount = Math.max(totals.grandTotal - paidAmount, 0);
+  const isOverpaid =
+    !isPaid && Number(header.amountReceived || 0) > totals.grandTotal + 0.009;
+  const overpayMessage = t("purchases.payExceedsBill", {
+    total: totals.grandTotal.toFixed(2),
+  });
 
   const purchaseSteps = useMemo(
     () => [
@@ -867,6 +872,10 @@ const [mobileStep, setMobileStep] = useState("details");
       )
     ) {
       setStatus({ type: "error", message: t("errors.conversionRequired") });
+      return;
+    }
+    if (isOverpaid) {
+      setStatus({ type: "error", message: overpayMessage });
       return;
     }
     if (requiresBankSelection(header, paidAmount)) {
@@ -2081,6 +2090,11 @@ setInvoiceOrder(purchase);
                         {t("services.fullyPaid")}
                       </label>
                     </div>
+                    {isOverpaid && (
+                      <p className="mt-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">
+                        {overpayMessage}
+                      </p>
+                    )}
                     <QuickPaymentButtons
                       disabled={totals.grandTotal <= 0}
                       onNoPayment={() => applyQuickPaidAmount(0)}

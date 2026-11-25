@@ -28,6 +28,7 @@ import {
 import { normalizeSessionPayload } from './session';
 import { canAccessFeature, normalizeSubscriptionPayload } from './subscription';
 import { pickWorkspaceFields } from './business/workspaces';
+import { consumeBridgeSession, isAppHost } from './sessionBridge';
 
 const AuthContext = createContext(null);
 const SHOULD_BOOTSTRAP_AUTH = import.meta.env.MODE !== 'test';
@@ -49,6 +50,11 @@ export function AuthProvider({ children }) {
   const [extraBusinessTypes, setExtraBusinessTypesState] = useState(['retail', 'cafe', 'hotel']);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(() => {
+    // A session handed over from the marketing host via the cross-subdomain
+    // cookie counts as an already-restored session — skip the extra /me call.
+    if (consumeBridgeSession()) {
+      return false;
+    }
     const storedToken = getToken();
     const storedSubscription = normalizeSubscriptionPayload(getSubscription());
 
@@ -119,6 +125,15 @@ export function AuthProvider({ children }) {
       extraBusinessTypes: nextWorkspaces?.extraBusinessTypes,
     };
   }, []);
+
+  useEffect(() => {
+    // Adopt a session bridged over from the marketing host (only meaningful
+    // on app.pasalmanager.com; the cookie is host-agnostic so we gate here).
+    if (!isAppHost()) return;
+    const bridged = consumeBridgeSession();
+    if (!bridged) return;
+    applySessionSnapshot(bridged);
+  }, [applySessionSnapshot]);
 
   const syncSession = useCallback((payload, overrides = {}) => {
     const snapshot = normalizeSessionPayload(payload, {
