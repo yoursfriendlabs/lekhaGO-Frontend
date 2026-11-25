@@ -6,6 +6,11 @@ import { hasUnverifiedEmail, isStaffActivationRequired } from '../lib/authFlow';
 import { getSubscriptionStatusState, humanizeKey } from '../lib/subscription';
 import { buildSettingsTabPath, SUBSCRIPTION_SETTINGS_TAB } from '../lib/business/settingsTabs';
 import AppErrorBoundary from '../components/layout/AppErrorBoundary.jsx';
+import {
+  buildAppRedirectPath,
+  consumeDemoIntent,
+  isMarketingHost,
+} from '../lib/sessionBridge';
 
 export const OWNER_AND_STAFF_ROLES = ['owner', 'staff'];
 
@@ -100,7 +105,17 @@ export function SubscriptionFeatureRoute({
 
 export function PublicOnlyRoute({ children }) {
   const { token } = useAuth();
-  if (token) return <Navigate to="/app" replace />;
+  if (token) {
+    // On the marketing host a stored token may belong to a past demo session.
+    // Only send the user into the local /app shell when they explicitly asked
+    // for the demo; otherwise hand them over to the real app host.
+    if (isMarketingHost()) {
+      if (consumeDemoIntent()) return <Navigate to="/app" replace />;
+      window.location.replace(buildAppRedirectPath('/app'));
+      return null;
+    }
+    return <Navigate to="/app" replace />;
+  }
   return children;
 }
 

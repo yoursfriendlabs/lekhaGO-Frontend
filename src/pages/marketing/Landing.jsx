@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import BrandLogo from '../../components/layout/BrandLogo.jsx';
+import { setDemoIntent } from '../../lib/sessionBridge';
 
 const features = [
   { title: 'Inventory & Units', desc: 'Track stock with primary and secondary units.' },
@@ -37,7 +38,13 @@ export default function Landing() {
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link className="btn-primary" to="/register">Start free setup</Link>
-              <Link className="btn-secondary" to="/login">See demo workspace</Link>
+              <Link
+                className="btn-secondary"
+                to="/login"
+                onClick={() => setDemoIntent()}
+              >
+                See demo workspace
+              </Link>
             </div>
           </div>
           <div className="card">

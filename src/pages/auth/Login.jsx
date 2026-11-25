@@ -5,6 +5,12 @@ import { api } from '../../lib/api';
 import { hasUnverifiedEmail } from '../../lib/authFlow';
 import { useAuth } from '../../lib/auth';
 import { getVerificationEmail, isEmailVerificationRequiredError } from '../../lib/emailVerification';
+import {
+  buildAppRedirectPath,
+  consumeDemoIntent,
+  isMarketingHost,
+  setBridgeSession,
+} from '../../lib/sessionBridge';
 import { useI18n } from '../../lib/i18n.jsx';
 import { consumeSessionNotice, getBusinessId, setPendingEmailVerification } from '../../lib/storage';
 import { findWorkspace, normalizeWorkspacePayload } from '../../lib/business/workspaces';
@@ -82,6 +88,14 @@ export default function Login() {
         data.accessControl || data.user?.accessControl || null,
         data
       );
+      // A stale business id from a previous (e.g. demo) session must never
+      // hijack a fresh login into the wrong workspace. Only honour the stored
+      // preference when it still belongs to one of the signed-in user's own
+      // workspaces.
+      // A stale business id left over from a previous (possibly demo)
+      // session must never silently hijack a fresh login into the wrong
+      // workspace. Only honour the stored preference when it is one of the
+      // signed-in user's own workspaces.
       if (preferred?.id && preferred.id !== loginBusinessId && typeof switchWorkspace === 'function') {
         await switchWorkspace(preferred.id);
       }
@@ -96,6 +110,25 @@ export default function Login() {
           navigate('/app/activate-account');
           return;
         }
+      }
+      // Demo intent (user clicked "See demo workspace" on the landing page)
+      // keeps the session on the marketing host instead of bridging to the
+      // app subdomain.
+      const isDemoIntent = consumeDemoIntent();
+      if (isMarketingHost() && !isDemoIntent) {
+        setBridgeSession({
+          token: data.token,
+          user: data.user,
+          role: resolvedRole,
+          businessId: preferred?.id || loginBusinessId || resolvedBusinessId,
+          business: data.business || null,
+          businessProfile: data.businessProfile || null,
+          subscription: data.subscription || null,
+          accessControl: data.accessControl || data.user?.accessControl || null,
+          workspaces: { items: workspaces },
+        });
+        window.location.assign(buildAppRedirectPath('/app'));
+        return;
       }
       navigate('/app');
     } catch (err) {
