@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  computeLineTotal,
+  getLineDiscount,
   getComputedServiceTotals,
   getServiceAttachmentUrls,
   getServiceItems,
@@ -105,5 +107,27 @@ describe("isPlaceholderItem", () => {
         lineTotal: 0,
       }),
     ).toBe(false);
+  });
+});
+
+describe("computeLineTotal", () => {
+  it("subtracts the line discount from quantity × price", () => {
+    expect(computeLineTotal({ quantity: "2", unitPrice: "150", discount: "50" })).toBe(250);
+  });
+
+  it("never goes below zero and ignores negative discounts", () => {
+    expect(computeLineTotal({ quantity: 1, unitPrice: 100, discount: 500 })).toBe(0);
+    expect(computeLineTotal({ quantity: 1, unitPrice: 100, discount: -20 })).toBe(100);
+  });
+});
+
+describe("getLineDiscount", () => {
+  it("uses an explicit discount when present", () => {
+    expect(getLineDiscount({ quantity: 1, unitPrice: 100, lineTotal: 100, discount: "10" })).toBe(10);
+  });
+
+  it("recovers the discount from a saved line total", () => {
+    expect(getLineDiscount({ quantity: 2, unitPrice: 100, lineTotal: 170 })).toBe(30);
+    expect(getLineDiscount({ quantity: 2, unitPrice: 100, lineTotal: 200 })).toBe(0);
   });
 });
