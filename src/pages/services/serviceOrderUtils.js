@@ -77,6 +77,33 @@ export function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+export function makeLineKey() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+// Line total before VAT: quantity × price minus the line's own discount.
+export function computeLineTotal(item) {
+  const gross =
+    toFiniteNumber(item?.quantity, 0) * toFiniteNumber(item?.unitPrice, 0);
+  const discount = Math.min(
+    Math.max(toFiniteNumber(item?.discount, 0), 0),
+    Math.max(gross, 0),
+  );
+  return Math.max(gross - discount, 0);
+}
+
+// Saved orders may not carry a `discount` field; recover it from the gap
+// between quantity × price and the stored line total.
+export function getLineDiscount(item) {
+  const explicit = toFiniteNumber(item?.discount, NaN);
+  if (Number.isFinite(explicit)) return Math.max(explicit, 0);
+  const gross =
+    toFiniteNumber(item?.quantity, 0) * toFiniteNumber(item?.unitPrice, 0);
+  const lineTotal = toFiniteNumber(item?.lineTotal, gross);
+  const gap = gross - lineTotal;
+  return gap > 0.005 ? Number(gap.toFixed(2)) : 0;
+}
+
 export function normalizeServiceItem(item) {
   const quantity = toFiniteNumber(item?.quantity, 0);
   const unitPrice = toFiniteNumber(item?.unitPrice, 0);
