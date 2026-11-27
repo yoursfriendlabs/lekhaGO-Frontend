@@ -1,12 +1,10 @@
 import { createPortal } from "react-dom";
-import { Dialog } from "@/components/ui/Dialog.tsx";
 import Notice from "@/components/ui/Notice";
 import PaymentMethodFields from "@/components/form/PaymentMethodFields.jsx";
 import NoteTextarea from "@/components/form/NoteTextarea.jsx";
 import FormSectionCard from "@/components/ui/FormSectionCard.jsx";
 import PaymentTypeSummary from "@/components/form/PaymentTypeSummary.jsx";
 import QuickPaymentButtons from "@/components/form/QuickPaymentButtons.jsx";
-import AsyncSearchableSelect from "@/components/form/AsyncSearchableSelect.jsx";
 import MobileFormStepper from "@/components/form/MobileFormStepper.jsx";
 import FlexibleDateInput from "@/components/form/FlexibleDateInput.jsx";
 import FileUpload from "@/components/form/FileUpload";
@@ -15,7 +13,8 @@ import {
   JEWELLERY_ATTRIBUTE_KEYS,
   METAL_TYPE_OPTIONS,
 } from "@/lib/business/jewellery.js";
-import { toProductLookupOption } from "@/lib/lookups.js";
+import ServiceItemPicker from "@/components/services/ServiceItemPicker.jsx";
+import ServiceBillLines from "@/components/services/ServiceBillLines.jsx";
 import dayjs from "@/lib/dates/datetime";
 import { normalizeAttachmentUrls } from "./serviceOrderUtils.js";
 import {
@@ -23,34 +22,28 @@ import {
   Plus,
   Check,
   Search,
-  Pencil,
   Phone,
   ArrowRight,
-  Package,
-  Wrench,
   MessageCircle,
 } from "lucide-react";
 
 export default function ServiceOrderFormDialog({
+  addProductLine,
+  addServiceLine,
   amountReceived,
   applyQuickReceivedAmount,
   businessProfile,
   canGoBackStep,
   canGoForwardStep,
-  canSaveDraftItem,
-  cancelItemForm,
   clearParty,
   closeDialog,
-  confirmItem,
   createAndSelectParty,
   creatingParty,
-  descriptionInputRef,
   dialogOpen,
   dialogTitle,
   discount,
   editLoading,
   editingId,
-  editingItemIdx,
   filteredParties,
   formNotice,
   formScrollRef,
@@ -59,22 +52,17 @@ export default function ServiceOrderFormDialog({
   getUnitLabel,
   goToNextMobileStep,
   goToPreviousMobileStep,
-  handleDraftChange,
-  handleDraftProductSelection,
   handleHeaderChange,
   handlePartySearch,
   handleSubmit,
   hasDeliveryDate,
+  highlightKey,
   header,
   irdModeEnabled,
   isGym,
   isPaid,
-  itemDraft,
-  itemDraftProduct,
-  itemDraftVatAmount,
   jewelleryAttributes,
   jewelleryPurityOptions,
-  loadProductOptions,
   mobilePrimaryActionLabel,
   mobileStep,
   mobileStepIndex,
@@ -85,8 +73,7 @@ export default function ServiceOrderFormDialog({
   partyDropdownStyle,
   partyPickerRef,
   partyQuery,
-  quantityInputRef,
-  removeItem,
+  removeLine,
   renderStoreTypeDropdown,
   selectParty,
   selectedParty,
@@ -106,16 +93,14 @@ export default function ServiceOrderFormDialog({
   showAddNew,
   showDetailsStep,
   showGoldJewelleryDetails,
-  showItemForm,
   showItemsStep,
   showPaymentStep,
-  startAddItem,
-  startEditItem,
   suggestedOrderNo,
   summaryOrderNo,
   t,
   totals,
   updateJewelleryAttribute,
+  updateLine,
   vacantTables,
   visibleItems
 }) {
@@ -728,466 +713,37 @@ export default function ServiceOrderFormDialog({
                     ) : null}
 
                     {showItemsStep ? (
-                      <FormSectionCard
-                        title={t("services.items")}
-                        hint={t("services.itemsSectionHint")}
-                        action={
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <span className="text-sm font-semibold text-secondary-500">
-                              {visibleItems.length} {t("services.items")}
-                            </span>
-                            <button
-                              className="btn-ghost w-full sm:w-auto"
-                              type="button"
-                              onClick={startAddItem}
-                            >
-                              {t("services.addLine")}
-                            </button>
-                          </div>
-                        }
-                        className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
-                      >
-                        {visibleItems.length > 0 ? (
-                          <div className="mb-4 space-y-3">
-                            {visibleItems.map((item, idx) => {
-                              const product = getProductById(item.productId);
-                              const displayName =
-                                item.itemType === "part"
-                                  ? product?.name ||
-                                    item.description ||
-                                    t("services.productLine")
-                                  : item.description ||
-                                    t("services.serviceLine");
-                              const unitLabel =
-                                item.itemType === "part"
-                                  ? getUnitLabel(product, item.unitType)
-                                  : "";
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)] lg:items-start">
+                        <FormSectionCard
+                          title={t("services.pickerTitle")}
+                          hint={t("services.pickerHint")}
+                          className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40"
+                        >
+                          <ServiceItemPicker
+                            t={t}
+                            money={money}
+                            items={visibleItems}
+                            skipStockCheck={Boolean(editingId)}
+                            onAddProduct={addProductLine}
+                            onAddService={addServiceLine}
+                          />
+                        </FormSectionCard>
 
-                              return (
-                                <div
-                                  key={`item-row-${idx}`}
-                                  className="rounded-[24px] border border-secondary-200/70 bg-mist/60 p-3.5 dark:border-slate-800/60 dark:bg-slate-900/40"
-                                >
-                                  <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-start gap-3">
-                                        <div
-                                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${item.itemType === "labor" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"}`}
-                                        >
-                                          {item.itemType === "labor" ? (
-                                            <Wrench size={18} />
-                                          ) : (
-                                            <Package size={18} />
-                                          )}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                          <div className="flex flex-wrap items-center gap-2">
-                                            <span
-                                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.itemType === "labor" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" : "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"}`}
-                                            >
-                                              {item.itemType === "labor"
-                                                ? t("services.serviceLine")
-                                                : t("services.productLine")}
-                                            </span>
-                                            <p className="truncate font-semibold text-ink">
-                                              {displayName}
-                                            </p>
-                                          </div>
-                                          {item.itemType === "part" &&
-                                          item.description &&
-                                          product?.name &&
-                                          item.description !== product.name ? (
-                                            <p className="mt-1 text-sm text-secondary-500">
-                                              {item.description}
-                                            </p>
-                                          ) : null}
-                                          <div className="mt-2 flex flex-wrap gap-2">
-                                            {item.itemType === "part" && (
-                                              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
-                                                {t("services.qty")}:{" "}
-                                                {item.quantity}
-                                                {unitLabel
-                                                  ? ` ${unitLabel}`
-                                                  : ""}
-                                              </span>
-                                            )}
-                                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
-                                              {item.itemType === "labor"
-                                                ? t("common.total")
-                                                : t("services.unitPrice")}
-                                              : {money(item.unitPrice)}
-                                            </span>
-                                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-secondary-700 ring-1 ring-slate-200 dark:bg-slate-950/60 dark:text-secondary-300 dark:ring-slate-700/70">
-                                              {t("services.tax")}:{" "}
-                                              {Number(
-                                                item.taxRate || 0,
-                                              ).toFixed(2)}
-                                              %
-                                            </span>
-                                            <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white dark:bg-primary-900/70">
-                                              {t("common.total")}:{" "}
-                                              {money(item.lineTotal)}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="flex gap-2 xl:pl-4">
-                                      <button
-                                        type="button"
-                                        className="btn-ghost flex-1 text-sm xl:flex-none"
-                                        onClick={() => startEditItem(idx)}
-                                      >
-                                        <Pencil
-                                          size={14}
-                                          className="mr-1.5 inline"
-                                        />
-                                        {t("common.edit")}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="btn-ghost flex-1 border-rose-200 text-rose-600 hover:bg-rose-50 xl:flex-none dark:border-rose-900/40 dark:text-rose-300 dark:hover:bg-rose-900/20"
-                                        onClick={() => removeItem(idx)}
-                                      >
-                                        <X
-                                          size={14}
-                                          className="mr-1.5 inline"
-                                        />
-                                        {t("common.remove")}
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="mb-4 rounded-[24px] border border-dashed border-slate-300 bg-mist/70 px-4 py-8 text-center dark:border-slate-700 dark:bg-slate-900/30">
-                            <p className="text-sm text-secondary-500">
-                              {t("services.addFirstItem")}
-                            </p>
-                            <button
-                              type="button"
-                              className="btn-primary mt-4 w-full sm:w-auto"
-                              onClick={startAddItem}
-                            >
-                              <Plus size={15} className="mr-1.5 inline" />
-                              {t("services.addLine")}
-                            </button>
-                          </div>
-                        )}
-                      </FormSectionCard>
-                    ) : null}
-
-                    <Dialog
-                      isOpen={showItemForm}
-                      onClose={cancelItemForm}
-                      title={
-                        editingItemIdx !== null
-                          ? t("services.editLine")
-                          : t("services.addLine")
-                      }
-                      size="xl"
-                      footer={
-                        <>
-                          <button
-                            type="button"
-                            className="btn-secondary w-full sm:w-auto"
-                            onClick={cancelItemForm}
-                          >
-                            {t("common.cancel")}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-primary w-full sm:w-auto"
-                            onClick={confirmItem}
-                            disabled={!canSaveDraftItem}
-                          >
-                            {editingItemIdx !== null
-                              ? t("common.update")
-                              : t("common.add")}
-                          </button>
-                        </>
-                      }
-                    >
-                      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-                        <div className="space-y-4">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-200">
-                              {t("services.itemComposerTitle")}
-                            </p>
-                            <p className="mt-2 text-sm text-secondary-700">
-                              {t("services.itemComposerHint")}
-                            </p>
-                          </div>
-
-                          <div className="flex flex-col gap-4">
-                            <div>
-                              <label className="label">
-                                {t("services.type")}
-                              </label>
-                              <div className="mt-1 flex gap-2">
-                                <button
-                                  type="button"
-                                  className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
-                                    itemDraft.itemType === "labor"
-                                      ? "bg-primary-600 text-white shadow-md ring-2 ring-primary-600 ring-offset-2 dark:ring-offset-slate-900"
-                                      : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200 dark:bg-slate-800 dark:text-secondary-400 dark:hover:bg-slate-700"
-                                  }`}
-                                  onClick={() =>
-                                    handleDraftChange("itemType", "labor")
-                                  }
-                                >
-                                  {t("services.serviceLine")}
-                                </button>
-                                <button
-                                  type="button"
-                                  className={`flex-1 rounded-xl px-4 py-3 text-sm font-semibold transition-all ${
-                                    itemDraft.itemType === "part"
-                                      ? "bg-primary-600 text-white shadow-md ring-2 ring-primary-600 ring-offset-2 dark:ring-offset-slate-900"
-                                      : "bg-secondary-100 text-secondary-700 hover:bg-secondary-200 dark:bg-slate-800 dark:text-secondary-400 dark:hover:bg-slate-700"
-                                  }`}
-                                  onClick={() =>
-                                    handleDraftChange("itemType", "part")
-                                  }
-                                >
-                                  {t("services.productLine")}
-                                </button>
-                              </div>
-                            </div>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                              <div>
-                                <label className="label">
-                                  {t("services.description")}
-                                </label>
-                                <input
-                                  ref={descriptionInputRef}
-                                  className="input mt-1"
-                                  value={itemDraft.description}
-                                  onChange={(e) =>
-                                    handleDraftChange(
-                                      "description",
-                                      e.target.value,
-                                    )
-                                  }
-                                  placeholder={t("services.placeholderService")}
-                                />
-                              </div>
-
-                              {itemDraft.itemType === "part" ? (
-                                <div className="sm:col-span-2">
-                                  <label className="label">
-                                    {t("services.productParts")}
-                                  </label>
-                                  <AsyncSearchableSelect
-                                    className="mt-1"
-                                    value={itemDraft.productId}
-                                    selectedOption={
-                                      itemDraftProduct
-                                        ? toProductLookupOption(
-                                            itemDraftProduct,
-                                          )
-                                        : null
-                                    }
-                                    onChange={handleDraftProductSelection}
-                                    loadOptions={loadProductOptions}
-                                    placeholder={t("purchases.selectProduct")}
-                                    searchPlaceholder={t(
-                                      "purchases.selectProduct",
-                                    )}
-                                    noResultsLabel={t("common.noData")}
-                                    loadingLabel={t("common.loading")}
-                                    renderOption={(option) => (
-                                      <div className="flex items-center gap-2">
-                                        {option.entity?.imageUrl ? (
-                                          <img src={option.entity.imageUrl} alt={option.label} className="h-6 w-6 rounded object-cover border border-secondary-200 dark:border-slate-800" />
-                                        ) : (
-                                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-secondary-100 text-[10px] font-bold text-secondary-400 dark:bg-slate-800">
-                                            {option.entity?.name?.charAt(0).toUpperCase() || 'P'}
-                                          </div>
-                                        )}
-                                        <span>{option.label}</span>
-                                      </div>
-                                    )}
-                                  />
-                                </div>
-                              ) : null}
-
-                              {itemDraft.itemType === "part" &&
-                              itemDraftProduct?.secondaryUnit ? (
-                                <div className="sm:col-span-2">
-                                  <label className="label">
-                                    {t("products.unitType")}
-                                  </label>
-                                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleDraftChange(
-                                          "unitType",
-                                          "primary",
-                                          itemDraftProduct.primaryUnit,
-                                        )
-                                      }
-                                      className={
-                                        itemDraft.unitType === "primary"
-                                          ? "btn-primary btn-sm w-full"
-                                          : "btn-ghost btn-sm w-full"
-                                      }
-                                    >
-                                      {itemDraftProduct.primaryUnit ||
-                                        t("products.primaryUnit")}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleDraftChange(
-                                          "unitType",
-                                          "secondary",
-                                          itemDraftProduct.secondaryUnit,
-                                        )
-                                      }
-                                      className={
-                                        itemDraft.unitType === "secondary"
-                                          ? "btn-primary btn-sm w-full"
-                                          : "btn-ghost btn-sm w-full"
-                                      }
-                                    >
-                                      {itemDraftProduct.secondaryUnit}
-                                    </button>
-                                  </div>
-                                  {itemDraftProduct.conversionRate > 0 ? (
-                                    <p className="mt-2 text-xs text-secondary-500">
-                                      1 {itemDraftProduct.primaryUnit} ={" "}
-                                      {itemDraftProduct.conversionRate}{" "}
-                                      {itemDraftProduct.secondaryUnit}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              ) : null}
-
-                              {itemDraft.itemType === "part" ? (
-                                <div>
-                                  <label className="label">
-                                    {t("services.qty")}
-                                  </label>
-                                  <input
-                                    ref={quantityInputRef}
-                                    className="input mt-1"
-                                    type="number"
-                                    inputMode="decimal"
-                                    min="0"
-                                    step="0.1"
-                                    value={itemDraft.quantity}
-                                    onChange={(e) =>
-                                      handleDraftChange(
-                                        "quantity",
-                                        e.target.value,
-                                      )
-                                    }
-                                  />
-                                  {itemDraft.itemType === "part" ? (
-                                    <p className="mt-1 text-xs text-secondary-500">
-                                      {getUnitLabel(
-                                        itemDraftProduct,
-                                        itemDraft.unitType,
-                                      )}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              ) : null}
-                              <div>
-                                <label className="label">
-                                  {itemDraft.itemType === "labor"
-                                    ? t("common.total")
-                                    : t("services.unitPrice")}
-                                </label>
-                                <input
-                                  className="input mt-1"
-                                  type="number"
-                                  min="0"
-                                  step="0.1"
-                                  value={itemDraft.unitPrice}
-                                  onChange={(e) =>
-                                    handleDraftChange(
-                                      "unitPrice",
-                                      e.target.value,
-                                    )
-                                  }
-                                />
-                              </div>
-                              <div>
-                                <label className="label">
-                                  {t("services.tax")}
-                                </label>
-                                <input
-                                  className="input mt-1"
-                                  type="number"
-                                  min="0"
-                                  step="1"
-                                  value={itemDraft.taxRate}
-                                  onChange={(e) =>
-                                    handleDraftChange("taxRate", e.target.value)
-                                  }
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="rounded-[28px] border border-primary-200 bg-primary-50/60 p-4 shadow-sm dark:border-primary-900/40 dark:bg-primary-900/15">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-200">
-                            {t("common.total")}
-                          </p>
-                          <p className="mt-2 text-2xl font-semibold text-ink">
-                            {money(itemDraft.lineTotal)}
-                          </p>
-                          <div className="mt-4 space-y-3">
-                            <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
-                                {t("services.taxTotal")}
-                              </p>
-                              <p className="mt-1 text-sm font-semibold text-ink dark:text-slate-200">
-                                {money(itemDraftVatAmount)}
-                              </p>
-                            </div>
-                            <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
-                                {t("services.type")}
-                              </p>
-                              <p className="mt-1 text-sm font-semibold text-ink dark:text-slate-200">
-                                {itemDraft.itemType === "labor"
-                                  ? t("services.serviceLine")
-                                  : t("services.productLine")}
-                              </p>
-                            </div>
-                            <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
-                                {t("services.description")}
-                              </p>
-                              <p className="mt-1 text-sm font-semibold text-ink dark:text-slate-200">
-                                {itemDraft.itemType === "part"
-                                  ? itemDraftProduct?.name ||
-                                    itemDraft.description ||
-                                    "—"
-                                  : itemDraft.description || "—"}
-                              </p>
-                            </div>
-                            <div className="rounded-2xl bg-white/80 px-4 py-3 dark:bg-slate-950/50">
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-secondary-400">
-                                {t("products.unitType")}
-                              </p>
-                              <p className="mt-1 text-sm font-semibold text-ink dark:text-slate-200">
-                                {getUnitLabel(
-                                  itemDraftProduct,
-                                  itemDraft.unitType,
-                                ) || t("products.primaryUnit")}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                        <FormSectionCard className="rounded-[28px] border-secondary-200/80 bg-white/95 shadow-sm shadow-slate-200/20 dark:border-slate-800/70 dark:bg-slate-950/40 lg:sticky lg:top-0">
+                          <ServiceBillLines
+                            t={t}
+                            money={money}
+                            items={visibleItems}
+                            totals={totals}
+                            getProductById={getProductById}
+                            getUnitLabel={getUnitLabel}
+                            highlightKey={highlightKey}
+                            onUpdateLine={updateLine}
+                            onRemoveLine={removeLine}
+                          />
+                        </FormSectionCard>
                       </div>
-                    </Dialog>
+                    ) : null}
 
                     {showPaymentStep ? (
                       <FormSectionCard

@@ -44,7 +44,6 @@ import {
   mergeLookupEntities,
   normalizeLookupParty,
   normalizeLookupProduct,
-  toProductLookupOption,
 } from "../../lib/lookups.js";
 import {
   getStockAvailabilityMessage,
@@ -63,13 +62,15 @@ import ServiceOrderFormDialog from "./ServiceOrderFormDialog.jsx";
 import ServiceInvoiceModal from "./ServiceInvoiceModal.jsx";
 import ServiceOrderList from "./ServiceOrderList.jsx";
 import {
-  emptyItem,
+  computeLineTotal,
+  getLineDiscount,
   getServiceAttachmentUrls,
   getServiceItems,
   getServiceOrderTotals,
   getVatAmount,
   isPlaceholderItem,
   makeEmptyHeader,
+  makeLineKey,
   normalizeAttachmentUrls,
   normalizeServiceOrder,
 } from "./serviceOrderUtils.js";
@@ -307,16 +308,13 @@ export default function Services() {
   const [tableNames, setTableNames] = useState({});
   const tableLookupTried = useRef(new Set());
   const [items, setItems] = useState([]);
-  const quantityInputRef = useRef(null);
-  const descriptionInputRef = useRef(null);
   const [discount, setDiscount] = useState("0");
   const [amountReceived, setAmountReceived] = useState("0");
   const [isPaid, setIsPaid] = useState(false);
 
-  // ── Items inline form ──
-  const [showItemForm, setShowItemForm] = useState(false);
-  const [itemDraft, setItemDraft] = useState({ ...emptyItem });
-  const [editingItemIdx, setEditingItemIdx] = useState(null);
+  // ── Items: last added/updated line gets a short highlight ──
+  const [highlightKey, setHighlightKey] = useState(null);
+  const highlightTimerRef = useRef(null);
   const [mobileStep, setMobileStep] = useState("details");
   const jewelleryAttributes = useMemo(
     () => normalizeJewelleryAttributes(header.attributes),
@@ -596,13 +594,6 @@ export default function Services() {
     setProductDirectory((previous) => mergeLookupEntities(previous, entries));
   };
 
-  const loadProductOptions = async (search) => {
-    const data = await api.lookupProducts({ search, limit: 10 });
-    const normalized = (data?.items || []).map(normalizeLookupProduct);
-    cacheProducts(normalized);
-    return normalized.map(toProductLookupOption);
-  };
-
   const getUnitLabel = (product, unitType) => {
     if (!product) return "";
     return unitType === "secondary"
@@ -610,63 +601,17 @@ export default function Services() {
       : product.primaryUnit || product.secondaryUnit || "";
   };
 
-  const syncItemDefaults = (index, product, draft = false) => {
-    if (!product) return;
-    if (draft) {
-      setItemDraft((prev) => {
-        const next = { ...prev };
-        if (!next.unitType) next.unitType = "primary";
-        if (next.unitType === "secondary") {
-          const explicit = Number(product.secondarySalePrice || 0);
-          if (explicit > 0) {
-            next.unitPrice = String(explicit);
-          } else {
-            const rate = Number(product.conversionRate || 0);
-            const primary = Number(product.salePrice || 0);
-            if (rate > 0 && primary > 0)
-              next.unitPrice = String((primary / rate).toFixed(4));
-          }
-        } else if (
-          next.unitType === "primary" &&
-          Number(product.salePrice || 0) > 0
-        ) {
-          next.unitPrice = String(product.salePrice);
-        }
-        next.lineTotal = (
-          Number(next.quantity || 0) * Number(next.unitPrice || 0)
-        ).toFixed(2);
-        return next;
-      });
-      return;
+  // Sale price for the chosen unit; secondary falls back to primary ÷ rate.
+  const getProductUnitPrice = (product, unitType = "primary") => {
+    if (!product) return 0;
+    if (unitType === "secondary") {
+      const explicit = Number(product.secondarySalePrice || 0);
+      if (explicit > 0) return explicit;
+      const rate = Number(product.conversionRate || 0);
+      const primary = Number(product.salePrice || 0);
+      return rate > 0 && primary > 0 ? Number((primary / rate).toFixed(4)) : 0;
     }
-    setItems((prev) =>
-      prev.map((item, idx) => {
-        if (idx !== index) return item;
-        const next = { ...item };
-
-        if (!next.unitType) next.unitType = "primary";
-        if (next.unitType === "secondary") {
-          const explicit = Number(product.secondarySalePrice || 0);
-          if (explicit > 0) {
-            next.unitPrice = String(explicit);
-          } else {
-            const rate = Number(product.conversionRate || 0);
-            const primary = Number(product.salePrice || 0);
-            if (rate > 0 && primary > 0)
-              next.unitPrice = String((primary / rate).toFixed(4));
-          }
-        } else if (
-          next.unitType === "primary" &&
-          Number(product.salePrice || 0) > 0
-        ) {
-          next.unitPrice = String(product.salePrice);
-        }
-        next.lineTotal = (
-          Number(next.quantity || 0) * Number(next.unitPrice || 0)
-        ).toFixed(2);
-        return next;
-      }),
-    );
+    return Number(product.salePrice || 0);
   };
 
   const handleHeaderChange = (e) => {
@@ -698,183 +643,129 @@ export default function Services() {
     });
   };
 
-  const handleItemChange = (index, field, value) => {
-    setItems((prev) =>
-      prev.map((item, idx) => {
-        if (idx !== index) return item;
-        const next = { ...item, [field]: value };
-        if (field === "itemType" && value === "labor") {
-          next.productId = "";
-          next.unitType = "primary";
-        }
-        next.lineTotal = (
-          Number(next.quantity || 0) * Number(next.unitPrice || 0)
-        ).toFixed(2);
-        return next;
-      }),
+  // ── Bill line helpers ──
+  const withLineTotal = (line) => ({
+    ...line,
+    lineTotal: computeLineTotal(line).toFixed(2),
+  });
+
+  const flashLine = (key) => {
+    if (!key) return;
+    setHighlightKey(key);
+    clearTimeout(highlightTimerRef.current);
+    highlightTimerRef.current = setTimeout(() => setHighlightKey(null), 900);
+  };
+
+  useEffect(() => () => clearTimeout(highlightTimerRef.current), []);
+
+  // New orders only: stock already taken by a saved order is not re-checked.
+  const hasStockFor = (product, unitType, quantity) => {
+    if (editingId || !product) return true;
+    const available = toAvailableUnitQuantity(
+      product,
+      unitType || "primary",
+      product,
     );
-    if (field === "productId" || field === "unitType") {
-      const productId = field === "productId" ? value : items[index]?.productId;
-      const product = getProductById(productId);
-      if (product) syncItemDefaults(index, product);
-    }
-  };
-
-  const removeItem = (index) =>
-    setItems((prev) => prev.filter((_, i) => i !== index));
-
-  const handleDraftProductSelection = (option) => {
-    const product = option?.entity
-      ? normalizeLookupProduct(option.entity)
-      : null;
-
-    if (product?.id) {
-      cacheProducts([product]);
-    }
-
-    setItemDraft((previous) => ({
-      ...previous,
-      productId: option?.value || "",
-      taxRate: String(product?.taxRate || 0),
-      actualUnit: "",
-    }));
-
-    if (product) {
-      syncItemDefaults(null, product, true);
-      // Auto-focus quantity input after product selection
-      setTimeout(() => {
-        quantityInputRef.current?.focus();
-        quantityInputRef.current?.select();
-      }, 100);
-    }
-  };
-
-  // ── Item draft helpers ──
-  const handleDraftChange = (field, value, actualUnit) => {
-    // unitType change needs to re-price from product immediately
-    if (field === "unitType") {
-      const product = getProductById(itemDraft.productId);
-      setItemDraft((prev) => {
-        const next = { ...prev, unitType: value };
-        if (product) {
-          if (value === "secondary") {
-            const explicit = Number(product.secondarySalePrice || 0);
-            if (explicit > 0) {
-              next.unitPrice = String(explicit);
-            } else {
-              const rate = Number(product.conversionRate || 0);
-              const primary = Number(product.salePrice || 0);
-              if (rate > 0 && primary > 0)
-                next.unitPrice = String((primary / rate).toFixed(4));
-            }
-          } else if (
-            value === "primary" &&
-            Number(product.salePrice || 0) > 0
-          ) {
-            next.unitPrice = String(product.salePrice);
-          }
-        }
-        next.actualUnit = actualUnit;
-        next.lineTotal = (
-          Number(next.quantity || 0) * Number(next.unitPrice || 0)
-        ).toFixed(2);
-        return next;
-      });
-      return;
-    }
-
-    setItemDraft((prev) => {
-      const next = { ...prev, [field]: value };
-      if (field === "itemType" && value === "labor") {
-        next.productId = "";
-        next.unitType = "primary";
-        next.quantity = "1";
-      }
-      next.lineTotal = (
-        Number(next.quantity || 0) * Number(next.unitPrice || 0)
-      ).toFixed(2);
-      return next;
+    if (quantity <= available) return true;
+    setFormNotice({
+      type: "error",
+      message: isAllStockExpired(product)
+        ? t("sales.allStockExpiredNamed", { name: product?.name })
+        : t("sales.insufficientStock"),
     });
-    if (field === "productId") {
-      const product = getProductById(value);
-      if (product) setTimeout(() => syncItemDefaults(null, product, true), 0);
-    }
+    return false;
   };
 
-  const startAddItem = () => {
-    setFormNotice({ type: "", message: "" });
-    setItemDraft({ ...emptyItem });
-    setEditingItemIdx(null);
-    setShowItemForm(true);
-    setMobileStep("items");
-  };
+  const addProductLine = (product) => {
+    if (!product?.id) return;
+    cacheProducts([product]);
+    const existing = items.find(
+      (item) =>
+        item.itemType === "part" &&
+        String(item.productId) === String(product.id) &&
+        (item.unitType || "primary") === "primary",
+    );
 
-  const startEditItem = (idx) => {
-    setFormNotice({ type: "", message: "" });
-    setItemDraft({ ...items[idx] });
-    setEditingItemIdx(idx);
-    setShowItemForm(true);
-    setMobileStep("items");
-  };
-
-  const cancelItemForm = () => {
-    setShowItemForm(false);
-    setEditingItemIdx(null);
-    setItemDraft({ ...emptyItem });
-  };
-
-  const confirmItem = () => {
-    if (itemDraft.itemType === "part" && !itemDraft.productId) {
-      setFormNotice({ type: "error", message: t("errors.selectProductPart") });
-      return;
-    }
-
-    if (
-      itemDraft.itemType === "part" &&
-      itemDraft.unitType === "secondary" &&
-      Number(getProductById(itemDraft.productId)?.conversionRate || 0) <= 0
-    ) {
-      setFormNotice({ type: "error", message: t("errors.conversionRequired") });
-      return;
-    }
-
-    if (itemDraft.itemType === "part") {
-      const product = getProductById(itemDraft.productId);
-      const requestedQty = Number(itemDraft.quantity || 0);
-      const available = toAvailableUnitQuantity(
-        product,
-        itemDraft.unitType || "primary",
-        product,
-      );
-      if (requestedQty > available) {
-        setFormNotice({
-          type: "error",
-          message: isAllStockExpired(product)
-            ? t("sales.allStockExpiredNamed", { name: product?.name })
-            : t("sales.insufficientStock"),
-        });
-        return;
-      }
-    }
-
-    const draft = {
-      ...itemDraft,
-      lineTotal: (
-        Number(itemDraft.quantity || 0) * Number(itemDraft.unitPrice || 0)
-      ).toFixed(2),
-    };
-    if (editingItemIdx !== null) {
+    if (existing) {
+      const nextQty = Number(existing.quantity || 0) + 1;
+      if (!hasStockFor(product, "primary", nextQty)) return;
       setItems((prev) =>
-        prev.map((item, idx) => (idx === editingItemIdx ? draft : item)),
+        prev.map((item) =>
+          item._key === existing._key
+            ? withLineTotal({ ...item, quantity: String(nextQty) })
+            : item,
+        ),
       );
-    } else {
-      setItems((prev) => [...prev, draft]);
+      setFormNotice({ type: "", message: "" });
+      flashLine(existing._key);
+      return;
     }
+
+    if (!hasStockFor(product, "primary", 1)) return;
+    const line = withLineTotal({
+      _key: makeLineKey(),
+      itemType: "part",
+      description: product.name || "",
+      productId: String(product.id),
+      quantity: "1",
+      unitType: "primary",
+      actualUnit: product.primaryUnit || "",
+      unitPrice: String(getProductUnitPrice(product, "primary")),
+      taxRate: String(product.taxRate || 0),
+      discount: "0",
+    });
+    setItems((prev) => [...prev, line]);
     setFormNotice({ type: "", message: "" });
-    setShowItemForm(false);
-    setEditingItemIdx(null);
-    setItemDraft({ ...emptyItem });
+    flashLine(line._key);
   };
+
+  const addServiceLine = ({ description, unitPrice }) => {
+    const line = withLineTotal({
+      _key: makeLineKey(),
+      itemType: "labor",
+      description: String(description || "").trim(),
+      productId: "",
+      quantity: "1",
+      unitType: "primary",
+      unitPrice: String(unitPrice || "0"),
+      taxRate: "0",
+      discount: "0",
+    });
+    setItems((prev) => [...prev, line]);
+    setFormNotice({ type: "", message: "" });
+    flashLine(line._key);
+  };
+
+  const updateLine = (key, patch) => {
+    const current = items.find((item) => item._key === key);
+    if (!current) return;
+    const product =
+      current.itemType === "part" ? getProductById(current.productId) : null;
+    const next = { ...current, ...patch };
+
+    if ("unitType" in patch && product) {
+      const price = getProductUnitPrice(product, patch.unitType);
+      if (price > 0) next.unitPrice = String(price);
+    }
+
+    const growing =
+      Number(next.quantity || 0) > Number(current.quantity || 0) ||
+      "unitType" in patch;
+    if (
+      product &&
+      growing &&
+      !hasStockFor(product, next.unitType, Number(next.quantity || 0))
+    ) {
+      return;
+    }
+
+    setItems((prev) =>
+      prev.map((item) => (item._key === key ? withLineTotal(next) : item)),
+    );
+  };
+
+  const removeLine = (key) =>
+    setItems((prev) => prev.filter((item) => item._key !== key));
 
   // ── Party helpers ──
   const filteredParties = useMemo(() => {
@@ -993,9 +884,7 @@ export default function Services() {
     setStoreDropdownOpen(false);
     setFormNotice({ type: "", message: "" });
     setEditingId(null);
-    setShowItemForm(false);
-    setItemDraft({ ...emptyItem });
-    setEditingItemIdx(null);
+    setHighlightKey(null);
     setSuggestedOrderNo("");
     setProductDirectory({});
     setMobileStep("details");
@@ -1146,6 +1035,7 @@ export default function Services() {
       setItems(
         rawItems.length > 0
           ? rawItems.map((i) => ({
+              _key: makeLineKey(),
               itemType: i.itemType || "labor",
               description: i.description || "",
               productId: i.productId || "",
@@ -1153,6 +1043,7 @@ export default function Services() {
               unitType: i.unitType || "primary",
               unitPrice: String(i.unitPrice ?? "0"),
               taxRate: String(i.taxRate ?? "0"),
+              discount: String(getLineDiscount(i)),
               lineTotal: String(i.lineTotal ?? "0"),
             }))
           : [],
@@ -1331,8 +1222,9 @@ export default function Services() {
           { paymentMethod, bankId, paymentNote },
           { includeEmptyBankId: true },
         ),
-        items: chargeableItems.map((item) => ({
+        items: chargeableItems.map(({ _key, ...item }) => ({
           ...item,
+          discount: Number(item.discount || 0),
           quantity: Number(item.quantity),
           unitType: item.unitType || "primary",
           conversionRate: Number(
@@ -1684,16 +1576,6 @@ export default function Services() {
   const showDetailsStep = mobileStep === "details";
   const showItemsStep = mobileStep === "items";
   const showPaymentStep = mobileStep === "payment";
-  const itemDraftProduct = getProductById(itemDraft.productId);
-  const itemDraftVatAmount = getVatAmount(
-    itemDraft.lineTotal,
-    itemDraft.taxRate,
-  );
-  const canSaveDraftItem =
-    itemDraft.itemType === "part"
-      ? Boolean(itemDraft.productId) && Number(itemDraft.lineTotal || 0) > 0
-      : Number(itemDraft.lineTotal || 0) > 0 ||
-        Boolean(String(itemDraft.description || "").trim());
   const dialogTitle = editingId ? t("services.editOrder") : newOrderLabel;
   const summaryOrderNo = header.orderNo || suggestedOrderNo || "—";
   const invoiceAttachmentUrls = invoiceOrder
@@ -1877,24 +1759,13 @@ export default function Services() {
         irdModeEnabled={irdModeEnabled}
         businessProfile={businessProfile}
         visibleItems={visibleItems}
-        startAddItem={startAddItem}
-        startEditItem={startEditItem}
-        removeItem={removeItem}
-        showItemForm={showItemForm}
-        itemDraft={itemDraft}
-        handleDraftChange={handleDraftChange}
-        handleDraftProductSelection={handleDraftProductSelection}
-        loadProductOptions={loadProductOptions}
         getProductById={getProductById}
         getUnitLabel={getUnitLabel}
-        itemDraftProduct={itemDraftProduct}
-        itemDraftVatAmount={itemDraftVatAmount}
-        canSaveDraftItem={canSaveDraftItem}
-        confirmItem={confirmItem}
-        cancelItemForm={cancelItemForm}
-        quantityInputRef={quantityInputRef}
-        descriptionInputRef={descriptionInputRef}
-        editingItemIdx={editingItemIdx}
+        highlightKey={highlightKey}
+        addProductLine={addProductLine}
+        addServiceLine={addServiceLine}
+        updateLine={updateLine}
+        removeLine={removeLine}
         editingId={editingId}
         totals={totals}
         discount={discount}
