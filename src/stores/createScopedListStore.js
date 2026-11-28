@@ -31,7 +31,27 @@ function normalizeFetchArgs(paramsOrForce, maybeForce, allowParams) {
   };
 }
 
+const scopedStoreRefreshers = new Set();
+
+/**
+ * Data may be stale (the app was in the background, or the user pulled to
+ * refresh). Every store drops its other cached lists and reloads the list on
+ * screen in place, so it updates without the page losing what is open.
+ */
+export function refreshScopedListStores() {
+  scopedStoreRefreshers.forEach((refresh) => refresh());
+}
+
 export function createScopedListStoreSlice(set, get, { resourceKey, fetcher, allowParams = true }) {
+  scopedStoreRefreshers.add(() => {
+    const state = get();
+    const current = state.lists[state.currentKey];
+    set({ lists: current ? { [state.currentKey]: current } : {} });
+    if (!current?.loaded || current.loading) return;
+    const reload = allowParams ? state.fetch(current.params || {}, true) : state.fetch(true);
+    Promise.resolve(reload).catch(() => {});
+  });
+
   return {
     [resourceKey]: [],
     loading: false,

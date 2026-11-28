@@ -87,6 +87,9 @@ export const Dialog = ({
         >
             <div
                 ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={typeof title === 'string' ? title : undefined}
                 onClick={(e) => e.stopPropagation()}
                 className={`relative flex max-h-[100dvh] w-full flex-col bg-white shadow-2xl md:max-h-[90vh] ${sizeClasses[size]} rounded-t-3xl md:rounded-3xl`}
             >

@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useI18n } from '../lib/i18n.jsx';
@@ -6,6 +6,7 @@ import { useBusinessSettings } from '../lib/business/businessSettings';
 import Sidebar from '../components/layout/Sidebar';
 import Topbar from '../components/layout/Topbar';
 import MobileNav from '../components/layout/MobileNav';
+import PullToRefresh from '../components/layout/PullToRefresh';
 import Notice from '../components/ui/Notice';
 import RouteFallback from '../components/layout/RouteFallback';
 import SubscriptionStatusBanner, { formatSubscriptionStatusDate } from '../components/subscription/SubscriptionStatusBanner.jsx';
@@ -13,7 +14,8 @@ import { isOwnStaffMembership } from '../lib/accessControl';
 import { hasUnverifiedEmail, isStaffActivationRequired } from '../lib/authFlow';
 import { getSubscriptionGuard, getSubscriptionStatusState } from '../lib/subscription';
 import { buildSettingsTabPath, ORDER_ATTRIBUTES_SETTINGS_TAB, SUBSCRIPTION_SETTINGS_TAB } from '../lib/business/settingsTabs';
-import { useSSE } from '../hooks/useSSE';
+import { broadcastStaleData, useSSE } from '../hooks/useSSE';
+import { APP_REFRESH_EVENT } from '../lib/pwa';
 import StudentsRoute from '../components/students/StudentsRoute.jsx';
 import {
   canUseHotelApis,
@@ -101,6 +103,21 @@ function OwnOrManagedStaffSalaryRoute() {
   );
 }
 
+// Live screens refresh themselves from server events and often hold an order
+// or cart in progress, so they are never reloaded from under the user.
+const LIVE_SCREEN_PREFIXES = ['/app/pos', '/app/billing', '/app/orders', '/app/kitchen', '/app/hotel', '/app/tables'];
+
+function canReloadScreenSafely(pathname = '') {
+  if (LIVE_SCREEN_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) return false;
+  // Any open dialog or full-screen overlay may hold a form being filled in.
+  if (document.querySelector('[role="dialog"], [aria-modal="true"], .fixed.inset-0')) return false;
+  const active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT' || active.isContentEditable)) {
+    return false;
+  }
+  return true;
+}
+
 function LedgerRedirect() {
   const [searchParams] = useSearchParams();
   const partyId = searchParams.get('partyId');
@@ -180,6 +197,27 @@ export default function AppShell() {
           }
           : null;
   const routeNotice = location.state?.notice || null;
+  const [refreshKey, setRefreshKey] = useState(0);
+  // Pull-to-refresh: drop cached data and remount the open screen so it loads
+  // everything fresh from the server.
+  const handlePullRefresh = useCallback(() => {
+    broadcastStaleData('pull');
+    setRefreshKey((value) => value + 1);
+  }, []);
+
+  // Back from the background (or back online): reload the open screen too,
+  // unless that would throw away work in progress.
+  useEffect(() => {
+    const handleRefresh = (event) => {
+      if (event.detail?.reason === 'pull') return;
+      if (!canReloadScreenSafely(window.location.pathname)) return;
+      const scrollY = window.scrollY;
+      setRefreshKey((value) => value + 1);
+      window.setTimeout(() => window.scrollTo({ top: scrollY }), 700);
+    };
+    window.addEventListener(APP_REFRESH_EVENT, handleRefresh);
+    return () => window.removeEventListener(APP_REFRESH_EVENT, handleRefresh);
+  }, []);
 
   return (
     <div className="gradient-bg min-h-[100dvh] overflow-x-hidden bg-mist text-ink md:h-screen md:overflow-hidden">
@@ -187,7 +225,7 @@ export default function AppShell() {
         <Sidebar />
         <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col overflow-x-hidden md:ml-16 md:min-h-0 md:h-screen md:overflow-hidden">
           <Topbar />
-          <main className="min-w-0 flex-1 overflow-x-hidden px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+88px)] md:min-h-0 md:overflow-y-auto md:px-6 md:py-8 md:pb-8">
+          <main className="min-w-0 flex-1 overflow-x-hidden px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+92px)] md:min-h-0 md:overflow-y-auto md:px-6 md:py-8 md:pb-8">
             {!businessId ? (
               <div className="mb-6">
                 <Notice
@@ -251,7 +289,7 @@ export default function AppShell() {
                 />
               )}
             >
-              <ScopedRouteBoundary>
+              <ScopedRouteBoundary key={refreshKey}>
                 <Routes>
                   <Route path="/" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="dashboard"><Dashboard /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
                   <Route path="products" element={<EmailActivationRequiredRoute><RoleGuard allowedRoles={OWNER_AND_STAFF_ROLES}><SubscriptionFeatureRoute featureKey="inventory"><Navigate to="/app/inventory" replace /></SubscriptionFeatureRoute></RoleGuard></EmailActivationRequiredRoute>} />
@@ -412,6 +450,7 @@ export default function AppShell() {
         </div>
       </div>
       <MobileNav />
+      <PullToRefresh onRefresh={handlePullRefresh} />
     </div>
   );
 }

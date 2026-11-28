@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { API_BASE, api, invalidateApiCache } from '../lib/api';
+import { API_BASE, api, clearApiCache, invalidateApiCache } from '../lib/api';
+import { refreshScopedListStores } from '../stores/createScopedListStore';
+import { requestAppRefresh } from '../lib/pwa';
 import { getToken, getBusinessId } from '../lib/storage';
 
 /**
@@ -59,6 +61,25 @@ const INITIAL_RECONNECT_DELAY_MS = 1_000;
  * this limit is not degraded behaviour: the app polls for updates anyway.
  */
 const MAX_CONSECUTIVE_FAILURES = 4;
+/**
+ * Phones freeze background apps and drop the stream. When the app has been
+ * away at least this long, treat its data as stale on return.
+ */
+const STALE_AFTER_HIDDEN_MS = 30_000;
+
+/**
+ * Tell every open screen its data may be stale: clear the cached responses and
+ * fire the same window events a live update would, so screens that already
+ * listen for them reload quietly without losing what is on screen.
+ */
+export function broadcastStaleData(reason = 'resume') {
+  clearApiCache();
+  refreshScopedListStores();
+  Object.values(EVENT_MAP).forEach((config) => {
+    window.dispatchEvent(new CustomEvent(config.windowEvent, { detail: { reason: 'resume' } }));
+  });
+  requestAppRefresh({ reason: 'resume' });
+}
 
 /**
  * Hook that establishes a persistent SSE connection to the backend.
@@ -150,20 +171,57 @@ export function useSSE({ enabled = true } = {}) {
       };
     }
 
+    let streamEnabled = true;
+
     // Ask first: opening a stream the server has switched off would burn the
     // retry budget before we learned anything.
     api
       .getEventsStatus()
       .then((status) => {
-        if (!destroyed && status?.enabled) connect();
+        streamEnabled = status?.enabled === true;
+        if (!destroyed && streamEnabled) connect();
       })
       .catch(() => {
         // Status is only an optimisation; fall back to trying the stream.
         if (!destroyed) connect();
       });
 
+    // Coming back to the app (or back online) after the stream died: start a
+    // fresh retry budget, reconnect, and refresh what is on screen.
+    let hiddenAt = document.visibilityState === 'hidden' ? Date.now() : 0;
+    const reviveStream = () => {
+      if (destroyed || !streamEnabled) return;
+      const closed = !esRef.current || esRef.current.readyState === 2;
+      if (!closed) return;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      failureCountRef.current = 0;
+      reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS;
+      connect();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        hiddenAt = Date.now();
+        return;
+      }
+      const wasAwayLong = hiddenAt && Date.now() - hiddenAt >= STALE_AFTER_HIDDEN_MS;
+      hiddenAt = 0;
+      reviveStream();
+      if (wasAwayLong) broadcastStaleData();
+    };
+    const handleOnline = () => {
+      reviveStream();
+      broadcastStaleData('online');
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
+
     return () => {
       destroyed = true;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;

@@ -7,12 +7,20 @@ import { fileURLToPath } from "node:url";
 
 const srcDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "src");
 
+const appVersion = `${process.env.npm_package_version || "1.0.0"}·${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
+
 export default defineConfig(({ mode }) => ({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [
     react(),
     VitePWA({
-      injectRegister: "auto",
-      registerType: "autoUpdate",
+      // The app registers the worker itself (PwaLifecycle) and asks the user
+      // before switching to a new version, so open screens never lose the
+      // files they were loaded with.
+      injectRegister: false,
+      registerType: "prompt",
       includeAssets: ["favicon-32.png", "apple-touch-icon.png", "Logo.png", "icon-192.png", "icon-512.png"],
       manifest: {
         id: "/",
@@ -24,10 +32,17 @@ export default defineConfig(({ mode }) => ({
         start_url: "/app",
         scope: "/",
         display: "standalone",
-        orientation: "portrait",
+        orientation: "any",
+        display_override: ["standalone", "minimal-ui"],
         background_color: "#f8f5f2",
         theme_color: "#9b6835",
         categories: ["business", "productivity"],
+        shortcuts: [
+          { name: "Quick POS", short_name: "POS", url: "/app/pos", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+          { name: "Sales invoices", short_name: "Sales", url: "/app/sales", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+          { name: "Inventory", short_name: "Items", url: "/app/inventory", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+          { name: "Parties", short_name: "Parties", url: "/app/parties", icons: [{ src: "/icon-192.png", sizes: "192x192" }] },
+        ],
         icons: [
           {
             src: "/icon-192.png",
@@ -52,7 +67,6 @@ export default defineConfig(({ mode }) => ({
       workbox: {
         cleanupOutdatedCaches: true,
         clientsClaim: true,
-        skipWaiting: true,
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,webp}"],
