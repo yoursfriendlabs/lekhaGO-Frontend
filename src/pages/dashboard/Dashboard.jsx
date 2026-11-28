@@ -6,6 +6,7 @@ import PageHeader from '../../components/layout/PageHeader';
 import Notice from '../../components/ui/Notice';
 import { useTaskNotifications } from '../../hooks/useTaskNotifications';
 import { api } from '../../lib/api';
+import { APP_REFRESH_EVENT } from '../../lib/pwa';
 import { useAuth } from '../../lib/auth.jsx';
 import { useBusinessSettings } from '../../lib/business/businessSettings.jsx';
 import StatsCard from '../../components/ui/StatsCard.jsx';
@@ -299,6 +300,14 @@ export default function Dashboard() {
   const [trendLoading, setTrendLoading] = useState(false);
   const [trendData, setTrendData] = useState([]);
   const [dateRange, setDateRange] = useState('month');
+  // Bumped when the app comes back from the background, so figures reload.
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  useEffect(() => {
+    const handleRefresh = () => setRefreshTick((value) => value + 1);
+    window.addEventListener(APP_REFRESH_EVENT, handleRefresh);
+    return () => window.removeEventListener(APP_REFRESH_EVENT, handleRefresh);
+  }, []);
 
   const rangeOptions = [
     { key: 'today', label: t('dashboard.filters.today') },
@@ -363,7 +372,7 @@ export default function Dashboard() {
     return () => {
       isActive = false;
     };
-  }, [rangeEnd, rangeStart]);
+  }, [rangeEnd, rangeStart, refreshTick]);
 
   const canViewReports = canViewFeature('reports');
 
@@ -403,7 +412,7 @@ export default function Dashboard() {
     return () => {
       isActive = false;
     };
-  }, [canViewReports, dateRange, rangeEnd, rangeStart]);
+  }, [canViewReports, dateRange, rangeEnd, rangeStart, refreshTick]);
 
   const selectedRangeLabel = rangeOptions.find((option) => option.key === dateRange)?.label ?? '';
   const mixData = useMemo(() => ([
