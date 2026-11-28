@@ -62,11 +62,13 @@ export default function Topbar() {
             <UpgradeSubscriptionCta className="btn-primary min-h-[42px] px-3 py-2 text-xs md:px-4 md:text-sm" />
           ) : null}
 
-          <ThemeSelector variant="compact" />
+          <div className="hidden md:block">
+            <ThemeSelector variant="compact" />
+          </div>
 
           <button
             onClick={() => setLocale(locale === 'en' ? 'ne' : 'en')}
-            className="inline-flex min-h-[42px] min-w-[42px] items-center justify-center rounded-2xl border border-secondary-200 bg-primary-50 px-3 py-2 text-base transition-transform active:scale-95"
+            className="hidden min-h-[42px] min-w-[42px] items-center justify-center rounded-2xl border border-secondary-200 bg-primary-50 px-3 py-2 text-base transition-transform active:scale-95 md:inline-flex"
             aria-label={t('topbar.language')}
             title={t('topbar.language')}
             type="button"
@@ -77,7 +79,7 @@ export default function Topbar() {
           {showProfileLink ? (
             <Link
               to="/app/profile"
-              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-2xl border border-secondary-200 bg-surface px-2 py-1.5 text-sm font-semibold text-ink transition-transform active:scale-95 md:px-3"
+              className="hidden min-h-[42px] items-center justify-center gap-2 rounded-2xl border border-secondary-200 bg-surface px-2 py-1.5 text-sm font-semibold text-ink transition-transform active:scale-95 md:inline-flex md:px-3"
               aria-label={t('nav.profile')}
               title={t('nav.profile')}
             >
@@ -93,7 +95,7 @@ export default function Topbar() {
           ) : null}
 
           <button
-            className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-2xl border border-secondary-200 bg-surface px-3 py-2 text-sm font-semibold text-rose-600 transition-transform active:scale-95"
+            className="hidden min-h-[42px] items-center justify-center gap-2 rounded-2xl border border-secondary-200 bg-surface px-3 py-2 text-sm font-semibold text-rose-600 transition-transform active:scale-95 md:inline-flex"
             onClick={logout}
             type="button"
             aria-label={t('topbar.logout')}

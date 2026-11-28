@@ -42,7 +42,7 @@ export default function Sidebar() {
               {t(group.labelKey)}
             </p>
             {group.items.map((item) => {
-              const Icon = getNavIcon(item.key);
+              const Icon = getNavIcon(item.key, item.route);
               return (
                 <NavLink
                   key={item.route}

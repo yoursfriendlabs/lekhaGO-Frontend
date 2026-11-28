@@ -114,7 +114,10 @@ export const NAV_GROUPS = [
   },
 ];
 
-export function getNavIcon(key) {
+export function getNavIcon(key, route = "") {
+  // Some business types file Quick POS under the "sales" key; give it the
+  // POS icon so it does not look the same as Sales invoices.
+  if (String(route).includes("/pos")) return NAV_ICON_MAP.quickPos;
   return NAV_ICON_MAP[key] || LayoutDashboard;
 }
 
@@ -122,15 +125,17 @@ export function groupNavItems(items = []) {
   const list = Array.isArray(items) ? items : [];
   const used = new Set();
 
+  // Several items can share a key (Quick POS and Sales invoices are both
+  // "sales" for some business types), so keep every match, not just the first.
   const groups = NAV_GROUPS.map((group) => {
-    const groupedItems = group.keys
-      .map((key) => list.find((item) => item?.key === key))
-      .filter(Boolean);
-    groupedItems.forEach((item) => used.add(item.key));
+    const groupedItems = group.keys.flatMap((key) =>
+      list.filter((item) => item?.key === key && !used.has(item)),
+    );
+    groupedItems.forEach((item) => used.add(item));
     return { id: group.id, labelKey: group.labelKey, items: groupedItems };
   }).filter((group) => group.items.length > 0);
 
-  const leftover = list.filter((item) => item?.key && !used.has(item.key));
+  const leftover = list.filter((item) => item?.key && !used.has(item));
   if (leftover.length) {
     groups.push({
       id: "more",
